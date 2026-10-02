@@ -1,0 +1,66 @@
+name: Build & Deploy Flutter Web
+
+# Every push to main rebuilds the Flutter web app and publishes it.
+# The live URL updates automatically — no manual uploads.
+#
+# ONE-TIME SETUP (by the repo owner):
+# 1. Push this Flutter project to a GitHub repo.
+# 2. In Cloudflare dashboard, create an API token (Workers/Pages: Edit).
+# 3. In GitHub repo: Settings → Secrets and variables → Actions → add:
+#      CLOUDFLARE_API_TOKEN  = your token
+#      CLOUDFLARE_ACCOUNT_ID = your account id (Cloudflare dashboard URL)
+# 4. In Cloudflare dashboard → Pages → create project "remedoo-app"
+#    (first deploy via this Action creates it automatically).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Build web release
+        run: flutter build web --release --no-web-resources-cdn
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy build/web --project-name=remedoo-app
+
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Set up Java (for Android build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: remedoo-app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
