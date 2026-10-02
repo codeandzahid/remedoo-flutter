@@ -228,6 +228,7 @@ class _AdminShellState extends State<AdminShell> {
     return Scaffold(
       appBar: _topBar(current.label, state),
       drawer: Drawer(
+        backgroundColor: _sidebarBg(),
         child: SafeArea(
           child: _navColumn(state, items, inDrawer: true),
         ),
@@ -249,13 +250,12 @@ class _AdminShellState extends State<AdminShell> {
     );
   }
 
-  /// Permanent light sidebar for desktop: logo header, sectioned nav,
-  /// sign-out footer. The active item gets an orange-tinted pill.
+  /// Permanent light sidebar for desktop: gradient brand header, sectioned
+  /// nav in the React sidebar's visual language, sign-out footer.
   Widget _sideNav(AppState state, List<_NavItem> items) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: 288,
-      color: scheme.surface,
+      color: _sidebarBg(),
       child: Column(
         children: [
           _brandHeader(),
@@ -268,71 +268,92 @@ class _AdminShellState extends State<AdminShell> {
     );
   }
 
+  Color _sidebarBg() {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return dark ? RemedooTheme.darkCard : RemedooTheme.sidebarLight;
+  }
+
+  /// Gradient brand banner (rounded-2xl orange gradient, white text) —
+  /// the admin counterpart of the React sidebar's gradient Close button.
   Widget _brandHeader() {
-    final scheme = Theme.of(context).colorScheme;
+    final p = Theme.of(context).colorScheme.primary;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: scheme.primary,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: RemedooTheme.softShadow,
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [p, p.withValues(alpha: 0.7)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
-            child: const Icon(Icons.shield_outlined,
-                color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Remedoo',
-                  style: TextStyle(
-                      color: scheme.onSurface,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 17)),
-              Text('Admin Console',
-                  style: TextStyle(
-                      color: scheme.onSurfaceVariant, fontSize: 12)),
-            ],
-          ),
-        ],
+          ],
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: Colors.white, size: 24),
+            SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Remedoo',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17)),
+                Text('Admin Console',
+                    style:
+                        TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _navList(AppState state, List<_NavItem> items) {
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
       children: _sectionedNav(items),
     );
   }
 
   Widget _navColumn(AppState state, List<_NavItem> items,
       {bool inDrawer = false}) {
-    return Column(
-      children: [
-        _brandHeader(),
-        Expanded(
-          child: ListView(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            children: _sectionedNav(items, onTap: () {
-              if (inDrawer) Navigator.of(context).pop();
-            }),
+    return Container(
+      color: _sidebarBg(),
+      child: Column(
+        children: [
+          if (inDrawer) ...[
+            const SizedBox(height: 20),
+            RSidebarCloseButton(
+                onPressed: () => Navigator.of(context).pop()),
+            const SizedBox(height: 16),
+          ],
+          _brandHeader(),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+              children: _sectionedNav(items, onTap: () {
+                if (inDrawer) Navigator.of(context).pop();
+              }),
+            ),
           ),
-        ),
-        _sideFooter(state),
-      ],
+          _sideFooter(state),
+        ],
+      ),
     );
   }
 
   List<Widget> _sectionedNav(List<_NavItem> items,
       {VoidCallback? onTap}) {
-    final scheme = Theme.of(context).colorScheme;
     final out = <Widget>[];
     String? lastSection;
     for (var i = 0; i < items.length; i++) {
@@ -340,75 +361,18 @@ class _AdminShellState extends State<AdminShell> {
       if (it.section != lastSection) {
         lastSection = it.section;
         out.add(Padding(
-          padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
-          child: Text(
-            it.section.toUpperCase(),
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
+          padding: EdgeInsets.only(top: i == 0 ? 0 : 16),
+          child: RSidebarGroupLabel(it.section.toUpperCase()),
         ));
       }
-      final active = i == _index;
-      out.add(Padding(
-        padding: const EdgeInsets.only(bottom: 2),
-        child: Material(
-          color: active
-              ? scheme.primary.withValues(alpha: 0.12)
-              : Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              _go(i);
-              onTap?.call();
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  Icon(it.icon,
-                      size: 20,
-                      color: active
-                          ? scheme.primary
-                          : scheme.onSurfaceVariant),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      it.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: active
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: active
-                            ? scheme.primary
-                            : scheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  if (active)
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: scheme.primary,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
+      out.add(RSidebarNavTile(
+        icon: it.icon,
+        label: it.label,
+        active: i == _index,
+        onTap: () {
+          _go(i);
+          onTap?.call();
+        },
       ));
     }
     return out;

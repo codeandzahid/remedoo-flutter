@@ -9,6 +9,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/patient_sidebar.dart';
 import 'doctors_screen.dart';
 import 'doctor_detail_screen.dart';
 import 'hospital_detail_screen.dart';
@@ -23,8 +24,6 @@ import 'lab_reports_screen.dart';
 import 'medical_history_screen.dart';
 import 'notifications_screen.dart';
 import 'care_match_screen.dart';
-import 'profile_screen.dart';
-import 'settings_screen.dart';
 
 /// Home tab: orange hero header (menu / Remedoo / bell, greeting, translucent
 /// search, Smart Care Finder), service grid, promo carousel, feature trio,
@@ -87,7 +86,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final popularMeds = state.activeMedicines.take(8).toList();
 
     return Scaffold(
-      drawer: _drawer(state),
+      drawer: _drawer(),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FocusTraversalGroup(
@@ -361,59 +360,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _drawer(AppState state) {
+  /// Phone drawer: the React AppSidebar — gradient Close button, Quick Actions
+  /// gradient tile grid, and the Navigate section. Tapping any item closes
+  /// the drawer first, then navigates (matching the React behavior).
+  Widget _drawer() {
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
-                gradient: RemedooTheme.headerGradient),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                const RemedooLogo(size: 48),
-                const SizedBox(height: 8),
-                Text(state.displayName,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18)),
-                Text(state.userEmail ?? 'Guest',
-                    style: const TextStyle(color: Colors.white70)),
-              ],
-            ),
-          ),
-          _drawerItem(Icons.person_outline, 'My Profile',
-              () => _go(const ProfileScreen())),
-          _drawerItem(Icons.settings_outlined, 'Settings',
-              () => _go(const SettingsScreen())),
-          _drawerItem(Icons.favorite_outline, 'Favorites',
-              () => _go(const FavoritesScreen())),
-          _drawerItem(Icons.science_outlined, 'Lab Reports',
-              () => _go(const LabReportsScreen())),
-          _drawerItem(Icons.history, 'Medical History',
-              () => _go(const MedicalHistoryScreen())),
-          _drawerItem(Icons.sos, 'Emergency SOS',
-              () => _go(const EmergencyScreen())),
-        ],
+      child: RPatientSidebar(
+        activeRoute: 'home',
+        onClose: () => Navigator.pop(context),
+        onPush: (page) => pushPage(context, page),
       ),
-    );
-  }
-
-  Widget _drawerItem(IconData icon, String label, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon, color: RemedooTheme.primary),
-      title: Text(label,
-          style: const TextStyle(fontWeight: FontWeight.w600)),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      onTap: () {
-        Navigator.pop(context);
-        onTap();
-      },
     );
   }
 

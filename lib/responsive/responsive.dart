@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
+import '../widgets/widgets.dart';
+
 /// Adaptive layout primitives for phones, tablets, laptops, desktops and TVs.
 ///
 /// Breakpoints:
@@ -126,6 +129,10 @@ class ResponsiveScaffold extends StatelessWidget {
   final Widget? drawerHeader;
   final FloatingActionButtonLocation? floatingActionButtonLocation;
 
+  /// Optional widget rendered at the top of the permanent side drawer, below
+  /// the header (e.g. the patient quick-actions grid). Ignored on phones.
+  final Widget? drawerLeading;
+
   const ResponsiveScaffold({
     super.key,
     required this.selectedIndex,
@@ -136,6 +143,7 @@ class ResponsiveScaffold extends StatelessWidget {
     this.appBar,
     this.drawerHeader,
     this.floatingActionButtonLocation,
+    this.drawerLeading,
   });
 
   List<_FlatDest> get _flat => [
@@ -173,6 +181,7 @@ class ResponsiveScaffold extends StatelessWidget {
         bottomNavigationBar: NavigationBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: onDestinationSelected,
+          indicatorColor: scheme.primary.withValues(alpha: 0.14),
           destinations: [
             for (final f in flat)
               NavigationDestination(
@@ -188,6 +197,9 @@ class ResponsiveScaffold extends StatelessWidget {
       );
     }
 
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final sidebarBg = dark ? RemedooTheme.darkCard : RemedooTheme.sidebarLight;
+
     if (context.isMedium) {
       return Scaffold(
         appBar: appBar,
@@ -202,6 +214,25 @@ class ResponsiveScaffold extends StatelessWidget {
                   onDestinationSelected: onDestinationSelected,
                   labelType: NavigationRailLabelType.all,
                   groupAlignment: -1,
+                  backgroundColor: sidebarBg,
+                  selectedIconTheme:
+                      IconThemeData(color: scheme.primary),
+                  unselectedIconTheme: IconThemeData(
+                      color: scheme.onSurfaceVariant
+                          .withValues(alpha: 0.6)),
+                  selectedLabelTextStyle: TextStyle(
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12),
+                  unselectedLabelTextStyle: TextStyle(
+                      color: scheme.onSurfaceVariant
+                          .withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12),
+                  indicatorColor:
+                      scheme.primary.withValues(alpha: 0.12),
+                  indicatorShape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
                   destinations: [
                     for (final f in flat)
                       NavigationRailDestination(
@@ -232,7 +263,10 @@ class ResponsiveScaffold extends StatelessWidget {
       );
     }
 
-    // expanded / wide: permanent drawer.
+    // expanded / wide: permanent drawer, styled like the React sidebar —
+    // optional leading widget (quick actions), tiny uppercase group labels,
+    // and nav rows with the orange-tint active pill + left indicator bar.
+    final leading = drawerLeading;
     return Scaffold(
       appBar: appBar,
       body: Row(
@@ -241,7 +275,7 @@ class ResponsiveScaffold extends StatelessWidget {
             key: const ValueKey('nav-drawer'),
             width: 288,
             decoration: BoxDecoration(
-              color: scheme.surface,
+              color: sidebarBg,
               border: Border(
                 right: BorderSide(color: scheme.outlineVariant),
               ),
@@ -249,29 +283,39 @@ class ResponsiveScaffold extends StatelessWidget {
             child: Column(
               children: [
                 header ?? const SizedBox.shrink(),
+                if (leading != null) ...[
+                  const SizedBox(height: 12),
+                  leading,
+                ],
+                // Scrollable nav: quick actions + long destination lists
+                // must never overflow a short viewport.
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.fromLTRB(8, 16, 8, 20),
                     children: [
-                      for (final s in sections) ...[
-                        if (s.title.isNotEmpty)
-                          Padding(
-                            padding:
-                                const EdgeInsets.fromLTRB(12, 12, 12, 4),
-                            child: Text(
-                              s.title.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.2,
-                                color: scheme.onSurfaceVariant,
-                              ),
+                      for (var i = 0; i < flat.length; i++) ...[
+                        if (i == 0 ||
+                            flat[i].section !=
+                                flat[i - 1].section) ...[
+                          if ((flat[i].section ?? '').isNotEmpty)
+                            Padding(
+                              padding: EdgeInsets.only(
+                                  top: i == 0 ? 0 : 16),
+                              child: RSidebarGroupLabel(
+                                  flat[i].section!.toUpperCase()),
                             ),
-                          ),
-                        for (final d in s.items)
-                          _drawerTile(context, d,
-                              flat.indexWhere((f) => f.dest == d)),
+                        ],
+                        RSidebarNavTile(
+                          icon: i == selectedIndex
+                              ? (flat[i].dest.selectedIcon ??
+                                  flat[i].dest.icon)
+                              : flat[i].dest.icon,
+                          label: flat[i].dest.label,
+                          active: i == selectedIndex,
+                          badgeLabel: flat[i].dest.badgeLabel,
+                          onTap: () => onDestinationSelected(i),
+                        ),
                       ],
                     ],
                   ),
@@ -293,39 +337,6 @@ class ResponsiveScaffold extends StatelessWidget {
       ),
       floatingActionButton: floatingActionButton,
       floatingActionButtonLocation: floatingActionButtonLocation,
-    );
-  }
-
-  Widget _drawerTile(BuildContext context, NavDestinationItem d, int index) {
-    final scheme = Theme.of(context).colorScheme;
-    final selected = index == selectedIndex;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
-      child: Material(
-        color: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: ListTile(
-          dense: true,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          selected: selected,
-          selectedTileColor: scheme.primary.withValues(alpha: 0.12),
-          leading:
-              _badge(d, selected ? (d.selectedIcon ?? d.icon) : d.icon),
-          title: Text(
-            d.label,
-            style: TextStyle(
-              fontWeight:
-                  selected ? FontWeight.w800 : FontWeight.w500,
-              color: selected ? scheme.primary : null,
-            ),
-          ),
-          onTap: () => onDestinationSelected(index),
-        ),
-      ),
     );
   }
 }

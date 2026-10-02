@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../responsive/responsive.dart';
+import '../responsive/animations.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/patient_sidebar.dart';
 import 'dashboard_screen.dart';
 import 'doctors_screen.dart';
 import 'hospitals_screen.dart';
@@ -122,13 +124,17 @@ class _MainShellState extends State<MainShell> {
       );
     }
 
-    // Tablets (rail) and desktop/TV (permanent side drawer).
+    // Tablets (rail) and desktop/TV (permanent side drawer, styled like the
+    // React sidebar: quick-actions grid on top, React-style nav rows).
     return ResponsiveScaffold(
       selectedIndex: _index,
       onDestinationSelected: (i) => setState(() => _index = i),
       sections: [NavSection('', _destinations(state))],
       pages: _pages,
       drawerHeader: _drawerHeader(context),
+      drawerLeading: RQuickActionsGrid(
+        onPush: (page) => pushPage(context, page),
+      ),
       floatingActionButton: _supportFab(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );

@@ -1632,3 +1632,297 @@ class RServiceTile extends StatelessWidget {
     );
   }
 }
+
+/// ---------------------------------------------------------------------------
+/// Sidebar primitives — rebuilt 1:1 from the React AppSidebar
+/// (`remedoo-react-ref/src/components/AppSidebar.tsx`).
+/// ---------------------------------------------------------------------------
+
+/// Tiny uppercase group label: "⚡ QUICK ACTIONS" / "🧭 NAVIGATE".
+/// 10px, extrabold, letter-spaced, muted gray.
+class RSidebarGroupLabel extends StatelessWidget {
+  final String label;
+
+  const RSidebarGroupLabel(this.label, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 2.0,
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.45),
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-width orange gradient Close button (rounded-2xl, white bold text +
+/// chevron-left), as at the top of the React sidebar.
+class RSidebarCloseButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const RSidebarCloseButton({super.key, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Theme.of(context).colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onPressed,
+          child: Ink(
+            padding:
+                const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [p, p.withValues(alpha: 0.7)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.chevron_left, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Close',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Gradient quick-action tile: big emoji + tiny (10px) bold white label,
+/// rounded-2xl, min height 44 — the React sidebar's action grid.
+class RSidebarQuickTile extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final List<Color> gradient;
+  final VoidCallback onTap;
+
+  const RSidebarQuickTile({
+    super.key,
+    required this.emoji,
+    required this.label,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradient,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 18)),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                  color: Colors.white,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black26,
+                      blurRadius: 2,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Sidebar nav row (rounded-2xl, icon + semibold label, min height 44).
+/// Active: orange-tint gradient background + vertical orange indicator bar on
+/// the left edge + subtle shadow + orange text. Inactive: muted gray text;
+/// press shows a light orange tint.
+class RSidebarNavTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  /// Optional count pill (e.g. cart items) shown at the row's trailing edge.
+  final String? badgeLabel;
+
+  const RSidebarNavTile({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+    this.badgeLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = dark ? RemedooTheme.darkAccent : RemedooTheme.accent;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          splashColor: scheme.primary.withValues(alpha: 0.12),
+          highlightColor: scheme.primary.withValues(alpha: 0.08),
+          child: Ink(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: active
+                  ? LinearGradient(
+                      colors: [accent, accent.withValues(alpha: 0.6)],
+                    )
+                  : null,
+              borderRadius: BorderRadius.circular(16),
+              border: active
+                  ? Border.all(
+                      color: scheme.primary.withValues(alpha: 0.2))
+                  : null,
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                if (active)
+                  Positioned(
+                    left: -16,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: Container(
+                        width: 4,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: scheme.primary,
+                          borderRadius: const BorderRadius.horizontal(
+                            right: Radius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                Row(
+                  children: [
+                    Icon(
+                      icon,
+                      size: 20,
+                      color: active
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant
+                              .withValues(alpha: 0.6),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: active
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant
+                                  .withValues(alpha: 0.75),
+                        ),
+                      ),
+                    ),
+                    if (badgeLabel != null &&
+                        badgeLabel!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: scheme.primary,
+                          borderRadius:
+                              BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          badgeLabel!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

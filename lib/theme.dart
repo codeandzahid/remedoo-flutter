@@ -26,6 +26,15 @@ class RemedooTheme {
   static const Color accent = Color(0xFFF4E7DA);
   static const Color accentForeground = Color(0xFF93490F);
 
+  /// Dark-mode sidebar accents (from the design spec's dark tokens):
+  /// --accent 24 30% 18%, --accent-foreground 24 50% 80%.
+  static const Color darkAccent = Color(0xFF3C2B20);
+  static const Color darkAccentForeground = Color(0xFFE6C7B3);
+
+  /// Sidebar surface: near-white in light mode (React `--sidebar-background`
+  /// 0 0% 98%), warm charcoal card in dark mode.
+  static const Color sidebarLight = Color(0xFFFAFAFA);
+
   /// Legacy aliases kept for screens written before the reskin.
   static const Color pageBg = background;
   static const Color ratingGreen = success;
