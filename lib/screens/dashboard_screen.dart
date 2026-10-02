@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -33,6 +35,15 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final _promoCtrl = PageController();
   int _promoPage = 0;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 650), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
 
   @override
   void dispose() {
@@ -41,7 +52,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _go(Widget page) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    pushPage(context, page);
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _loading = true);
+    await Future.delayed(const Duration(milliseconds: 700));
+    if (mounted) setState(() => _loading = false);
   }
 
   @override
@@ -65,81 +82,181 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: const Text('?',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _header(state)),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _greeting(state),
-                  const SizedBox(height: 14),
-                  _searchBox(),
-                  const SizedBox(height: 14),
-                  _careFinderCard(),
-                  const SizedBox(height: 18),
-                  _categories(state),
-                  const SizedBox(height: 18),
-                  _promoCarousel(),
-                  const SizedBox(height: 18),
-                  _featureTrio(),
-                  const SizedBox(height: 18),
-                  _statsRow(state),
-                  const SizedBox(height: 20),
-                  SectionHeader(
-                    title: 'Upcoming Appointments',
-                    actionLabel: 'See all',
-                    onAction: () => _go(const AppointmentsScreen()),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: FocusTraversalGroup(
+          policy: ReadingOrderTraversalPolicy(),
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(child: _header(state)),
+              if (_loading)
+                SliverToBoxAdapter(child: _skeletonBody())
+              else
+                SliverToBoxAdapter(
+                  child: MaxWidthBox(
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          StaggerItem(index: 0, child: _greeting(state)),
+                          const SizedBox(height: 14),
+                          StaggerItem(index: 1, child: _searchBox()),
+                          const SizedBox(height: 14),
+                          StaggerItem(
+                              index: 2, child: _careFinderCard()),
+                          const SizedBox(height: 18),
+                          StaggerItem(
+                              index: 3, child: _categories(state)),
+                          const SizedBox(height: 18),
+                          StaggerItem(
+                              index: 4, child: _promoCarousel()),
+                          const SizedBox(height: 18),
+                          StaggerItem(index: 5, child: _featureTrio()),
+                          const SizedBox(height: 18),
+                          StaggerItem(
+                              index: 6, child: _statsRow(state)),
+                          const SizedBox(height: 20),
+                          StaggerItem(
+                            index: 7,
+                            child: SectionHeader(
+                              title: 'Upcoming Appointments',
+                              actionLabel: 'See all',
+                              onAction: () =>
+                                  _go(const AppointmentsScreen()),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          StaggerItem(
+                            index: 8,
+                            child: Column(
+                              children: [
+                                if (upcoming.isEmpty)
+                                  _emptyAppointments()
+                                else
+                                  ...upcoming.map(_appointmentCard),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          StaggerItem(
+                            index: 9,
+                            child: SectionHeader(
+                              title: 'Popular Doctors',
+                              actionLabel: 'See all',
+                              onAction: () =>
+                                  _go(const DoctorsScreen()),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          StaggerItem(
+                              index: 10,
+                              child: _doctorRail(popularDoctors)),
+                          const SizedBox(height: 20),
+                          StaggerItem(
+                            index: 11,
+                            child: SectionHeader(
+                              title: 'Popular Hospitals',
+                              actionLabel: 'See all',
+                              onAction: () =>
+                                  _go(const HospitalsScreen()),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          StaggerItem(
+                              index: 12,
+                              child:
+                                  _hospitalRail(popularHospitals)),
+                          const SizedBox(height: 20),
+                          const StaggerItem(
+                              index: 13,
+                              child: SectionHeader(
+                                  title: 'Popular Medicines')),
+                          const SizedBox(height: 8),
+                          StaggerItem(
+                              index: 14,
+                              child: _medicineGrid(
+                                  popularMeds, state)),
+                          const SizedBox(height: 20),
+                          StaggerItem(
+                              index: 15, child: _pharmacyBenefits()),
+                          const SizedBox(height: 20),
+                          const StaggerItem(
+                              index: 16,
+                              child: SectionHeader(
+                                  title: 'Explore More')),
+                          const SizedBox(height: 8),
+                          StaggerItem(
+                              index: 17, child: _exploreMore()),
+                          const SizedBox(height: 20),
+                          const StaggerItem(
+                              index: 18,
+                              child: SectionHeader(
+                                  title: 'Browse Services')),
+                          const SizedBox(height: 8),
+                          StaggerItem(
+                              index: 19,
+                              child: _browseServices()),
+                          const SizedBox(height: 20),
+                          const StaggerItem(
+                              index: 20,
+                              child: SectionHeader(
+                                  title: 'Health Tips')),
+                          const SizedBox(height: 8),
+                          StaggerItem(
+                              index: 21, child: _healthTips()),
+                          const SizedBox(height: 20),
+                          const StaggerItem(
+                              index: 22,
+                              child:
+                                  SectionHeader(title: 'Sponsored')),
+                          const SizedBox(height: 8),
+                          StaggerItem(
+                              index: 23, child: _sponsored()),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  if (upcoming.isEmpty)
-                    _emptyAppointments()
-                  else
-                    ...upcoming.map(_appointmentCard),
-                  const SizedBox(height: 20),
-                  SectionHeader(
-                    title: 'Popular Doctors',
-                    actionLabel: 'See all',
-                    onAction: () => _go(const DoctorsScreen()),
-                  ),
-                  const SizedBox(height: 8),
-                  _doctorRail(popularDoctors),
-                  const SizedBox(height: 20),
-                  SectionHeader(
-                    title: 'Popular Hospitals',
-                    actionLabel: 'See all',
-                    onAction: () => _go(const HospitalsScreen()),
-                  ),
-                  const SizedBox(height: 8),
-                  _hospitalRail(popularHospitals),
-                  const SizedBox(height: 20),
-                  const SectionHeader(title: 'Popular Medicines'),
-                  const SizedBox(height: 8),
-                  _medicineGrid(popularMeds, state),
-                  const SizedBox(height: 20),
-                  _pharmacyBenefits(),
-                  const SizedBox(height: 20),
-                  const SectionHeader(title: 'Explore More'),
-                  const SizedBox(height: 8),
-                  _exploreMore(),
-                  const SizedBox(height: 20),
-                  const SectionHeader(title: 'Browse Services'),
-                  const SizedBox(height: 8),
-                  _browseServices(),
-                  const SizedBox(height: 20),
-                  const SectionHeader(title: 'Health Tips'),
-                  const SizedBox(height: 8),
-                  _healthTips(),
-                  const SizedBox(height: 20),
-                  const SectionHeader(title: 'Sponsored'),
-                  const SizedBox(height: 8),
-                  _sponsored(),
-                ],
-              ),
-            ),
+                ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Skeleton placeholders shown while the dashboard "loads".
+  Widget _skeletonBody() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SkeletonBox(width: 180, height: 22),
+          const SizedBox(height: 14),
+          const SkeletonBox(height: 52, radius: 24),
+          const SizedBox(height: 14),
+          const SkeletonBox(height: 96, radius: 20),
+          const SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: const [
+              SkeletonBox(width: 58, height: 58, radius: 18),
+              SkeletonBox(width: 58, height: 58, radius: 18),
+              SkeletonBox(width: 58, height: 58, radius: 18),
+              SkeletonBox(width: 58, height: 58, radius: 18),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const SkeletonBox(height: 130, radius: 20),
+          const SizedBox(height: 18),
+          const SkeletonCard(),
+          const SizedBox(height: 12),
+          const SkeletonCard(),
+          const SizedBox(height: 12),
+          const SkeletonCard(),
         ],
       ),
     );
@@ -320,15 +437,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ('Orders', Icons.receipt_long, () => _go(const OrdersScreen())),
       ('Reports', Icons.description, () => _go(const LabReportsScreen())),
     ];
-    return GridView.builder(
+    return ResponsiveGrid(
+      compactCols: 4,
+      mediumCols: 6,
+      expandedCols: 8,
+      wideCols: 8,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 8,
-        childAspectRatio: 0.85,
-      ),
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 8,
+      childAspectRatio: 0.85,
       itemCount: items.length,
       itemBuilder: (_, i) {
         final (label, icon, onTap) = items[i];
@@ -564,6 +682,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _doctorRail(List<Doctor> list) {
+    if (!context.isCompact) {
+      // Tablets and larger: adaptive grid with visible TV focus.
+      return ResponsiveGrid(
+        compactCols: 2,
+        mediumCols: 3,
+        expandedCols: 4,
+        wideCols: 5,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        childAspectRatio: 0.78,
+        itemCount: list.length,
+        itemBuilder: (_, i) => FocusableScale(
+          autofocus: i == 0,
+          onTap: () => _go(DoctorDetailScreen(doctor: list[i])),
+          child: _doctorCard(list[i]),
+        ),
+      );
+    }
     return SizedBox(
       height: 210,
       child: ListView.separated(
@@ -574,10 +710,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final d = list[i];
           return SizedBox(
             width: 170,
-            child: InkWell(
-              onTap: () => _go(DoctorDetailScreen(doctor: d)),
-              borderRadius: BorderRadius.circular(16),
-              child: Card(
+            child: _doctorCard(d),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _doctorCard(Doctor d) {
+    return InkWell(
+      onTap: () => _go(DoctorDetailScreen(doctor: d)),
+      borderRadius: BorderRadius.circular(16),
+      child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -618,14 +762,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-            ),
-          );
-        },
-      ),
     );
   }
 
   Widget _hospitalRail(List<Hospital> list) {
+    if (!context.isCompact) {
+      return ResponsiveGrid(
+        compactCols: 1,
+        mediumCols: 2,
+        expandedCols: 3,
+        wideCols: 4,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        childAspectRatio: 1.9,
+        itemCount: list.length,
+        itemBuilder: (_, i) => _hospitalCard(list[i]),
+      );
+    }
     return SizedBox(
       height: 150,
       child: ListView.separated(
@@ -636,10 +789,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final h = list[i];
           return SizedBox(
             width: 240,
-            child: InkWell(
-              onTap: () => _go(HospitalDetailScreen(hospital: h)),
-              borderRadius: BorderRadius.circular(16),
-              child: Card(
+            child: _hospitalCard(h),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _hospitalCard(Hospital h) {
+    return InkWell(
+      onTap: () => _go(HospitalDetailScreen(hospital: h)),
+      borderRadius: BorderRadius.circular(16),
+      child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -690,23 +851,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-            ),
-          );
-        },
-      ),
     );
   }
 
   Widget _medicineGrid(List<Medicine> list, AppState state) {
-    return GridView.builder(
+    return ResponsiveGrid(
+      compactCols: 2,
+      mediumCols: 3,
+      expandedCols: 4,
+      wideCols: 6,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.35,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-      ),
+      childAspectRatio: 1.35,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
       itemCount: list.length,
       itemBuilder: (_, i) {
         final m = list[i];
@@ -850,15 +1008,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ('Health Packages', Icons.health_and_safety,
           () => _go(const LabsScreen())),
     ];
-    return GridView.builder(
+    return ResponsiveGrid(
+      compactCols: 2,
+      mediumCols: 3,
+      expandedCols: 4,
+      wideCols: 4,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 2.4,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-      ),
+      childAspectRatio: 2.4,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
       itemCount: items.length,
       itemBuilder: (_, i) {
         final (label, icon, onTap) = items[i];
@@ -897,15 +1056,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ('Pharmacy', Icons.medication, Colors.blue,
           () => _go(const PharmaciesScreen())),
     ];
-    return GridView.builder(
+    return ResponsiveGrid(
+      compactCols: 2,
+      mediumCols: 3,
+      expandedCols: 4,
+      wideCols: 4,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.6,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-      ),
+      childAspectRatio: 1.6,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
       itemCount: items.length,
       itemBuilder: (_, i) {
         final (label, icon, color, onTap) = items[i];

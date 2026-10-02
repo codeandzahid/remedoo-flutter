@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -22,77 +24,100 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
     final state = AppStateScope.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Medical History')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(
-              children: ['All', 'Appointments', 'Prescriptions', 'Lab Reports']
-                  .map((c) {
-                final sel = c == _chip;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(c),
-                    selected: sel,
-                    onSelected: (_) => setState(() => _chip = c),
-                    selectedColor: RemedooTheme.primary,
-                    labelStyle: TextStyle(
-                        color: sel
-                            ? Colors.white
-                            : Theme.of(context)
-                                .colorScheme
-                                .onSurface),
-                  ),
-                );
-              }).toList(),
+      body: MaxWidthBox(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    'All',
+                    'Appointments',
+                    'Prescriptions',
+                    'Lab Reports'
+                  ].map((c) {
+                    final sel = c == _chip;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(c),
+                        selected: sel,
+                        onSelected: (_) => setState(() => _chip = c),
+                        selectedColor: RemedooTheme.primary,
+                        labelStyle: TextStyle(
+                            color: sel
+                                ? Colors.white
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurface),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (_chip == 'All' || _chip == 'Appointments') ...[
-                  const _GroupTitle('Appointments'),
-                  ...state.appointments.map((a) => _apptCard(a)),
-                ],
-                if (_chip == 'All' || _chip == 'Prescriptions') ...[
-                  const _GroupTitle('Prescriptions'),
-                  ...state.prescriptions
-                      .map((p) => _rxCard(p)),
-                ],
-                if (_chip == 'All' || _chip == 'Lab Reports') ...[
-                  const _GroupTitle('Lab Reports'),
-                  ...state.reports.map((r) => Card(
-                        margin:
-                            const EdgeInsets.only(bottom: 10),
-                        child: ListTile(
-                          leading: const Icon(Icons.science,
-                              color: RemedooTheme.teal),
-                          title: Text(r.labName,
-                              style: const TextStyle(
-                                  fontWeight:
-                                      FontWeight.w700)),
-                          subtitle: Text(
-                              '${r.tests.length} tests • ${r.date.day}/${r.date.month}/${r.date.year}'),
-                          trailing:
-                              StatusChip(status: r.status),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  if (_chip == 'All' || _chip == 'Appointments') ...[
+                    const _GroupTitle('Appointments'),
+                    ...state.appointments.asMap().entries.map(
+                          (e) => StaggerItem(
+                            index: e.key % 6,
+                            child: _apptCard(e.value),
+                          ),
                         ),
-                      )),
+                  ],
+                  if (_chip == 'All' || _chip == 'Prescriptions') ...[
+                    const _GroupTitle('Prescriptions'),
+                    ...state.prescriptions.asMap().entries.map(
+                          (e) => StaggerItem(
+                            index: e.key % 6,
+                            child: _rxCard(e.value),
+                          ),
+                        ),
+                  ],
+                  if (_chip == 'All' || _chip == 'Lab Reports') ...[
+                    const _GroupTitle('Lab Reports'),
+                    ...state.reports.asMap().entries.map(
+                          (e) => StaggerItem(
+                            index: e.key % 6,
+                            child: Card(
+                              margin:
+                                  const EdgeInsets.only(bottom: 10),
+                              child: ListTile(
+                                leading: const Icon(Icons.science,
+                                    color: RemedooTheme.teal),
+                                title: Text(e.value.labName,
+                                    style: const TextStyle(
+                                        fontWeight:
+                                            FontWeight.w700)),
+                                subtitle: Text(
+                                    '${e.value.tests.length} tests • ${e.value.date.day}/${e.value.date.month}/${e.value.date.year}'),
+                                trailing: StatusChip(
+                                    status: e.value.status),
+                              ),
+                            ),
+                          ),
+                        ),
+                  ],
+                  if (state.appointments.isEmpty &&
+                      state.prescriptions.isEmpty &&
+                      state.reports.isEmpty)
+                    const EmptyState(
+                      icon: Icons.history,
+                      title: 'No medical history yet',
+                      subtitle:
+                          'Your visits, prescriptions and reports will build your history here.',
+                    ),
                 ],
-                if (state.appointments.isEmpty &&
-                    state.prescriptions.isEmpty &&
-                    state.reports.isEmpty)
-                  const EmptyState(
-                    icon: Icons.history,
-                    title: 'No medical history yet',
-                    subtitle:
-                        'Your visits, prescriptions and reports will build your history here.',
-                  ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

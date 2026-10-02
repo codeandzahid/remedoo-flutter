@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 
@@ -61,8 +62,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final last = _page == _slides.length - 1;
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
+        child: MaxWidthBox(
+          maxWidth: 480,
+          child: Column(
+            children: [
             Align(
               alignment: Alignment.topRight,
               child: TextButton(
@@ -157,6 +160,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     );
                   }
                 },
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(64, 48),
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -168,7 +174,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
             const SizedBox(height: 32),
-          ],
+            ],
+          ),
         ),
       ),
     );

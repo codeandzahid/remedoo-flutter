@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -48,11 +50,21 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   bool _rating4 = false;
   bool _lowFee = false;
   bool _nearest = false;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     _search = TextEditingController(text: widget.initialQuery);
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _loading = true);
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (mounted) setState(() => _loading = false);
   }
 
   @override
@@ -104,7 +116,8 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     final list = _filtered(state);
     return Scaffold(
       appBar: AppBar(title: const Text('Find Doctors')),
-      body: Column(
+      body: MaxWidthBox(
+        child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -219,33 +232,81 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
             ),
           ),
           Expanded(
-            child: list.isEmpty
-                ? const EmptyState(
-                    icon: Icons.person_search,
-                    title: 'No doctors found',
-                    subtitle: 'Try a different search or filter.',
+            child: _loading
+                ? ListView.builder(
+                    padding:
+                        const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    itemCount: 4,
+                    itemBuilder: (_, _) => const SkeletonCard(),
                   )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                    itemCount: list.length,
-                    itemBuilder: (_, i) =>
-                        _doctorCard(list[i], state),
+                : RefreshIndicator(
+                    onRefresh: _refresh,
+                    child: list.isEmpty
+                        ? ListView(
+                            physics:
+                                const AlwaysScrollableScrollPhysics(),
+                            children: const [
+                              SizedBox(height: 60),
+                              EmptyState(
+                                icon: Icons.person_search,
+                                title: 'No doctors found',
+                                subtitle:
+                                    'Try a different search or filter.',
+                              ),
+                            ],
+                          )
+                        : context.isCompact
+                            ? ListView.separated(
+                                padding:
+                                    const EdgeInsets.fromLTRB(
+                                        16, 4, 16, 16),
+                                itemCount: list.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 12),
+                                itemBuilder: (_, i) => StaggerItem(
+                                  index: i % 6,
+                                  child: _doctorCard(
+                                      list[i], state),
+                                ),
+                              )
+                            : ResponsiveGrid(
+                                compactCols: 1,
+                                mediumCols: 2,
+                                expandedCols: 2,
+                                wideCols: 3,
+                                padding:
+                                    const EdgeInsets.fromLTRB(
+                                        16, 4, 16, 16),
+                                // Taller cells: card content (fee banner +
+                                // avatar row + wrapping info chips) needs
+                                // ~240px at grid widths.
+                                childAspectRatio: 1.5,
+                                itemCount: list.length,
+                                itemBuilder: (_, i) =>
+                                    StaggerItem(
+                                  index: i % 6,
+                                  child: _doctorCard(
+                                      list[i], state),
+                                ),
+                              ),
                   ),
           ),
         ],
+        ),
       ),
     );
   }
 
   Widget _doctorCard(Doctor d, AppState state) {
+    // No bottom margin: list spacing comes from the separator, grid
+    // spacing from the grid itself, so cells never clip the card.
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => Navigator.push(
+        onTap: () => pushPage(
           context,
-          MaterialPageRoute(
-              builder: (_) => DoctorDetailScreen(doctor: d)),
+          DoctorDetailScreen(doctor: d),
         ),
         child: Column(
           children: [
@@ -271,7 +332,10 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  InitialsAvatar(name: d.name, radius: 30),
+                  Hero(
+                    tag: 'doctor-avatar-${d.id}',
+                    child: InitialsAvatar(name: d.name, radius: 30),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

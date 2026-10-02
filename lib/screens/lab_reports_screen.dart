@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -43,8 +45,9 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
     }
     return Scaffold(
       appBar: AppBar(title: const Text('My Lab Reports')),
-      body: Column(
-        children: [
+      body: MaxWidthBox(
+        child: Column(
+          children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: TextField(
@@ -88,10 +91,14 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: list.length,
-                    itemBuilder: (_, i) => _card(list[i]),
+                    itemBuilder: (_, i) => StaggerItem(
+                      index: i % 6,
+                      child: _card(list[i]),
+                    ),
                   ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -114,11 +121,7 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
         subtitle: Text(
             '${r.tests.length} tests • ${r.date.day}/${r.date.month}/${r.date.year}'),
         trailing: StatusChip(status: r.status),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => LabReportDetailScreen(report: r)),
-        ),
+        onTap: () => pushPage(context, LabReportDetailScreen(report: r)),
       ),
     );
   }

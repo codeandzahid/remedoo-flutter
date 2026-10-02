@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -15,18 +17,23 @@ class SupportTicketsScreen extends StatelessWidget {
     final state = AppStateScope.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Support Tickets')),
-      body: state.tickets.isEmpty
-          ? const EmptyState(
-              icon: Icons.support_agent,
-              title: 'No tickets yet',
-              subtitle: 'Raise a ticket and our team will help you out.',
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: state.tickets.length,
-              itemBuilder: (_, i) =>
-                  _card(context, state.tickets[i]),
-            ),
+      body: MaxWidthBox(
+        child: state.tickets.isEmpty
+            ? const EmptyState(
+                icon: Icons.support_agent,
+                title: 'No tickets yet',
+                subtitle:
+                    'Raise a ticket and our team will help you out.',
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: state.tickets.length,
+                itemBuilder: (_, i) => StaggerItem(
+                  index: i % 6,
+                  child: _card(context, state.tickets[i]),
+                ),
+              ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _newTicket(context, state),
         icon: const Icon(Icons.add),
@@ -98,9 +105,9 @@ class SupportTicketsScreen extends StatelessWidget {
     final subject = TextEditingController();
     final desc = TextEditingController();
     String category = ticketCategories.first;
-    showDialog(
-      context: context,
-      builder: (_) => StatefulBuilder(
+    showResponsiveDialog(
+      context,
+      (_) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
           title: const Text('New Ticket'),
           content: Column(

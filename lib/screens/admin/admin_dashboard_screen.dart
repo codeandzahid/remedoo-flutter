@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../responsive/animations.dart';
+import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 
@@ -19,117 +21,171 @@ class AdminDashboardScreen extends StatelessWidget {
     for (final o in state.orders) {
       byStatus[o.status] = (byStatus[o.status] ?? 0) + 1;
     }
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          childAspectRatio: 1.5,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          children: [
-            _stat('Users', '${state.adminUsers.length}',
-                Icons.people, RemedooTheme.primary),
-            _stat('Doctors', '${state.activeDoctors.length}',
-                Icons.person_search, RemedooTheme.teal),
-            _stat('Orders', '${state.orders.length}',
-                Icons.shopping_bag, RemedooTheme.purple),
-            _stat('Revenue', inr(revenue), Icons.currency_rupee,
-                RemedooTheme.ratingGreen),
-          ],
-        ),
-        const SizedBox(height: 16),
-        const Text('Monthly Revenue',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              height: 200,
-              child: CustomPaint(
-                painter: _BarPainter(
-                    _months, _revenue, RemedooTheme.primary),
-              ),
-            ),
+
+    final stats = [
+      _stat('Users', '${state.adminUsers.length}', Icons.people,
+          RemedooTheme.primary),
+      _stat('Doctors', '${state.activeDoctors.length}',
+          Icons.person_search, RemedooTheme.teal),
+      _stat('Orders', '${state.orders.length}',
+          Icons.shopping_bag, RemedooTheme.purple),
+      _stat('Revenue', inr(revenue), Icons.currency_rupee,
+          RemedooTheme.ratingGreen),
+    ];
+
+    final revenueCard = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SizedBox(
+          height: 200,
+          child: CustomPaint(
+            painter: _BarPainter(_months, _revenue, RemedooTheme.primary),
           ),
         ),
-        const SizedBox(height: 16),
-        const Text('Orders by Status',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+      ),
+    );
+
+    final donutCard = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 150,
+              height: 150,
+              child: CustomPaint(
+                painter: _DonutPainter(byStatus),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: byStatus.entries.map((e) {
+                  return Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color:
+                                _DonutPainter.colorFor(e.key),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: Text(
+                          e.key.replaceAll('_', ' '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )),
+                        Text('${e.value}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return MaxWidthBox(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          ResponsiveGrid(
+            compactCols: 2,
+            mediumCols: 3,
+            expandedCols: 4,
+            wideCols: 6,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            // Taller cells: stat content (icon + value + label) needs
+            // breathing room at every breakpoint and text scale.
+            childAspectRatio: 1.4,
+            itemCount: stats.length,
+            itemBuilder: (_, i) =>
+                StaggerItem(index: i % 6, child: stats[i]),
+          ),
+          const SizedBox(height: 16),
+          if (context.isDesktop)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 150,
-                  height: 150,
-                  child: CustomPaint(
-                    painter: _DonutPainter(byStatus),
-                  ),
+                Expanded(
+                  flex: 3,
+                  child: StaggerItem(
+                      index: 0,
+                      child:
+                          _section('Monthly Revenue', revenueCard)),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: byStatus.entries.map((e) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 4),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: _DonutPainter
-                                    .colorFor(e.key),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                                child: Text(e.key
-                                    .replaceAll('_', ' '))),
-                            Text('${e.value}',
-                                style: const TextStyle(
-                                    fontWeight:
-                                        FontWeight.w700)),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                  flex: 2,
+                  child: StaggerItem(
+                      index: 1,
+                      child: _section(
+                          'Orders by Status', donutCard)),
                 ),
               ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        const Text('Recent Activity',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            )
+          else ...[
+            StaggerItem(
+                index: 0,
+                child: _section('Monthly Revenue', revenueCard)),
+            const SizedBox(height: 16),
+            StaggerItem(
+                index: 1,
+                child: _section('Orders by Status', donutCard)),
+          ],
+          const SizedBox(height: 16),
+          const Text('Recent Activity',
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          ...state.notifications.take(8).map((n) => StaggerItem(
+                index: 0,
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: Icon(n.icon,
+                        color: RemedooTheme.primary),
+                    title: Text(n.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600)),
+                    subtitle: Text(n.body,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  Widget _section(String title, Widget card) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(title,
+            style: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
-        ...state.notifications.take(8).map((n) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Icon(n.icon,
-                    color: RemedooTheme.primary),
-                title: Text(n.title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600)),
-                subtitle: Text(n.body,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-              ),
-            )),
+        card,
       ],
     );
   }
@@ -146,11 +202,15 @@ class AdminDashboardScreen extends StatelessWidget {
             Icon(icon, color: color),
             const SizedBox(height: 6),
             Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                     fontSize: 20, fontWeight: FontWeight.w800)),
             Text(label,
-                style:
-                    const TextStyle(color: Colors.grey, fontSize: 12)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: Colors.grey, fontSize: 12)),
           ],
         ),
       ),

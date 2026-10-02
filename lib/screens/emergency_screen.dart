@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
+import '../responsive/responsive.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
@@ -54,15 +55,16 @@ class EmergencyScreen extends StatelessWidget {
             ),
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: GestureDetector(
-                      onTap: () => _sosConfirm(context),
-                      child: Container(
+            child: MaxWidthBox(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: FocusableScale(
+                        onTap: () => _sosConfirm(context),
+                        child: Container(
                         width: 190,
                         height: 190,
                         decoration: BoxDecoration(
@@ -103,7 +105,8 @@ class EmergencyScreen extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
-                  GridView.builder(
+                  FocusTraversalGroup(
+                    child: GridView.builder(
                     shrinkWrap: true,
                     physics:
                         const NeverScrollableScrollPhysics(),
@@ -131,6 +134,7 @@ class EmergencyScreen extends StatelessWidget {
                               const SizedBox(height: 6),
                               Text(name,
                                   textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600)),
@@ -144,6 +148,7 @@ class EmergencyScreen extends StatelessWidget {
                         ),
                       );
                     },
+                  ),
                   ),
                   const SizedBox(height: 20),
                   const Text('Nearby Hospitals',
@@ -189,73 +194,83 @@ class EmergencyScreen extends StatelessWidget {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () => _callDialog(
-                                          context,
-                                          h.name,
-                                          '0194-000000'),
-                                      icon: const Icon(
-                                          Icons.call,
-                                          size: 16),
-                                      label:
-                                          const Text('Call'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () => showDialog(
-                                        context: context,
-                                        builder: (_) => AlertDialog(
-                                          title: const Text(
-                                              'Directions'),
-                                          content: Text(
-                                              'Opening maps to ${h.name}… (demo)'),
-                                          actions: [
-                                            FilledButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(
-                                                      context),
-                                              child:
-                                                  const Text('OK'),
-                                            ),
-                                          ],
-                                        ),
+                              FocusTraversalGroup(
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: _actionButton(
+                                        onPressed: () =>
+                                            _callDialog(
+                                                context,
+                                                h.name,
+                                                '0194-000000'),
+                                        icon: Icons.call,
+                                        label: 'Call',
+                                        backgroundColor:
+                                            RemedooTheme.emergency
+                                                .withValues(
+                                                    alpha: 0.12),
+                                        foregroundColor:
+                                            RemedooTheme.emergency,
                                       ),
-                                      icon: const Icon(
-                                          Icons.directions,
-                                          size: 16),
-                                      label: const Text(
-                                          'Directions'),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: FilledButton(
-                                      onPressed: () =>
-                                          Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _actionButton(
+                                        onPressed: () => showDialog(
+                                          context: context,
                                           builder: (_) =>
-                                              BookingScreen(
-                                            kind: 'hospital',
-                                            refId: h.id,
-                                            title: h.name,
-                                            subtitle:
-                                                'Emergency Consultation',
-                                            place: h.location,
-                                            fee: 300,
+                                              AlertDialog(
+                                            title: const Text(
+                                                'Directions'),
+                                            content: Text(
+                                                'Opening maps to ${h.name}… (demo)'),
+                                            actions: [
+                                              FilledButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(
+                                                        context),
+                                                child: const Text(
+                                                    'OK'),
+                                              ),
+                                            ],
                                           ),
                                         ),
+                                        icon: Icons.directions,
+                                        label: 'Directions',
+                                        backgroundColor:
+                                            RemedooTheme.primary
+                                                .withValues(
+                                                    alpha: 0.12),
+                                        foregroundColor:
+                                            RemedooTheme.primary,
                                       ),
-                                      child:
-                                          const Text('Book'),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _actionButton(
+                                        onPressed: () =>
+                                            Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                BookingScreen(
+                                              kind: 'hospital',
+                                              refId: h.id,
+                                              title: h.name,
+                                              subtitle:
+                                                  'Emergency Consultation',
+                                              place: h.location,
+                                              fee: 300,
+                                            ),
+                                          ),
+                                        ),
+                                        icon: Icons.calendar_month,
+                                        label: 'Book',
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -264,6 +279,32 @@ class EmergencyScreen extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 56px-minimum touch target button with icon + ellipsis-safe label.
+  Widget _actionButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    Color? backgroundColor,
+    Color? foregroundColor,
+  }) {
+    return BigTargetButton(
+      onPressed: onPressed,
+      backgroundColor: backgroundColor,
+      foregroundColor: foregroundColor,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(label, overflow: TextOverflow.ellipsis),
           ),
         ],
       ),

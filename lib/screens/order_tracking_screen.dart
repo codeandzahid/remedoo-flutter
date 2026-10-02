@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/responsive.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 
@@ -38,9 +39,11 @@ class OrderTrackingScreen extends StatelessWidget {
     final done = _doneIndex;
     return Scaffold(
       appBar: AppBar(title: Text('Order Tracking • ${o.id}')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: MaxWidthBox(
+        maxWidth: 720,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -66,6 +69,7 @@ class OrderTrackingScreen extends StatelessWidget {
                             style: TextStyle(
                                 color: Colors.grey, fontSize: 13)),
                         Text(o.eta,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800)),
@@ -117,14 +121,17 @@ class OrderTrackingScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(width: 12),
-                      Padding(
-                        padding:
-                            const EdgeInsets.only(top: 8),
-                        child: Text(
-                          label,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: isDone ? null : Colors.grey,
+                      Expanded(
+                        child: Padding(
+                          padding:
+                              const EdgeInsets.only(top: 8),
+                          child: Text(
+                            label,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: isDone ? null : Colors.grey,
+                            ),
                           ),
                         ),
                       ),
@@ -148,6 +155,7 @@ class OrderTrackingScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(o.pharmacyName,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w700)),
                       ),
@@ -203,7 +211,8 @@ class OrderTrackingScreen extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                  '${l.medicine.name} × ${l.qty}'),
+                                  '${l.medicine.name} × ${l.qty}',
+                                  overflow: TextOverflow.ellipsis),
                             ),
                             Text(inr(l.lineTotal),
                                 style: const TextStyle(
@@ -230,6 +239,7 @@ class OrderTrackingScreen extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

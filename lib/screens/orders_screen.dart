@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'order_tracking_screen.dart';
+import 'remedoo_pharmacy_screen.dart';
 
 /// My Orders with Active / Past tabs.
 class OrdersScreen extends StatefulWidget {
@@ -17,11 +20,16 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
+    // Skeleton shimmer on first load; data itself is local.
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) setState(() => _loading = false);
+    });
   }
 
   @override
@@ -45,28 +53,50 @@ class _OrdersScreenState extends State<OrdersScreen>
           tabs: const [Tab(text: 'Active'), Tab(text: 'Past')],
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
-        children: [
-          _list(state.activeOrders),
-          _list(state.pastOrders),
-        ],
+      body: MaxWidthBox(
+        child: TabBarView(
+          controller: _tabs,
+          children: [
+            _list(state.activeOrders),
+            _list(state.pastOrders),
+          ],
+        ),
       ),
     );
   }
 
   Widget _list(List<MedOrder> list) {
+    if (_loading) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 3,
+        itemBuilder: (_, i) => const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: SkeletonCard(),
+        ),
+      );
+    }
     if (list.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.shopping_bag_outlined,
         title: 'No orders yet',
         subtitle: 'Order medicines and track them here.',
+        actionLabel: 'Browse Pharmacy',
+        onAction: () =>
+            pushPage(context, const RemedooPharmacyScreen()),
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      itemBuilder: (_, i) => _card(list[i]),
+    return RefreshIndicator(
+      onRefresh: () async {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        if (mounted) AppStateScope.of(context).refresh();
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: list.length,
+        itemBuilder: (_, i) =>
+            StaggerItem(index: i % 6, child: _card(list[i])),
+      ),
     );
   }
 
@@ -75,11 +105,7 @@ class _OrdersScreenState extends State<OrdersScreen>
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => OrderTrackingScreen(order: o)),
-        ),
+        onTap: () => pushPage(context, OrderTrackingScreen(order: o)),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -104,9 +130,11 @@ class _OrdersScreenState extends State<OrdersScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Order ${o.id}',
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w700)),
                         Text(o.pharmacyName,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                                 fontSize: 13, color: Colors.grey)),
                       ],

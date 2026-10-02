@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/mock_data.dart';
+import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
@@ -172,7 +173,8 @@ List<_NavItem> _items(AppState s) => [
           (_) => const AdminSuspiciousActivityScreen()),
     ];
 
-/// Admin console shell with sectioned drawer.
+/// Admin console shell: drawer on phones, rail on tablets,
+/// permanent sectioned drawer on desktop.
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
 
@@ -187,11 +189,34 @@ class _AdminShellState extends State<AdminShell> {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final items = _items(state);
-    final item = items[_index];
+
+    // Group items into sections, preserving order.
+    final sections = <NavSection>[];
     String? lastSection;
-    return Scaffold(
+    List<NavDestinationItem> current = [];
+    for (final it in items) {
+      if (it.section != lastSection) {
+        if (current.isNotEmpty) {
+          sections.add(NavSection(lastSection ?? '', current));
+        }
+        lastSection = it.section;
+        current = [];
+      }
+      current.add(NavDestinationItem(icon: it.icon, label: it.label));
+    }
+    if (current.isNotEmpty) {
+      sections.add(NavSection(lastSection ?? '', current));
+    }
+
+    final currentItem = items[_index];
+    return ResponsiveScaffold(
+      selectedIndex: _index,
+      onDestinationSelected: (i) => setState(() => _index = i),
+      sections: sections,
+      pages: [for (final it in items) it.builder(state)],
+      drawerHeader: _drawerHeader(),
       appBar: AppBar(
-        title: Text(item.label),
+        title: Text(currentItem.label),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -212,71 +237,29 @@ class _AdminShellState extends State<AdminShell> {
           ),
         ],
       ),
-      drawer: Drawer(
-        child: ListView(
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                  gradient: RemedooTheme.headerGradient),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  RemedooLogo(size: 44),
-                  SizedBox(height: 8),
-                  Text('Admin Console',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18)),
-                  Text('admin@remedoo.app',
-                      style: TextStyle(color: Colors.white70)),
-                ],
-              ),
-            ),
-            for (var i = 0; i < items.length; i++) ...[
-              if (items[i].section != lastSection)
-                Builder(builder: (_) {
-                  lastSection = items[i].section;
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                        16, 12, 16, 4),
-                    child: Text(
-                      items[i].section.toUpperCase(),
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.grey,
-                          letterSpacing: 1.2),
-                    ),
-                  );
-                }),
-              ListTile(
-                dense: true,
-                leading: Icon(items[i].icon,
-                    color: i == _index
-                        ? RemedooTheme.primary
-                        : null),
-                title: Text(items[i].label,
-                    style: TextStyle(
-                        fontWeight: i == _index
-                            ? FontWeight.w800
-                            : FontWeight.w500,
-                        color: i == _index
-                            ? RemedooTheme.primary
-                            : null)),
-                selected: i == _index,
-                onTap: () {
-                  setState(() => _index = i);
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-            const SizedBox(height: 16),
-          ],
-        ),
+    );
+  }
+
+  Widget _drawerHeader() {
+    return Container(
+      decoration:
+          const BoxDecoration(gradient: RemedooTheme.headerGradient),
+      padding: const EdgeInsets.fromLTRB(20, 32, 20, 20),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RemedooLogo(size: 44),
+          SizedBox(height: 8),
+          Text('Admin Console',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18)),
+          Text('admin@remedoo.app',
+              style: TextStyle(color: Colors.white70)),
+        ],
       ),
-      body: item.builder(state),
     );
   }
 }

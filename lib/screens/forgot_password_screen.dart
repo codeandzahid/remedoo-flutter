@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/responsive.dart';
 import '../widgets/widgets.dart';
 import 'reset_password_screen.dart';
 
@@ -24,7 +25,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Forgot Password')),
-      body: ResponsiveBody(
+      body: MaxWidthBox(
+        maxWidth: 480,
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
@@ -46,6 +48,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             const SizedBox(height: 20),
             FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(64, 48),
+              ),
               onPressed: () {
                 if (_email.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(

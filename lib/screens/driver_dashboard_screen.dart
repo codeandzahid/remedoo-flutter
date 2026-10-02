@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -14,7 +16,8 @@ class DriverDashboardScreen extends StatefulWidget {
       _DriverDashboardScreenState();
 }
 
-class _DriverDashboardScreenState extends State<DriverDashboardScreen>
+class _DriverDashboardScreenState
+    extends State<DriverDashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
 
@@ -43,86 +46,92 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
         done.fold<double>(0, (s, d) => s + d.amount * 0.1);
     return Scaffold(
       appBar: AppBar(title: const Text('Driver Dashboard')),
-      body: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: state.driverOnline
-                  ? const LinearGradient(colors: [
-                      RemedooTheme.ratingGreen,
-                      Color(0xFF35C172)
-                    ])
-                  : LinearGradient(colors: [
-                      Colors.grey.shade400,
-                      Colors.grey.shade500
-                    ]),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        state.driverOnline
-                            ? 'You are Online'
-                            : 'You are Offline',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 18),
-                      ),
-                      Text(
-                        state.driverOnline
-                            ? 'Accept deliveries to earn'
-                            : 'Go online to get deliveries',
-                        style: const TextStyle(
-                            color: Colors.white70),
-                      ),
-                    ],
+      body: MaxWidthBox(
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: state.driverOnline
+                    ? const LinearGradient(colors: [
+                        RemedooTheme.ratingGreen,
+                        Color(0xFF35C172)
+                      ])
+                    : LinearGradient(colors: [
+                        Colors.grey.shade400,
+                        Colors.grey.shade500
+                      ]),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          state.driverOnline
+                              ? 'You are Online'
+                              : 'You are Offline',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18),
+                        ),
+                        Text(
+                          state.driverOnline
+                              ? 'Accept deliveries to earn'
+                              : 'Go online to get deliveries',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white70),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Switch(
-                  value: state.driverOnline,
-                  onChanged: state.setDriverOnline,
-                  activeThumbColor: Colors.white,
-                ),
-              ],
+                  Switch(
+                    value: state.driverOnline,
+                    onChanged: state.setDriverOnline,
+                    activeThumbColor: Colors.white,
+                  ),
+                ],
+              ),
             ),
-          ),
-          TabBar(
-            controller: _tabs,
-            labelColor: RemedooTheme.primary,
-            unselectedLabelColor:
-                Theme.of(context).colorScheme.onSurfaceVariant,
-            indicatorColor: RemedooTheme.primary,
-            tabs: const [
-              Tab(text: 'Deliveries'),
-              Tab(text: 'Earnings'),
-              Tab(text: 'History'),
-            ],
-          ),
-          Expanded(
-            child: TabBarView(
+            TabBar(
               controller: _tabs,
-              children: [
-                _deliveries(active, state),
-                _earnings(earnings, done.length),
-                _deliveries(done, state, history: true),
+              labelColor: RemedooTheme.primary,
+              unselectedLabelColor: Theme.of(context)
+                  .colorScheme
+                  .onSurfaceVariant,
+              indicatorColor: RemedooTheme.primary,
+              tabs: const [
+                Tab(text: 'Deliveries'),
+                Tab(text: 'Earnings'),
+                Tab(text: 'History'),
               ],
             ),
-          ),
-        ],
+            Expanded(
+              child: TabBarView(
+                controller: _tabs,
+                children: [
+                  _deliveries(active, state),
+                  _earnings(earnings, done.length),
+                  _deliveries(done, state, history: true),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _deliveries(
-      List<DriverDelivery> list, AppState state,
+  Widget _deliveries(List<DriverDelivery> list, AppState state,
       {bool history = false}) {
     if (list.isEmpty) {
       return const EmptyState(
@@ -134,7 +143,10 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: list.length,
-      itemBuilder: (_, i) => _card(list[i], state, history),
+      itemBuilder: (_, i) => StaggerItem(
+        index: i % 6,
+        child: _card(list[i], state, history),
+      ),
     );
   }
 
@@ -151,6 +163,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
               children: [
                 Expanded(
                   child: Text('Order ${d.orderId}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16)),
@@ -178,7 +192,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
                 child: FilledButton(
                   onPressed: () {
                     state.advanceDelivery(d.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(
                       SnackBar(
                           content: Text(
                               'Status updated: ${d.status}')),
@@ -211,21 +226,24 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                const Text("Today's earnings",
-                    style: TextStyle(color: Colors.grey)),
-                Text(inr(earnings),
-                    style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        color: RemedooTheme.ratingGreen)),
-                const SizedBox(height: 8),
-                Text('$count deliveries completed'),
-              ],
+        StaggerItem(
+          index: 0,
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  const Text("Today's earnings",
+                      style: TextStyle(color: Colors.grey)),
+                  Text(inr(earnings),
+                      style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          color: RemedooTheme.ratingGreen)),
+                  const SizedBox(height: 8),
+                  Text('$count deliveries completed'),
+                ],
+              ),
             ),
           ),
         ),

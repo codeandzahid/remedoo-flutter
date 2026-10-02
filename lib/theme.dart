@@ -12,6 +12,34 @@ class RemedooTheme {
   static const Color ink = Color(0xFF1A2332);
   static const Color cardBorder = Color(0xFFF0E4D8);
 
+  // Dark-mode surfaces.
+  static const Color darkBg = Color(0xFF14100C);
+  static const Color darkSurface = Color(0xFF1F1A14);
+  static const Color darkSurface2 = Color(0xFF2A221A);
+  static const Color darkBorder = Color(0xFF3A2E22);
+
+  /// Soft card shadow (light mode).
+  static List<BoxShadow> get softShadow => [
+        BoxShadow(
+          color: const Color(0xFF3A2410).withValues(alpha: 0.06),
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        ),
+      ];
+
+  /// Fade + slide page transition used on every platform.
+  static const PageTransitionsTheme pageTransitions =
+      PageTransitionsTheme(
+    builders: {
+      TargetPlatform.android: _FadeSlideBuilder(),
+      TargetPlatform.iOS: _FadeSlideBuilder(),
+      TargetPlatform.macOS: _FadeSlideBuilder(),
+      TargetPlatform.windows: _FadeSlideBuilder(),
+      TargetPlatform.linux: _FadeSlideBuilder(),
+      TargetPlatform.fuchsia: _FadeSlideBuilder(),
+    },
+  );
+
   static ThemeData light([Color? brand]) {
     final p = brand ?? primary;
     final scheme = ColorScheme.fromSeed(
@@ -22,6 +50,29 @@ class RemedooTheme {
       useMaterial3: true,
       colorScheme: scheme.copyWith(primary: p),
       scaffoldBackgroundColor: pageBg,
+      pageTransitionsTheme: RemedooTheme.pageTransitions,
+      dividerTheme: const DividerThemeData(
+        color: cardBorder,
+        thickness: 1,
+        space: 1,
+      ),
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        showDragHandle: true,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         foregroundColor: ink,
@@ -39,7 +90,7 @@ class RemedooTheme {
         color: Colors.white,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: cardBorder),
         ),
       ),
@@ -99,7 +150,32 @@ class RemedooTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme.copyWith(primary: p),
-      scaffoldBackgroundColor: const Color(0xFF14100C),
+      scaffoldBackgroundColor: darkBg,
+      pageTransitionsTheme: RemedooTheme.pageTransitions,
+      dividerTheme: const DividerThemeData(
+        color: darkBorder,
+        thickness: 1,
+        space: 1,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: darkSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: darkSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        showDragHandle: true,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -112,23 +188,23 @@ class RemedooTheme {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: const Color(0xFF1F1A14),
+        color: darkSurface,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: Color(0xFF3A2E22)),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: darkBorder),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFF1F1A14),
+        fillColor: darkSurface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: Color(0xFF3A2E22)),
+          borderSide: const BorderSide(color: darkBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: const BorderRadius.all(Radius.circular(24)),
@@ -174,6 +250,88 @@ class RemedooTheme {
     end: Alignment.bottomRight,
     colors: [Color(0xFFE05353), Color(0xFFD43D3D), Color(0xFFB92F2F)],
   );
+}
+
+/// 8pt spacing scale.
+class RemedooSpacing {
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 24;
+  static const double xxl = 32;
+  static const double xxxl = 48;
+}
+
+/// Corner radius scale.
+class RemedooRadius {
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 20;
+  static const double xxl = 28;
+}
+
+/// Elevated type scale with proper weights.
+class RemedooType {
+  static const TextStyle displayLarge = TextStyle(
+      fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.5);
+  static const TextStyle displayMedium = TextStyle(
+      fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.25);
+  static const TextStyle headlineLarge =
+      TextStyle(fontSize: 24, fontWeight: FontWeight.w800);
+  static const TextStyle headlineMedium =
+      TextStyle(fontSize: 20, fontWeight: FontWeight.w700);
+  static const TextStyle headlineSmall =
+      TextStyle(fontSize: 18, fontWeight: FontWeight.w700);
+  static const TextStyle titleLarge =
+      TextStyle(fontSize: 16, fontWeight: FontWeight.w700);
+  static const TextStyle titleMedium =
+      TextStyle(fontSize: 15, fontWeight: FontWeight.w600);
+  static const TextStyle titleSmall =
+      TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+  static const TextStyle bodyLarge =
+      TextStyle(fontSize: 15, fontWeight: FontWeight.w400, height: 1.45);
+  static const TextStyle bodyMedium =
+      TextStyle(fontSize: 14, fontWeight: FontWeight.w400, height: 1.45);
+  static const TextStyle bodySmall =
+      TextStyle(fontSize: 13, fontWeight: FontWeight.w400, height: 1.4);
+  static const TextStyle labelLarge =
+      TextStyle(fontSize: 13, fontWeight: FontWeight.w700);
+  static const TextStyle labelMedium =
+      TextStyle(fontSize: 12, fontWeight: FontWeight.w600);
+  static const TextStyle labelSmall =
+      TextStyle(fontSize: 11, fontWeight: FontWeight.w600);
+}
+
+/// Global fade + slide page transition.
+class _FadeSlideBuilder extends PageTransitionsBuilder {
+  const _FadeSlideBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeIn,
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0.06, 0),
+          end: Offset.zero,
+        ).animate(curved),
+        child: child,
+      ),
+    );
+  }
 }
 
 /// Formats a number as Indian rupees with Indian digit grouping.

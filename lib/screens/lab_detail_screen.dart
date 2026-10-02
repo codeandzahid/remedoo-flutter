@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
@@ -19,6 +21,22 @@ class LabDetailScreen extends StatefulWidget {
 class _LabDetailScreenState extends State<LabDetailScreen> {
   final Set<String> _selected = {};
 
+  void _book(List<LabTest> selectedTests, double total) {
+    final l = widget.lab;
+    pushPage(
+      context,
+      BookingScreen(
+        kind: 'lab',
+        refId: l.id,
+        title: l.name,
+        subtitle: '${selectedTests.length} tests • Home collection',
+        place: l.location,
+        fee: total,
+        tests: selectedTests,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = widget.lab;
@@ -26,122 +44,48 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
     final selectedTests =
         tests.where((t) => _selected.contains(t.id)).toList();
     final total = selectedTests.fold<double>(0, (s, t) => s + t.price);
+
+    final infoCard = _infoCard(l);
+    final testsSection = _testsSection(tests);
+    final bookButton = FilledButton(
+      onPressed: selectedTests.isEmpty
+          ? null
+          : () => _book(selectedTests, total),
+      child: Text(selectedTests.isEmpty
+          ? 'Select tests to book'
+          : 'Book ${selectedTests.length} Tests • ${inr(total)}'),
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Lab Details'),
         actions: [FavoriteButton(favKey: 'lab:${l.id}')],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: RemedooTheme.teal
-                              .withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(Icons.science,
-                            color: RemedooTheme.teal, size: 32),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                          children: [
-                            Text(l.name,
-                                style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800)),
-                            Text(l.location,
-                                style: const TextStyle(
-                                    color: Colors.grey)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      RatingPill(rating: l.rating),
-                      if (l.nabl)
-                        const StatusChip(status: 'NABL Accredited'),
-                      Chip(
-                          label: Text(
-                              'Report in ${l.turnaround}')),
-                      Chip(
-                          label:
-                              Text('${l.testCount} tests')),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const InfoRow(
-                    icon: Icons.home,
-                    label: 'Home collection',
-                    value: 'Available',
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text('Available Tests',
-              style:
-                  TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          ...tests.map((t) {
-            final sel = _selected.contains(t.id);
-            return Card(
-              child: ListTile(
-                title: Text(t.name,
-                    style:
-                        const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                    'Report in ${t.turnaround} • ${t.category}'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+      body: context.isCompact
+          ? ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                infoCard,
+                const SizedBox(height: 16),
+                testsSection,
+                const SizedBox(height: 90),
+              ],
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: DetailSplit(
+                main: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(inr(t.price),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: RemedooTheme.primary)),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: Text(sel ? 'ADDED' : 'ADD'),
-                      selected: sel,
-                      onSelected: (_) =>
-                          setState(() => sel
-                              ? _selected.remove(t.id)
-                              : _selected.add(t.id)),
-                      selectedColor: RemedooTheme.primary,
-                      labelStyle: TextStyle(
-                          color: sel
-                              ? Colors.white
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onSurface),
-                    ),
+                    infoCard,
+                    const SizedBox(height: 16),
+                    testsSection,
+                    const SizedBox(height: 16),
                   ],
                 ),
+                side: _selectionPanel(selectedTests, total),
               ),
-            );
-          }),
-          const SizedBox(height: 90),
-        ],
-      ),
+            ),
       bottomSheet: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
         decoration: BoxDecoration(
@@ -154,29 +98,184 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
             ),
           ],
         ),
-        child: SafeArea(
-          child: FilledButton(
-            onPressed: selectedTests.isEmpty
-                ? null
-                : () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => BookingScreen(
-                          kind: 'lab',
-                          refId: l.id,
-                          title: l.name,
-                          subtitle:
-                              '${selectedTests.length} tests • Home collection',
-                          place: l.location,
-                          fee: total,
-                          tests: selectedTests,
-                        ),
-                      ),
+        child: SafeArea(child: bookButton),
+      ),
+    );
+  }
+
+  Widget _infoCard(Lab l) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Hero(
+                  tag: 'lab-image-${l.id}',
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color:
+                          RemedooTheme.teal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-            child: Text(selectedTests.isEmpty
-                ? 'Select tests to book'
-                : 'Book ${selectedTests.length} Tests • ${inr(total)}'),
-          ),
+                    child: const Icon(Icons.science,
+                        color: RemedooTheme.teal, size: 32),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800)),
+                      Text(l.location,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              const TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                RatingPill(rating: l.rating),
+                if (l.nabl)
+                  const StatusChip(status: 'NABL Accredited'),
+                Chip(label: Text('Report in ${l.turnaround}')),
+                Chip(label: Text('${l.testCount} tests')),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const InfoRow(
+              icon: Icons.home,
+              label: 'Home collection',
+              value: 'Available',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _testsSection(List<LabTest> tests) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Available Tests',
+            style:
+                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        ...tests.map((t) {
+          final sel = _selected.contains(t.id);
+          return Card(
+            child: ListTile(
+              title: Text(t.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text('Report in ${t.turnaround} • ${t.category}',
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(inr(t.price),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: RemedooTheme.primary)),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: Text(sel ? 'ADDED' : 'ADD'),
+                    selected: sel,
+                    onSelected: (_) => setState(() =>
+                        sel ? _selected.remove(t.id) : _selected.add(t.id)),
+                    selectedColor: RemedooTheme.primary,
+                    labelStyle: TextStyle(
+                        color: sel
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurface),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _selectionPanel(List<LabTest> selectedTests, double total) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Your selection',
+                style:
+                    TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 12),
+            if (selectedTests.isEmpty)
+              const Text('No tests selected yet.',
+                  style: TextStyle(color: Colors.grey))
+            else
+              ...selectedTests.map((t) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(t.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(inr(t.price),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  )),
+            const Divider(height: 20),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('Total',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+                Text(inr(total),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: RemedooTheme.primary)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            BigTargetButton(
+              onPressed: selectedTests.isEmpty
+                  ? null
+                  : () => _book(selectedTests, total),
+              child: Text(selectedTests.isEmpty
+                  ? 'Select tests to book'
+                  : 'Book ${selectedTests.length} Tests'),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Free home sample collection above ₹299.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
         ),
       ),
     );

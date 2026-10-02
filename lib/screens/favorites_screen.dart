@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -21,32 +23,35 @@ class FavoritesScreen extends StatelessWidget {
     if (favs.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Favorites')),
-        body: EmptyState(
-          icon: Icons.favorite_border,
-          title: 'No favorites yet',
-          subtitle:
-              'Tap the heart on any doctor, hospital, lab or pharmacy to save it here.',
-          actionLabel: 'Explore',
-          onAction: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => const DoctorsScreen()),
+        body: MaxWidthBox(
+          child: EmptyState(
+            icon: Icons.favorite_border,
+            title: 'No favorites yet',
+            subtitle:
+                'Tap the heart on any doctor, hospital, lab or pharmacy to save it here.',
+            actionLabel: 'Explore',
+            onAction: () => pushPage(context, const DoctorsScreen()),
           ),
         ),
       );
     }
     return Scaffold(
       appBar: AppBar(title: Text('Favorites (${favs.length})')),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: favs.length,
-        itemBuilder: (_, i) {
-          final key = favs[i];
-          final parts = key.split(':');
-          final kind = parts[0];
-          final id = parts.sublist(1).join(':');
-          return _tile(context, state, kind, id, key);
-        },
+      body: MaxWidthBox(
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: favs.length,
+          itemBuilder: (_, i) {
+            final key = favs[i];
+            final parts = key.split(':');
+            final kind = parts[0];
+            final id = parts.sublist(1).join(':');
+            return StaggerItem(
+              index: i % 6,
+              child: _tile(context, state, kind, id, key),
+            );
+          },
+        ),
       ),
     );
   }
@@ -62,39 +67,24 @@ class FavoritesScreen extends StatelessWidget {
           final d = doctorById(id);
           title = d.name;
           sub = d.specialty;
-          onTap = () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => DoctorDetailScreen(doctor: d)),
-              );
+          onTap = () => pushPage(context, DoctorDetailScreen(doctor: d));
         case 'hospital':
           final h = hospitalById(id);
           title = h.name;
           sub = h.location;
-          onTap = () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => HospitalDetailScreen(hospital: h)),
-              );
+          onTap =
+              () => pushPage(context, HospitalDetailScreen(hospital: h));
         case 'lab':
           final l = labById(id);
           title = l.name;
           sub = l.location;
-          onTap = () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => LabDetailScreen(lab: l)),
-              );
+          onTap = () => pushPage(context, LabDetailScreen(lab: l));
         case 'pharmacy':
           final p = pharmacyById(id);
           title = p.name;
           sub = p.location;
-          onTap = () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) =>
-                        PharmacyDetailScreen(pharmacy: p)),
-              );
+          onTap = () =>
+              pushPage(context, PharmacyDetailScreen(pharmacy: p));
       }
     } catch (_) {
       return const SizedBox.shrink();

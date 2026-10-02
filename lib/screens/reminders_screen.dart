@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -44,12 +46,14 @@ class _RemindersScreenState extends State<RemindersScreen>
           tabs: const [Tab(text: 'Upcoming'), Tab(text: 'Completed')],
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
-        children: [
-          _list(state, false),
-          _list(state, true),
-        ],
+      body: MaxWidthBox(
+        child: TabBarView(
+          controller: _tabs,
+          children: [
+            _list(state, false),
+            _list(state, true),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addDialog(context, state),
@@ -75,7 +79,10 @@ class _RemindersScreenState extends State<RemindersScreen>
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: list.length,
-      itemBuilder: (_, i) => _card(state, list[i]),
+      itemBuilder: (_, i) => StaggerItem(
+        index: i % 6,
+        child: _card(state, list[i]),
+      ),
     );
   }
 
@@ -119,9 +126,9 @@ class _RemindersScreenState extends State<RemindersScreen>
     final title = TextEditingController();
     final time = TextEditingController(text: '09:00');
     String repeat = 'Daily';
-    showDialog(
-      context: context,
-      builder: (_) => StatefulBuilder(
+    showResponsiveDialog(
+      context,
+      (_) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
           title: const Text('Add Reminder'),
           content: Column(

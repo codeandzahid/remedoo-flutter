@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 
@@ -30,9 +32,10 @@ class AnalyticsScreen extends StatelessWidget {
     ]..sort((a, b) => b.$2.compareTo(a.$2));
     return Scaffold(
       appBar: AppBar(title: const Text('My Analytics')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: MaxWidthBox(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
           Row(
             children: [
               _statCard('${state.appointments.length}',
@@ -68,33 +71,37 @@ class AnalyticsScreen extends StatelessWidget {
               style:
                   TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          ...categories.map((c) {
-            final (label, count, icon) = c;
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: RemedooTheme.primary
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+          ...categories.asMap().entries.map((e) {
+            final (label, count, icon) = e.value;
+            return StaggerItem(
+              index: e.key % 6,
+              child: Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: RemedooTheme.primary
+                          .withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child:
+                        Icon(icon, color: RemedooTheme.primary),
                   ),
-                  child: Icon(icon,
-                      color: RemedooTheme.primary),
+                  title: Text(label,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700)),
+                  trailing: Text('$count',
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800)),
                 ),
-                title: Text(label,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700)),
-                trailing: Text('$count',
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800)),
               ),
             );
           }),
         ],
+        ),
       ),
     );
   }
@@ -108,11 +115,16 @@ class AnalyticsScreen extends StatelessWidget {
             children: [
               Icon(icon, color: RemedooTheme.primary),
               const SizedBox(height: 6),
-              Text(value,
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(value,
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800)),
+              ),
               Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                       fontSize: 11, color: Colors.grey)),
             ],

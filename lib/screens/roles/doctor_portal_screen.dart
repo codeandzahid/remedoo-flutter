@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../data/mock_data.dart';
 import '../../models.dart';
+import '../../responsive/animations.dart';
+import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
@@ -72,25 +74,34 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
         subtitle: 'Patient bookings will appear here.',
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      itemBuilder: (_, i) {
-        final a = list[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            leading:
-                InitialsAvatar(name: a.doctorName, radius: 22),
-            title: Text(a.doctorName,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('${a.dateLabel} • ${a.timeLabel}'),
-            trailing: StatusChip(status: a.status),
-            onTap: () => _detail(state, a),
-          ),
-        );
-      },
+    return MaxWidthBox(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: list.length,
+        itemBuilder: (_, i) {
+          final a = list[i];
+          return StaggerItem(
+            index: i % 6,
+            child: Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: ListTile(
+                leading: InitialsAvatar(
+                    name: a.doctorName, radius: 22),
+                title: Text(a.doctorName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700)),
+                subtitle: Text('${a.dateLabel} • ${a.timeLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                trailing: StatusChip(status: a.status),
+                onTap: () => _detail(state, a),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -108,6 +119,8 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(a.doctorName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                     fontSize: 18, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
@@ -166,72 +179,75 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
   Widget _scheduleTab() {
     final state = AppStateScope.of(context);
     final slots = state.doctorSlots(_me.id, _day);
-    return Column(
-      children: [
-        SizedBox(
-          height: 52,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _days.length,
-            separatorBuilder: (_, _) =>
-                const SizedBox(width: 8),
-            itemBuilder: (_, i) {
-              final sel = i == _day;
-              return Center(
-                child: ChoiceChip(
-                  label: Text(_days[i]),
-                  selected: sel,
-                  onSelected: (_) =>
-                      setState(() => _day = i),
-                  selectedColor: RemedooTheme.primary,
-                  labelStyle: TextStyle(
-                      color: sel
-                          ? Colors.white
-                          : Theme.of(context)
-                              .colorScheme
-                              .onSurface),
+    return MaxWidthBox(
+      child: Column(
+        children: [
+          SizedBox(
+            height: 52,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _days.length,
+              separatorBuilder: (_, _) =>
+                  const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final sel = i == _day;
+                return Center(
+                  child: ChoiceChip(
+                    label: Text(_days[i]),
+                    selected: sel,
+                    onSelected: (_) =>
+                        setState(() => _day = i),
+                    selectedColor: RemedooTheme.primary,
+                    labelStyle: TextStyle(
+                        color: sel
+                            ? Colors.white
+                            : Theme.of(context)
+                                .colorScheme
+                                .onSurface),
+                  ),
+                );
+              },
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: slots
+                      .map((s) => Chip(
+                            label: Text(s),
+                            deleteIcon: const Icon(Icons.close,
+                                size: 16),
+                            onDeleted: () =>
+                                state.removeDoctorSlot(
+                                    _me.id, _day, s),
+                          ))
+                      .toList(),
                 ),
-              );
-            },
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () => _addSlotDialog(state),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add slot'),
+                ),
+              ],
+            ),
           ),
-        ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: slots
-                    .map((s) => Chip(
-                          label: Text(s),
-                          deleteIcon:
-                              const Icon(Icons.close, size: 16),
-                          onDeleted: () => state.removeDoctorSlot(
-                              _me.id, _day, s),
-                        ))
-                    .toList(),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    _addSlotDialog(state),
-                icon: const Icon(Icons.add),
-                label: const Text('Add slot'),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   void _addSlotDialog(AppState state) {
     final ctrl = TextEditingController(text: '11:00');
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
+    showResponsiveDialog(
+      context,
+      (_) => AlertDialog(
         title: Text('Add slot • ${_days[_day]}'),
         content: TextField(
           controller: ctrl,
@@ -262,28 +278,30 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
         state.appointments.where((a) => a.kind == 'doctor');
     final total =
         mine.fold<double>(0, (s, a) => s + a.fee);
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                const Text('Total earnings',
-                    style: TextStyle(color: Colors.grey)),
-                Text(inr(total),
-                    style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        color: RemedooTheme.ratingGreen)),
-                const SizedBox(height: 8),
-                Text('${mine.length} appointments'),
-              ],
+    return MaxWidthBox(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  const Text('Total earnings',
+                      style: TextStyle(color: Colors.grey)),
+                  Text(inr(total),
+                      style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          color: RemedooTheme.ratingGreen)),
+                  const SizedBox(height: 8),
+                  Text('${mine.length} appointments'),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

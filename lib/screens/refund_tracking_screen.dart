@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -37,17 +38,20 @@ class RefundTrackingScreen extends StatelessWidget {
     final list = state.refundRequests;
     return Scaffold(
       appBar: AppBar(title: const Text('Refund Status')),
-      body: list.isEmpty
-          ? const EmptyState(
-              icon: Icons.replay,
-              title: 'No refunds',
-              subtitle: 'Refund requests will appear here.',
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: list.length,
-              itemBuilder: (_, i) => _card(list[i]),
-            ),
+      body: MaxWidthBox(
+        maxWidth: 720,
+        child: list.isEmpty
+            ? const EmptyState(
+                icon: Icons.replay,
+                title: 'No refunds',
+                subtitle: 'Refund requests will appear here.',
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: list.length,
+                itemBuilder: (_, i) => _card(list[i]),
+              ),
+      ),
     );
   }
 
@@ -64,6 +68,7 @@ class RefundTrackingScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text('Refund ${r.id}',
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontWeight: FontWeight.w800, fontSize: 16)),
                 ),
@@ -72,6 +77,8 @@ class RefundTrackingScreen extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text('Order ${r.orderId} • ${r.reason}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style:
                     const TextStyle(fontSize: 13, color: Colors.grey)),
             const SizedBox(height: 4),
@@ -108,6 +115,8 @@ class RefundTrackingScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(_steps[i],
                           textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                               fontSize: 10,
                               color: isDone

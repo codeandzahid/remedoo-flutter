@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -34,16 +35,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (state.isGuest) {
       return Scaffold(
         appBar: AppBar(title: const Text('My Profile')),
-        body: EmptyState(
-          icon: Icons.person_outline,
-          title: 'You are browsing as a guest',
-          subtitle: 'Sign in to manage your profile.',
-          actionLabel: 'Sign In',
-          onAction: () => Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-                builder: (_) => const LoginScreen()),
-            (r) => r.isFirst,
+        body: MaxWidthBox(
+          child: EmptyState(
+            icon: Icons.person_outline,
+            title: 'You are browsing as a guest',
+            subtitle: 'Sign in to manage your profile.',
+            actionLabel: 'Sign In',
+            onAction: () => Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const LoginScreen()),
+              (r) => r.isFirst,
+            ),
           ),
         ),
       );
@@ -56,7 +59,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     return Scaffold(
       appBar: AppBar(title: const Text('My Profile')),
-      body: ResponsiveBody(
+      body: MaxWidthBox(
+        maxWidth: 720,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -180,9 +184,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 10),
             OutlinedButton(
-              onPressed: () => showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
+              onPressed: () => showResponsiveDialog(
+                context,
+                (_) => AlertDialog(
                   title: const Text('Change Password'),
                   content: const Text(
                       'A reset link will be sent to your email. (demo)'),

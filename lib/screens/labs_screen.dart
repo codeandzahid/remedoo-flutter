@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -28,7 +30,16 @@ class _LabsScreenState extends State<LabsScreen> {
   bool _mostTests = false;
   bool _offers = false;
   bool _nearest = false;
+  bool _loading = true;
   Lab? _compareA;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
 
   @override
   void dispose() {
@@ -64,113 +75,165 @@ class _LabsScreenState extends State<LabsScreen> {
     return list;
   }
 
+  double _aspectFor(double maxWidth, BuildContext context) {
+    final cols = const ResponsiveValue<int>(
+      compact: 1,
+      medium: 2,
+      expanded: 3,
+      wide: 4,
+    ).of(context);
+    final cellW = (maxWidth - 32 - 12 * (cols - 1)) / cols;
+    // Card content height is width-independent; 235 leaves slack for
+    // larger text scales.
+    return (cellW / 235).clamp(0.6, 3.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final list = _filtered(state);
     return Scaffold(
       appBar: AppBar(title: const Text('Labs & Diagnostics')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: TextField(
-              controller: _search,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'Search labs…',
-                prefixIcon: Icon(Icons.search),
+      body: MaxWidthBox(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: TextField(
+                controller: _search,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  hintText: 'Search labs…',
+                  prefixIcon: Icon(Icons.search),
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: DropdownButtonFormField<String>(
-              initialValue: _sort,
-              decoration: const InputDecoration(
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12)),
-              items: _sortOptions
-                  .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-                  .toList(),
-              onChanged: (v) =>
-                  setState(() => _sort = v ?? _sortOptions.first),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                FilterChip(
-                  label: const Text('Rating 4.0+'),
-                  selected: _rating4,
-                  onSelected: (v) => setState(() => _rating4 = v),
-                ),
-                FilterChip(
-                  label: const Text('Most Tests'),
-                  selected: _mostTests,
-                  onSelected: (v) => setState(() => _mostTests = v),
-                ),
-                FilterChip(
-                  label: const Text('Has Offers'),
-                  selected: _offers,
-                  onSelected: (v) => setState(() => _offers = v),
-                ),
-                FilterChip(
-                  label: const Text('Nearest First'),
-                  selected: _nearest,
-                  onSelected: (v) => setState(() => _nearest = v),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [RemedooTheme.purple, Color(0xFF8B5CF6)]),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.science, color: Colors.white),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Home sample collection — free above ₹299!',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '${list.length} labs near you',
-                style: const TextStyle(fontWeight: FontWeight.w700),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: DropdownButtonFormField<String>(
+                initialValue: _sort,
+                decoration: const InputDecoration(
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12)),
+                items: _sortOptions
+                    .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+                    .toList(),
+                onChanged: (v) =>
+                    setState(() => _sort = v ?? _sortOptions.first),
               ),
             ),
-          ),
-          Expanded(
-            child: list.isEmpty
-                ? const EmptyState(
-                    icon: Icons.science,
-                    title: 'No labs found',
-                    subtitle: 'Try a different search or filter.',
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                    itemCount: list.length,
-                    itemBuilder: (_, i) => _card(list[i]),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  FilterChip(
+                    label: const Text('Rating 4.0+'),
+                    selected: _rating4,
+                    onSelected: (v) => setState(() => _rating4 = v),
                   ),
-          ),
-        ],
+                  FilterChip(
+                    label: const Text('Most Tests'),
+                    selected: _mostTests,
+                    onSelected: (v) => setState(() => _mostTests = v),
+                  ),
+                  FilterChip(
+                    label: const Text('Has Offers'),
+                    selected: _offers,
+                    onSelected: (v) => setState(() => _offers = v),
+                  ),
+                  FilterChip(
+                    label: const Text('Nearest First'),
+                    selected: _nearest,
+                    onSelected: (v) => setState(() => _nearest = v),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    colors: [RemedooTheme.purple, Color(0xFF8B5CF6)]),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.science, color: Colors.white),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Home sample collection — free above ₹299!',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${list.length} labs near you',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            Expanded(child: _resultsBody(list)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _resultsBody(List<Lab> list) {
+    Widget grid({
+      required int itemCount,
+      required Widget Function(BuildContext, int) itemBuilder,
+    }) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return ResponsiveGrid(
+            compactCols: 1,
+            mediumCols: 2,
+            expandedCols: 3,
+            wideCols: 4,
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            childAspectRatio:
+                _aspectFor(constraints.maxWidth, context),
+            itemCount: itemCount,
+            itemBuilder: itemBuilder,
+          );
+        },
+      );
+    }
+
+    if (_loading) {
+      return grid(
+        itemCount: 6,
+        itemBuilder: (_, _) => const SkeletonCard(height: 150),
+      );
+    }
+    if (list.isEmpty) {
+      return const EmptyState(
+        icon: Icons.science,
+        title: 'No labs found',
+        subtitle: 'Try a different search or filter.',
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () async {
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted) setState(() {});
+      },
+      child: grid(
+        itemCount: list.length,
+        itemBuilder: (_, i) =>
+            StaggerItem(index: i % 6, child: _card(list[i])),
       ),
     );
   }
@@ -178,7 +241,6 @@ class _LabsScreenState extends State<LabsScreen> {
   Widget _card(Lab l) {
     final comparing = _compareA != null;
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {
@@ -186,22 +248,18 @@ class _LabsScreenState extends State<LabsScreen> {
             LabCompareSheet.show(context, _compareA!, l);
             setState(() => _compareA = null);
           } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => LabDetailScreen(lab: l)),
-            );
+            pushPage(context, LabDetailScreen(lab: l));
           }
         },
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: RemedooTheme.teal,
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20)),
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Center(
                 child: Text(
@@ -212,71 +270,100 @@ class _LabsScreenState extends State<LabsScreen> {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: RemedooTheme.teal.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(Icons.science,
-                        color: RemedooTheme.teal, size: 30),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(l.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16)),
+                        Hero(
+                          tag: 'lab-image-${l.id}',
+                          child: Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: RemedooTheme.teal
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            if (l.verified)
-                              const Icon(Icons.verified,
-                                  size: 18,
-                                  color: RemedooTheme.primary),
-                            FavoriteButton(favKey: 'lab:${l.id}'),
-                          ],
+                            child: const Icon(Icons.science,
+                                color: RemedooTheme.teal, size: 30),
+                          ),
                         ),
-                        Text(l.location,
-                            style: const TextStyle(
-                                fontSize: 13, color: Colors.grey)),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            RatingPill(rating: l.rating),
-                            _miniChip(
-                                '${l.distanceKm.toStringAsFixed(1)} km'),
-                            _miniChip('Report in ${l.turnaround}'),
-                            _miniChip('${l.testCount} tests'),
-                            if (l.nabl) _miniChip('NABL'),
-                          ],
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () => setState(() => _compareA =
-                                _compareA?.id == l.id ? null : l),
-                            child: Text(_compareA?.id == l.id
-                                ? 'Cancel compare'
-                                : 'Compare'),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(l.name,
+                                        maxLines: 1,
+                                        overflow:
+                                            TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            fontWeight:
+                                                FontWeight.w700,
+                                            fontSize: 16)),
+                                  ),
+                                  if (l.verified)
+                                    const Icon(Icons.verified,
+                                        size: 18,
+                                        color: RemedooTheme.primary),
+                                  FavoriteButton(
+                                      favKey: 'lab:${l.id}'),
+                                ],
+                              ),
+                              Text(l.location,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey)),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 34,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          RatingPill(rating: l.rating),
+                          const SizedBox(width: 8),
+                          _miniChip(
+                              '${l.distanceKm.toStringAsFixed(1)} km'),
+                          const SizedBox(width: 8),
+                          _miniChip('Report in ${l.turnaround}'),
+                          const SizedBox(width: 8),
+                          _miniChip('${l.testCount} tests'),
+                          if (l.nabl) ...[
+                            const SizedBox(width: 8),
+                            _miniChip('NABL'),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => setState(() => _compareA =
+                            _compareA?.id == l.id ? null : l),
+                        child: Text(_compareA?.id == l.id
+                            ? 'Cancel compare'
+                            : 'Compare'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

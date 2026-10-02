@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -52,7 +53,8 @@ class _SignupScreenState extends State<SignupScreen> {
     return Scaffold(
       appBar: AppBar(),
       body: SafeArea(
-        child: ResponsiveBody(
+        child: MaxWidthBox(
+          maxWidth: 480,
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
@@ -128,7 +130,13 @@ class _SignupScreenState extends State<SignupScreen> {
                 }),
               ),
               const SizedBox(height: 20),
-              FilledButton(onPressed: _signUp, child: const Text('Sign Up')),
+              FilledButton(
+                onPressed: _signUp,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(64, 48),
+                ),
+                child: const Text('Sign Up'),
+              ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: _signUp,
@@ -141,8 +149,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Text('Already have an account? '),
                   TextButton(

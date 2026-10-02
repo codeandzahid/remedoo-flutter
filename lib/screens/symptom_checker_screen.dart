@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../theme.dart';
 import 'care_match_screen.dart';
 
@@ -78,28 +80,30 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
     if (_done) return _results();
     return Scaffold(
       appBar: AppBar(title: const Text('Symptom Checker')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            LinearProgressIndicator(
-              value: (_step + 1) / 5,
-              backgroundColor: Colors.grey.shade200,
-              color: RemedooTheme.primary,
-            ),
-            const SizedBox(height: 8),
-            Text('Step ${_step + 1} of 5',
-                style:
-                    const TextStyle(color: Colors.grey, fontSize: 13)),
-            const SizedBox(height: 16),
-            Expanded(child: _stepBody()),
-            FilledButton(
-              onPressed: _canNext ? _next : null,
-              child: Text(_step == 4 ? 'See results' : 'Continue'),
-            ),
-            const SizedBox(height: 8),
-          ],
+      body: MaxWidthBox(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LinearProgressIndicator(
+                value: (_step + 1) / 5,
+                backgroundColor: Colors.grey.shade200,
+                color: RemedooTheme.primary,
+              ),
+              const SizedBox(height: 8),
+              Text('Step ${_step + 1} of 5',
+                  style:
+                      const TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 16),
+              Expanded(child: _stepBody()),
+              BigTargetButton(
+                onPressed: _canNext ? _next : null,
+                child: Text(_step == 4 ? 'See results' : 'Continue'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -163,13 +167,25 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _existing.map((c) {
+              children: _existing.asMap().entries.map((e) {
+                final c = e.value;
                 final sel = _conditions.contains(c);
-                return FilterChip(
-                  label: Text(c),
-                  selected: sel,
-                  onSelected: (_) => setState(() =>
-                      sel ? _conditions.remove(c) : _conditions.add(c)),
+                return StaggerItem(
+                  index: e.key % 6,
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(minHeight: 56),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilterChip(
+                        label: Text(c),
+                        selected: sel,
+                        onSelected: (_) => setState(() => sel
+                            ? _conditions.remove(c)
+                            : _conditions.add(c)),
+                      ),
+                    ),
+                  ),
                 );
               }).toList(),
             ),
@@ -190,17 +206,29 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: options.map((o) {
+          children: options.asMap().entries.map((e) {
+            final o = e.value;
             final sel = o == selected;
-            return ChoiceChip(
-              label: Text(o),
-              selected: sel,
-              onSelected: (_) => onPick(o),
-              selectedColor: RemedooTheme.primary,
-              labelStyle: TextStyle(
-                  color: sel
-                      ? Colors.white
-                      : Theme.of(context).colorScheme.onSurface),
+            return StaggerItem(
+              index: e.key % 6,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 56),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ChoiceChip(
+                    label: Text(o),
+                    selected: sel,
+                    onSelected: (_) => onPick(o),
+                    selectedColor: RemedooTheme.primary,
+                    labelStyle: TextStyle(
+                        color: sel
+                            ? Colors.white
+                            : Theme.of(context)
+                                .colorScheme
+                                .onSurface),
+                  ),
+                ),
+              ),
             );
           }).toList(),
         ),
@@ -229,87 +257,94 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('Possible Conditions')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'Based on your answers, here are some possibilities. '
-                'This is not a diagnosis — please consult a doctor for proper evaluation.',
-                style: TextStyle(fontSize: 14),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...conditions.map((c) {
-            final (name, pct, desc) = c;
-            return Card(
-              margin: const EdgeInsets.only(bottom: 10),
+      body: MaxWidthBox(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children: [
-                          Text(name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 16)),
-                          const SizedBox(height: 6),
-                          Text(desc,
-                              style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      children: [
-                        Text('$pct%',
-                            style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                color: RemedooTheme.primary)),
-                        const Text('match',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                  ],
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Based on your answers, here are some possibilities. '
+                  'This is not a diagnosis — please consult a doctor for proper evaluation.',
+                  style: TextStyle(fontSize: 14),
                 ),
               ),
-            );
-          }),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Text(
-              'Not a diagnosis. If symptoms are severe or worsening, seek care immediately.',
-              style: TextStyle(fontSize: 13),
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () => Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    CareMatchScreen(initialSymptom: _symptom ?? ''),
+            const SizedBox(height: 12),
+            ...conditions.asMap().entries.map((e) {
+              final (name, pct, desc) = e.value;
+              return StaggerItem(
+                index: e.key % 6,
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16)),
+                              const SizedBox(height: 6),
+                              Text(desc,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          children: [
+                            Text('$pct%',
+                                style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    color: RemedooTheme.primary)),
+                            const Text('match',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Not a diagnosis. If symptoms are severe or worsening, seek care immediately.',
+                style: TextStyle(fontSize: 13),
               ),
             ),
-            child: const Text('Find Care'),
-          ),
-        ],
+            const SizedBox(height: 16),
+            BigTargetButton(
+              onPressed: () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      CareMatchScreen(initialSymptom: _symptom ?? ''),
+                ),
+              ),
+              child: const Text('Find Care'),
+            ),
+          ],
+        ),
       ),
     );
   }

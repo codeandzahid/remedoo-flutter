@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -57,20 +59,22 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
-        children: [
-          _list(state.notifications),
-          _list(state.notifications
-              .where((n) => n.category == 'appointments')
-              .toList()),
-          _list(state.notifications
-              .where((n) => n.category == 'orders')
-              .toList()),
-          _list(state.notifications
-              .where((n) => n.category == 'system')
-              .toList()),
-        ],
+      body: MaxWidthBox(
+        child: TabBarView(
+          controller: _tabs,
+          children: [
+            _list(state.notifications),
+            _list(state.notifications
+                .where((n) => n.category == 'appointments')
+                .toList()),
+            _list(state.notifications
+                .where((n) => n.category == 'orders')
+                .toList()),
+            _list(state.notifications
+                .where((n) => n.category == 'system')
+                .toList()),
+          ],
+        ),
       ),
     );
   }
@@ -88,7 +92,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       itemCount: list.length,
       itemBuilder: (_, i) {
         final n = list[i];
-        return Card(
+        return StaggerItem(
+          index: i % 6,
+          child: Card(
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
             leading: Stack(
@@ -134,6 +140,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               n.read = true;
               AppStateScope.of(context).refresh();
             },
+          ),
           ),
         );
       },

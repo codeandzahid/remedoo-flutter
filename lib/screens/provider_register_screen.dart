@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -36,7 +37,8 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Become a Provider')),
-      body: ResponsiveBody(
+      body: MaxWidthBox(
+        maxWidth: 720,
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../data/mock_data.dart';
 import '../../models.dart';
+import '../../responsive/animations.dart';
+import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
@@ -65,73 +67,89 @@ class _LabPortalScreenState extends State<LabPortalScreen>
 
   Widget _catalog() {
     final list = labTests.toList();
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      itemBuilder: (_, i) {
-        final t = list[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            title: Text(t.name,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text(t.category),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(inr(t.price),
+    return MaxWidthBox(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: list.length,
+        itemBuilder: (_, i) {
+          final t = list[i];
+          return StaggerItem(
+            index: i % 6,
+            child: Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                title: Text(t.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: RemedooTheme.primary)),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 20),
-                  onPressed: () => _testDialog(t),
+                        fontWeight: FontWeight.w600)),
+                subtitle: Text(t.category,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(inr(t.price),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: RemedooTheme.primary)),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined,
+                          size: 20),
+                      onPressed: () => _testDialog(t),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline,
+                          size: 20,
+                          color: RemedooTheme.emergency),
+                      onPressed: () async {
+                        final ok = await confirmDialog(
+                          context,
+                          title: 'Delete test?',
+                          message:
+                              'Remove "${t.name}" from the catalog?',
+                          confirmLabel: 'Delete',
+                        );
+                        if (ok && mounted) {
+                          labTests.remove(t);
+                          AppStateScope.of(context).refresh();
+                        }
+                      },
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline,
-                      size: 20, color: RemedooTheme.emergency),
-                  onPressed: () async {
-                    final ok = await confirmDialog(
-                      context,
-                      title: 'Delete test?',
-                      message: 'Remove "${t.name}" from the catalog?',
-                      confirmLabel: 'Delete',
-                    );
-                    if (ok && mounted) {
-                      labTests.remove(t);
-                      AppStateScope.of(context).refresh();
-                    }
-                  },
-                ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
   void _testDialog(LabTest? existing) {
-    final name = TextEditingController(text: existing?.name ?? '');
+    final name =
+        TextEditingController(text: existing?.name ?? '');
     final price = TextEditingController(
-        text: existing != null ? existing.price.toStringAsFixed(0) : '');
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(existing == null ? 'Add Test' : 'Edit Test'),
+        text: existing != null
+            ? existing.price.toStringAsFixed(0)
+            : '');
+    showResponsiveDialog(
+      context,
+      (_) => AlertDialog(
+        title:
+            Text(existing == null ? 'Add Test' : 'Edit Test'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
                 controller: name,
-                decoration:
-                    const InputDecoration(labelText: 'Test name')),
+                decoration: const InputDecoration(
+                    labelText: 'Test name')),
             TextField(
               controller: price,
               keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(labelText: 'Price (₹)'),
+              decoration: const InputDecoration(
+                  labelText: 'Price (₹)'),
             ),
           ],
         ),
@@ -145,7 +163,8 @@ class _LabPortalScreenState extends State<LabPortalScreen>
               final p = double.tryParse(price.text) ?? 0;
               if (existing == null) {
                 labTests.add(LabTest(
-                  id: 't${DateTime.now().millisecondsSinceEpoch}',
+                  id:
+                      't${DateTime.now().millisecondsSinceEpoch}',
                   name: name.text.trim(),
                   price: p,
                 ));
@@ -171,8 +190,9 @@ class _LabPortalScreenState extends State<LabPortalScreen>
 
   Widget _bookings() {
     final state = AppStateScope.of(context);
-    final list =
-        state.appointments.where((a) => a.kind == 'lab').toList();
+    final list = state.appointments
+        .where((a) => a.kind == 'lab')
+        .toList();
     if (list.isEmpty) {
       return const EmptyState(
         icon: Icons.science,
@@ -180,71 +200,84 @@ class _LabPortalScreenState extends State<LabPortalScreen>
         subtitle: 'Patient test bookings will appear here.',
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      itemBuilder: (_, i) {
-        final a = list[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            title: Text(a.doctorName,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text(
-                '${a.dateLabel} • ${a.timeLabel}\n${a.tests.length} tests'),
-            isThreeLine: true,
-            trailing: StatusChip(status: a.status),
-          ),
-        );
-      },
+    return MaxWidthBox(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: list.length,
+        itemBuilder: (_, i) {
+          final a = list[i];
+          return StaggerItem(
+            index: i % 6,
+            child: Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: ListTile(
+                title: Text(a.doctorName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700)),
+                subtitle: Text(
+                    '${a.dateLabel} • ${a.timeLabel}\n${a.tests.length} tests',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+                isThreeLine: true,
+                trailing: StatusChip(status: a.status),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
   Widget _reports() {
     final state = AppStateScope.of(context);
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Upload report',
+    return MaxWidthBox(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  const Text('Upload report',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16)),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Attach a completed report PDF for a booking. (demo)',
                     style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16)),
-                const SizedBox(height: 8),
-                const Text(
-                  'Attach a completed report PDF for a booking. (demo)',
-                  style:
-                      TextStyle(fontSize: 13, color: Colors.grey),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    state.addNotification(
-                      title: 'Report uploaded',
-                      message:
-                          'Your lab report is ready to view.',
-                      category: 'system',
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text(
-                              'Report uploaded! (demo)')),
-                    );
-                  },
-                  icon: const Icon(Icons.upload_file),
-                  label: const Text('Upload PDF'),
-                ),
-              ],
+                        fontSize: 13, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      state.addNotification(
+                        title: 'Report uploaded',
+                        message:
+                            'Your lab report is ready to view.',
+                        category: 'system',
+                      );
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(
+                        const SnackBar(
+                            content: Text(
+                                'Report uploaded! (demo)')),
+                      );
+                    },
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Upload PDF'),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

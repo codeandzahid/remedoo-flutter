@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/responsive.dart';
 import '../theme.dart';
-import '../widgets/widgets.dart';
 
 /// Set a new password (demo).
 class ResetPasswordScreen extends StatefulWidget {
@@ -36,7 +36,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     final s = _strength(_p1.text);
     return Scaffold(
       appBar: AppBar(title: const Text('Reset Password')),
-      body: ResponsiveBody(
+      body: MaxWidthBox(
+        maxWidth: 480,
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
@@ -87,6 +88,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ),
             const SizedBox(height: 20),
             FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(64, 48),
+              ),
               onPressed: () {
                 if (_p1.text.length < 8) {
                   ScaffoldMessenger.of(context).showSnackBar(

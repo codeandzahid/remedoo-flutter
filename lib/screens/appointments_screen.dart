@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -52,12 +54,14 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
           tabs: const [Tab(text: 'Upcoming'), Tab(text: 'Past')],
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
-        children: [
-          _list(upcoming, state, isUpcoming: true),
-          _list(past, state, isUpcoming: false),
-        ],
+      body: MaxWidthBox(
+        child: TabBarView(
+          controller: _tabs,
+          children: [
+            _list(upcoming, state, isUpcoming: true),
+            _list(past, state, isUpcoming: false),
+          ],
+        ),
       ),
     );
   }
@@ -75,18 +79,17 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
             : 'Your completed visits will appear here.',
         actionLabel: isUpcoming ? 'Book Now' : null,
         onAction: isUpcoming
-            ? () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const DoctorsScreen()),
-                )
+            ? () => pushPage(context, const DoctorsScreen())
             : null,
       );
     }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: list.length,
-      itemBuilder: (_, i) => _card(list[i], state, isUpcoming),
+      itemBuilder: (_, i) => StaggerItem(
+        index: i % 6,
+        child: _card(list[i], state, isUpcoming),
+      ),
     );
   }
 
@@ -95,11 +98,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => AppointmentDetailScreen(appointment: a)),
-        ),
+        onTap: () =>
+            pushPage(context, AppointmentDetailScreen(appointment: a)),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -136,18 +136,16 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.push(
+                        onPressed: () => pushPage(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => BookingScreen(
-                              kind: a.kind,
-                              refId: a.refId,
-                              title: a.doctorName,
-                              subtitle: a.specialty,
-                              place: a.place,
-                              fee: a.fee,
-                              prefill: a,
-                            ),
+                          BookingScreen(
+                            kind: a.kind,
+                            refId: a.refId,
+                            title: a.doctorName,
+                            subtitle: a.specialty,
+                            place: a.place,
+                            fee: a.fee,
+                            prefill: a,
                           ),
                         ),
                         child: const Text('Reschedule'),

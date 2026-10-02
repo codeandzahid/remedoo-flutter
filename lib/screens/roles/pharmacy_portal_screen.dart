@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../data/mock_data.dart';
 import '../../models.dart';
+import '../../responsive/animations.dart';
+import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
@@ -15,7 +17,8 @@ class PharmacyPortalScreen extends StatefulWidget {
       _PharmacyPortalScreenState();
 }
 
-class _PharmacyPortalScreenState extends State<PharmacyPortalScreen>
+class _PharmacyPortalScreenState
+    extends State<PharmacyPortalScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   final Pharmacy _me = pharmacies[0];
@@ -58,63 +61,82 @@ class _PharmacyPortalScreenState extends State<PharmacyPortalScreen>
 
   Widget _inventory() {
     final state = AppStateScope.of(context);
-    final list =
-        medicinesForPharmacy(_me.id).where((m) => m.active).toList();
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      itemBuilder: (_, i) {
-        final m = list[i];
-        final stock = state.stockOf(m.id);
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(m.name,
-                    style:
-                        const TextStyle(fontWeight: FontWeight.w700)),
-                Text('${m.pack} • ${m.brand}',
-                    style: const TextStyle(
-                        fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 8),
-                Row(
+    final list = medicinesForPharmacy(_me.id)
+        .where((m) => m.active)
+        .toList();
+    return MaxWidthBox(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: list.length,
+        itemBuilder: (_, i) {
+          final m = list[i];
+          final stock = state.stockOf(m.id);
+          return StaggerItem(
+            index: i % 6,
+            child: Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
-                    const Text('Stock: '),
-                    QtyStepper(
-                      qty: stock,
-                      onMinus: () =>
-                          state.setStock(m.id, stock - 1),
-                      onPlus: () =>
-                          state.setStock(m.id, stock + 1),
-                    ),
-                    const Spacer(),
-                    SizedBox(
-                      width: 90,
-                      child: TextFormField(
-                        initialValue: state
-                            .priceOf(m)
-                            .toStringAsFixed(0),
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          prefixText: '₹',
-                          isDense: true,
+                    Text(m.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700)),
+                    Text('${m.pack} • ${m.brand}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Text('Stock: '),
+                        Flexible(
+                          child: QtyStepper(
+                            qty: stock,
+                            onMinus: () => state.setStock(
+                                m.id, stock - 1),
+                            onPlus: () => state.setStock(
+                                m.id, stock + 1),
+                          ),
                         ),
-                        onFieldSubmitted: (v) {
-                          final p = double.tryParse(v);
-                          if (p != null) state.setPrice(m.id, p);
-                        },
-                      ),
+                        const Spacer(),
+                        SizedBox(
+                          width: 90,
+                          child: TextFormField(
+                            initialValue: state
+                                .priceOf(m)
+                                .toStringAsFixed(0),
+                            keyboardType:
+                                TextInputType.number,
+                            decoration:
+                                const InputDecoration(
+                              prefixText: '₹',
+                              isDense: true,
+                            ),
+                            onFieldSubmitted: (v) {
+                              final p =
+                                  double.tryParse(v);
+                              if (p != null) {
+                                state.setPrice(m.id, p);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -127,53 +149,69 @@ class _PharmacyPortalScreenState extends State<PharmacyPortalScreen>
       return const EmptyState(
         icon: Icons.shopping_bag_outlined,
         title: 'No incoming orders',
-        subtitle: 'New orders from patients will appear here.',
+        subtitle:
+            'New orders from patients will appear here.',
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      itemBuilder: (_, i) {
-        final o = list[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return MaxWidthBox(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: list.length,
+        itemBuilder: (_, i) {
+          final o = list[i];
+          return StaggerItem(
+            index: i % 6,
+            child: Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text('Order ${o.id}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w800)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('Order ${o.id}',
+                              maxLines: 1,
+                              overflow:
+                                  TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontWeight:
+                                      FontWeight.w800)),
+                        ),
+                        StatusChip(status: o.status),
+                      ],
                     ),
-                    StatusChip(status: o.status),
+                    const SizedBox(height: 6),
+                    Text(
+                        '${o.items.length} items • ${inr(o.total)}'),
+                    Text(o.address,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey)),
+                    if (o.status != 'delivered') ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () =>
+                              state.advanceOrderStatus(
+                                  o.id),
+                          child:
+                              Text(_nextLabel(o.status)),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                    '${o.items.length} items • ${inr(o.total)}'),
-                Text(o.address,
-                    style: const TextStyle(
-                        fontSize: 12, color: Colors.grey)),
-                if (o.status != 'delivered') ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () =>
-                          state.advanceOrderStatus(o.id),
-                      child: Text(_nextLabel(o.status)),
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 

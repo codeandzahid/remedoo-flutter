@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -29,6 +31,15 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
   bool _icu = false;
   bool _govt = false;
   bool _nearest = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
 
   @override
   void dispose() {
@@ -64,131 +75,178 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
     return list;
   }
 
+  double _aspectFor(double maxWidth, BuildContext context) {
+    final cols = const ResponsiveValue<int>(
+      compact: 1,
+      medium: 2,
+      expanded: 3,
+      wide: 4,
+    ).of(context);
+    final cellW = (maxWidth - 32 - 12 * (cols - 1)) / cols;
+    // Card content height is width-independent (~214 logical px); 235
+    // leaves slack for larger text scales. Buttons pin to the cell bottom.
+    return (cellW / 235).clamp(0.6, 3.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final list = _filtered(state);
     return Scaffold(
       appBar: AppBar(title: const Text('Hospitals')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: TextField(
-              controller: _search,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'Search hospitals…',
-                prefixIcon: Icon(Icons.search),
+      body: MaxWidthBox(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: TextField(
+                controller: _search,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  hintText: 'Search hospitals…',
+                  prefixIcon: Icon(Icons.search),
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: DropdownButtonFormField<String>(
-              initialValue: _sort,
-              decoration: const InputDecoration(
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12)),
-              items: _sortOptions
-                  .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-                  .toList(),
-              onChanged: (v) =>
-                  setState(() => _sort = v ?? _sortOptions.first),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                FilterChip(
-                  label: const Text('Rating 4.0+'),
-                  selected: _rating4,
-                  onSelected: (v) => setState(() => _rating4 = v),
-                ),
-                FilterChip(
-                  label: const Text('Has ICU'),
-                  selected: _icu,
-                  onSelected: (v) => setState(() => _icu = v),
-                ),
-                FilterChip(
-                  label: const Text('Government'),
-                  selected: _govt,
-                  onSelected: (v) => setState(() => _govt = v),
-                ),
-                FilterChip(
-                  label: const Text('Nearest First'),
-                  selected: _nearest,
-                  onSelected: (v) => setState(() => _nearest = v),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [RemedooTheme.teal, Color(0xFF3BB98A)]),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.health_and_safety, color: Colors.white),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Free health checkup on your first hospital visit!',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '${list.length} hospitals near you',
-                style: const TextStyle(fontWeight: FontWeight.w700),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: DropdownButtonFormField<String>(
+                initialValue: _sort,
+                decoration: const InputDecoration(
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12)),
+                items: _sortOptions
+                    .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+                    .toList(),
+                onChanged: (v) =>
+                    setState(() => _sort = v ?? _sortOptions.first),
               ),
             ),
-          ),
-          Expanded(
-            child: list.isEmpty
-                ? const EmptyState(
-                    icon: Icons.local_hospital,
-                    title: 'No hospitals found',
-                    subtitle: 'Try a different search or filter.',
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                    itemCount: list.length,
-                    itemBuilder: (_, i) => _card(list[i]),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  FilterChip(
+                    label: const Text('Rating 4.0+'),
+                    selected: _rating4,
+                    onSelected: (v) => setState(() => _rating4 = v),
                   ),
-          ),
-        ],
+                  FilterChip(
+                    label: const Text('Has ICU'),
+                    selected: _icu,
+                    onSelected: (v) => setState(() => _icu = v),
+                  ),
+                  FilterChip(
+                    label: const Text('Government'),
+                    selected: _govt,
+                    onSelected: (v) => setState(() => _govt = v),
+                  ),
+                  FilterChip(
+                    label: const Text('Nearest First'),
+                    selected: _nearest,
+                    onSelected: (v) => setState(() => _nearest = v),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    colors: [RemedooTheme.teal, Color(0xFF3BB98A)]),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.health_and_safety, color: Colors.white),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Free health checkup on your first hospital visit!',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${list.length} hospitals near you',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            Expanded(child: _resultsBody(list)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _resultsBody(List<Hospital> list) {
+    Widget grid({
+      required int itemCount,
+      required Widget Function(BuildContext, int) itemBuilder,
+    }) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return ResponsiveGrid(
+            compactCols: 1,
+            mediumCols: 2,
+            expandedCols: 3,
+            wideCols: 4,
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            childAspectRatio:
+                _aspectFor(constraints.maxWidth, context),
+            itemCount: itemCount,
+            itemBuilder: itemBuilder,
+          );
+        },
+      );
+    }
+
+    if (_loading) {
+      return grid(
+        itemCount: 6,
+        itemBuilder: (_, _) => const SkeletonCard(height: 150),
+      );
+    }
+    if (list.isEmpty) {
+      return const EmptyState(
+        icon: Icons.local_hospital,
+        title: 'No hospitals found',
+        subtitle: 'Try a different search or filter.',
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () async {
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted) setState(() {});
+      },
+      child: grid(
+        itemCount: list.length,
+        itemBuilder: (_, i) =>
+            StaggerItem(index: i % 6, child: _card(list[i])),
       ),
     );
   }
 
   Widget _card(Hospital h) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => HospitalDetailScreen(hospital: h)),
-        ),
+        onTap: () =>
+            pushPage(context, HospitalDetailScreen(hospital: h)),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
                 gradient: RemedooTheme.headerGradient,
@@ -206,82 +264,108 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: RemedooTheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(Icons.local_hospital,
-                        color: RemedooTheme.primary, size: 30),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(h.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16)),
+                        Hero(
+                          tag: 'hospital-image-${h.id}',
+                          child: Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: RemedooTheme.primary
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            if (h.verified)
-                              const Icon(Icons.verified,
-                                  size: 18,
-                                  color: RemedooTheme.primary),
-                            FavoriteButton(
-                                favKey: 'hospital:${h.id}'),
-                          ],
+                            child: const Icon(Icons.local_hospital,
+                                color: RemedooTheme.primary, size: 30),
+                          ),
                         ),
-                        Text(h.location,
-                            style: const TextStyle(
-                                fontSize: 13, color: Colors.grey)),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            RatingPill(rating: h.rating),
-                            _miniChip('${h.beds} beds'),
-                            if (h.hasIcu) _miniChip('ICU'),
-                            _miniChip(
-                                '${h.distanceKm.toStringAsFixed(1)} km'),
-                            _miniChip('${h.waitMin} min wait'),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => BookingScreen(
-                                  kind: 'hospital',
-                                  refId: h.id,
-                                  title: h.name,
-                                  subtitle: 'General Consultation',
-                                  place: h.location,
-                                  fee: 300,
-                                ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(h.name,
+                                        maxLines: 1,
+                                        overflow:
+                                            TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            fontWeight:
+                                                FontWeight.w700,
+                                            fontSize: 16)),
+                                  ),
+                                  if (h.verified)
+                                    const Icon(Icons.verified,
+                                        size: 18,
+                                        color: RemedooTheme.primary),
+                                  FavoriteButton(
+                                      favKey: 'hospital:${h.id}'),
+                                ],
                               ),
-                            ),
-                            child: const Text('Book Appointment'),
+                              Text(h.location,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey)),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 34,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          RatingPill(rating: h.rating),
+                          const SizedBox(width: 8),
+                          _miniChip('${h.beds} beds'),
+                          const SizedBox(width: 8),
+                          if (h.hasIcu) ...[
+                            _miniChip('ICU'),
+                            const SizedBox(width: 8),
+                          ],
+                          _miniChip(
+                              '${h.distanceKm.toStringAsFixed(1)} km'),
+                          const SizedBox(width: 8),
+                          _miniChip('${h.waitMin} min wait'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Spacer(),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => pushPage(
+                          context,
+                          BookingScreen(
+                            kind: 'hospital',
+                            refId: h.id,
+                            title: h.name,
+                            subtitle: 'General Consultation',
+                            place: h.location,
+                            fee: 300,
+                          ),
+                        ),
+                        child: const Text('Book Appointment'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

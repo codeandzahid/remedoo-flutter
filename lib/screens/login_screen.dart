@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -48,7 +50,8 @@ class _LoginScreenState extends State<LoginScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: ResponsiveBody(
+        child: MaxWidthBox(
+          maxWidth: 480,
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
@@ -113,17 +116,17 @@ class _LoginScreenState extends State<LoginScreen>
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const ForgotPasswordScreen()),
-                  ),
+                  onPressed: () => pushPage(
+                      context, const ForgotPasswordScreen()),
                   child: const Text('Forgot Password?',
                       style: TextStyle(color: RemedooTheme.primary)),
                 ),
               ),
               FilledButton(
                 onPressed: _signIn,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(64, 48),
+                ),
                 child: Text(_tabs.index == 1 ? 'Send Magic Link' : 'Sign In'),
               ),
               const SizedBox(height: 12),
@@ -153,27 +156,22 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Text("Don't have an account? "),
                   TextButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const SignupScreen()),
-                    ),
+                    onPressed: () =>
+                        pushPage(context, const SignupScreen()),
                     child: const Text('Sign Up',
                         style: TextStyle(color: RemedooTheme.primary)),
                   ),
                 ],
               ),
               TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const ProviderRegisterScreen()),
-                ),
+                onPressed: () =>
+                    pushPage(context, const ProviderRegisterScreen()),
                 child: const Text('Are you a provider? Register',
                     style: TextStyle(color: RemedooTheme.primary)),
               ),
@@ -186,11 +184,8 @@ class _LoginScreenState extends State<LoginScreen>
               const SizedBox(height: 8),
               Center(
                 child: TextButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const AdminLoginScreen()),
-                  ),
+                  onPressed: () =>
+                      pushPage(context, const AdminLoginScreen()),
                   child: Text('Admin',
                       style: TextStyle(
                           color: Theme.of(context)

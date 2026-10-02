@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
 
 /// Generic admin list: search, add/edit dialog from field specs,
 /// delete with confirm, active toggle.
+/// On phones/tablets the rows render as cards; on desktop (>=1100)
+/// they render as a real DataTable.
 class AdminCrudScreen extends StatefulWidget {
   final EntitySpec spec;
 
@@ -45,60 +48,145 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
     var rows = spec.read();
     if (q.isNotEmpty) {
       rows = rows
-          .where((r) => r.values
-              .any((v) => v.toLowerCase().contains(q)))
+          .where((r) =>
+              r.values.any((v) => v.toLowerCase().contains(q)))
           .toList();
     }
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _search,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    hintText: 'Search…',
-                    prefixIcon: Icon(Icons.search),
-                    isDense: true,
+    return MaxWidthBox(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _search,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      hintText: 'Search…',
+                      prefixIcon: Icon(Icons.search),
+                      isDense: true,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: () => _editDialog(null),
-                icon: const Icon(Icons.add),
-                label: Text('Add ${spec.singular}'),
-              ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: () => _editDialog(null),
+                  icon: const Icon(Icons.add),
+                  label: Text('Add ${spec.singular}'),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('${rows.length} ${spec.title.toLowerCase()}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700)),
+            ),
+          ),
+          Expanded(
+            child: rows.isEmpty
+                ? const EmptyState(
+                    icon: Icons.inbox,
+                    title: 'Nothing here',
+                    subtitle: 'Add the first entry.',
+                  )
+                : context.isDesktop
+                    ? _dataTable(rows, spec)
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: rows.length,
+                        itemBuilder: (_, i) =>
+                            _row(rows[i], spec),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Desktop layout: real DataTable built from the entity field specs.
+  Widget _dataTable(
+      List<Map<String, String>> rows, EntitySpec spec) {
+    final hasToggle = spec.rowActive != null;
+    return Scrollbar(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columns: [
+              for (final f in spec.fields)
+                DataColumn(
+                  label: Text(f.label,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800)),
+                ),
+              if (hasToggle)
+                const DataColumn(
+                    label: Text('Active',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800))),
+              const DataColumn(
+                  label: Text('Actions',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w800))),
+            ],
+            rows: [
+              for (final r in rows)
+                DataRow(cells: [
+                  for (final f in spec.fields)
+                    DataCell(
+                      ConstrainedBox(
+                        constraints:
+                            const BoxConstraints(maxWidth: 220),
+                        child: Text(
+                          f.type == 'toggle'
+                              ? ((r[f.key] ?? '0') == '1'
+                                  ? 'Yes'
+                                  : 'No')
+                              : (r[f.key] ?? ''),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  if (hasToggle)
+                    DataCell(Switch(
+                      value: spec.rowActive!(r),
+                      activeThumbColor:
+                          RemedooTheme.ratingGreen,
+                      onChanged: (v) =>
+                          spec.setRowActive!(r['id'] ?? '', v),
+                    )),
+                  DataCell(Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined,
+                            size: 20),
+                        tooltip: 'Edit',
+                        onPressed: () => _editDialog(r),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline,
+                            size: 20,
+                            color: RemedooTheme.emergency),
+                        tooltip: 'Delete',
+                        onPressed: () =>
+                            _confirmDelete(r, spec),
+                      ),
+                    ],
+                  )),
+                ]),
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text('${rows.length} ${spec.title.toLowerCase()}',
-                style:
-                    const TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ),
-        Expanded(
-          child: rows.isEmpty
-              ? const EmptyState(
-                  icon: Icons.inbox,
-                  title: 'Nothing here',
-                  subtitle: 'Add the first entry.',
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: rows.length,
-                  itemBuilder: (_, i) =>
-                      _row(rows[i], spec),
-                ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -109,9 +197,13 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         title: Text(_title(r),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle:
-            _subtitle(r).isEmpty ? null : Text(_subtitle(r)),
+        subtitle: _subtitle(r).isEmpty
+            ? null
+            : Text(_subtitle(r),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -129,20 +221,23 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
             IconButton(
               icon: const Icon(Icons.delete_outline,
                   size: 20, color: RemedooTheme.emergency),
-              onPressed: () async {
-                final ok = await confirmDialog(
-                  context,
-                  title: 'Delete ${spec.singular}?',
-                  message: '"${_title(r)}" will be removed.',
-                  confirmLabel: 'Delete',
-                );
-                if (ok) spec.remove(id);
-              },
+              onPressed: () => _confirmDelete(r, spec),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(
+      Map<String, String> r, EntitySpec spec) async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Delete ${spec.singular}?',
+      message: '"${_title(r)}" will be removed.',
+      confirmLabel: 'Delete',
+    );
+    if (ok) spec.remove(r['id'] ?? '');
   }
 
   void _editDialog(Map<String, String>? row) {
@@ -155,9 +250,9 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
       for (final f in spec.fields.where((f) => f.type == 'toggle'))
         f.key: (row?[f.key] ?? '0') == '1'
     };
-    showDialog(
-      context: context,
-      builder: (_) => StatefulBuilder(
+    showResponsiveDialog(
+      context,
+      (_) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
           title: Text(
               '${row == null ? 'Add' : 'Edit'} ${spec.singular}'),

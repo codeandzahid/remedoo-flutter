@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../responsive/animations.dart';
+import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -14,19 +16,23 @@ class FamilyScreen extends StatelessWidget {
     final state = AppStateScope.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Family Members')),
-      body: state.family.isEmpty
-          ? const EmptyState(
-              icon: Icons.family_restroom,
-              title: 'No family members yet',
-              subtitle:
-                  'Add your loved ones to manage their health in one place.',
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: state.family.length,
-              itemBuilder: (_, i) =>
-                  _card(context, state, state.family[i]),
-            ),
+      body: MaxWidthBox(
+        child: state.family.isEmpty
+            ? const EmptyState(
+                icon: Icons.family_restroom,
+                title: 'No family members yet',
+                subtitle:
+                    'Add your loved ones to manage their health in one place.',
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: state.family.length,
+                itemBuilder: (_, i) => StaggerItem(
+                  index: i % 6,
+                  child: _card(context, state, state.family[i]),
+                ),
+              ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addDialog(context, state),
         icon: const Icon(Icons.add),
@@ -65,9 +71,9 @@ class FamilyScreen extends StatelessWidget {
     final name = TextEditingController();
     final relation = TextEditingController();
     final age = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
+    showResponsiveDialog(
+      context,
+      (_) => AlertDialog(
         title: const Text('Add Family Member'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
