@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remedoo_app/main.dart';
 import 'package:remedoo_app/state/app_state.dart';
+import 'package:remedoo_app/services/auth_service.dart';
 import 'package:remedoo_app/screens/doctors_screen.dart';
 import 'package:remedoo_app/screens/pharmacy_detail_screen.dart';
 import 'package:remedoo_app/screens/booking_screen.dart';
@@ -17,6 +18,10 @@ Widget _wrap(Widget child) {
 }
 
 void main() {
+  // Supabase's token auto-refresh uses a periodic Timer that would keep
+  // pumpAndSettle from ever settling; disable it in widget tests.
+  AuthService.disableAutoRefresh = true;
+
   testWidgets('guest login lands on dashboard with greeting',
       (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
@@ -24,7 +29,13 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(
         AppStateScope(state: AppState(), child: const RemedooApp()));
-    await tester.pump(const Duration(milliseconds: 1600));
+    // RootGate waits for Supabase auth init (or its timeout) before routing.
+    for (var i = 0;
+        i < 40 &&
+            find.text('Book Appointments').evaluate().isEmpty;
+        i++) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
     await tester.pumpAndSettle();
     // Onboarding first launch
     expect(find.text('Book Appointments'), findsOneWidget);
@@ -112,7 +123,12 @@ void main() {
     state.switchRole('admin');
     await tester.pumpWidget(
         AppStateScope(state: state, child: const RemedooApp()));
-    await tester.pump(const Duration(milliseconds: 1600));
+    // RootGate waits for Supabase auth init (or its timeout) before routing.
+    for (var i = 0;
+        i < 40 && find.byType(AdminShell).evaluate().isEmpty;
+        i++) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
     await tester.pumpAndSettle();
     expect(find.byType(AdminShell), findsOneWidget);
   });

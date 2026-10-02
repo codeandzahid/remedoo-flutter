@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../responsive/responsive.dart';
+import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
-import 'reset_password_screen.dart';
 
 /// "Forgot Password": request a reset link (React ForgotPassword.tsx).
 class ForgotPasswordScreen extends StatefulWidget {
@@ -15,11 +15,39 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _email = TextEditingController();
+  bool _busy = false;
+  String? _error;
+  bool _sent = false;
+
+  static final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 
   @override
   void dispose() {
     _email.dispose();
     super.dispose();
+  }
+
+  Future<void> _send() async {
+    final email = _email.text.trim();
+    if (!_emailRegex.hasMatch(email)) {
+      setState(() => _error = 'Please enter a valid email address.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final result =
+        await AppStateScope.of(context).sendPasswordReset(email);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (result.ok) {
+        _sent = true;
+      } else {
+        _error = result.error;
+      }
+    });
   }
 
   @override
@@ -101,44 +129,111 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: RCard(
                   padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      RTextField(
-                        label: 'Email',
-                        hint: 'your@email.com',
-                        controller: _email,
-                        keyboardType: TextInputType.emailAddress,
-                        prefixIcon:
-                            const Icon(Icons.mail_outline, size: 18),
-                      ),
-                      const SizedBox(height: 20),
-                      RButton(
-                        label: 'Send Reset Link',
-                        fullWidth: true,
-                        onPressed: () {
-                          if (_email.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Please enter your email')),
-                            );
-                            return;
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    'Reset link sent! Check your inbox.')),
-                          );
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    const ResetPasswordScreen()),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                  child: _sent
+                      ? Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: RemedooTheme.success
+                                    .withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.mark_email_read_outlined,
+                                color: RemedooTheme.success,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Reset link sent!',
+                              style: textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Check your inbox for the password reset link. Tap the link to set a new password.',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Didn\'t get it? Check spam, or try again in a minute.',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.stretch,
+                          children: [
+                            RTextField(
+                              label: 'Email',
+                              hint: 'your@email.com',
+                              controller: _email,
+                              keyboardType:
+                                  TextInputType.emailAddress,
+                              prefixIcon: const Icon(
+                                  Icons.mail_outline,
+                                  size: 18),
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: RemedooTheme.emergency
+                                      .withValues(alpha: 0.08),
+                                  borderRadius:
+                                      BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: RemedooTheme.emergency
+                                        .withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(Icons.error_outline,
+                                        size: 18,
+                                        color:
+                                            RemedooTheme.emergency),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _error!,
+                                        style: textTheme.bodySmall
+                                            ?.copyWith(
+                                          color:
+                                              RemedooTheme.emergency,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 20),
+                            RButton(
+                              label: _busy
+                                  ? 'Please wait…'
+                                  : 'Send Reset Link',
+                              fullWidth: true,
+                              onPressed: _busy ? null : _send,
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ),

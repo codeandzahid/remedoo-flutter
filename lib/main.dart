@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'services/auth_service.dart';
 import 'state/app_state.dart';
 import 'theme.dart';
 import 'screens/splash_screen.dart';
@@ -7,7 +8,12 @@ import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/maintenance_screen.dart';
+import 'screens/reset_password_screen.dart';
 import 'screens/admin/admin_shell.dart';
+
+/// Global navigator key: lets the auth listener route to the new-password
+/// screen when a password-recovery link is opened, from anywhere.
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   runApp(
@@ -27,6 +33,7 @@ class RemedooApp extends StatelessWidget {
     return MaterialApp(
       title: 'Remedoo - Patient Health App',
       debugShowCheckedModeBanner: false,
+      navigatorKey: appNavigatorKey,
       theme: RemedooTheme.light(state.brandPrimary),
       darkTheme: RemedooTheme.dark(state.brandPrimary),
       themeMode: state.darkMode ? ThemeMode.dark : ThemeMode.light,
@@ -36,6 +43,9 @@ class RemedooApp extends StatelessWidget {
 }
 
 /// Splash -> onboarding -> login -> main shell (or maintenance).
+///
+/// Waits for Supabase auth init (session restore) before routing, so a
+/// persisted session lands straight in the app with no login flash.
 class RootGate extends StatefulWidget {
   const RootGate({super.key});
 
@@ -45,6 +55,8 @@ class RootGate extends StatefulWidget {
 
 class _RootGateState extends State<RootGate> {
   bool _splashDone = false;
+  bool _authReady = false;
+  bool _booted = false;
 
   @override
   void initState() {
@@ -55,10 +67,41 @@ class _RootGateState extends State<RootGate> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_booted) return;
+    _booted = true;
+    final state = AppStateScope.of(context);
+    state.onPasswordRecovery = _goToPasswordReset;
+    // Boot Supabase (persisted session restore + auth-link handling),
+    // then attach the auth listener. Never throws: offline falls back
+    // to the login/guest flow.
+    Future(() async {
+      await AuthService.instance.init();
+      state.attachAuthListener();
+      if (mounted) setState(() => _authReady = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    try {
+      AppStateScope.of(context).onPasswordRecovery = null;
+    } catch (_) {}
+    super.dispose();
+  }
+
+  void _goToPasswordReset() {
+    appNavigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     if (state.maintenanceMode) return const MaintenanceScreen();
-    if (!_splashDone) return const SplashView();
+    if (!_splashDone || !_authReady) return const SplashView();
     if (!state.seenOnboarding) return const OnboardingScreen();
     if (!state.isLoggedIn) return const LoginScreen();
     if (state.role == 'admin') return const AdminShell();

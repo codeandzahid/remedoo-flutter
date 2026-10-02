@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../responsive/responsive.dart';
+import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 
-/// Set a new password (React ResetPassword.tsx). Demo behavior kept.
+/// Set a new password after opening a password-recovery link
+/// (React ResetPassword.tsx). The recovery link creates a Supabase session;
+/// this screen then updates the password for real.
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
 
@@ -16,12 +19,45 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _p1 = TextEditingController();
   final _p2 = TextEditingController();
   bool _obscure = true;
+  bool _busy = false;
+  String? _error;
 
   @override
   void dispose() {
     _p1.dispose();
     _p2.dispose();
     super.dispose();
+  }
+
+  Future<void> _update() async {
+    if (_p1.text.length < 8) {
+      setState(
+          () => _error = 'Password must be at least 8 characters.');
+      return;
+    }
+    if (_p1.text != _p2.text) {
+      setState(() => _error = 'Passwords do not match.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final result =
+        await AppStateScope.of(context).updatePassword(_p1.text);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!result.ok) {
+      setState(() => _error = result.error);
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('Password updated! Please sign in again.')),
+    );
+    // Drop the recovery session and return to the login screen.
+    AppStateScope.of(context).logout();
+    Navigator.popUntil(context, (r) => r.isFirst);
   }
 
   @override
@@ -90,7 +126,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     children: [
                       RTextField(
                         label: 'New Password',
-                        hint: 'Min. 6 characters',
+                        hint: 'Min. 8 characters',
                         controller: _p1,
                         obscureText: _obscure,
                         onChanged: (_) => setState(() {}),
@@ -117,33 +153,45 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             const Icon(Icons.lock_outline, size: 18),
                       ),
                       const SizedBox(height: 20),
+                      if (_error != null) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: RemedooTheme.emergency
+                                .withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: RemedooTheme.emergency
+                                  .withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.error_outline,
+                                  size: 18,
+                                  color: RemedooTheme.emergency),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _error!,
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: RemedooTheme.emergency,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       RButton(
-                        label: 'Update Password',
+                        label: _busy ? 'Please wait…' : 'Update Password',
                         fullWidth: true,
-                        onPressed: () {
-                          if (_p1.text.length < 8) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      'Password must be at least 8 characters')),
-                            );
-                            return;
-                          }
-                          if (_p1.text != _p2.text) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text('Passwords do not match')),
-                            );
-                            return;
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    'Password reset! Please sign in again.')),
-                          );
-                          Navigator.popUntil(context, (r) => r.isFirst);
-                        },
+                        onPressed: _busy ? null : _update,
                       ),
                     ],
                   ),

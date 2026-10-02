@@ -18,6 +18,12 @@ class _SignupScreenState extends State<SignupScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;
+  bool _busy = false;
+  String? _error;
+  bool _confirmationSent = false;
+  bool _resent = false;
+
+  static final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 
   @override
   void dispose() {
@@ -27,15 +33,60 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _signUp() {
-    if (_name.text.trim().isEmpty || _email.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill name and email')),
-      );
+  Future<void> _signUp() async {
+    final name = _name.text.trim();
+    final email = _email.text.trim();
+    final password = _password.text;
+    if (name.isEmpty) {
+      setState(() => _error = 'Please enter your full name.');
       return;
     }
-    AppStateScope.of(context)
-        .login(name: _name.text.trim(), email: _email.text.trim());
+    if (!_emailRegex.hasMatch(email)) {
+      setState(() => _error = 'Please enter a valid email address.');
+      return;
+    }
+    if (password.length < 8) {
+      setState(
+          () => _error = 'Password must be at least 8 characters.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final result =
+        await AppStateScope.of(context).signUpWithPassword(
+      name: name,
+      email: email,
+      password: password,
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!result.ok) {
+      setState(() => _error = result.error);
+    } else if (result.confirmationRequired) {
+      setState(() => _confirmationSent = true);
+    }
+    // On direct success the auth listener flips isLoggedIn and RootGate
+    // routes into the app.
+  }
+
+  Future<void> _resend() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final result = await AppStateScope.of(context)
+        .resendConfirmationEmail(_email.text.trim());
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (result.ok) {
+        _resent = true;
+      } else {
+        _error = result.error;
+      }
+    });
   }
 
   @override
@@ -140,7 +191,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       const SizedBox(height: 12),
                       RTextField(
                         label: 'Password',
-                        hint: 'Min. 6 characters',
+                        hint: 'Min. 8 characters',
                         controller: _password,
                         obscureText: _obscure,
                         onChanged: (_) => setState(() {}),
@@ -183,10 +234,99 @@ class _SignupScreenState extends State<SignupScreen> {
                         }),
                       ),
                       const SizedBox(height: 20),
+                      if (_confirmationSent) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: RemedooTheme.success
+                                .withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: RemedooTheme.success
+                                  .withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.mark_email_read_outlined,
+                                      size: 20,
+                                      color: RemedooTheme.success),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Check your email to confirm your account, then sign in.',
+                                      style:
+                                          textTheme.bodySmall?.copyWith(
+                                        color: RemedooTheme.success,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              RButton(
+                                label: _resent
+                                    ? 'Confirmation email resent'
+                                    : 'Resend confirmation email',
+                                small: true,
+                                variant: RButtonVariant.outline,
+                                fullWidth: true,
+                                onPressed: (_busy || _resent)
+                                    ? null
+                                    : _resend,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (_error != null) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: RemedooTheme.emergency
+                                .withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: RemedooTheme.emergency
+                                  .withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.error_outline,
+                                  size: 18,
+                                  color: RemedooTheme.emergency),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _error!,
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: RemedooTheme.emergency,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       RButton(
-                        label: 'Sign Up',
+                        label: _busy ? 'Please wait…' : 'Sign Up',
                         fullWidth: true,
-                        onPressed: _signUp,
+                        onPressed: _busy ? null : _signUp,
                       ),
                       const SizedBox(height: 20),
                       Row(
@@ -212,7 +352,14 @@ class _SignupScreenState extends State<SignupScreen> {
                         icon: Icons.g_mobiledata,
                         variant: RButtonVariant.outline,
                         fullWidth: true,
-                        onPressed: _signUp,
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Google sign-in is not enabled yet - please sign up with email instead.'),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

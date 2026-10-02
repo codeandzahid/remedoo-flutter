@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models.dart';
 import '../data/mock_data.dart';
+import '../services/auth_service.dart';
 
 /// Inherited access to the single AppState for the whole app.
 class AppStateScope extends InheritedNotifier<AppState> {
@@ -26,9 +30,15 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------- Auth ----------
+  //
+  // Two session kinds:
+  //  - Supabase session (_supaUser != null): real account, persisted +
+  //    auto-refreshed by supabase_flutter in secure web storage.
+  //  - Guest session (_guest): local only, no credentials.
+  // Admin login stays fully mock (see AdminLoginScreen) and uses login().
 
-  bool _loggedIn = false;
   bool _guest = false;
+  bool _mockLoggedIn = false; // mock login() (admin console + tests)
   bool _seenOnboarding = false;
   String _name = 'Patient';
   String _email = '';
@@ -36,11 +46,77 @@ class AppState extends ChangeNotifier {
   String _gender = 'Male';
   String _address = 'Bakura, Srinagar, J&K 190006';
 
-  bool get isLoggedIn => _loggedIn;
-  bool get isGuest => _guest && _loggedIn;
+  User? _supaUser;
+  bool _authAttached = false;
+
+  /// Called by RootGate after Supabase init. Restores any persisted session
+  /// and subscribes to auth changes (sign-out, expiry, recovery links).
+  void attachAuthListener() {
+    if (_authAttached) return;
+    _authAttached = true;
+    // Offline / init failed (e.g. widget tests): stay in mock/guest mode.
+    if (!AuthService.instance.isInitialized) return;
+    _syncUserFromSession();
+    // AppState lives for the whole app lifetime, so the subscription is
+    // intentionally never cancelled.
+    AuthService.instance.authStateChanges.listen((data) {
+      final event = data.event;
+      if (event == AuthChangeEvent.signedOut) {
+        _supaUser = null;
+        _clearAuthLocal(notify: false);
+        notifyListeners();
+      } else if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.tokenRefreshed ||
+          event == AuthChangeEvent.userUpdated ||
+          event == AuthChangeEvent.initialSession) {
+        final user = data.session?.user;
+        if (user != null) {
+          _supaUser = user;
+          _guest = false;
+          _mockLoggedIn = false;
+          notifyListeners();
+        }
+      } else if (event == AuthChangeEvent.passwordRecovery) {
+        _supaUser = data.session?.user;
+        _guest = false;
+        _mockLoggedIn = false;
+        notifyListeners();
+        final cb = onPasswordRecovery;
+        if (cb != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => cb());
+        }
+      }
+    });
+  }
+
+  /// Fired when a password-recovery link is opened (RootGate navigates to
+  /// the new-password screen). Set by RootGate; null everywhere else.
+  void Function()? onPasswordRecovery;
+
+  void _syncUserFromSession() {
+    final session = AuthService.instance.currentSession;
+    if (session?.user != null) {
+      _supaUser = session!.user;
+      _guest = false;
+      _mockLoggedIn = false;
+      notifyListeners();
+    }
+  }
+
+  /// True when a Supabase session, a mock login, OR a guest session is active.
+  bool get isLoggedIn => _supaUser != null || _guest || _mockLoggedIn;
+  bool get isGuest => _guest && _supaUser == null && !_mockLoggedIn;
   bool get seenOnboarding => _seenOnboarding;
-  String get userName => _name;
-  String get email => _email;
+
+  /// Display name: Supabase user metadata -> email fallback -> mock name.
+  String get userName => _supaUser != null
+      ? AuthService.instance.displayNameOf(_supaUser!)
+      : _name;
+
+  /// Email: Supabase user email first, then the mock value.
+  String get email =>
+      _supaUser?.email ?? _email;
+
   String get phone => _phone;
   String get gender => _gender;
   String get address => _address;
@@ -51,23 +127,77 @@ class AppState extends ChangeNotifier {
   }
 
   void loginAsGuest() {
-    _loggedIn = true;
+    _supaUser = null;
+    _mockLoggedIn = false;
     _guest = true;
     _name = 'Patient';
     notifyListeners();
   }
 
+  /// Mock login (admin console + tests). Real user auth uses the async
+  /// methods below; do NOT route real users through this.
   void login({required String name, required String email}) {
-    _loggedIn = true;
+    _supaUser = null;
     _guest = false;
+    _mockLoggedIn = true;
     _name = name.isEmpty ? 'Patient' : name;
     _email = email;
     notifyListeners();
   }
 
-  void logout() {
-    _loggedIn = false;
+  /// Real email+password sign-in via Supabase. On success the auth listener
+  /// flips isLoggedIn and RootGate routes into the app.
+  Future<AuthResult> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    final result = await AuthService.instance.signIn(
+      email: email,
+      password: password,
+    );
+    if (result.ok) _syncUserFromSession();
+    return result;
+  }
+
+  /// Real sign-up via Supabase. Returns needsConfirmation when the project
+  /// requires email confirmation (user must click the email link).
+  Future<AuthResult> signUpWithPassword({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    final result = await AuthService.instance.signUp(
+      email: email,
+      password: password,
+      name: name,
+    );
+    if (result.ok && !result.confirmationRequired) {
+      _syncUserFromSession();
+    }
+    return result;
+  }
+
+  Future<AuthResult> resendConfirmationEmail(String email) {
+    return AuthService.instance.resendConfirmation(email);
+  }
+
+  Future<AuthResult> sendMagicLink(String email) {
+    return AuthService.instance.sendMagicLink(email);
+  }
+
+  Future<AuthResult> sendPasswordReset(String email) {
+    return AuthService.instance.sendPasswordReset(email);
+  }
+
+  /// Sets a new password after a recovery link (requires the recovery
+  /// session created when the link was opened).
+  Future<AuthResult> updatePassword(String newPassword) {
+    return AuthService.instance.updatePassword(newPassword);
+  }
+
+  void _clearAuthLocal({bool notify = true}) {
     _guest = false;
+    _mockLoggedIn = false;
     _name = 'Patient';
     _email = '';
     appointments.clear();
@@ -76,7 +206,15 @@ class AppState extends ChangeNotifier {
     cartPharmacyId = null;
     cartPharmacyName = null;
     testCart.clear();
-    notifyListeners();
+    if (notify) notifyListeners();
+  }
+
+  /// Signs out of Supabase (best-effort, fire-and-forget) and clears all
+  /// local session state including guest mode.
+  void logout() {
+    unawaited(AuthService.instance.signOut());
+    _supaUser = null;
+    _clearAuthLocal();
   }
 
   void saveProfile({
@@ -804,8 +942,8 @@ class AppState extends ChangeNotifier {
 
   // ---------- Convenience aliases used by the UI ----------
 
-  String get displayName => _name;
-  String? get userEmail => _email.isEmpty ? null : _email;
+  String get displayName => userName;
+  String? get userEmail => email.isEmpty ? null : email;
   String? get userPhone => _phone.isEmpty ? null : _phone;
   String? get userAddress => _address.isEmpty ? null : _address;
 

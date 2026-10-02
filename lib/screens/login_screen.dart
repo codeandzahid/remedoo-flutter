@@ -24,6 +24,12 @@ class _LoginScreenState extends State<LoginScreen>
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;
+  bool _busy = false;
+  String? _error;
+  bool _magicSent = false;
+
+  static final _emailRegex =
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 
   @override
   void initState() {
@@ -39,11 +45,53 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  void _signIn() {
-    final state = AppStateScope.of(context);
+  Future<void> _signIn() async {
     final email = _email.text.trim();
-    final name = email.contains('@') ? email.split('@')[0] : 'Patient';
-    state.login(name: name, email: email);
+    if (!_emailRegex.hasMatch(email)) {
+      setState(() => _error = 'Please enter a valid email address.');
+      return;
+    }
+    if (_password.text.isEmpty) {
+      setState(() => _error = 'Please enter your password.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final result = await AppStateScope.of(context).signInWithPassword(
+      email: email,
+      password: _password.text,
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!result.ok) {
+      setState(() => _error = result.error);
+    }
+    // On success the auth listener flips isLoggedIn and RootGate routes in.
+  }
+
+  Future<void> _sendMagicLink() async {
+    final email = _email.text.trim();
+    if (!_emailRegex.hasMatch(email)) {
+      setState(() => _error = 'Please enter a valid email address.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final result =
+        await AppStateScope.of(context).sendMagicLink(email);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (result.ok) {
+        _magicSent = true;
+      } else {
+        _error = result.error;
+      }
+    });
   }
 
   @override
@@ -213,11 +261,89 @@ class _LoginScreenState extends State<LoginScreen>
                             )
                           else
                             const SizedBox(height: 16),
+                          if (_error != null) ...[
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: RemedooTheme.emergency
+                                    .withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: RemedooTheme.emergency
+                                      .withValues(alpha: 0.35),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.error_outline,
+                                      size: 18,
+                                      color: RemedooTheme.emergency),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _error!,
+                                      style:
+                                          textTheme.bodySmall?.copyWith(
+                                        color: RemedooTheme.emergency,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if (magic && _magicSent) ...[
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: RemedooTheme.success
+                                    .withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: RemedooTheme.success
+                                      .withValues(alpha: 0.35),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.mark_email_read_outlined,
+                                      size: 18,
+                                      color: RemedooTheme.success),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Magic link sent! Check your inbox and tap the link to sign in.',
+                                      style:
+                                          textTheme.bodySmall?.copyWith(
+                                        color: RemedooTheme.success,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           RButton(
-                            label: magic ? 'Send Magic Link' : 'Sign In',
+                            label: _busy
+                                ? 'Please wait…'
+                                : (magic
+                                    ? 'Send Magic Link'
+                                    : 'Sign In'),
                             icon: magic ? Icons.auto_awesome : null,
                             fullWidth: true,
-                            onPressed: _signIn,
+                            onPressed: _busy
+                                ? null
+                                : (magic ? _sendMagicLink : _signIn),
                           ),
                           const SizedBox(height: 12),
                           // "or" divider.
@@ -244,7 +370,14 @@ class _LoginScreenState extends State<LoginScreen>
                             icon: Icons.g_mobiledata,
                             variant: RButtonVariant.outline,
                             fullWidth: true,
-                            onPressed: _signIn,
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Google sign-in is not enabled yet - please use email instead.'),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -312,7 +445,15 @@ class _LoginScreenState extends State<LoginScreen>
       String label, int index, bool selected, ColorScheme scheme) {
     return Expanded(
       child: GestureDetector(
-        onTap: () => _tabs.animateTo(index),
+        onTap: () {
+          if (_tabs.index != index) {
+            setState(() {
+              _magicSent = false;
+              _error = null;
+            });
+          }
+          _tabs.animateTo(index);
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 8),

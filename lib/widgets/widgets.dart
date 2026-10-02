@@ -957,6 +957,8 @@ class RButton extends StatelessWidget {
         Flexible(
           child: Text(
             label,
+            maxLines: 1,
+            softWrap: false,
             style: TextStyle(
               fontFamily: RemedooTheme.fontFamily,
               color: fg,
