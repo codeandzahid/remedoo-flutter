@@ -8,6 +8,8 @@ import '../widgets/widgets.dart';
 import 'booking_screen.dart';
 
 /// Doctor profile: single column on phones, info + booking panel on larger.
+/// Mirrors the React DoctorDetail page: profile card, About, Hospital,
+/// Working Hours, sticky Book Appointment CTA.
 class DoctorDetailScreen extends StatelessWidget {
   final Doctor doctor;
 
@@ -28,13 +30,13 @@ class DoctorDetailScreen extends StatelessWidget {
           DetailSplit(
             main: Column(
               children: [
-                _profileCard(d),
+                _profileCard(context, d),
                 const SizedBox(height: 12),
-                _aboutCard(d),
+                _aboutCard(context, d),
                 const SizedBox(height: 12),
                 _hospitalCard(context, d),
                 const SizedBox(height: 12),
-                _hoursCard(),
+                _hoursCard(context),
               ],
             ),
             side: _bookingPanel(context, d),
@@ -46,235 +48,319 @@ class DoctorDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _profileCard(Doctor d) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Hero(
-              tag: 'doctor-avatar-${d.id}',
-              child: InitialsAvatar(name: d.name, radius: 44),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: Text(d.name,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.w800)),
+  Widget _profileCard(BuildContext context, Doctor d) {
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Hero(
+                tag: 'doctor-avatar-${d.id}',
+                child: InitialsAvatar(name: d.name, radius: 40),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            d.name,
+                            style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        if (d.verified) ...[
+                          const SizedBox(width: 6),
+                          Icon(Icons.verified,
+                              size: 20, color: scheme.primary),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      d.specialty,
+                      style: TextStyle(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        RRatingPill(rating: d.rating),
+                        const SizedBox(width: 12),
+                        Icon(Icons.work_outline,
+                            size: 15,
+                            color: scheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${d.expYears} yrs exp',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                if (d.verified) ...[
-                  const SizedBox(width: 6),
-                  const Icon(Icons.verified,
-                      color: RemedooTheme.primary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.currency_rupee,
+                      size: 18, color: scheme.primary),
+                  Text(
+                    inr(d.fee),
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: scheme.primary),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '/ consultation',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant),
+                  ),
                 ],
-              ],
-            ),
-            Text(d.specialty,
-                style: const TextStyle(
-                    color: RemedooTheme.primary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16)),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _stat(RatingPill(rating: d.rating), 'Rating'),
-                _stat(
-                    Text('${d.expYears} yrs',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800)),
-                    'Experience'),
-                _stat(
-                    Text(inr(d.fee),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: RemedooTheme.primary)),
-                    'Fee'),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _aboutCard(Doctor d) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('About',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            Text(d.about),
-          ],
-        ),
+  Widget _aboutCard(BuildContext context, Doctor d) {
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('About',
+              style:
+                  TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Text(
+            d.about,
+            style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: scheme.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }
 
   Widget _hospitalCard(BuildContext context, Doctor d) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Hospital',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            InfoRow(
-                icon: Icons.local_hospital,
-                label: 'Name',
-                value: d.hospital),
-            InfoRow(
-                icon: Icons.location_on,
-                label: 'Address',
-                value: 'Main Road, Srinagar'),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () {
-                  showResponsiveDialog(
-                    context,
-                    (_) => AlertDialog(
-                      title: const Text('Directions'),
-                      content: const Text(
-                          'Opening maps to the hospital… (demo)'),
-                      actions: [
-                        FilledButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('OK'),
-                        ),
-                      ],
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.business, size: 16, color: scheme.primary),
+              const SizedBox(width: 8),
+              const Text('Hospital',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(d.hospital,
+              style:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.location_on,
+                  size: 14, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text('Main Road, Srinagar',
+                  style: TextStyle(
+                      fontSize: 13, color: scheme.onSurfaceVariant)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          RButton(
+            label: 'Get Directions',
+            icon: Icons.directions,
+            variant: RButtonVariant.outline,
+            small: true,
+            fullWidth: true,
+            onPressed: () {
+              showResponsiveDialog(
+                context,
+                (_) => AlertDialog(
+                  title: const Text('Directions'),
+                  content: const Text(
+                      'Opening maps to the hospital… (demo)'),
+                  actions: [
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('OK'),
                     ),
-                  );
-                },
-                icon: const Icon(Icons.directions),
-                label: const Text('Get Directions'),
-              ),
-            ),
-          ],
-        ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
 
-  Widget _hoursCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Working Hours',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800)),
-            SizedBox(height: 8),
-            InfoRow(
-                icon: Icons.schedule,
-                label: 'Mon – Sat',
-                value: '09:00 AM – 05:00 PM'),
-            InfoRow(
-                icon: Icons.schedule,
-                label: 'Sunday',
-                value: 'Closed'),
-          ],
-        ),
+  Widget _hoursCard(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.schedule, size: 16, color: scheme.primary),
+              const SizedBox(width: 8),
+              const Text('Working Hours',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _hoursRow(context, 'Mon – Sat', '09:00 AM – 05:00 PM', false),
+          _hoursRow(context, 'Sunday', 'Closed', true),
+        ],
+      ),
+    );
+  }
+
+  Widget _hoursRow(
+      BuildContext context, String day, String hours, bool closed) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(day,
+              style: TextStyle(
+                  fontSize: 14, color: scheme.onSurfaceVariant)),
+          Text(hours,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: closed
+                      ? RemedooTheme.destructive
+                      : scheme.onSurface)),
+        ],
       ),
     );
   }
 
   /// Booking panel: sticky bottom bar on phones, side panel on larger screens.
   Widget _bookingPanel(BuildContext context, Doctor d) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Book Appointment',
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                RatingPill(rating: d.rating),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text('${d.expYears} yrs experience',
-                      style: const TextStyle(
-                          fontSize: 13, color: Colors.grey)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text('Consultation fee',
-                style: TextStyle(fontSize: 13, color: Colors.grey)),
-            Text(inr(d.fee),
-                style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: RemedooTheme.primary)),
-            const SizedBox(height: 8),
-            const Row(
-              children: [
-                Icon(Icons.schedule,
-                    size: 16, color: Colors.grey),
-                SizedBox(width: 6),
-                Expanded(
-                    child: Text('Available Mon–Sat, 9 AM – 5 PM',
-                        style: TextStyle(
-                            fontSize: 13, color: Colors.grey))),
-              ],
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () => pushPage(
-                context,
-                BookingScreen(
-                  kind: 'doctor',
-                  refId: d.id,
-                  title: d.name,
-                  subtitle: d.specialty,
-                  place: d.hospital,
-                  fee: d.fee,
-                ),
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Book Appointment',
+              style:
+                  TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              RRatingPill(rating: d.rating),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('${d.expYears} yrs experience',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: scheme.onSurfaceVariant)),
               ),
-              child: const Text('Book Appointment'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text('Consultation fee',
+              style: TextStyle(
+                  fontSize: 13, color: scheme.onSurfaceVariant)),
+          Text(inr(d.fee),
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: scheme.primary)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.schedule,
+                  size: 16, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Expanded(
+                  child: Text('Available Mon–Sat, 9 AM – 5 PM',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: scheme.onSurfaceVariant))),
+            ],
+          ),
+          const SizedBox(height: 16),
+          RButton(
+            label: 'Book Appointment',
+            icon: Icons.calendar_month,
+            fullWidth: true,
+            onPressed: () => pushPage(
+              context,
+              BookingScreen(
+                kind: 'doctor',
+                refId: d.id,
+                title: d.name,
+                subtitle: d.specialty,
+                place: d.hospital,
+                fee: d.fee,
+              ),
             ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                showResponsiveDialog(
-                  context,
-                  (_) => AlertDialog(
-                    title: const Text('Call clinic'),
-                    content: Text(
-                        'Calling ${d.hospital} reception… (demo)'),
-                    actions: [
-                      FilledButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('OK'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              icon: const Icon(Icons.call),
-              label: const Text('Call Clinic'),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 10),
+          RButton(
+            label: 'Call Clinic',
+            icon: Icons.call,
+            variant: RButtonVariant.outline,
+            fullWidth: true,
+            onPressed: () {
+              showResponsiveDialog(
+                context,
+                (_) => AlertDialog(
+                  title: const Text('Call clinic'),
+                  content: Text(
+                      'Calling ${d.hospital} reception… (demo)'),
+                  actions: [
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -293,7 +379,10 @@ class DoctorDetailScreen extends StatelessWidget {
         ],
       ),
       child: SafeArea(
-        child: FilledButton(
+        child: RButton(
+          label: 'Book Appointment',
+          icon: Icons.calendar_month,
+          fullWidth: true,
           onPressed: () => pushPage(
             context,
             BookingScreen(
@@ -305,20 +394,8 @@ class DoctorDetailScreen extends StatelessWidget {
               fee: d.fee,
             ),
           ),
-          child: const Text('Book Appointment'),
         ),
       ),
-    );
-  }
-
-  Widget _stat(Widget value, String label) {
-    return Column(
-      children: [
-        value,
-        const SizedBox(height: 4),
-        Text(label,
-            style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      ],
     );
   }
 }

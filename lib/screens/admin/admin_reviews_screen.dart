@@ -11,46 +11,37 @@ class AdminReviewsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final entries = state.reviews.entries.toList();
     if (entries.isEmpty) {
-      return const EmptyState(
+      return const REmptyState(
         icon: Icons.star_border,
         title: 'No reviews yet',
         subtitle: 'Patient reviews will appear here.',
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: entries.length,
       itemBuilder: (_, i) {
         final r = entries[i].value;
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: RCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Row(
-                      children: List.generate(5, (s) {
-                        return Icon(
-                          s < r.stars
-                              ? Icons.star
-                              : Icons.star_border,
-                          size: 18,
-                          color: Colors.amber.shade700,
-                        );
-                      }),
-                    ),
+                    RRatingPill(
+                        rating: r.stars.toDouble()),
                     const Spacer(),
                     if (r.hidden)
                       const StatusChip(status: 'hidden'),
                     Switch(
                       value: !r.hidden,
                       activeThumbColor:
-                          RemedooTheme.ratingGreen,
+                          RemedooTheme.success,
                       onChanged: (_) =>
                           state.toggleReviewHidden(
                               r.appointmentId),
@@ -58,12 +49,14 @@ class AdminReviewsScreen extends StatelessWidget {
                   ],
                 ),
                 if (r.comment.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(r.comment),
                 ],
+                const SizedBox(height: 6),
                 Text('Appointment ${r.appointmentId}',
-                    style: const TextStyle(
-                        fontSize: 12, color: Colors.grey)),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant)),
               ],
             ),
           ),

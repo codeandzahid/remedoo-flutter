@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/mock_data.dart';
 import '../../theme.dart';
+import '../../widgets/widgets.dart';
 
 /// Admin analytics: user growth chart, top specialties, top medicines.
 class AdminAnalyticsScreen extends StatelessWidget {
@@ -12,6 +13,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final specCount = <String, int>{};
     for (final d in doctors) {
       specCount[d.specialty] = (specCount[d.specialty] ?? 0) + 1;
@@ -22,60 +24,80 @@ class AdminAnalyticsScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('User Growth',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              height: 200,
-              child: CustomPaint(
-                painter: _GrowthPainter(
-                    _months, _users, RemedooTheme.purple),
-              ),
+        const RSectionHeader(
+            title: 'User Growth',
+            subtitle: 'New signups per month'),
+        const SizedBox(height: 12),
+        RCard(
+          child: SizedBox(
+            height: 200,
+            child: CustomPaint(
+              painter: _GrowthPainter(
+                  _months, _users, RemedooTheme.purple),
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        const Text('Top Specialties',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
-        ...topSpecs.take(6).map((e) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: const Icon(Icons.medical_services,
-                    color: RemedooTheme.primary),
-                title: Text(e.key,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600)),
-                trailing: Text('${e.value} doctors',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700)),
+        const SizedBox(height: 24),
+        const RSectionHeader(
+            title: 'Top Specialties',
+            subtitle: 'Doctor count per specialty'),
+        const SizedBox(height: 12),
+        ...topSpecs.take(6).map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: RCard(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 6),
+                child: ListTile(
+                  leading: _tile(context, Icons.medical_services,
+                      scheme.primary),
+                  title: Text(e.key,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600)),
+                  trailing: Text('${e.value} doctors',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700)),
+                ),
               ),
             )),
-        const SizedBox(height: 16),
-        const Text('Top Medicines',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
-        ...topMeds.map((m) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: const Icon(Icons.medication,
-                    color: RemedooTheme.teal),
-                title: Text(m.name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600)),
-                subtitle: Text(m.category),
-                trailing: Text(inr(m.price),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700)),
+        const SizedBox(height: 24),
+        const RSectionHeader(
+            title: 'Top Medicines',
+            subtitle: 'Best-selling catalog items'),
+        const SizedBox(height: 12),
+        ...topMeds.map((m) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: RCard(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 6),
+                child: ListTile(
+                  leading: _tile(context, Icons.medication,
+                      RemedooTheme.teal),
+                  title: Text(m.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600)),
+                  subtitle: Text(m.category),
+                  trailing: Text(inr(m.price),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700)),
+                ),
               ),
             )),
       ],
+    );
+  }
+
+  Widget _tile(BuildContext context, IconData icon, Color color) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: dark
+            ? color.withValues(alpha: 0.18)
+            : Color.lerp(color, Colors.white, 0.85),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Icon(icon, color: color, size: 22),
     );
   }
 }

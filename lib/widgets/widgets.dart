@@ -6,6 +6,14 @@ import '../data/mock_data.dart';
 import '../state/app_state.dart';
 
 // Shared building blocks for the Remedoo app.
+//
+// Naming: legacy widgets keep their original names (screens depend on them);
+// new reskin components use the `R` prefix. Every component below follows the
+// design spec in `~/workspace/remedoo-reskin/DESIGN_SPEC.md`.
+
+/// Whether the current theme is dark.
+bool _isDark(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark;
 
 class ResponsiveBody extends StatelessWidget {
   final Widget child;
@@ -55,7 +63,8 @@ class RemedooLogo extends StatelessWidget {
   }
 }
 
-/// Orange gradient header used on top of tab screens.
+/// Orange gradient header used on top of tab screens, with a rounded bottom
+/// (~28px) like the React app's dashboard hero.
 class GradientHeader extends StatelessWidget {
   final String title;
   final List<Widget>? actions;
@@ -71,11 +80,16 @@ class GradientHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(gradient: RemedooTheme.headerGradient),
+      decoration: const BoxDecoration(
+        gradient: RemedooTheme.headerGradient,
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(RemedooRadius.xxl),
+        ),
+      ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 8, 16),
+          padding: const EdgeInsets.fromLTRB(4, 8, 8, 20),
           child: Row(
             children: [
               leading ??
@@ -109,11 +123,11 @@ class InitialsAvatar extends StatelessWidget {
   const InitialsAvatar({super.key, required this.name, this.radius = 28});
 
   static const _palette = [
-    Color(0xFFE86A1C),
+    Color(0xFFEC6A13),
     Color(0xFF3B82F6),
     Color(0xFF8B5CF6),
     Color(0xFF2E9E6B),
-    Color(0xFFD43D3D),
+    Color(0xFFDE3F3F),
     Color(0xFF0E9F8A),
   ];
 
@@ -139,6 +153,7 @@ class InitialsAvatar extends StatelessWidget {
   }
 }
 
+/// Green rating pill with a white star + number, as in the React listings.
 class RatingPill extends StatelessWidget {
   final double rating;
 
@@ -149,21 +164,20 @@ class RatingPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: RemedooTheme.ratingGreen.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        color: RemedooTheme.success,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star,
-              size: 14, color: RemedooTheme.ratingGreen),
+          const Icon(Icons.star, size: 13, color: Colors.white),
           const SizedBox(width: 3),
           Text(
             rating.toStringAsFixed(1),
             style: const TextStyle(
-              color: RemedooTheme.ratingGreen,
+              color: Colors.white,
               fontWeight: FontWeight.w700,
-              fontSize: 13,
+              fontSize: 12,
             ),
           ),
         ],
@@ -172,6 +186,7 @@ class RatingPill extends StatelessWidget {
   }
 }
 
+/// Bold section title with an orange "See all"-style action on the right.
 class SectionHeader extends StatelessWidget {
   final String title;
   final String? actionLabel;
@@ -195,15 +210,24 @@ class SectionHeader extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style:
-                const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
           ),
         ),
         if (actionLabel != null)
           TextButton(
             onPressed: onAction,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             child: Text(
               actionLabel!,
-              style: const TextStyle(color: RemedooTheme.primary),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
             ),
           ),
       ],
@@ -235,12 +259,15 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundColor:
-                  RemedooTheme.primary.withValues(alpha: 0.12),
+            Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                color: RemedooTheme.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
               child: Icon(icon,
-                  size: 36, color: RemedooTheme.primary),
+                  size: 40, color: RemedooTheme.primary),
             ),
             const SizedBox(height: 16),
             Text(
@@ -253,12 +280,17 @@ class EmptyState extends StatelessWidget {
             Text(
               subtitle,
               style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 14),
               textAlign: TextAlign.center,
             ),
             if (actionLabel != null) ...[
-              const SizedBox(height: 16),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+              const SizedBox(height: 20),
+              RButton(
+                label: actionLabel!,
+                onPressed: onAction,
+                small: true,
+              ),
             ],
           ],
         ),
@@ -276,21 +308,27 @@ class StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final lower = status.toLowerCase();
     final Color color;
+    final Color bg;
     if (lower.contains('cancel') || lower.contains('reject')) {
-      color = RemedooTheme.emergency;
+      color = RemedooTheme.destructive;
+      bg = RemedooTheme.destructive.withValues(alpha: 0.12);
     } else if (lower.contains('deliver') ||
         lower.contains('complet') ||
         lower.contains('approv') ||
         lower.contains('resolv')) {
-      color = RemedooTheme.ratingGreen;
+      color = RemedooTheme.success;
+      bg = RemedooTheme.success.withValues(alpha: 0.12);
     } else if (lower.contains('pack') ||
         lower.contains('pick') ||
         lower.contains('progress') ||
         lower.contains('pend') ||
-        lower.contains('request')) {
-      color = Colors.orange.shade800;
+        lower.contains('request') ||
+        lower.contains('placed')) {
+      color = const Color(0xFFB45309);
+      bg = const Color(0xFFFEF3C7);
     } else {
-      color = RemedooTheme.primary;
+      color = Theme.of(context).colorScheme.primary;
+      bg = Theme.of(context).colorScheme.primary.withValues(alpha: 0.12);
     }
     final label = status.replaceAll('_', ' ');
     final pretty = label.isEmpty
@@ -299,7 +337,7 @@ class StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -332,7 +370,8 @@ class InfoRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: RemedooTheme.primary),
+          Icon(icon,
+              size: 18, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 12),
           Text(label,
               style: TextStyle(
@@ -368,9 +407,10 @@ class QtyStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = Theme.of(context).colorScheme.primary;
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: RemedooTheme.primary),
+        border: Border.all(color: p),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -378,7 +418,7 @@ class QtyStepper extends StatelessWidget {
         children: [
           IconButton(
             icon: const Icon(Icons.remove, size: 18),
-            color: RemedooTheme.primary,
+            color: p,
             onPressed: onMinus,
             padding: const EdgeInsets.all(4),
             constraints: const BoxConstraints(),
@@ -387,7 +427,7 @@ class QtyStepper extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w700)),
           IconButton(
             icon: const Icon(Icons.add, size: 18),
-            color: RemedooTheme.primary,
+            color: p,
             onPressed: onPlus,
             padding: const EdgeInsets.all(4),
             constraints: const BoxConstraints(),
@@ -438,6 +478,7 @@ class MedicineDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = medicine;
+    final p = Theme.of(context).colorScheme.primary;
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -454,7 +495,7 @@ class MedicineDetailSheet extends StatelessWidget {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: Theme.of(context).dividerColor,
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -466,12 +507,10 @@ class MedicineDetailSheet extends StatelessWidget {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color:
-                      RemedooTheme.primary.withValues(alpha: 0.1),
+                  color: p.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(Icons.medication,
-                    color: RemedooTheme.primary, size: 32),
+                child: Icon(Icons.medication, color: p, size: 32),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -490,10 +529,10 @@ class MedicineDetailSheet extends StatelessWidget {
                     Row(
                       children: [
                         Text(inr(m.price),
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
-                                color: RemedooTheme.primary)),
+                                color: p)),
                         const SizedBox(width: 8),
                         Text(
                           inr(m.mrp),
@@ -724,10 +763,12 @@ class LabCompareSheet extends StatelessWidget {
     );
   }
 
-  Widget _row(String label, String va, String vb, {bool highlightA = false, bool highlightB = false}) {
+  Widget _row(BuildContext context, String label, String va, String vb,
+      {bool highlightA = false, bool highlightB = false}) {
+    final p = Theme.of(context).colorScheme.primary;
     TextStyle style(bool h) => TextStyle(
         fontWeight: h ? FontWeight.w800 : FontWeight.w500,
-        color: h ? RemedooTheme.primary : null);
+        color: h ? p : null);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -736,7 +777,10 @@ class LabCompareSheet extends StatelessWidget {
           Expanded(
             child: Text(label,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                style: TextStyle(
+                    color:
+                        Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 13)),
           ),
           Expanded(
               child: Text(va == vb ? '' : vb,
@@ -748,7 +792,6 @@ class LabCompareSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cheaperA = true; // visual only
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       child: Column(
@@ -760,7 +803,7 @@ class LabCompareSheet extends StatelessWidget {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: Theme.of(context).dividerColor,
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -774,10 +817,13 @@ class LabCompareSheet extends StatelessWidget {
               Expanded(
                   child: Text(a.name,
                       style: const TextStyle(fontWeight: FontWeight.w700))),
-              const Expanded(
+              Expanded(
                   child: Text('vs',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey))),
+                      style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant))),
               Expanded(
                   child: Text(b.name,
                       textAlign: TextAlign.right,
@@ -785,18 +831,18 @@ class LabCompareSheet extends StatelessWidget {
             ],
           ),
           const Divider(),
-          _row('Rating', a.rating.toString(), b.rating.toString(),
+          _row(context, 'Rating', a.rating.toString(), b.rating.toString(),
               highlightA: a.rating >= b.rating,
               highlightB: b.rating > a.rating),
-          _row('Tests', '${a.testCount}', '${b.testCount}',
+          _row(context, 'Tests', '${a.testCount}', '${b.testCount}',
               highlightA: a.testCount >= b.testCount,
               highlightB: b.testCount > a.testCount),
-          _row('Turnaround', a.turnaround, b.turnaround),
-          _row('NABL', a.nabl ? 'Yes' : 'No', b.nabl ? 'Yes' : 'No',
+          _row(context, 'Turnaround', a.turnaround, b.turnaround),
+          _row(context, 'NABL', a.nabl ? 'Yes' : 'No',
+              b.nabl ? 'Yes' : 'No',
               highlightA: a.nabl && !b.nabl, highlightB: b.nabl && !a.nabl),
-          _row('Distance', '${a.distanceKm.toStringAsFixed(1)} km',
+          _row(context, 'Distance', '${a.distanceKm.toStringAsFixed(1)} km',
               '${b.distanceKm.toStringAsFixed(1)} km'),
-          if (cheaperA) const SizedBox.shrink(),
         ],
       ),
     );
@@ -850,4 +896,739 @@ Future<bool> confirmDialog(
     ),
   );
   return res ?? false;
+}
+
+// ============================================================================
+// Reskin component library (R-prefixed). Screen workstreams: build screens
+// out of these so every screen inherits the React reference look.
+// ============================================================================
+
+/// Button variants matching the React app: solid orange pill, white outline
+/// pill, and red danger pill.
+enum RButtonVariant { primary, outline, danger }
+
+/// Pill-shaped semibold button.
+class RButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final bool fullWidth;
+  final bool small;
+  final RButtonVariant variant;
+
+  const RButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.fullWidth = false,
+    this.small = false,
+    this.variant = RButtonVariant.primary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final Color bg;
+    final Color fg;
+    final BorderSide? side;
+    switch (variant) {
+      case RButtonVariant.primary:
+        bg = scheme.primary;
+        fg = Colors.white;
+        side = null;
+      case RButtonVariant.outline:
+        bg = scheme.surface;
+        fg = scheme.primary;
+        side = BorderSide(color: scheme.primary, width: 1.4);
+      case RButtonVariant.danger:
+        bg = RemedooTheme.emergency;
+        fg = Colors.white;
+        side = null;
+    }
+    final content = Row(
+      mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: small ? 16 : 18, color: fg),
+          SizedBox(width: small ? 6 : 8),
+        ],
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: RemedooTheme.fontFamily,
+              color: fg,
+              fontSize: small ? 14 : 16,
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+    final button = Material(
+      color: bg,
+      shape: StadiumBorder(side: side ?? BorderSide.none),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const StadiumBorder(),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: small ? 18 : 24,
+            vertical: small ? 10 : 14,
+          ),
+          child: content,
+        ),
+      ),
+    );
+    if (onPressed == null) {
+      return Opacity(opacity: 0.5, child: button);
+    }
+    return fullWidth
+        ? SizedBox(width: double.infinity, child: button)
+        : button;
+  }
+}
+
+/// White card: 18px radius, thin warm-gray border, soft subtle shadow.
+class RCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+
+  const RCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(16),
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final card = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(RemedooRadius.card),
+        border: Border.all(color: Theme.of(context).dividerColor),
+        boxShadow: _isDark(context) ? null : RemedooTheme.softShadow,
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: child,
+      ),
+    );
+    if (onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(RemedooRadius.card),
+        child: card,
+      ),
+    );
+  }
+}
+
+/// Rounded-full search bar with a magnifier icon.
+class RSearchBar extends StatelessWidget {
+  final String hint;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onSubmitted;
+  final TextEditingController? controller;
+  final bool readOnly;
+
+  const RSearchBar({
+    super.key,
+    this.hint = 'Search',
+    this.onChanged,
+    this.onSubmitted,
+    this.controller,
+    this.readOnly = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return TextField(
+      controller: controller,
+      readOnly: readOnly,
+      onChanged: onChanged,
+      onSubmitted: (_) => onSubmitted?.call(),
+      style: const TextStyle(
+          fontFamily: RemedooTheme.fontFamily, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: Icon(Icons.search, color: scheme.onSurfaceVariant),
+        filled: true,
+        fillColor: scheme.surface,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(30),
+          borderSide: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(30),
+          borderSide: BorderSide(color: scheme.primary, width: 1.6),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      ),
+    );
+  }
+}
+
+/// Bold dark title (+ optional gray subtitle) with an orange "See all" action.
+class RSectionHeader extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onSeeAll;
+
+  const RSectionHeader({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.onSeeAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w700),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: TextStyle(
+                      fontSize: 13, color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (onSeeAll != null)
+          TextButton(
+            onPressed: onSeeAll,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'See all',
+              style: TextStyle(
+                color: scheme.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Small white pill with a border; selected = dark near-black pill, white text.
+class RFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  const RFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = _isDark(context);
+    final Color bg =
+        selected ? const Color(0xFF201410) : scheme.surface;
+    final Color fg =
+        selected ? Colors.white : (dark ? scheme.onSurface : RemedooTheme.ink);
+    return Material(
+      color: bg,
+      shape: StadiumBorder(
+        side: selected
+            ? BorderSide.none
+            : BorderSide(color: Theme.of(context).dividerColor),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 15, color: fg),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: RemedooTheme.fontFamily,
+                  color: fg,
+                  fontSize: 13,
+                  fontWeight:
+                      selected ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Green pill with a white star + rating number (listings).
+class RRatingPill extends StatelessWidget {
+  final double rating;
+
+  const RRatingPill({super.key, required this.rating});
+
+  @override
+  Widget build(BuildContext context) => RatingPill(rating: rating);
+}
+
+/// Gradient promo banner: white bold title, lighter subtitle, trailing
+/// illustration widget, optional dot indicators ([pageCount] pages,
+/// [pageIndex] active).
+class RPromoBanner extends StatelessWidget {
+  final Gradient gradient;
+  final String title;
+  final String subtitle;
+  final Widget? illustration;
+  final int? pageCount;
+  final int pageIndex;
+
+  const RPromoBanner({
+    super.key,
+    this.gradient = RemedooTheme.promoTealGradient,
+    required this.title,
+    required this.subtitle,
+    this.illustration,
+    this.pageCount,
+    this.pageIndex = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (illustration != null)
+                SizedBox(width: 96, height: 96, child: illustration),
+            ],
+          ),
+          if (pageCount != null && pageCount! > 1) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(pageCount!, (i) {
+                final active = i == pageIndex;
+                return Container(
+                  width: active ? 18 : 6,
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Orange ribbon badge overlaid at the bottom of a listing image header
+/// (e.g. "ICU Available 24/7", "Government Hospital").
+class RRibbon extends StatelessWidget {
+  final String label;
+  final IconData icon;
+
+  const RRibbon({
+    super.key,
+    required this.label,
+    this.icon = Icons.shield_outlined,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFFF2790F), Color(0xFFEC6A13)],
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tiny icon + gray text stat (e.g. "500 beds", "ICU", "20–30 min").
+class RStat extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const RStat({super.key, required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon,
+            size: 14,
+            color: Theme.of(context).colorScheme.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12.5,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Centered empty state: icon illustration, title, subtitle, orange pill CTA.
+class REmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const REmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) => EmptyState(
+        icon: icon,
+        title: title,
+        subtitle: subtitle,
+        actionLabel: actionLabel,
+        onAction: onAction,
+      );
+}
+
+/// Floating white rounded-2xl bottom bar with soft shadow.
+/// 5 items: Home, Hospitals, Labs, Pharmacy, Orders — active = orange.
+class RBottomNav extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  const RBottomNav({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+  });
+
+  static const _items = [
+    ('Home', Icons.home_outlined, Icons.home),
+    ('Hospitals', Icons.business_outlined, Icons.business),
+    ('Labs', Icons.science_outlined, Icons.science),
+    ('Pharmacy', Icons.storefront_outlined, Icons.storefront),
+    ('Orders', Icons.shopping_cart_outlined, Icons.shopping_cart),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Theme.of(context).dividerColor),
+          boxShadow: _isDark(context)
+              ? null
+              : [
+                  BoxShadow(
+                    color: const Color(0xFF3A2410).withValues(alpha: 0.10),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+        ),
+        child: Row(
+          children: List.generate(_items.length, (i) {
+            final active = i == currentIndex;
+            final color =
+                active ? scheme.primary : scheme.onSurfaceVariant;
+            return Expanded(
+              child: InkWell(
+                onTap: () => onTap(i),
+                borderRadius: BorderRadius.circular(24),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(active ? _items[i].$3 : _items[i].$2,
+                          size: 24, color: color),
+                      const SizedBox(height: 3),
+                      Text(
+                        _items[i].$1,
+                        style: TextStyle(
+                          fontFamily: RemedooTheme.fontFamily,
+                          fontSize: 11,
+                          fontWeight: active
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+/// Labeled form field: small orange icon + label above a rounded filled input.
+class RTextField extends StatelessWidget {
+  final String? label;
+  final IconData? labelIcon;
+  final String? hint;
+  final TextEditingController? controller;
+  final bool enabled;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final int maxLines;
+  final ValueChanged<String>? onChanged;
+  final Widget? suffixIcon;
+  final Widget? prefixIcon;
+
+  const RTextField({
+    super.key,
+    this.label,
+    this.labelIcon,
+    this.hint,
+    this.controller,
+    this.enabled = true,
+    this.obscureText = false,
+    this.keyboardType,
+    this.maxLines = 1,
+    this.onChanged,
+    this.suffixIcon,
+    this.prefixIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label != null) ...[
+          Row(
+            children: [
+              if (labelIcon != null) ...[
+                Icon(labelIcon, size: 14, color: scheme.primary),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label!,
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          maxLines: maxLines,
+          onChanged: onChanged,
+          style: const TextStyle(
+              fontFamily: RemedooTheme.fontFamily, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: hint,
+            suffixIcon: suffixIcon,
+            prefixIcon: prefixIcon,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Orange gradient header container with a rounded bottom (~28px) for
+/// dashboard-style headers; content goes in [child].
+class RGradientHeader extends StatelessWidget {
+  final Widget child;
+  final Gradient gradient;
+  final EdgeInsetsGeometry padding;
+
+  const RGradientHeader({
+    super.key,
+    required this.child,
+    this.gradient = RemedooTheme.headerGradient,
+    this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 28),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(RemedooRadius.xxl),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(padding: padding, child: child),
+      ),
+    );
+  }
+}
+
+/// Pastel rounded tile + icon + label, for the dashboard service grid.
+class RServiceTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color tileColor;
+  final Color iconColor;
+  final VoidCallback? onTap;
+
+  const RServiceTile({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.tileColor,
+    required this.iconColor,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(RemedooRadius.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 62,
+            height: 62,
+            decoration: BoxDecoration(
+              color: tileColor,
+              borderRadius: BorderRadius.circular(RemedooRadius.lg),
+            ),
+            child: Icon(icon, size: 28, color: iconColor),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
 }

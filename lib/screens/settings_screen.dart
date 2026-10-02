@@ -17,136 +17,208 @@ import 'roles/pharmacy_portal_screen.dart';
 import 'roles/lab_portal_screen.dart';
 import 'roles/hospital_portal_screen.dart';
 
-/// Settings: profile, history links, preferences, about, logout.
+/// Settings: profile card, quick links, preferences, about, logout.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: MaxWidthBox(
-        maxWidth: 720,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Card(
-              child: ListTile(
-                leading: InitialsAvatar(
-                    name: state.displayName, radius: 24),
-                title: Text(state.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700)),
-                subtitle: Text(state.userEmail ?? 'Guest',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-                trailing: const Icon(
-                    Icons.arrow_forward_ios, size: 18),
-                onTap: () =>
-                    pushPage(context, const ProfileScreen()),
-              ),
+      body: Column(
+        children: [
+          RGradientHeader(
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.maybePop(context),
+                ),
+                const SizedBox(width: 4),
+                const Text('Settings',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800)),
+              ],
             ),
-            const SizedBox(height: 12),
-            _row(context, Icons.calendar_month,
-                'My Appointments',
-                () => _go(context, const AppointmentsScreen())),
-            _row(context, Icons.shopping_bag, 'My Orders',
-                () => _go(context, const OrdersScreen())),
-            _row(context, Icons.history, 'Medical History',
-                () => _go(context, const MedicalHistoryScreen())),
-            _row(context, Icons.favorite, 'My Favorites',
-                () => _go(context, const FavoritesScreen())),
-            _row(context, Icons.replay, 'Refund Status',
-                () => _go(context, const RefundTrackingScreen())),
-            _row(context, Icons.swap_horiz, 'Switch role (demo)',
-                () => _roleDialog(context, state)),
-            const SizedBox(height: 12),
-            const Text('Preferences',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            Card(
-              child: Column(
+          ),
+          Expanded(
+            child: MaxWidthBox(
+              maxWidth: 720,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
                 children: [
-                  SwitchListTile(
-                    value: state.darkMode,
-                    onChanged: state.setDarkMode,
-                    title: const Text('Dark Mode'),
-                    secondary: const Icon(
-                        Icons.dark_mode_outlined,
-                        color: RemedooTheme.primary),
-                  ),
-                  SwitchListTile(
-                    value: state.notificationsEnabled,
-                    onChanged: state.setNotificationsEnabled,
-                    title: const Text('Notifications'),
-                    secondary: const Icon(
-                        Icons.notifications_outlined,
-                        color: RemedooTheme.primary),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.language,
-                        color: RemedooTheme.primary),
-                    title: const Text('Language'),
-                    trailing: DropdownButton<String>(
-                      value: state.language,
-                      underline: const SizedBox.shrink(),
-                      items: const ['English', 'Hindi', 'Urdu']
-                          .map((l) => DropdownMenuItem(
-                              value: l, child: Text(l)))
-                          .toList(),
-                      onChanged: (v) =>
-                          state.setLanguage(v ?? 'English'),
+                  // User info card.
+                  RCard(
+                    onTap: () =>
+                        pushPage(context, const ProfileScreen()),
+                    child: Row(
+                      children: [
+                        InitialsAvatar(
+                            name: state.displayName, radius: 26),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(state.displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 2),
+                              Text(state.userEmail ?? 'Guest',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: scheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right,
+                            color: scheme.onSurfaceVariant),
+                      ],
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Quick links.
+                  _groupCard(context, [
+                    _linkData(context, Icons.person_outline,
+                        'Edit Profile',
+                        () => pushPage(
+                            context, const ProfileScreen())),
+                    _linkData(context, Icons.calendar_month,
+                        'My Appointments',
+                        () => _go(
+                            context, const AppointmentsScreen())),
+                    _linkData(context, Icons.shopping_bag, 'My Orders',
+                        () => _go(context, const OrdersScreen())),
+                    _linkData(context, Icons.history,
+                        'Medical History',
+                        () => _go(context,
+                            const MedicalHistoryScreen())),
+                    _linkData(context, Icons.favorite_outline,
+                        'My Favorites',
+                        () => _go(context,
+                            const FavoritesScreen())),
+                    _linkData(context, Icons.replay,
+                        'Refund Status',
+                        () => _go(context,
+                            const RefundTrackingScreen())),
+                    _linkData(context, Icons.swap_horiz,
+                        'Switch role (demo)',
+                        () => _roleDialog(context, state)),
+                  ]),
+                  const SizedBox(height: 20),
+                  const Text('Preferences',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 10),
+                  RCard(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 6),
+                    child: Column(
+                      children: [
+                        _prefRow(
+                          context,
+                          icon: Icons.dark_mode_outlined,
+                          label: 'Dark Mode',
+                          trailing: Switch(
+                            value: state.darkMode,
+                            activeThumbColor: scheme.primary,
+                            onChanged: state.setDarkMode,
+                          ),
+                        ),
+                        _prefRow(
+                          context,
+                          icon: Icons.notifications_outlined,
+                          label: 'Email Notifications',
+                          trailing: Switch(
+                            value: state.emailNotif,
+                            activeThumbColor: scheme.primary,
+                            onChanged: (_) =>
+                                state.toggleEmailNotif(),
+                          ),
+                        ),
+                        _prefRow(
+                          context,
+                          icon: Icons.notifications_outlined,
+                          label: 'Push Notifications',
+                          trailing: Switch(
+                            value: state.pushNotif,
+                            activeThumbColor: scheme.primary,
+                            onChanged: (_) =>
+                                state.togglePushNotif(),
+                          ),
+                        ),
+                        _prefRow(
+                          context,
+                          icon: Icons.language,
+                          label: 'Language',
+                          last: true,
+                          trailing: DropdownButton<String>(
+                            value: state.language,
+                            underline: const SizedBox.shrink(),
+                            style: TextStyle(
+                                color: scheme.onSurface,
+                                fontSize: 14),
+                            items: const [
+                              'English',
+                              'Hindi',
+                              'Urdu'
+                            ]
+                                .map((l) => DropdownMenuItem(
+                                    value: l,
+                                    child: Text(l)))
+                                .toList(),
+                            onChanged: (v) =>
+                                state.setLanguage(v ?? 'English'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _groupCard(context, [
+                    _linkData(
+                        context,
+                        Icons.privacy_tip_outlined,
+                        'Privacy Policy',
+                        () => _infoDialog(
+                            context,
+                            'Privacy Policy',
+                            'Your health data is encrypted and never shared without your consent. (demo policy text)')),
+                    _linkData(
+                        context,
+                        Icons.info_outline,
+                        'About Remedoo',
+                        () => _infoDialog(
+                            context,
+                            'About Remedoo',
+                            'Remedoo v1.0.0\nYour Health, Our Priority.\n\nBook doctors, hospitals, labs and medicines in one app.'),
+                        last: true),
+                  ]),
+                  const SizedBox(height: 20),
+                  // Log out: red outline pill.
+                  _logoutButton(context, state),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Text('Remedoo v1.0.0',
+                        style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 12)),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            _row(
-                context,
-                Icons.privacy_tip_outlined,
-                'Privacy Policy',
-                () => _infoDialog(
-                    context,
-                    'Privacy Policy',
-                    'Your health data is encrypted and never shared without your consent. (demo policy text)')),
-            _row(
-                context,
-                Icons.info_outline,
-                'About',
-                () => _infoDialog(
-                    context,
-                    'About Remedoo',
-                    'Remedoo v1.0.0\nYour Health, Our Priority.\n\nBook doctors, hospitals, labs and medicines in one app.')),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                  foregroundColor: RemedooTheme.emergency),
-              onPressed: () async {
-                final ok = await confirmDialog(
-                  context,
-                  title: 'Log out?',
-                  message:
-                      'You will be signed out of Remedoo.',
-                  confirmLabel: 'Log Out',
-                );
-                if (ok) state.logout();
-              },
-              icon: const Icon(Icons.logout),
-              label: const Text('Log Out'),
-            ),
-            const SizedBox(height: 16),
-            const Center(
-              child: Text('Remedoo v1.0.0',
-                  style: TextStyle(
-                      color: Colors.grey, fontSize: 12)),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -155,17 +227,148 @@ class SettingsScreen extends StatelessWidget {
     pushPage(context, page);
   }
 
-  Widget _row(BuildContext context, IconData icon, String label,
-      VoidCallback onTap) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(icon, color: RemedooTheme.primary),
-        title: Text(label,
-            maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing:
-            const Icon(Icons.arrow_forward_ios, size: 18),
-        onTap: onTap,
+  /// One row of a grouped link card.
+  _LinkData _linkData(
+      BuildContext context, IconData icon, String label,
+      VoidCallback onTap,
+      {bool last = false}) {
+    return _LinkData(icon, label, onTap, last);
+  }
+
+  Widget _groupCard(BuildContext context, List<_LinkData> rows) {
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            InkWell(
+              onTap: rows[i].onTap,
+              borderRadius: i == 0
+                  ? const BorderRadius.vertical(
+                      top: Radius.circular(RemedooRadius.card))
+                  : i == rows.length - 1
+                      ? const BorderRadius.vertical(
+                          bottom:
+                              Radius.circular(RemedooRadius.card))
+                      : BorderRadius.zero,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: RemedooTheme.accent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(rows[i].icon,
+                          size: 18,
+                          color: RemedooTheme.accentForeground),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(rows[i].label,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    Icon(Icons.chevron_right,
+                        size: 20, color: scheme.onSurfaceVariant),
+                  ],
+                ),
+              ),
+            ),
+            if (i < rows.length - 1)
+              Divider(
+                  height: 1,
+                  indent: 64,
+                  color: Theme.of(context).dividerColor),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _prefRow(BuildContext context,
+      {required IconData icon,
+      required String label,
+      required Widget trailing,
+      bool last = false}) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: RemedooTheme.accent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon,
+                    size: 18,
+                    color: RemedooTheme.accentForeground),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(label,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500)),
+              ),
+              trailing,
+            ],
+          ),
+        ),
+        if (!last)
+          Divider(
+              height: 1,
+              indent: 48,
+              color: Theme.of(context).dividerColor),
+      ],
+    );
+  }
+
+  Widget _logoutButton(BuildContext context, AppState state) {
+    return Material(
+      color: RemedooTheme.destructive.withValues(alpha: 0.06),
+      shape: StadiumBorder(
+        side: BorderSide(
+            color:
+                RemedooTheme.destructive.withValues(alpha: 0.35)),
+      ),
+      child: InkWell(
+        onTap: () async {
+          final ok = await confirmDialog(
+            context,
+            title: 'Log out?',
+            message: 'You will be signed out of Remedoo.',
+            confirmLabel: 'Log Out',
+          );
+          if (ok) state.logout();
+        },
+        customBorder: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.logout,
+                  size: 18, color: RemedooTheme.destructive),
+              SizedBox(width: 8),
+              Text('Log Out',
+                  style: TextStyle(
+                      color: RemedooTheme.destructive,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -178,9 +381,10 @@ class SettingsScreen extends StatelessWidget {
         title: Text(title),
         content: Text(body),
         actions: [
-          FilledButton(
+          RButton(
+            label: 'OK',
+            small: true,
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
           ),
         ],
       ),
@@ -241,4 +445,13 @@ class SettingsScreen extends StatelessWidget {
       pushPage(context, page);
     }
   }
+}
+
+class _LinkData {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool last;
+
+  _LinkData(this.icon, this.label, this.onTap, [this.last = false]);
 }

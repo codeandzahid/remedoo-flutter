@@ -173,8 +173,8 @@ List<_NavItem> _items(AppState s) => [
           (_) => const AdminSuspiciousActivityScreen()),
     ];
 
-/// Admin console shell: drawer on phones, rail on tablets,
-/// permanent sectioned drawer on desktop.
+/// Admin console shell: light sidebar nav (desktop) / drawer (phone, tablet),
+/// top app bar with the current page title.
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
 
@@ -185,79 +185,286 @@ class AdminShell extends StatefulWidget {
 class _AdminShellState extends State<AdminShell> {
   int _index = 0;
 
+  void _go(int i) {
+    setState(() => _index = i);
+  }
+
+  Future<void> _logout(AppState state) async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Log out?',
+      message: 'Leave the admin console?',
+      confirmLabel: 'Log Out',
+    );
+    if (ok && context.mounted) {
+      // RootGate switches back to the login screen automatically.
+      state.switchRole('patient');
+      state.logout();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final items = _items(state);
+    final current = items[_index];
+    final page = IndexedStack(
+      index: _index,
+      children: [for (final it in items) it.builder(state)],
+    );
 
-    // Group items into sections, preserving order.
-    final sections = <NavSection>[];
-    String? lastSection;
-    List<NavDestinationItem> current = [];
-    for (final it in items) {
-      if (it.section != lastSection) {
-        if (current.isNotEmpty) {
-          sections.add(NavSection(lastSection ?? '', current));
-        }
-        lastSection = it.section;
-        current = [];
-      }
-      current.add(NavDestinationItem(icon: it.icon, label: it.label));
+    if (context.isDesktop) {
+      return Scaffold(
+        appBar: _topBar(current.label, state),
+        body: Row(
+          children: [
+            _sideNav(state, items),
+            const VerticalDivider(width: 1, thickness: 1),
+            Expanded(child: page),
+          ],
+        ),
+      );
     }
-    if (current.isNotEmpty) {
-      sections.add(NavSection(lastSection ?? '', current));
-    }
+    return Scaffold(
+      appBar: _topBar(current.label, state),
+      drawer: Drawer(
+        child: SafeArea(
+          child: _navColumn(state, items, inDrawer: true),
+        ),
+      ),
+      body: page,
+    );
+  }
 
-    final currentItem = items[_index];
-    return ResponsiveScaffold(
-      selectedIndex: _index,
-      onDestinationSelected: (i) => setState(() => _index = i),
-      sections: sections,
-      pages: [for (final it in items) it.builder(state)],
-      drawerHeader: _drawerHeader(),
-      appBar: AppBar(
-        title: Text(currentItem.label),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Log out',
-            onPressed: () async {
-              final ok = await confirmDialog(
-                context,
-                title: 'Log out?',
-                message: 'Leave the admin console?',
-                confirmLabel: 'Log Out',
-              );
-              if (ok && context.mounted) {
-                // RootGate switches back to the login screen automatically.
-                state.switchRole('patient');
-                state.logout();
-              }
-            },
+  PreferredSizeWidget _topBar(String title, AppState state) {
+    return AppBar(
+      title: Text(title),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Log out',
+          onPressed: () => _logout(state),
+        ),
+      ],
+    );
+  }
+
+  /// Permanent light sidebar for desktop: logo header, sectioned nav,
+  /// sign-out footer. The active item gets an orange-tinted pill.
+  Widget _sideNav(AppState state, List<_NavItem> items) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 288,
+      color: scheme.surface,
+      child: Column(
+        children: [
+          _brandHeader(),
+          Expanded(
+            child: _navList(state, items),
+          ),
+          _sideFooter(state),
+        ],
+      ),
+    );
+  }
+
+  Widget _brandHeader() {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: RemedooTheme.softShadow,
+            ),
+            child: const Icon(Icons.shield_outlined,
+                color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Remedoo',
+                  style: TextStyle(
+                      color: scheme.onSurface,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17)),
+              Text('Admin Console',
+                  style: TextStyle(
+                      color: scheme.onSurfaceVariant, fontSize: 12)),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _drawerHeader() {
-    return Container(
-      decoration:
-          const BoxDecoration(gradient: RemedooTheme.headerGradient),
-      padding: const EdgeInsets.fromLTRB(20, 32, 20, 20),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+  Widget _navList(AppState state, List<_NavItem> items) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      children: _sectionedNav(items),
+    );
+  }
+
+  Widget _navColumn(AppState state, List<_NavItem> items,
+      {bool inDrawer = false}) {
+    return Column(
+      children: [
+        _brandHeader(),
+        Expanded(
+          child: ListView(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            children: _sectionedNav(items, onTap: () {
+              if (inDrawer) Navigator.of(context).pop();
+            }),
+          ),
+        ),
+        _sideFooter(state),
+      ],
+    );
+  }
+
+  List<Widget> _sectionedNav(List<_NavItem> items,
+      {VoidCallback? onTap}) {
+    final scheme = Theme.of(context).colorScheme;
+    final out = <Widget>[];
+    String? lastSection;
+    for (var i = 0; i < items.length; i++) {
+      final it = items[i];
+      if (it.section != lastSection) {
+        lastSection = it.section;
+        out.add(Padding(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
+          child: Text(
+            it.section.toUpperCase(),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ));
+      }
+      final active = i == _index;
+      out.add(Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: Material(
+          color: active
+              ? scheme.primary.withValues(alpha: 0.12)
+              : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              _go(i);
+              onTap?.call();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(it.icon,
+                      size: 20,
+                      color: active
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      it.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: active
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: active
+                            ? scheme.primary
+                            : scheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  if (active)
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ));
+    }
+    return out;
+  }
+
+  Widget _sideFooter(AppState state) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RemedooLogo(size: 44),
-          SizedBox(height: 8),
-          Text('Admin Console',
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              'SUPER ADMIN',
               style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18)),
-          Text('admin@remedoo.app',
-              style: TextStyle(color: Colors.white70)),
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: scheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Material(
+            color: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _logout(state),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.logout,
+                        size: 20, color: RemedooTheme.destructive),
+                    SizedBox(width: 12),
+                    Text('Sign Out',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: RemedooTheme.destructive)),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

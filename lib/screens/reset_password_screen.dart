@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../responsive/responsive.dart';
 import '../theme.dart';
+import '../widgets/widgets.dart';
 
-/// Set a new password (demo).
+/// Set a new password (React ResetPassword.tsx). Demo behavior kept.
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
 
@@ -14,6 +15,7 @@ class ResetPasswordScreen extends StatefulWidget {
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _p1 = TextEditingController();
   final _p2 = TextEditingController();
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -22,100 +24,133 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     super.dispose();
   }
 
-  int _strength(String p) {
-    var s = 0;
-    if (p.length >= 8) s++;
-    if (RegExp(r'[A-Z]').hasMatch(p)) s++;
-    if (RegExp(r'[0-9]').hasMatch(p)) s++;
-    if (RegExp(r'[^A-Za-z0-9]').hasMatch(p)) s++;
-    return s;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final s = _strength(_p1.text);
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Reset Password')),
       body: MaxWidthBox(
         maxWidth: 480,
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.zero,
           children: [
-            const SizedBox(height: 8),
-            const Text(
-              'Choose a strong new password for your account.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _p1,
-              obscureText: true,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                labelText: 'NEW PASSWORD',
-                prefixIcon: Icon(Icons.lock_outline),
+            // Orange header with rounded bottom.
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 56, 24, 60),
+              decoration: const BoxDecoration(
+                gradient: RemedooTheme.headerGradient,
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(28),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: List.generate(4, (i) {
-                return Expanded(
-                  child: Container(
-                    height: 6,
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
+              child: Column(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
-                      color: i < s
-                          ? (i < 2
-                              ? Colors.red
-                              : i < 3
-                                  ? Colors.orange
-                                  : RemedooTheme.ratingGreen)
-                          : Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(3),
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.favorite,
+                      color: Colors.white,
+                      size: 28,
                     ),
                   ),
-                );
-              }),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _p2,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'CONFIRM PASSWORD',
-                prefixIcon: Icon(Icons.lock_outline),
+                  const SizedBox(height: 10),
+                  Text(
+                    'New Password',
+                    style: textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Set your new password',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(64, 48),
+            // Card overlapping the header.
+            Transform.translate(
+              offset: const Offset(0, -20),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: RCard(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      RTextField(
+                        label: 'New Password',
+                        hint: 'Min. 6 characters',
+                        controller: _p1,
+                        obscureText: _obscure,
+                        onChanged: (_) => setState(() {}),
+                        prefixIcon:
+                            const Icon(Icons.lock_outline, size: 18),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscure
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            size: 18,
+                          ),
+                          onPressed: () =>
+                              setState(() => _obscure = !_obscure),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      RTextField(
+                        label: 'Confirm Password',
+                        hint: 'Repeat your password',
+                        controller: _p2,
+                        obscureText: _obscure,
+                        prefixIcon:
+                            const Icon(Icons.lock_outline, size: 18),
+                      ),
+                      const SizedBox(height: 20),
+                      RButton(
+                        label: 'Update Password',
+                        fullWidth: true,
+                        onPressed: () {
+                          if (_p1.text.length < 8) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Password must be at least 8 characters')),
+                            );
+                            return;
+                          }
+                          if (_p1.text != _p2.text) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text('Passwords do not match')),
+                            );
+                            return;
+                          }
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Password reset! Please sign in again.')),
+                          );
+                          Navigator.popUntil(context, (r) => r.isFirst);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              onPressed: () {
-                if (_p1.text.length < 8) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Password must be at least 8 characters')),
-                  );
-                  return;
-                }
-                if (_p1.text != _p2.text) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Passwords do not match')),
-                  );
-                  return;
-                }
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text(
-                          'Password reset! Please sign in again.')),
-                );
-                Navigator.popUntil(context, (r) => r.isFirst);
-              },
-              child: const Text('Reset Password'),
             ),
+            const SizedBox(height: 24),
           ],
         ),
       ),

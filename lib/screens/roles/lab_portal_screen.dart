@@ -40,10 +40,10 @@ class _LabPortalScreenState extends State<LabPortalScreen>
         title: Text(_me.name),
         bottom: TabBar(
           controller: _tabs,
-          labelColor: RemedooTheme.primary,
+          labelColor: Theme.of(context).colorScheme.primary,
           unselectedLabelColor:
               Theme.of(context).colorScheme.onSurfaceVariant,
-          indicatorColor: RemedooTheme.primary,
+          indicatorColor: Theme.of(context).colorScheme.primary,
           tabs: const [
             Tab(text: 'Test Catalog'),
             Tab(text: 'Bookings'),
@@ -57,6 +57,10 @@ class _LabPortalScreenState extends State<LabPortalScreen>
       ),
       floatingActionButton: _tabs.index == 0
           ? FloatingActionButton.extended(
+              backgroundColor:
+                  Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              shape: const StadiumBorder(),
               onPressed: () => _testDialog(null),
               icon: const Icon(Icons.add),
               label: const Text('Add Test'),
@@ -66,6 +70,7 @@ class _LabPortalScreenState extends State<LabPortalScreen>
   }
 
   Widget _catalog() {
+    final scheme = Theme.of(context).colorScheme;
     final list = labTests.toList();
     return MaxWidthBox(
       child: ListView.builder(
@@ -75,48 +80,71 @@ class _LabPortalScreenState extends State<LabPortalScreen>
           final t = list[i];
           return StaggerItem(
             index: i % 6,
-            child: Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(t.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600)),
-                subtitle: Text(t.category,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(inr(t.price),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: RemedooTheme.primary)),
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined,
-                          size: 20),
-                      onPressed: () => _testDialog(t),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: RCard(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 6),
+                child: ListTile(
+                  leading: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: scheme.primary
+                          .withValues(alpha: 0.1),
+                      borderRadius:
+                          BorderRadius.circular(13),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline,
-                          size: 20,
-                          color: RemedooTheme.emergency),
-                      onPressed: () async {
-                        final ok = await confirmDialog(
-                          context,
-                          title: 'Delete test?',
-                          message:
-                              'Remove "${t.name}" from the catalog?',
-                          confirmLabel: 'Delete',
-                        );
-                        if (ok && mounted) {
-                          labTests.remove(t);
-                          AppStateScope.of(context).refresh();
-                        }
-                      },
-                    ),
-                  ],
+                    child: Icon(Icons.science,
+                        color: scheme.primary),
+                  ),
+                  title: Text(t.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700)),
+                  subtitle: Text(t.category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(inr(t.price),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: scheme.primary)),
+                      IconButton(
+                        icon: Icon(Icons.edit_outlined,
+                            size: 20,
+                            color: scheme.onSurfaceVariant),
+                        tooltip: 'Edit',
+                        onPressed: () => _testDialog(t),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                            Icons.delete_outline,
+                            size: 20,
+                            color: RemedooTheme.emergency),
+                        tooltip: 'Delete',
+                        onPressed: () async {
+                          final ok = await confirmDialog(
+                            context,
+                            title: 'Delete test?',
+                            message:
+                                'Remove "${t.name}" from the catalog?',
+                            confirmLabel: 'Delete',
+                          );
+                          if (ok && mounted) {
+                            labTests.remove(t);
+                            AppStateScope.of(context).refresh();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -136,20 +164,20 @@ class _LabPortalScreenState extends State<LabPortalScreen>
     showResponsiveDialog(
       context,
       (_) => AlertDialog(
-        title:
-            Text(existing == null ? 'Add Test' : 'Edit Test'),
+        title: Text(existing == null ? 'Add Test' : 'Edit Test',
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.w800)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-                controller: name,
-                decoration: const InputDecoration(
-                    labelText: 'Test name')),
-            TextField(
+            RTextField(
+                label: 'Test name',
+                controller: name),
+            const SizedBox(height: 12),
+            RTextField(
+              label: 'Price (₹)',
               controller: price,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  labelText: 'Price (₹)'),
             ),
           ],
         ),
@@ -158,7 +186,9 @@ class _LabPortalScreenState extends State<LabPortalScreen>
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          FilledButton(
+          RButton(
+            label: 'Save',
+            small: true,
             onPressed: () {
               final p = double.tryParse(price.text) ?? 0;
               if (existing == null) {
@@ -181,7 +211,6 @@ class _LabPortalScreenState extends State<LabPortalScreen>
               AppStateScope.of(context).refresh();
               Navigator.pop(context);
             },
-            child: const Text('Save'),
           ),
         ],
       ),
@@ -194,8 +223,8 @@ class _LabPortalScreenState extends State<LabPortalScreen>
         .where((a) => a.kind == 'lab')
         .toList();
     if (list.isEmpty) {
-      return const EmptyState(
-        icon: Icons.science,
+      return const REmptyState(
+        icon: Icons.science_outlined,
         title: 'No bookings',
         subtitle: 'Patient test bookings will appear here.',
       );
@@ -208,20 +237,26 @@ class _LabPortalScreenState extends State<LabPortalScreen>
           final a = list[i];
           return StaggerItem(
             index: i % 6,
-            child: Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: ListTile(
-                title: Text(a.doctorName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700)),
-                subtitle: Text(
-                    '${a.dateLabel} • ${a.timeLabel}\n${a.tests.length} tests',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
-                isThreeLine: true,
-                trailing: StatusChip(status: a.status),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: RCard(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 6),
+                child: ListTile(
+                  leading: InitialsAvatar(
+                      name: a.doctorName, radius: 22),
+                  title: Text(a.doctorName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                      '${a.dateLabel} • ${a.timeLabel}\n${a.tests.length} tests',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                  isThreeLine: true,
+                  trailing: StatusChip(status: a.status),
+                ),
               ),
             ),
           );
@@ -232,48 +267,68 @@ class _LabPortalScreenState extends State<LabPortalScreen>
 
   Widget _reports() {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     return MaxWidthBox(
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  const Text('Upload report',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16)),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Attach a completed report PDF for a booking. (demo)',
-                    style: TextStyle(
-                        fontSize: 13, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      state.addNotification(
-                        title: 'Report uploaded',
-                        message:
-                            'Your lab report is ready to view.',
-                        category: 'system',
-                      );
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(
-                        const SnackBar(
-                            content: Text(
-                                'Report uploaded! (demo)')),
-                      );
-                    },
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Upload PDF'),
-                  ),
-                ],
-              ),
+          RCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: scheme.primary
+                            .withValues(alpha: 0.1),
+                        borderRadius:
+                            BorderRadius.circular(14),
+                      ),
+                      child: Icon(Icons.upload_file,
+                          color: scheme.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text('Upload report',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Attach a completed report PDF for a booking. (demo)',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: scheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 14),
+                RButton(
+                  label: 'Upload PDF',
+                  icon: Icons.upload_file,
+                  variant: RButtonVariant.outline,
+                  onPressed: () {
+                    state.addNotification(
+                      title: 'Report uploaded',
+                      message:
+                          'Your lab report is ready to view.',
+                      category: 'system',
+                    );
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              'Report uploaded! (demo)')),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         ],

@@ -20,24 +20,23 @@ class AdminApprovalsScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('Pending Review',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
+        RSectionHeader(
+            title: 'Pending Review',
+            subtitle: '${pending.length} applications waiting'),
+        const SizedBox(height: 12),
         if (pending.isEmpty)
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('No pending applications.'),
-            ),
+          const REmptyState(
+            icon: Icons.check_circle_outline,
+            title: 'All caught up',
+            subtitle: 'No pending applications to review.',
           )
         else
           ...pending.map((a) => _card(context, state, a, true)),
-        const SizedBox(height: 16),
-        const Text('Decided',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 24),
+        RSectionHeader(
+            title: 'Decided',
+            subtitle: '${done.length} reviewed applications'),
+        const SizedBox(height: 12),
         ...done.map((a) => _card(context, state, a, false)),
       ],
     );
@@ -45,48 +44,67 @@ class AdminApprovalsScreen extends StatelessWidget {
 
   Widget _card(BuildContext context, AppState state,
       ProviderApplication a, bool pending) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: RCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
+                InitialsAvatar(name: a.name, radius: 22),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(a.name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16)),
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(a.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15)),
+                      const SizedBox(height: 2),
+                      Text('${a.role} • ${a.email}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  scheme.onSurfaceVariant)),
+                    ],
+                  ),
                 ),
                 StatusChip(status: a.status),
               ],
             ),
-            const SizedBox(height: 4),
-            Text('${a.role} • ${a.email} • ${a.phone}'),
-            Text('License: ${a.license}',
-                style:
-                    const TextStyle(fontSize: 13, color: Colors.grey)),
+            const SizedBox(height: 10),
+            Text('Phone: ${a.phone} • License: ${a.license}',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: scheme.onSurfaceVariant)),
             if (pending) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red),
+                    child: RButton(
+                      label: 'Reject',
+                      small: true,
+                      variant: RButtonVariant.danger,
                       onPressed: () => state.setApplicationStatus(
                           a.id, 'rejected'),
-                      child: const Text('Reject'),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: FilledButton(
+                    child: RButton(
+                      label: 'Approve',
+                      small: true,
                       onPressed: () => state.setApplicationStatus(
                           a.id, 'approved'),
-                      child: const Text('Approve'),
                     ),
                   ),
                 ],

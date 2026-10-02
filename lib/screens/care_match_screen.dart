@@ -9,13 +9,26 @@ import 'doctor_detail_screen.dart';
 import 'hospital_detail_screen.dart';
 import 'lab_detail_screen.dart';
 
-const _symptomChips = [
-  'Fever',
-  'Headache',
-  'Cough',
+const _quickSymptoms = [
+  'Fever and body ache',
+  'Chest discomfort',
+  'Persistent cough',
   'Stomach pain',
-  'Chest pain',
   'Skin rash',
+  'Headache and dizziness',
+];
+
+const _careTypes = [
+  'Anything suitable',
+  'Doctor',
+  'Hospital',
+  'Lab test',
+];
+
+const _urgencies = [
+  'Routine',
+  'Within a few days',
+  'Urgent',
 ];
 
 /// Smart Care Finder: symptom input + preferences → ranked matches.
@@ -30,23 +43,31 @@ class CareMatchScreen extends StatefulWidget {
 
 class _CareMatchScreenState extends State<CareMatchScreen> {
   late final TextEditingController _symptom;
-  final Set<String> _chips = {};
+  late final TextEditingController _budget;
+  late final TextEditingController _distance;
+  final _notes = TextEditingController();
   String _careType = 'Anything suitable';
   String _urgency = 'Routine';
-  double _budget = 1000;
-  double _distance = 10;
-  final _notes = TextEditingController();
   bool _searched = false;
+
+  double get _budgetValue =>
+      double.tryParse(_budget.text) ?? 1000;
+  double get _distanceValue =>
+      double.tryParse(_distance.text) ?? 10;
 
   @override
   void initState() {
     super.initState();
     _symptom = TextEditingController(text: widget.initialSymptom);
+    _budget = TextEditingController(text: '1000');
+    _distance = TextEditingController(text: '10');
   }
 
   @override
   void dispose() {
     _symptom.dispose();
+    _budget.dispose();
+    _distance.dispose();
     _notes.dispose();
     super.dispose();
   }
@@ -54,199 +75,251 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Smart Care Finder')),
-      body: MaxWidthBox(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
           children: [
-            StaggerItem(
-              index: 0,
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Describe your symptoms',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16)),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _symptom,
-                        decoration: const InputDecoration(
-                          hintText:
-                              'e.g. fever and headache for 2 days…',
+            // White sticky header.
+            Container(
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                border: Border(
+                  bottom: BorderSide(
+                      color: Theme.of(context).dividerColor),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              padding:
+                  const EdgeInsets.fromLTRB(8, 8, 16, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHighest,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.arrow_back,
+                          size: 20),
+                      onPressed: () =>
+                          Navigator.maybePop(context),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.auto_awesome,
+                                size: 16,
+                                color: scheme.primary),
+                            const SizedBox(width: 6),
+                            const Text('Smart Care Finder',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800)),
+                          ],
                         ),
-                        maxLines: 2,
+                        Text(
+                            'Describe your symptoms, get matched care',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color:
+                                    scheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: MaxWidthBox(
+                maxWidth: 720,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                      20, 16, 20, 32),
+                  children: [
+                    RCard(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          const Text('How are you feeling?',
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 8),
+                          RTextField(
+                            hint:
+                                'e.g. Sharp stomach pain with nausea for two days, worse after meals',
+                            controller: _symptom,
+                            maxLines: 3,
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _quickSymptoms
+                                .map((s) => RFilterChip(
+                                      label: s,
+                                      selected: false,
+                                      onTap: () => setState(
+                                          () =>
+                                              _symptom.text = s),
+                                    ))
+                                .toList(),
+                          ),
+                          const SizedBox(height: 18),
+                          const Text(
+                              'What kind of care do you want?',
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _careTypes
+                                .map((t) => _segPill(
+                                    t,
+                                    _careType == t,
+                                    () => setState(
+                                        () => _careType = t)))
+                                .toList(),
+                          ),
+                          const SizedBox(height: 18),
+                          const Text(
+                              'How soon do you need it?',
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _urgencies
+                                .map((u) => _segPill(
+                                    u,
+                                    _urgency == u,
+                                    () => setState(
+                                        () => _urgency = u)))
+                                .toList(),
+                          ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: RTextField(
+                                  label: 'Budget (₹)',
+                                  hint: 'e.g. 500',
+                                  controller: _budget,
+                                  keyboardType:
+                                      TextInputType.number,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: RTextField(
+                                  label: 'Max distance (km)',
+                                  hint: 'e.g. 10',
+                                  controller: _distance,
+                                  keyboardType:
+                                      TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          RTextField(
+                            label: 'Anything else? (optional)',
+                            hint:
+                                'e.g. prefer a female doctor, home sample collection',
+                            controller: _notes,
+                          ),
+                          const SizedBox(height: 18),
+                          RButton(
+                            label: 'Find my care match',
+                            icon: Icons.auto_awesome,
+                            fullWidth: true,
+                            onPressed: () => setState(
+                                () => _searched = true),
+                          ),
+                          const SizedBox(height: 10),
+                          Center(
+                            child: Text(
+                              '⚕️ Guidance only, not a medical diagnosis. Always consult a qualified doctor.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color:
+                                      scheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    if (_searched) ...[
+                      const SizedBox(height: 20),
+                      const Text('Your matches',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800)),
                       const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _symptomChips
-                            .asMap()
-                            .entries
-                            .map((e) => _optionChip(e.key, e.value))
-                            .toList(),
-                      ),
+                      ..._matches(state),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            StaggerItem(
-              index: 1,
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('What kind of care?',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16)),
-                      RadioGroup<String>(
-                        groupValue: _careType,
-                        onChanged: (v) =>
-                            setState(() => _careType = v!),
-                        child: Column(
-                          children: [
-                            for (final t in [
-                              'Anything suitable',
-                              'Doctor',
-                              'Hospital',
-                              'Lab test'
-                            ])
-                              RadioListTile<String>(
-                                value: t,
-                                title: Text(t),
-                                activeColor:
-                                    RemedooTheme.primary,
-                                contentPadding:
-                                    EdgeInsets.zero,
-                                dense: true,
-                              ),
-                          ],
-                        ),
-                      ),
-                      const Divider(),
-                      const Text('How urgent?',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16)),
-                      RadioGroup<String>(
-                        groupValue: _urgency,
-                        onChanged: (v) =>
-                            setState(() => _urgency = v!),
-                        child: Column(
-                          children: [
-                            for (final t in [
-                              'Routine',
-                              'Soon',
-                              'Urgent'
-                            ])
-                              RadioListTile<String>(
-                                value: t,
-                                title: Text(t),
-                                activeColor:
-                                    RemedooTheme.primary,
-                                contentPadding:
-                                    EdgeInsets.zero,
-                                dense: true,
-                              ),
-                          ],
-                        ),
-                      ),
-                      const Divider(),
-                      Text(
-                          'Budget: up to ${inr(_budget.round())}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700)),
-                      Slider(
-                        value: _budget,
-                        min: 200,
-                        max: 5000,
-                        divisions: 24,
-                        activeColor: RemedooTheme.primary,
-                        onChanged: (v) =>
-                            setState(() => _budget = v),
-                      ),
-                      Text(
-                          'Max distance: ${_distance.round()} km',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700)),
-                      Slider(
-                        value: _distance,
-                        min: 1,
-                        max: 30,
-                        divisions: 29,
-                        activeColor: RemedooTheme.primary,
-                        onChanged: (v) =>
-                            setState(() => _distance = v),
-                      ),
-                      TextField(
-                        controller: _notes,
-                        decoration: const InputDecoration(
-                          hintText: 'Notes (optional)',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            BigTargetButton(
-              onPressed: () => setState(() => _searched = true),
-              child: const Text('Find my care match'),
-            ),
-            if (_searched) ...[
-              const SizedBox(height: 16),
-              const Text('Your matches',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              ..._matches(state),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'This is guidance only, not a diagnosis. '
-                  'For urgent symptoms please visit emergency care.',
-                  style: TextStyle(fontSize: 13),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
-  /// Symptom option chip with a 56px-minimum touch target.
-  Widget _optionChip(int index, String c) {
-    final sel = _chips.contains(c);
-    return StaggerItem(
-      index: 2 + (index % 6),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 56),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: FilterChip(
-            label: Text(c),
-            selected: sel,
-            onSelected: (_) =>
-                setState(() => sel ? _chips.remove(c) : _chips.add(c)),
-          ),
+  /// Segmented pill: selected = orange, unselected = bordered.
+  Widget _segPill(
+      String label, bool selected, VoidCallback onTap) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: selected
+          ? scheme.primary
+          : Theme.of(context).cardColor,
+      shape: StadiumBorder(
+        side: selected
+            ? BorderSide.none
+            : BorderSide(
+                color: Theme.of(context).dividerColor),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 14, vertical: 10),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: selected
+                      ? Colors.white
+                      : scheme.onSurface)),
         ),
       ),
     );
@@ -255,22 +328,28 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
   List<Widget> _matches(AppState state) {
     final out = <Widget>[];
     final urgent = _urgency == 'Urgent';
+    final budget = _budgetValue;
+    final distance = _distanceValue;
     Widget staggered(Widget card) =>
         StaggerItem(index: out.length % 6, child: card);
     if (_careType == 'Anything suitable' || _careType == 'Doctor') {
       final docs = state.activeDoctors
           .where((d) =>
-              d.fee <= _budget && d.distanceKm <= _distance)
+              d.fee <= budget && d.distanceKm <= distance)
           .take(2)
           .toList();
       for (final d in docs) {
         out.add(staggered(_matchCard(
-          'Doctor',
-          d.name,
-          '${d.specialty} • ${inr(d.fee)} • ${d.distanceKm.toStringAsFixed(1)} km',
-          d.rating,
-          urgent ? 96 : 92,
-          () => Navigator.push(
+          kind: 'Doctor',
+          icon: Icons.medical_services,
+          name: d.name,
+          sub:
+              '${d.specialty} • ${inr(d.fee)} • ${d.distanceKm.toStringAsFixed(1)} km',
+          rating: d.rating,
+          pct: urgent ? 96 : 92,
+          reason:
+              'Matches your symptoms and stays within your budget and distance.',
+          onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
                 builder: (_) => DoctorDetailScreen(doctor: d)),
@@ -280,17 +359,21 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
     }
     if (_careType == 'Anything suitable' || _careType == 'Hospital') {
       final hs = state.activeHospitals
-          .where((h) => h.distanceKm <= _distance)
+          .where((h) => h.distanceKm <= distance)
           .take(2)
           .toList();
       for (final h in hs) {
         out.add(staggered(_matchCard(
-          'Hospital',
-          h.name,
-          '${h.location} • ${h.distanceKm.toStringAsFixed(1)} km',
-          h.rating,
-          urgent ? 94 : 88,
-          () => Navigator.push(
+          kind: 'Hospital',
+          icon: Icons.local_hospital_outlined,
+          name: h.name,
+          sub:
+              '${h.location} • ${h.distanceKm.toStringAsFixed(1)} km',
+          rating: h.rating,
+          pct: urgent ? 94 : 88,
+          reason:
+              'Well-rated hospital close to you with emergency support.',
+          onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
                 builder: (_) =>
@@ -301,17 +384,21 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
     }
     if (_careType == 'Anything suitable' || _careType == 'Lab test') {
       final ls = state.activeLabs
-          .where((l) => l.distanceKm <= _distance)
+          .where((l) => l.distanceKm <= distance)
           .take(1)
           .toList();
       for (final l in ls) {
         out.add(staggered(_matchCard(
-          'Lab',
-          l.name,
-          '${l.testCount} tests • Report in ${l.turnaround}',
-          l.rating,
-          85,
-          () => Navigator.push(
+          kind: 'Lab',
+          icon: Icons.science_outlined,
+          name: l.name,
+          sub:
+              '${l.testCount} tests • Report in ${l.turnaround}',
+          rating: l.rating,
+          pct: 85,
+          reason:
+              'Recommended lab for the tests your symptoms suggest.',
+          onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
                 builder: (_) => LabDetailScreen(lab: l)),
@@ -320,75 +407,92 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
       }
     }
     if (out.isEmpty) {
-      out.add(const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-              'No matches for these filters — try widening your budget or distance.'),
-        ),
+      out.add(RCard(
+        child: Text(
+            'No matches for these filters — try widening your budget or distance.',
+            style: TextStyle(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant)),
       ));
     }
     return out;
   }
 
-  Widget _matchCard(String kind, String name, String sub, double rating,
-      int pct, VoidCallback onTap) {
-    return Card(
+  Widget _matchCard({
+    required String kind,
+    required IconData icon,
+    required String name,
+    required String sub,
+    required double rating,
+    required int pct,
+    required String reason,
+    required VoidCallback onTap,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+      child: RCard(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: RemedooTheme.primary
-                            .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(kind,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 16, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700)),
+                      Text(kind,
+                          style: TextStyle(
                               fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: RemedooTheme.primary)),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 15)),
-                    Text(sub,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13, color: Colors.grey)),
-                    const SizedBox(height: 4),
-                    RatingPill(rating: rating),
-                  ],
+                              color: scheme.onSurfaceVariant)),
+                    ],
+                  ),
                 ),
-              ),
-              Column(
-                children: [
-                  Text('$pct%',
-                      style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: RemedooTheme.ratingGreen)),
-                  const Text('match',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ],
-          ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: scheme.primary
+                        .withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('$pct% match',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.primary)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(reason,
+                style: TextStyle(
+                    fontSize: 12.5,
+                    color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                RStat(
+                    icon: Icons.star,
+                    text: rating.toStringAsFixed(1)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: RStat(icon: Icons.info_outline, text: sub),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

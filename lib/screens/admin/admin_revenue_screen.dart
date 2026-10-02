@@ -20,52 +20,58 @@ class AdminRevenueScreen extends StatelessWidget {
     final avg = state.orders.isEmpty
         ? 0.0
         : total / state.orders.length;
+    final scheme = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Row(
           children: [
-            _card('Total Revenue', inr(total), Icons.trending_up,
-                RemedooTheme.ratingGreen),
+            _card(context, 'Total Revenue', inr(total),
+                Icons.trending_up, RemedooTheme.success),
             const SizedBox(width: 10),
-            _card('Avg. Order', inr(avg), Icons.receipt,
-                RemedooTheme.primary),
+            _card(context, 'Avg. Order', inr(avg),
+                Icons.receipt, scheme.primary),
             const SizedBox(width: 10),
-            _card('Transactions', '${state.orders.length}',
-                Icons.list_alt, RemedooTheme.purple),
+            _card(context, 'Transactions',
+                '${state.orders.length}', Icons.list_alt,
+                RemedooTheme.purple),
           ],
         ),
-        const SizedBox(height: 16),
-        const Text('Revenue Trend',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              height: 180,
-              child: CustomPaint(
-                painter: _RevPainter(
-                    _months, _vals, RemedooTheme.ratingGreen),
-              ),
+        const SizedBox(height: 24),
+        const RSectionHeader(
+            title: 'Revenue Trend',
+            subtitle: 'Last 6 months (demo data)'),
+        const SizedBox(height: 12),
+        RCard(
+          child: SizedBox(
+            height: 180,
+            child: CustomPaint(
+              painter: _RevPainter(
+                  _months, _vals, RemedooTheme.success),
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        const Text('Transactions',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
-        Card(
+        const SizedBox(height: 24),
+        const RSectionHeader(
+            title: 'Transactions',
+            subtitle: 'All medicine orders'),
+        const SizedBox(height: 12),
+        RCard(
+          padding: const EdgeInsets.all(8),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
+              headingTextStyle: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                letterSpacing: 0.4,
+                color: scheme.onSurfaceVariant,
+              ),
               columns: const [
-                DataColumn(label: Text('Order')),
-                DataColumn(label: Text('Pharmacy')),
-                DataColumn(label: Text('Amount')),
-                DataColumn(label: Text('Status')),
+                DataColumn(label: Text('ORDER')),
+                DataColumn(label: Text('PHARMACY')),
+                DataColumn(label: Text('AMOUNT')),
+                DataColumn(label: Text('STATUS')),
               ],
               rows: state.orders.map((MedOrder o) {
                 return DataRow(cells: [
@@ -82,24 +88,42 @@ class AdminRevenueScreen extends StatelessWidget {
     );
   }
 
-  Widget _card(
-      String label, String value, IconData icon, Color color) {
+  Widget _card(BuildContext context, String label, String value,
+      IconData icon, Color color) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            children: [
-              Icon(icon, color: color),
-              const SizedBox(height: 6),
-              Text(value,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800)),
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 11, color: Colors.grey)),
-            ],
-          ),
+      child: RCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: dark
+                    ? color.withValues(alpha: 0.18)
+                    : Color.lerp(color, Colors.white, 0.85),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(height: 10),
+            Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 17)),
+            const SizedBox(height: 2),
+            Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: scheme.onSurfaceVariant)),
+          ],
         ),
       ),
     );

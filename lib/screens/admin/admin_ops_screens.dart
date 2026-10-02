@@ -8,6 +8,23 @@ import '../../widgets/widgets.dart';
 // Operations screens: payouts, refunds, ambulance, drivers,
 // inventory, sessions, logs, suspicious activity.
 
+/// Pastel icon tile that adapts to light/dark.
+Widget _tile(BuildContext context, IconData icon, Color color,
+    {double size = 46}) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      color: dark
+          ? color.withValues(alpha: 0.18)
+          : Color.lerp(color, Colors.white, 0.85),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Icon(icon, color: color, size: 24),
+  );
+}
+
 /// Payouts to providers (demo data).
 class AdminPayoutsScreen extends StatelessWidget {
   const AdminPayoutsScreen({super.key});
@@ -21,37 +38,33 @@ class AdminPayoutsScreen extends StatelessWidget {
       ('Irfan Dar (Driver)', 'Driver', 1450.0, 'Processed'),
     ];
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: payouts.length,
       itemBuilder: (_, i) {
         final (name, role, amount, status) = payouts[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            leading: Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: RemedooTheme.ratingGreen
-                    .withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: RCard(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 6),
+            child: ListTile(
+              leading: _tile(
+                  context, Icons.payments, RemedooTheme.success),
+              title: Text(name,
+                  style:
+                      const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(role),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(inr(amount),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  StatusChip(status: status),
+                ],
               ),
-              child: const Icon(Icons.payments,
-                  color: RemedooTheme.ratingGreen),
-            ),
-            title: Text(name,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text(role),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(inr(amount),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800)),
-                StatusChip(status: status),
-              ],
             ),
           ),
         );
@@ -69,24 +82,23 @@ class AdminRefundsScreen extends StatelessWidget {
     final state = AppStateScope.of(context);
     final list = state.refundRequests;
     if (list.isEmpty) {
-      return const EmptyState(
+      return const REmptyState(
         icon: Icons.replay,
         title: 'No refund requests',
         subtitle: 'Refund requests will appear here.',
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: list.length,
       itemBuilder: (_, i) => _card(state, list[i]),
     );
   }
 
   Widget _card(AppState state, RefundRequest r) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: RCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -100,40 +112,41 @@ class AdminRefundsScreen extends StatelessWidget {
                 StatusChip(status: r.status),
               ],
             ),
+            const SizedBox(height: 6),
             Text(
                 'Order ${r.orderId} • ${inr(r.amount)} • ${r.reason}'),
             if (r.status == 'requested') ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red),
+                    child: RButton(
+                      label: 'Reject',
+                      small: true,
+                      variant: RButtonVariant.danger,
                       onPressed: () => state.setRefundStatus(
                           r.id, 'rejected'),
-                      child: const Text('Reject'),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: FilledButton(
+                    child: RButton(
+                      label: 'Approve',
+                      small: true,
                       onPressed: () => state.setRefundStatus(
                           r.id, 'approved'),
-                      child: const Text('Approve'),
                     ),
                   ),
                 ],
               ),
             ] else if (r.status == 'approved') ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => state.setRefundStatus(
-                      r.id, 'completed'),
-                  child: const Text('Mark Completed'),
-                ),
+              const SizedBox(height: 12),
+              RButton(
+                label: 'Mark Completed',
+                fullWidth: true,
+                small: true,
+                onPressed: () => state.setRefundStatus(
+                    r.id, 'completed'),
               ),
             ],
           ],
@@ -164,41 +177,36 @@ class _AdminAmbulanceScreenState
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: _fleet.length,
       itemBuilder: (_, i) {
         final (id, base, status) = _fleet[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            leading: Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: RemedooTheme.emergency
-                    .withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: RCard(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 6),
+            child: ListTile(
+              leading: _tile(context, Icons.emergency,
+                  RemedooTheme.emergency),
+              title: Text(id,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700)),
+              subtitle: Text('Base: $base'),
+              trailing: DropdownButton<String>(
+                value: status,
+                underline: const SizedBox.shrink(),
+                items: const [
+                  'Available',
+                  'On Trip',
+                  'Maintenance'
+                ]
+                    .map((s) => DropdownMenuItem(
+                        value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (v) => setState(() =>
+                    _fleet[i] = (id, base, v ?? status)),
               ),
-              child: const Icon(Icons.emergency,
-                  color: RemedooTheme.emergency),
-            ),
-            title: Text(id,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('Base: $base'),
-            trailing: DropdownButton<String>(
-              value: status,
-              underline: const SizedBox.shrink(),
-              items: const [
-                'Available',
-                'On Trip',
-                'Maintenance'
-              ]
-                  .map((s) => DropdownMenuItem(
-                      value: s, child: Text(s)))
-                  .toList(),
-              onChanged: (v) => setState(() =>
-                  _fleet[i] = (id, base, v ?? status)),
             ),
           ),
         );
@@ -220,38 +228,43 @@ class AdminDeliveryDriversScreen extends StatelessWidget {
       ('Danish Lone', '9906987654', 'Offline'),
     ];
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: drivers.length,
       itemBuilder: (_, i) {
         final (name, phone, status) = drivers[i];
         final assigned = state.deliveries
             .where((d) => d.status != 'delivered')
             .length;
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            leading: InitialsAvatar(name: name, radius: 22),
-            title: Text(name,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('$phone • $assigned active'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                StatusChip(status: status),
-                IconButton(
-                  icon: const Icon(Icons.assignment_ind),
-                  tooltip: 'Assign delivery',
-                  onPressed: () {
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(
-                      SnackBar(
-                          content: Text(
-                              'Delivery assigned to $name (demo)')),
-                    );
-                  },
-                ),
-              ],
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: RCard(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 6),
+            child: ListTile(
+              leading:
+                  InitialsAvatar(name: name, radius: 22),
+              title: Text(name,
+                  style:
+                      const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('$phone • $assigned active'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  StatusChip(status: status),
+                  IconButton(
+                    icon: const Icon(Icons.assignment_ind),
+                    tooltip: 'Assign delivery',
+                    onPressed: () {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(
+                        SnackBar(
+                            content: Text(
+                                'Delivery assigned to $name (demo)')),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -267,32 +280,40 @@ class AdminInventoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final list = state.activeMedicines.take(20).toList();
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: list.length,
       itemBuilder: (_, i) {
         final m = list[i];
         final stock = state.stockOf(m.id);
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: RCard(
+            padding: const EdgeInsets.all(14),
             child: Row(
               children: [
+                _tile(context, Icons.medication,
+                    RemedooTheme.teal,
+                    size: 42),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment:
                         CrossAxisAlignment.start,
                     children: [
                       Text(m.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               fontWeight: FontWeight.w700)),
                       Text(
                           '${m.pack} • ${inr(state.priceOf(m))}',
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey)),
+                              color:
+                                  scheme.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -318,28 +339,34 @@ class AdminSessionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final sessions = [
       ('Zahid Manzoor', 'Android • Srinagar', 'Active now'),
       ('Aisha Khan', 'iPhone • Jammu', '12 min ago'),
       ('Rohan Gupta', 'Web • Delhi', '1 hr ago'),
     ];
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: sessions.length,
       itemBuilder: (_, i) {
         final (name, device, last) = sessions[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: const Icon(Icons.devices,
-                color: RemedooTheme.primary),
-            title: Text(name,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text(device),
-            trailing: Text(last,
-                style:
-                    const TextStyle(fontSize: 12, color: Colors.grey)),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: RCard(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 6),
+            child: ListTile(
+              leading:
+                  _tile(context, Icons.devices, scheme.primary),
+              title: Text(name,
+                  style:
+                      const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(device),
+              trailing: Text(last,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant)),
+            ),
           ),
         );
       },
@@ -360,26 +387,32 @@ class AdminLogsScreen extends StatelessWidget {
       ('aisha.k@example.com', 'Success', 'Yesterday, 18:31'),
     ];
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: logs.length,
       itemBuilder: (_, i) {
         final (email, result, at) = logs[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: Icon(
-              result == 'Success'
-                  ? Icons.check_circle
-                  : Icons.error,
-              color: result == 'Success'
-                  ? RemedooTheme.ratingGreen
-                  : RemedooTheme.emergency,
+        final ok = result == 'Success';
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: RCard(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 6),
+            child: ListTile(
+              leading: _tile(
+                context,
+                ok ? Icons.check_circle : Icons.error,
+                ok
+                    ? RemedooTheme.success
+                    : RemedooTheme.emergency,
+              ),
+              title: Text(email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600)),
+              subtitle: Text(at),
+              trailing: StatusChip(status: result),
             ),
-            title: Text(email,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text(at),
-            trailing: StatusChip(status: result),
           ),
         );
       },
@@ -393,6 +426,7 @@ class AdminSuspiciousActivityScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final flags = [
       ('Multiple failed logins', 'unknown@example.com',
           '5 attempts in 2 minutes'),
@@ -402,37 +436,51 @@ class AdminSuspiciousActivityScreen extends StatelessWidget {
           '12 slots booked at once'),
     ];
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: flags.length,
       itemBuilder: (_, i) {
         final (title, subject, detail) = flags[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            leading: Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: Colors.orange.shade100,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(Icons.warning,
-                  color: Colors.orange),
-            ),
-            title: Text(title,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('$subject\n$detail'),
-            isThreeLine: true,
-            trailing: OutlinedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content:
-                          Text('Flagged for review (demo)')),
-                );
-              },
-              child: const Text('Review'),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: RCard(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _tile(context, Icons.warning,
+                    RemedooTheme.warning),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      Text('$subject\n$detail',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color:
+                                  scheme.onSurfaceVariant)),
+                      const SizedBox(height: 8),
+                      RButton(
+                        label: 'Review',
+                        small: true,
+                        variant: RButtonVariant.outline,
+                        onPressed: () {
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Flagged for review (demo)')),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         );

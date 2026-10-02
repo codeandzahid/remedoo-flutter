@@ -68,8 +68,8 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
         .where((a) => a.kind == 'doctor')
         .toList();
     if (list.isEmpty) {
-      return const EmptyState(
-        icon: Icons.calendar_month,
+      return const REmptyState(
+        icon: Icons.calendar_month_outlined,
         title: 'No appointments',
         subtitle: 'Patient bookings will appear here.',
       );
@@ -82,21 +82,25 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
           final a = list[i];
           return StaggerItem(
             index: i % 6,
-            child: Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: ListTile(
-                leading: InitialsAvatar(
-                    name: a.doctorName, radius: 22),
-                title: Text(a.doctorName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700)),
-                subtitle: Text('${a.dateLabel} • ${a.timeLabel}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-                trailing: StatusChip(status: a.status),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: RCard(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 6),
                 onTap: () => _detail(state, a),
+                child: ListTile(
+                  leading: InitialsAvatar(
+                      name: a.doctorName, radius: 22),
+                  title: Text(a.doctorName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700)),
+                  subtitle: Text('${a.dateLabel} • ${a.timeLabel}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  trailing: StatusChip(status: a.status),
+                ),
               ),
             ),
           );
@@ -123,7 +127,7 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                     fontSize: 18, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             InfoRow(
                 icon: Icons.calendar_month,
                 label: 'Date',
@@ -141,20 +145,21 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
             Row(
               children: [
                 Expanded(
-                  child: FilledButton(
+                  child: RButton(
+                    label: 'Cancel',
+                    small: true,
+                    variant: RButtonVariant.danger,
                     onPressed: () {
                       state.cancelAppointment(a.id);
                       Navigator.pop(context);
                     },
-                    style: FilledButton.styleFrom(
-                        backgroundColor:
-                            RemedooTheme.emergency),
-                    child: const Text('Cancel'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: FilledButton(
+                  child: RButton(
+                    label: 'Complete',
+                    small: true,
                     onPressed: () {
                       state.cancelAppointment(a.id);
                       Navigator.pop(context);
@@ -165,11 +170,11 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
                                 'Marked complete! (demo)')),
                       );
                     },
-                    child: const Text('Complete'),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 12),
           ],
         ),
       ),
@@ -192,20 +197,11 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
               separatorBuilder: (_, _) =>
                   const SizedBox(width: 8),
               itemBuilder: (_, i) {
-                final sel = i == _day;
                 return Center(
-                  child: ChoiceChip(
-                    label: Text(_days[i]),
-                    selected: sel,
-                    onSelected: (_) =>
-                        setState(() => _day = i),
-                    selectedColor: RemedooTheme.primary,
-                    labelStyle: TextStyle(
-                        color: sel
-                            ? Colors.white
-                            : Theme.of(context)
-                                .colorScheme
-                                .onSurface),
+                  child: RFilterChip(
+                    label: _days[i],
+                    selected: i == _day,
+                    onTap: () => setState(() => _day = i),
                   ),
                 );
               },
@@ -230,10 +226,11 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
                       .toList(),
                 ),
                 const SizedBox(height: 16),
-                OutlinedButton.icon(
+                RButton(
+                  label: 'Add slot',
+                  icon: Icons.add,
+                  variant: RButtonVariant.outline,
                   onPressed: () => _addSlotDialog(state),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add slot'),
                 ),
               ],
             ),
@@ -248,24 +245,27 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
     showResponsiveDialog(
       context,
       (_) => AlertDialog(
-        title: Text('Add slot • ${_days[_day]}'),
-        content: TextField(
+        title: Text('Add slot • ${_days[_day]}',
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.w800)),
+        content: RTextField(
           controller: ctrl,
-          decoration: const InputDecoration(
-              labelText: 'Time (HH:MM)', hintText: '11:00'),
+          label: 'Time (HH:MM)',
+          hint: '11:00',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          FilledButton(
+          RButton(
+            label: 'Add',
+            small: true,
             onPressed: () {
               state.addDoctorSlot(
                   _me.id, _day, ctrl.text.trim());
               Navigator.pop(context);
             },
-            child: const Text('Add'),
           ),
         ],
       ),
@@ -278,26 +278,43 @@ class _DoctorPortalScreenState extends State<DoctorPortalScreen> {
         state.appointments.where((a) => a.kind == 'doctor');
     final total =
         mine.fold<double>(0, (s, a) => s + a.fee);
+    final scheme = Theme.of(context).colorScheme;
     return MaxWidthBox(
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  const Text('Total earnings',
-                      style: TextStyle(color: Colors.grey)),
-                  Text(inr(total),
-                      style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          color: RemedooTheme.ratingGreen)),
-                  const SizedBox(height: 8),
-                  Text('${mine.length} appointments'),
-                ],
-              ),
+          RCard(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: RemedooTheme.success
+                        .withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.payments,
+                      color: RemedooTheme.success, size: 28),
+                ),
+                const SizedBox(height: 12),
+                Text('Total earnings',
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 13)),
+                const SizedBox(height: 4),
+                Text(inr(total),
+                    style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: RemedooTheme.success)),
+                const SizedBox(height: 8),
+                Text('${mine.length} appointments',
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 13)),
+              ],
             ),
           ),
         ],

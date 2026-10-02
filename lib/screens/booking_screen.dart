@@ -8,6 +8,13 @@ import '../widgets/widgets.dart';
 import 'appointments_screen.dart';
 
 /// Book an appointment for a doctor, hospital or lab visit.
+/// Layout mirrors the React BookAppointment page: orange gradient header,
+/// provider card, date strip, time-slot grid, notes, payment toggle cards,
+/// booking summary and an orange pill confirm button.
+///
+/// NOTE (regression): the payment toggle cards must stay InkWell-wrapped,
+/// time slots must stay ChoiceChips, and the confirm action must stay a
+/// FilledButton — widget tests depend on this structure.
 class BookingScreen extends StatefulWidget {
   final String kind; // doctor | hospital | lab
   final String refId;
@@ -123,32 +130,32 @@ class _BookingScreenState extends State<BookingScreen> {
         const SizedBox(height: 12),
         _testsCard(),
       ],
-      const SizedBox(height: 16),
-      _sectionTitle('Select Date'),
-      const SizedBox(height: 8),
+      const SizedBox(height: 20),
+      _sectionTitle(Icons.calendar_month, 'Select Date'),
+      const SizedBox(height: 10),
       _datePicker(),
-      const SizedBox(height: 16),
-      _sectionTitle('Select Time'),
-      const SizedBox(height: 8),
+      const SizedBox(height: 20),
+      _sectionTitle(Icons.schedule, 'Select Time'),
+      const SizedBox(height: 10),
       _timePicker(slots),
-      const SizedBox(height: 16),
-      _sectionTitle('Notes (optional)'),
-      const SizedBox(height: 8),
-      TextField(
+      const SizedBox(height: 20),
+      RTextField(
+        label: 'Notes (optional)',
+        hint: 'Anything the doctor should know…',
         controller: _notes,
         maxLines: 2,
-        decoration: const InputDecoration(
-            hintText: 'Anything the doctor should know…'),
       ),
-      const SizedBox(height: 16),
-      _sectionTitle('Payment'),
-      const SizedBox(height: 8),
+      const SizedBox(height: 20),
+      _sectionTitle(Icons.credit_card, 'Payment Method'),
+      const SizedBox(height: 10),
       _payCard('At Clinic', 'Pay when you visit', Icons.payments_outlined),
-      const SizedBox(height: 8),
+      const SizedBox(height: 10),
       _payCard('Pay Online', 'Auto-confirm your slot', Icons.credit_card),
     ];
 
     final summary = _summaryCard();
+    // Orange pill via the theme's FilledButton style (kept as FilledButton:
+    // widget tests tap this exact widget type).
     final confirm = FilledButton(
       onPressed: () => _confirm(isReschedule),
       child: Text(isReschedule
@@ -157,121 +164,148 @@ class _BookingScreenState extends State<BookingScreen> {
     );
 
     return Scaffold(
-      appBar:
-          AppBar(title: Text(isReschedule ? 'Reschedule' : 'Book Appointment')),
-      body: context.isCompact
-          ? MaxWidthBox(
-              maxWidth: 640,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  ...sections,
-                  const SizedBox(height: 16),
-                  summary,
-                  const SizedBox(height: 24),
-                  confirm,
-                  const SizedBox(height: 16),
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: DetailSplit(
-                main: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ...sections,
-                    const SizedBox(height: 24),
-                    confirm,
-                  ],
+      body: Column(
+        children: [
+          RGradientHeader(
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.maybePop(context),
                 ),
-                side: summary,
-              ),
+                Expanded(
+                  child: Text(
+                    isReschedule ? 'Reschedule' : 'Book Appointment',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ),
+          Expanded(
+            child: context.isCompact
+                ? MaxWidthBox(
+                    maxWidth: 640,
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        ...sections,
+                        const SizedBox(height: 16),
+                        summary,
+                        const SizedBox(height: 24),
+                        confirm,
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: DetailSplit(
+                      main: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ...sections,
+                          const SizedBox(height: 24),
+                          confirm,
+                        ],
+                      ),
+                      side: summary,
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _sectionTitle(String text) {
-    return Text(text,
-        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16));
+  Widget _sectionTitle(IconData icon, String text) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: scheme.primary),
+        const SizedBox(width: 8),
+        Text(text,
+            style: const TextStyle(
+                fontWeight: FontWeight.w800, fontSize: 16)),
+      ],
+    );
   }
 
   Widget _providerCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            InitialsAvatar(name: widget.title, radius: 28),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800, fontSize: 16)),
-                  Text(widget.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: RemedooTheme.primary,
-                          fontWeight: FontWeight.w600)),
-                  Text(widget.place,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          const TextStyle(fontSize: 13, color: Colors.grey)),
-                ],
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Booking with',
+              style: TextStyle(
+                  fontSize: 12, color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 2),
+          Text(widget.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, fontSize: 18)),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text(
+                widget.kind[0].toUpperCase() +
+                    widget.kind.substring(1),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600),
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(inr(widget.fee),
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: RemedooTheme.primary)),
-          ],
-        ),
+              if (widget.fee > 0) ...[
+                const SizedBox(width: 6),
+                Text('· ${inr(widget.fee)}',
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700)),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _testsCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Selected Tests',
-                style:
-                    TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: 8),
-            ...widget.tests!.map((t) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(t.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(inr(t.price),
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                )),
-          ],
-        ),
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Selected Tests',
+              style:
+                  TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 8),
+          ...widget.tests!.map((t) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(t.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(inr(t.price),
+                        style:
+                            const TextStyle(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              )),
+        ],
       ),
     );
   }
 
   Widget _datePicker() {
+    final scheme = Theme.of(context).colorScheme;
     return SizedBox(
       height: 84,
       child: ListView.separated(
@@ -287,13 +321,12 @@ class _BookingScreenState extends State<BookingScreen> {
             child: Container(
               width: 66,
               decoration: BoxDecoration(
-                color:
-                    sel ? RemedooTheme.primary : Theme.of(context).cardColor,
+                color: sel ? scheme.primary : scheme.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                     color: sel
-                        ? RemedooTheme.primary
-                        : Colors.grey.shade300),
+                        ? scheme.primary
+                        : Theme.of(context).dividerColor),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -302,11 +335,13 @@ class _BookingScreenState extends State<BookingScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: sel ? Colors.white : Colors.grey,
+                          color: sel
+                              ? Colors.white
+                              : scheme.onSurfaceVariant,
                           fontSize: 12)),
                   Text('${d.day}',
                       style: TextStyle(
-                          color: sel ? Colors.white : null,
+                          color: sel ? Colors.white : scheme.onSurface,
                           fontWeight: FontWeight.w800,
                           fontSize: 18)),
                 ],
@@ -319,6 +354,7 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Widget _timePicker(List<String> slots) {
+    final scheme = Theme.of(context).colorScheme;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -330,17 +366,24 @@ class _BookingScreenState extends State<BookingScreen> {
               const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           selected: sel,
           onSelected: (_) => setState(() => _time = s),
-          selectedColor: RemedooTheme.primary,
+          selectedColor: scheme.primary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          side: BorderSide(
+            color:
+                sel ? scheme.primary : Theme.of(context).dividerColor,
+          ),
           labelStyle: TextStyle(
-              color: sel
-                  ? Colors.white
-                  : Theme.of(context).colorScheme.onSurface),
+              color: sel ? Colors.white : scheme.onSurface,
+              fontWeight: FontWeight.w600),
         );
       }).toList(),
     );
   }
 
   Widget _payCard(String value, String sub, IconData icon) {
+    final scheme = Theme.of(context).colorScheme;
     final sel = _payment == value;
     return InkWell(
       onTap: () => setState(() => _payment = value),
@@ -349,33 +392,49 @@ class _BookingScreenState extends State<BookingScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: sel ? RemedooTheme.primary : Colors.transparent,
-            width: 2,
+            color: sel ? scheme.primary : Theme.of(context).dividerColor,
+            width: sel ? 2 : 1,
           ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              Icon(icon,
-                  color: sel ? RemedooTheme.primary : Colors.grey),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: sel
+                      ? scheme.primary.withValues(alpha: 0.12)
+                      : scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon,
+                    size: 20,
+                    color: sel
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(value,
-                        style:
-                            const TextStyle(fontWeight: FontWeight.w700)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: sel
+                                ? scheme.primary
+                                : scheme.onSurface)),
                     Text(sub,
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.grey)),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant)),
                   ],
                 ),
               ),
               if (sel)
-                const Icon(Icons.check_circle,
-                    color: RemedooTheme.primary),
+                Icon(Icons.check_circle, color: scheme.primary),
             ],
           ),
         ),
@@ -409,43 +468,42 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Widget _summaryCard() {
+    final scheme = Theme.of(context).colorScheme;
     final dateLabel =
         '${_weekdays[_date.weekday - 1]}, ${_date.day} ${_months[_date.month - 1]}';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Booking Summary',
-                style:
-                    TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: 8),
-            _sumRow('Provider', widget.title),
-            _sumRow('Date', dateLabel),
-            _sumRow('Time', _time),
-            _sumRow('Payment', _payment),
-            const Divider(height: 20),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text('Total payable',
-                      style: TextStyle(fontWeight: FontWeight.w800)),
-                ),
-                Text(inr(widget.fee),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                        color: RemedooTheme.primary)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Free cancellation up to 2 hours before your slot.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Booking Summary',
+              style:
+                  TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 8),
+          _sumRow('Provider', widget.title),
+          _sumRow('Date', dateLabel),
+          _sumRow('Time', _time),
+          _sumRow('Payment', _payment),
+          const Divider(height: 20),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Total payable',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+              Text(inr(widget.fee),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      color: scheme.primary)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Free cancellation up to 2 hours before your slot.',
+            style: TextStyle(
+                fontSize: 12, color: scheme.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }

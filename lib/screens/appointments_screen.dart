@@ -11,6 +11,8 @@ import 'booking_screen.dart';
 import 'doctors_screen.dart';
 
 /// Upcoming / Past appointments with reschedule + cancel.
+/// Mirrors the React Appointments page: orange gradient header with
+/// Upcoming/Past pill tabs, status-pill cards, tap to detail.
 class AppointmentsScreen extends StatefulWidget {
   const AppointmentsScreen({super.key});
 
@@ -26,6 +28,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
+    _tabs.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -37,30 +42,94 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final upcoming = state.appointments
-        .where((a) => a.status == 'upcoming')
-        .toList();
+    final upcoming =
+        state.appointments.where((a) => a.status == 'upcoming').toList();
     final past =
         state.appointments.where((a) => a.status != 'upcoming').toList();
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Appointments (${state.appointments.length})'),
-        bottom: TabBar(
-          controller: _tabs,
-          labelColor: RemedooTheme.primary,
-          unselectedLabelColor:
-              Theme.of(context).colorScheme.onSurfaceVariant,
-          indicatorColor: RemedooTheme.primary,
-          tabs: const [Tab(text: 'Upcoming'), Tab(text: 'Past')],
-        ),
+      body: Column(
+        children: [
+          RGradientHeader(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon:
+                          const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.maybePop(context),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        // Keeps the historic 'Appointments (N)' title text
+                        // (widget tests assert it); count badge lives in the
+                        // tab pills like the React page.
+                        'Appointments (${state.appointments.length})',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                        child: _tabPill(
+                            'Upcoming (${upcoming.length})', 0)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child:
+                            _tabPill('Past (${past.length})', 1)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: MaxWidthBox(
+              child: TabBarView(
+                controller: _tabs,
+                children: [
+                  _list(upcoming, state, isUpcoming: true),
+                  _list(past, state, isUpcoming: false),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
-      body: MaxWidthBox(
-        child: TabBarView(
-          controller: _tabs,
-          children: [
-            _list(upcoming, state, isUpcoming: true),
-            _list(past, state, isUpcoming: false),
-          ],
+    );
+  }
+
+  /// Pill tab: active = white bg + orange text, inactive = translucent white.
+  Widget _tabPill(String label, int index) {
+    final selected = _tabs.index == index;
+    return Material(
+      color: selected
+          ? Colors.white
+          : Colors.white.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _tabs.animateTo(index),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: selected ? RemedooTheme.primary : Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ),
     );
@@ -94,104 +163,106 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   }
 
   Widget _card(Appointment a, AppState state, bool isUpcoming) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: RCard(
+        padding: const EdgeInsets.all(14),
         onTap: () =>
             pushPage(context, AppointmentDetailScreen(appointment: a)),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                InitialsAvatar(name: a.doctorName, radius: 26),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(a.doctorName,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16)),
+                      Text(a.specialty,
+                          style: TextStyle(
+                              color: scheme.primary, fontSize: 13)),
+                      Text('${a.dateLabel} • ${a.timeLabel}',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: scheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                StatusChip(status: a.status),
+              ],
+            ),
+            if (isUpcoming) ...[
+              const SizedBox(height: 12),
               Row(
                 children: [
-                  InitialsAvatar(name: a.doctorName, radius: 26),
-                  const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(a.doctorName,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16)),
-                        Text(a.specialty,
-                            style: const TextStyle(
-                                color: RemedooTheme.primary,
-                                fontSize: 13)),
-                        Text('${a.dateLabel} • ${a.timeLabel}',
-                            style: const TextStyle(
-                                fontSize: 13, color: Colors.grey)),
-                      ],
+                    child: RButton(
+                      label: 'Reschedule',
+                      variant: RButtonVariant.outline,
+                      small: true,
+                      onPressed: () => pushPage(
+                        context,
+                        BookingScreen(
+                          kind: a.kind,
+                          refId: a.refId,
+                          title: a.doctorName,
+                          subtitle: a.specialty,
+                          place: a.place,
+                          fee: a.fee,
+                          prefill: a,
+                        ),
+                      ),
                     ),
                   ),
-                  StatusChip(status: a.status),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: RButton(
+                      label: 'Cancel',
+                      variant: RButtonVariant.danger,
+                      small: true,
+                      onPressed: () async {
+                        final ok = await confirmDialog(
+                          context,
+                          title: 'Cancel appointment?',
+                          message:
+                              'This slot will be released. This cannot be undone.',
+                          confirmLabel: 'Yes, cancel',
+                        );
+                        if (ok) {
+                          state.cancelAppointment(a.id);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Appointment cancelled')),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ),
                 ],
               ),
-              if (isUpcoming) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => pushPage(
-                          context,
-                          BookingScreen(
-                            kind: a.kind,
-                            refId: a.refId,
-                            title: a.doctorName,
-                            subtitle: a.specialty,
-                            place: a.place,
-                            fee: a.fee,
-                            prefill: a,
-                          ),
-                        ),
-                        child: const Text('Reschedule'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                            foregroundColor: RemedooTheme.emergency),
-                        onPressed: () async {
-                          final ok = await confirmDialog(
-                            context,
-                            title: 'Cancel appointment?',
-                            message:
-                                'This slot will be released. This cannot be undone.',
-                            confirmLabel: 'Yes, cancel',
-                          );
-                          if (ok) {
-                            state.cancelAppointment(a.id);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Appointment cancelled')),
-                              );
-                            }
-                          }
-                        },
-                        child: const Text('Cancel'),
-                      ),
-                    ),
-                  ],
-                ),
-              ] else if (state.canReview(a.id)) ...[
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () => ReviewDialog.show(
-                      context, a.id, a.doctorName),
-                  icon: const Icon(Icons.star_outline),
-                  label: const Text('Write a review'),
-                ),
-              ],
+            ] else if (state.canReview(a.id)) ...[
+              const SizedBox(height: 12),
+              RButton(
+                label: 'Write a review',
+                icon: Icons.star_outline,
+                variant: RButtonVariant.outline,
+                small: true,
+                onPressed: () =>
+                    ReviewDialog.show(context, a.id, a.doctorName),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );

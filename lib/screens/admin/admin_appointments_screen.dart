@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../models.dart';
 import '../../state/app_state.dart';
-import '../../theme.dart';
 import '../../widgets/widgets.dart';
 
 /// Admin appointments: filterable list with status-change actions.
@@ -28,35 +27,37 @@ class _AdminAppointmentsScreenState
     }
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: statuses.map((s) {
-              final sel = s == _filter;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(s),
-                  selected: sel,
-                  onSelected: (_) =>
-                      setState(() => _filter = s),
-                  selectedColor: RemedooTheme.primary,
-                  labelStyle: TextStyle(
-                      color: sel ? Colors.white : null),
+        SizedBox(
+          height: 52,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: statuses.length,
+            separatorBuilder: (_, _) =>
+                const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final s = statuses[i];
+              return Center(
+                child: RFilterChip(
+                  label: s == 'All' ? 'All' : s,
+                  selected: s == _filter,
+                  onTap: () => setState(() => _filter = s),
                 ),
               );
-            }).toList(),
+            },
           ),
         ),
         Expanded(
           child: list.isEmpty
-              ? const EmptyState(
-                  icon: Icons.calendar_month,
+              ? const REmptyState(
+                  icon: Icons.calendar_month_outlined,
                   title: 'No appointments',
                   subtitle: 'Bookings will appear here.',
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(
+                      16, 4, 16, 16),
                   itemCount: list.length,
                   itemBuilder: (_, i) =>
                       _card(state, list[i]),
@@ -67,27 +68,37 @@ class _AdminAppointmentsScreenState
   }
 
   Widget _card(AppState state, Appointment a) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        title: Text(a.doctorName,
-            style:
-                const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text(
-            '${a.specialty} • ${a.dateLabel} ${a.timeLabel}'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            StatusChip(status: a.status),
-            if (a.status == 'upcoming')
-              IconButton(
-                icon: const Icon(Icons.cancel_outlined,
-                    color: Colors.red),
-                tooltip: 'Cancel',
-                onPressed: () =>
-                    state.cancelAppointment(a.id),
-              ),
-          ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: RCard(
+        padding: const EdgeInsets.symmetric(
+            horizontal: 8, vertical: 6),
+        child: ListTile(
+          leading: InitialsAvatar(
+              name: a.doctorName, radius: 22),
+          title: Text(a.doctorName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(
+              '${a.specialty} • ${a.dateLabel} ${a.timeLabel}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              StatusChip(status: a.status),
+              if (a.status == 'upcoming')
+                IconButton(
+                  icon: const Icon(Icons.cancel_outlined,
+                      color: Colors.red),
+                  tooltip: 'Cancel',
+                  onPressed: () =>
+                      state.cancelAppointment(a.id),
+                ),
+            ],
+          ),
         ),
       ),
     );

@@ -10,7 +10,7 @@ import 'forgot_password_screen.dart';
 import 'provider_register_screen.dart';
 import 'admin/admin_login_screen.dart';
 
-/// "Welcome Back" sign-in with Password / Magic Link tabs.
+/// "Welcome Back" sign-in with Password / Magic Link tabs (React Login.tsx).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -48,153 +48,295 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      body: SafeArea(
-        child: MaxWidthBox(
-          maxWidth: 480,
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              const SizedBox(height: 24),
-              const Center(child: RemedooLogo(size: 72)),
-              const SizedBox(height: 16),
-              const Center(
-                child: Text('Welcome Back',
-                    style:
-                        TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
-              ),
-              const SizedBox(height: 6),
-              Center(
-                child: Text('Sign in to continue to Remedoo',
-                    style: TextStyle(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant)),
-              ),
-              const SizedBox(height: 24),
-              TabBar(
-                controller: _tabs,
-                labelColor: RemedooTheme.primary,
-                unselectedLabelColor:
-                    Theme.of(context).colorScheme.onSurfaceVariant,
-                indicatorColor: RemedooTheme.primary,
-                tabs: const [Tab(text: 'Password'), Tab(text: 'Magic Link')],
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _email,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'EMAIL',
-                  prefixIcon: Icon(Icons.email_outlined),
+      body: MaxWidthBox(
+        maxWidth: 480,
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            // Orange curved header with decorative circles.
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 56, 24, 48),
+              decoration: const BoxDecoration(
+                gradient: RemedooTheme.headerGradient,
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(28),
                 ),
               ),
-              const SizedBox(height: 12),
-              AnimatedBuilder(
-                animation: _tabs,
-                builder: (_, _) {
-                  if (_tabs.index == 1) {
-                    return const SizedBox.shrink();
-                  }
-                  return TextField(
-                    controller: _password,
-                    obscureText: _obscure,
-                    decoration: InputDecoration(
-                      labelText: 'PASSWORD',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscure
-                            ? Icons.visibility_off
-                            : Icons.visibility),
-                        onPressed: () =>
-                            setState(() => _obscure = !_obscure),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned(
+                    top: -70,
+                    right: -70,
+                    child: Container(
+                      width: 190,
+                      height: 190,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.06),
                       ),
                     ),
-                  );
-                },
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => pushPage(
-                      context, const ForgotPasswordScreen()),
-                  child: const Text('Forgot Password?',
-                      style: TextStyle(color: RemedooTheme.primary)),
-                ),
-              ),
-              FilledButton(
-                onPressed: _signIn,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(64, 48),
-                ),
-                child: Text(_tabs.index == 1 ? 'Send Magic Link' : 'Sign In'),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Expanded(child: Divider()),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('OR',
-                        style: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant)),
                   ),
-                  const Expanded(child: Divider()),
+                  Positioned(
+                    bottom: -50,
+                    left: -60,
+                    child: Container(
+                      width: 150,
+                      height: 150,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.06),
+                      ),
+                    ),
+                  ),
+                  Column(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.medical_services_rounded,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Welcome Back',
+                        style: textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Sign in to continue to Remedoo',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.65),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _signIn,
-                icon: const Icon(Icons.g_mobiledata, size: 28),
-                label: const Text('Continue with Google'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28)),
+            ),
+            // Form card overlapping the header.
+            Transform.translate(
+              offset: const Offset(0, -24),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: AnimatedBuilder(
+                  animation: _tabs,
+                  builder: (_, _) {
+                    final magic = _tabs.index == 1;
+                    return RCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Segmented mode tabs.
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: scheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                _modeTab('Password', 0, !magic, scheme),
+                                _modeTab('Magic Link', 1, magic, scheme),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          RTextField(
+                            label: 'Email',
+                            hint: 'your@email.com',
+                            controller: _email,
+                            keyboardType: TextInputType.emailAddress,
+                            prefixIcon: const Icon(
+                                Icons.mail_outline, size: 18),
+                          ),
+                          if (!magic) ...[
+                            const SizedBox(height: 12),
+                            RTextField(
+                              label: 'Password',
+                              hint: '••••••••',
+                              controller: _password,
+                              obscureText: _obscure,
+                              prefixIcon: const Icon(
+                                  Icons.lock_outline, size: 18),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscure
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  size: 18,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
+                              ),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'We\'ll send you a magic link — no password needed.',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                          if (!magic)
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () => pushPage(
+                                    context,
+                                    const ForgotPasswordScreen()),
+                                child: Text(
+                                  'Forgot Password?',
+                                  style: textTheme.labelMedium?.copyWith(
+                                    color: scheme.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox(height: 16),
+                          RButton(
+                            label: magic ? 'Send Magic Link' : 'Sign In',
+                            icon: magic ? Icons.auto_awesome : null,
+                            fullWidth: true,
+                            onPressed: _signIn,
+                          ),
+                          const SizedBox(height: 12),
+                          // "or" divider.
+                          Row(
+                            children: [
+                              const Expanded(child: Divider()),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12),
+                                child: Text(
+                                  'or',
+                                  style: textTheme.labelSmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              const Expanded(child: Divider()),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          RButton(
+                            label: 'Continue with Google',
+                            icon: Icons.g_mobiledata,
+                            variant: RButtonVariant.outline,
+                            fullWidth: true,
+                            onPressed: _signIn,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
-              const SizedBox(height: 16),
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
+            ),
+            // Bottom actions.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: Column(
                 children: [
-                  const Text("Don't have an account? "),
-                  TextButton(
+                  RButton(
+                    label: "Don't have an account? Sign Up",
+                    icon: Icons.person_add_outlined,
+                    variant: RButtonVariant.outline,
+                    fullWidth: true,
                     onPressed: () =>
                         pushPage(context, const SignupScreen()),
-                    child: const Text('Sign Up',
-                        style: TextStyle(color: RemedooTheme.primary)),
+                  ),
+                  const SizedBox(height: 8),
+                  RButton(
+                    label: 'Are you a provider? Register',
+                    icon: Icons.medical_services_outlined,
+                    variant: RButtonVariant.outline,
+                    fullWidth: true,
+                    onPressed: () =>
+                        pushPage(context, const ProviderRegisterScreen()),
+                  ),
+                  const SizedBox(height: 4),
+                  TextButton.icon(
+                    onPressed: () =>
+                        AppStateScope.of(context).loginAsGuest(),
+                    icon: Icon(Icons.arrow_forward,
+                        size: 16, color: scheme.onSurfaceVariant),
+                    label: Text(
+                      'Skip, continue as guest',
+                      style: textTheme.labelLarge?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        pushPage(context, const AdminLoginScreen()),
+                    child: Text(
+                      'Admin',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
                 ],
               ),
-              TextButton(
-                onPressed: () =>
-                    pushPage(context, const ProviderRegisterScreen()),
-                child: const Text('Are you a provider? Register',
-                    style: TextStyle(color: RemedooTheme.primary)),
-              ),
-              TextButton(
-                onPressed: () =>
-                    AppStateScope.of(context).loginAsGuest(),
-                child: const Text('Skip, continue as guest →',
-                    style: TextStyle(color: RemedooTheme.primary)),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton(
-                  onPressed: () =>
-                      pushPage(context, const AdminLoginScreen()),
-                  child: Text('Admin',
-                      style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
-                          fontSize: 12)),
-                ),
-              ),
-            ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _modeTab(
+      String label, int index, bool selected, ColorScheme scheme) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _tabs.animateTo(index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? scheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: scheme.primary.withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: selected ? Colors.white : scheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),

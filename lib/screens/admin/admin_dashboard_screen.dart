@@ -4,6 +4,7 @@ import '../../responsive/animations.dart';
 import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/widgets.dart';
 
 /// Admin overview: stat cards, revenue bar chart, orders donut, activity.
 class AdminDashboardScreen extends StatelessWidget {
@@ -21,79 +22,86 @@ class AdminDashboardScreen extends StatelessWidget {
     for (final o in state.orders) {
       byStatus[o.status] = (byStatus[o.status] ?? 0) + 1;
     }
+    final pendingApprovals = state.providerApplications
+        .where((a) => a.status == 'pending')
+        .length;
+    final activeEmergencies = state.sosAlerts
+        .where((a) => a.status != 'dispatched')
+        .length;
 
+    final scheme = Theme.of(context).colorScheme;
     final stats = [
-      _stat('Users', '${state.adminUsers.length}', Icons.people,
-          RemedooTheme.primary),
-      _stat('Doctors', '${state.activeDoctors.length}',
+      _stat(context, 'Total Users', '${state.adminUsers.length}',
+          Icons.people, scheme.primary),
+      _stat(context, 'Doctors', '${state.activeDoctors.length}',
           Icons.person_search, RemedooTheme.teal),
-      _stat('Orders', '${state.orders.length}',
-          Icons.shopping_bag, RemedooTheme.purple),
-      _stat('Revenue', inr(revenue), Icons.currency_rupee,
-          RemedooTheme.ratingGreen),
+      _stat(context, 'Appointments', '${state.appointments.length}',
+          Icons.calendar_month, RemedooTheme.purple),
+      _stat(context, 'Total Orders', '${state.orders.length}',
+          Icons.shopping_bag, RemedooTheme.warning),
+      _stat(context, 'Pending Approvals', '$pendingApprovals',
+          Icons.approval, scheme.primary),
+      _stat(context, 'Active Emergencies', '$activeEmergencies',
+          Icons.sos, RemedooTheme.emergency),
+      _stat(context, 'Revenue', inr(revenue), Icons.currency_rupee,
+          RemedooTheme.success),
     ];
 
-    final revenueCard = Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SizedBox(
-          height: 200,
-          child: CustomPaint(
-            painter: _BarPainter(_months, _revenue, RemedooTheme.primary),
-          ),
+    final revenueCard = RCard(
+      child: SizedBox(
+        height: 200,
+        child: CustomPaint(
+          painter: _BarPainter(_months, _revenue, scheme.primary),
         ),
       ),
     );
 
-    final donutCard = Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 150,
-              height: 150,
-              child: CustomPaint(
-                painter: _DonutPainter(byStatus),
-              ),
+    final donutCard = RCard(
+      child: Row(
+        children: [
+          SizedBox(
+            width: 150,
+            height: 150,
+            child: CustomPaint(
+              painter: _DonutPainter(byStatus),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: byStatus.entries.map((e) {
-                  return Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color:
-                                _DonutPainter.colorFor(e.key),
-                            shape: BoxShape.circle,
-                          ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: byStatus.entries.map((e) {
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color:
+                              _DonutPainter.colorFor(e.key),
+                          shape: BoxShape.circle,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                            child: Text(
-                          e.key.replaceAll('_', ' '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        )),
-                        Text('${e.value}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700)),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                          child: Text(
+                        e.key.replaceAll('_', ' '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      )),
+                      Text('${e.value}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                );
+              }).toList(),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
 
@@ -105,19 +113,17 @@ class AdminDashboardScreen extends StatelessWidget {
             compactCols: 2,
             mediumCols: 3,
             expandedCols: 4,
-            wideCols: 6,
+            wideCols: 4,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            // Taller cells: stat content (icon + value + label) needs
-            // breathing room at every breakpoint and text scale.
-            childAspectRatio: 1.4,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.15,
             itemCount: stats.length,
             itemBuilder: (_, i) =>
                 StaggerItem(index: i % 6, child: stats[i]),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           if (context.isDesktop)
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,48 +132,72 @@ class AdminDashboardScreen extends StatelessWidget {
                   flex: 3,
                   child: StaggerItem(
                       index: 0,
-                      child:
-                          _section('Monthly Revenue', revenueCard)),
+                      child: _section('Monthly Revenue',
+                          'Last 6 months of platform revenue',
+                          revenueCard)),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   flex: 2,
                   child: StaggerItem(
                       index: 1,
-                      child: _section(
-                          'Orders by Status', donutCard)),
+                      child: _section('Orders by Status',
+                          'Current order pipeline', donutCard)),
                 ),
               ],
             )
           else ...[
             StaggerItem(
                 index: 0,
-                child: _section('Monthly Revenue', revenueCard)),
-            const SizedBox(height: 16),
+                child: _section('Monthly Revenue',
+                    'Last 6 months of platform revenue',
+                    revenueCard)),
+            const SizedBox(height: 24),
             StaggerItem(
                 index: 1,
-                child: _section('Orders by Status', donutCard)),
+                child: _section('Orders by Status',
+                    'Current order pipeline', donutCard)),
           ],
-          const SizedBox(height: 16),
-          const Text('Recent Activity',
-              style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 24),
+          const RSectionHeader(
+              title: 'Recent Activity',
+              subtitle: 'Latest platform events'),
+          const SizedBox(height: 12),
           ...state.notifications.take(8).map((n) => StaggerItem(
                 index: 0,
-                child: Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: Icon(n.icon,
-                        color: RemedooTheme.primary),
-                    title: Text(n.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600)),
-                    subtitle: Text(n.body,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: RCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        _tile(context, n.icon, scheme.primary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(n.title,
+                                  maxLines: 1,
+                                  overflow:
+                                      TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontWeight:
+                                          FontWeight.w600)),
+                              Text(n.body,
+                                  maxLines: 1,
+                                  overflow:
+                                      TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: scheme
+                                          .onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               )),
@@ -176,44 +206,59 @@ class AdminDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _section(String title, Widget card) {
+  Widget _section(String title, String subtitle, Widget card) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(title,
-            style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
+        RSectionHeader(title: title, subtitle: subtitle),
+        const SizedBox(height: 12),
         card,
       ],
     );
   }
 
-  Widget _stat(
-      String label, String value, IconData icon, Color color) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 6),
-            Text(value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w800)),
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    color: Colors.grey, fontSize: 12)),
-          ],
-        ),
+  Widget _stat(BuildContext context, String label, String value,
+      IconData icon, Color color) {
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _tile(context, icon, color),
+          const SizedBox(height: 10),
+          Text(value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: scheme.onSurfaceVariant, fontSize: 12)),
+        ],
       ),
+    );
+  }
+
+  /// Pastel icon tile: light tint of [color] in light mode,
+  /// translucent tint in dark mode.
+  Widget _tile(BuildContext context, IconData icon, Color color) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: dark
+            ? color.withValues(alpha: 0.18)
+            : Color.lerp(color, Colors.white, 0.85),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Icon(icon, color: color, size: 22),
     );
   }
 }
@@ -268,7 +313,7 @@ class _DonutPainter extends CustomPainter {
   static Color colorFor(String status) {
     switch (status) {
       case 'delivered':
-        return RemedooTheme.ratingGreen;
+        return RemedooTheme.success;
       case 'out_for_delivery':
         return RemedooTheme.primary;
       case 'packed':

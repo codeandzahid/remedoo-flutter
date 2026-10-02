@@ -33,58 +33,65 @@ class OtpSettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     return _Scaffold(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('OTP Settings',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Expanded(child: Text('OTP length (digits)')),
-                  QtyStepper(
-                    qty: state.otpLength,
-                    onMinus: () {
-                      state.otpLength =
-                          (state.otpLength - 1).clamp(4, 8);
-                      state.refresh();
-                    },
-                    onPlus: () {
-                      state.otpLength =
-                          (state.otpLength + 1).clamp(4, 8);
-                      state.refresh();
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Expanded(child: Text('Expiry (minutes)')),
-                  QtyStepper(
-                    qty: state.otpExpiryMinutes,
-                    onMinus: () {
-                      state.otpExpiryMinutes =
-                          (state.otpExpiryMinutes - 1)
-                              .clamp(1, 30);
-                      state.refresh();
-                    },
-                    onPlus: () {
-                      state.otpExpiryMinutes =
-                          (state.otpExpiryMinutes + 1)
-                              .clamp(1, 30);
-                      state.refresh();
-                    },
-                  ),
-                ],
-              ),
-            ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const RSectionHeader(
+              title: 'OTP Settings',
+              subtitle: 'Verification code policy'),
+          const SizedBox(height: 12),
+          RCard(
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                        child: Text('OTP length (digits)',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600))),
+                    QtyStepper(
+                      qty: state.otpLength,
+                      onMinus: () {
+                        state.otpLength =
+                            (state.otpLength - 1).clamp(4, 8);
+                        state.refresh();
+                      },
+                      onPlus: () {
+                        state.otpLength =
+                            (state.otpLength + 1).clamp(4, 8);
+                        state.refresh();
+                      },
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+                Row(
+                  children: [
+                    const Expanded(
+                        child: Text('Expiry (minutes)',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600))),
+                    QtyStepper(
+                      qty: state.otpExpiryMinutes,
+                      onMinus: () {
+                        state.otpExpiryMinutes =
+                            (state.otpExpiryMinutes - 1)
+                                .clamp(1, 30);
+                        state.refresh();
+                      },
+                      onPlus: () {
+                        state.otpExpiryMinutes =
+                            (state.otpExpiryMinutes + 1)
+                                .clamp(1, 30);
+                        state.refresh();
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -97,50 +104,73 @@ class CommissionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     return _Scaffold(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Commission (%)',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              ...state.commission.keys.map((k) {
-                final v = state.commission[k]!;
-                return Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(child: Text(k)),
-                          Text('${v.toStringAsFixed(0)}%'),
-                        ],
-                      ),
-                      Slider(
-                        value: v,
-                        min: 0,
-                        max: 30,
-                        divisions: 30,
-                        activeColor: RemedooTheme.primary,
-                        onChanged: (nv) {
-                          state.commission[k] = nv;
-                          state.refresh();
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const RSectionHeader(
+              title: 'Commission',
+              subtitle: 'Platform cut per category'),
+          const SizedBox(height: 12),
+          RCard(
+            child: Column(
+              children: [
+                ...state.commission.keys.map((k) {
+                  final v = state.commission[k]!;
+                  return Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                                child: Text(k,
+                                    style: const TextStyle(
+                                        fontWeight:
+                                            FontWeight.w600))),
+                            Container(
+                              padding:
+                                  const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 5),
+                              decoration: BoxDecoration(
+                                color: scheme.primary
+                                    .withValues(alpha: 0.1),
+                                borderRadius:
+                                    BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                  '${v.toStringAsFixed(0)}%',
+                                  style: TextStyle(
+                                      fontWeight:
+                                          FontWeight.w700,
+                                      color: scheme.primary)),
+                            ),
+                          ],
+                        ),
+                        Slider(
+                          value: v,
+                          min: 0,
+                          max: 30,
+                          divisions: 30,
+                          activeColor: scheme.primary,
+                          onChanged: (nv) {
+                            state.commission[k] = nv;
+                            state.refresh();
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -207,71 +237,99 @@ class ApiKeysScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.all(12),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: () {
-                state.collectionAdd(state.apiKeys, {
-                  'name': 'New key',
-                  'key': _newKey(),
-                });
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add Key'),
-            ),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Row(
+            children: [
+              const Expanded(
+                child: RSectionHeader(
+                    title: 'API Keys',
+                    subtitle: 'Regenerate keys anytime'),
+              ),
+              RButton(
+                label: 'Add Key',
+                icon: Icons.add,
+                small: true,
+                onPressed: () {
+                  state.collectionAdd(state.apiKeys, {
+                    'name': 'New key',
+                    'key': _newKey(),
+                  });
+                },
+              ),
+            ],
           ),
         ),
+        const SizedBox(height: 12),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.all(12),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16),
             itemCount: state.apiKeys.length,
             itemBuilder: (_, i) {
               final k = state.apiKeys[i];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: const Icon(Icons.key,
-                      color: RemedooTheme.primary),
-                  title: Text(k['name'] ?? 'Key',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700)),
-                  subtitle: Text(k['key'] ?? '',
-                      style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12)),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                            Icons.refresh, size: 20),
-                        tooltip: 'Regenerate',
-                        onPressed: () {
-                          k['key'] = _newKey();
-                          state.refresh();
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    'Key regenerated (demo)')),
-                          );
-                        },
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: RCard(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 6),
+                  child: ListTile(
+                    leading: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.1),
+                        borderRadius:
+                            BorderRadius.circular(13),
                       ),
-                      IconButton(
-                        icon: const Icon(
-                            Icons.delete_outline,
-                            size: 20,
-                            color:
-                                RemedooTheme.emergency),
-                        onPressed: () => state
-                            .collectionRemove(
-                                state.apiKeys,
-                                k['id']!),
-                      ),
-                    ],
+                      child: Icon(Icons.key,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary),
+                    ),
+                    title: Text(k['name'] ?? 'Key',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700)),
+                    subtitle: Text(k['key'] ?? '',
+                        style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12)),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                              Icons.refresh, size: 20),
+                          tooltip: 'Regenerate',
+                          onPressed: () {
+                            k['key'] = _newKey();
+                            state.refresh();
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Key regenerated (demo)')),
+                            );
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                              Icons.delete_outline,
+                              size: 20,
+                              color:
+                                  RemedooTheme.emergency),
+                          onPressed: () => state
+                              .collectionRemove(
+                                  state.apiKeys,
+                                  k['id']!),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -317,76 +375,82 @@ class _BrandingScreenState extends State<BrandingScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     return _Scaffold(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Branding',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _name,
-                decoration: const InputDecoration(
-                    labelText: 'App name'),
-                onChanged: (v) => state.brandName = v,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _tagline,
-                decoration: const InputDecoration(
-                    labelText: 'Tagline'),
-                onChanged: (v) => state.brandTagline = v,
-              ),
-              const SizedBox(height: 16),
-              const Text('Primary color',
-                  style:
-                      TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              Row(
-                children: List.generate(
-                    AppState.brandSwatches.length, (i) {
-                  final c = AppState.brandSwatches[i];
-                  final sel = state.brandColorIndex == i;
-                  return GestureDetector(
-                    onTap: () {
-                      state.brandColorIndex = i;
-                      state.refresh();
-                    },
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      margin:
-                          const EdgeInsets.only(right: 10),
-                      decoration: BoxDecoration(
-                        color: c,
-                        shape: BoxShape.circle,
-                        border: sel
-                            ? Border.all(
-                                color: Colors.black,
-                                width: 3)
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const RSectionHeader(
+              title: 'Branding',
+              subtitle: 'Applies instantly across the app'),
+          const SizedBox(height: 12),
+          RCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RTextField(
+                  label: 'App name',
+                  controller: _name,
+                  onChanged: (v) => state.brandName = v,
+                ),
+                const SizedBox(height: 12),
+                RTextField(
+                  label: 'Tagline',
+                  controller: _tagline,
+                  onChanged: (v) => state.brandTagline = v,
+                ),
+                const SizedBox(height: 20),
+                const Text('Primary color',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: List.generate(
+                      AppState.brandSwatches.length, (i) {
+                    final c = AppState.brandSwatches[i];
+                    final sel = state.brandColorIndex == i;
+                    return GestureDetector(
+                      onTap: () {
+                        state.brandColorIndex = i;
+                        state.refresh();
+                      },
+                      child: Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: c,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: sel
+                                ? scheme.primary
+                                : Colors.transparent,
+                            width: 3,
+                          ),
+                          boxShadow:
+                              RemedooTheme.softShadow,
+                        ),
+                        child: sel
+                            ? const Icon(Icons.check,
+                                color: Colors.white, size: 20)
                             : null,
                       ),
-                      child: sel
-                          ? const Icon(Icons.check,
-                              color: Colors.white)
-                          : null,
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Applies instantly across the whole app.',
-                style:
-                    TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
+                    );
+                  }),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Applies instantly across the whole app.',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -414,19 +478,30 @@ class QuickActionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     return _Scaffold(
-      child: Card(
-        child: Column(
-          children: state.quickActions.keys.map((k) {
-            return SwitchListTile(
-              value: state.quickActions[k]!,
-              onChanged: (v) {
-                state.quickActions[k] = v;
-                state.refresh();
-              },
-              title: Text(k),
-            );
-          }).toList(),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const RSectionHeader(
+              title: 'Quick Actions',
+              subtitle: 'Home screen shortcuts'),
+          const SizedBox(height: 12),
+          RCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: state.quickActions.keys.map((k) {
+                return SwitchListTile(
+                  value: state.quickActions[k]!,
+                  activeThumbColor: RemedooTheme.success,
+                  onChanged: (v) {
+                    state.quickActions[k] = v;
+                    state.refresh();
+                  },
+                  title: Text(k),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -440,19 +515,30 @@ class CategoryActionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     return _Scaffold(
-      child: Card(
-        child: Column(
-          children: state.categoryActions.keys.map((k) {
-            return SwitchListTile(
-              value: state.categoryActions[k]!,
-              onChanged: (v) {
-                state.categoryActions[k] = v;
-                state.refresh();
-              },
-              title: Text(k),
-            );
-          }).toList(),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const RSectionHeader(
+              title: 'Category Actions',
+              subtitle: 'Category row shortcuts'),
+          const SizedBox(height: 12),
+          RCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: state.categoryActions.keys.map((k) {
+                return SwitchListTile(
+                  value: state.categoryActions[k]!,
+                  activeThumbColor: RemedooTheme.success,
+                  onChanged: (v) {
+                    state.categoryActions[k] = v;
+                    state.refresh();
+                  },
+                  title: Text(k),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -510,33 +596,41 @@ class FeaturedScreen extends StatelessWidget {
     List<String> selected,
     List<(String, String)> options,
   ) {
+    final scheme = Theme.of(context).colorScheme;
     String nameOf(String id) {
       final hit = options.where((o) => o.$1 == id);
       return hit.isEmpty ? id : hit.first.$2;
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(title,
-                      style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800)),
-                ),
-                TextButton.icon(
-                  onPressed: () => _pickDialog(
-                      context, state, title, selected, options),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Pick'),
-                ),
-              ],
-            ),
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(title,
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800)),
+              ),
+              RButton(
+                label: 'Pick',
+                icon: Icons.add,
+                small: true,
+                variant: RButtonVariant.outline,
+                onPressed: () => _pickDialog(
+                    context, state, title, selected, options),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (selected.isEmpty)
+            Text('None selected.',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: scheme.onSurfaceVariant))
+          else
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -552,8 +646,7 @@ class FeaturedScreen extends StatelessWidget {
                       ))
                   .toList(),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -570,7 +663,9 @@ class FeaturedScreen extends StatelessWidget {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
-          title: Text(title),
+          title: Text(title,
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w800)),
           content: SizedBox(
             width: 400,
             height: 400,
@@ -595,7 +690,9 @@ class FeaturedScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
-            FilledButton(
+            RButton(
+              label: 'Save',
+              small: true,
               onPressed: () {
                 selected
                   ..clear()
@@ -603,7 +700,6 @@ class FeaturedScreen extends StatelessWidget {
                 state.refresh();
                 Navigator.pop(context);
               },
-              child: const Text('Save'),
             ),
           ],
         ),

@@ -13,24 +13,24 @@ class AdminEmergenciesScreen extends StatelessWidget {
     final state = AppStateScope.of(context);
     final list = state.sosAlerts.toList();
     if (list.isEmpty) {
-      return const EmptyState(
+      return const REmptyState(
         icon: Icons.sos,
         title: 'No SOS alerts',
         subtitle: 'Emergency alerts will appear here.',
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: list.length,
-      itemBuilder: (_, i) => _card(state, list[i]),
+      itemBuilder: (_, i) => _card(context, state, list[i]),
     );
   }
 
-  Widget _card(AppState state, SosAlert a) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+  Widget _card(BuildContext context, AppState state, SosAlert a) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: RCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -38,6 +38,8 @@ class AdminEmergenciesScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(a.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16)),
@@ -45,32 +47,39 @@ class AdminEmergenciesScreen extends StatelessWidget {
                 StatusChip(status: a.status),
               ],
             ),
-            const SizedBox(height: 4),
-            Text('${a.phone} • ${a.location}'),
+            const SizedBox(height: 6),
+            Text('${a.phone} • ${a.location}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 2),
             Text(
               '${a.time.day}/${a.time.month} ${a.time.hour}:${a.time.minute.toString().padLeft(2, '0')}',
-              style:
-                  const TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(
+                  fontSize: 12, color: scheme.onSurfaceVariant),
             ),
             if (a.status != 'dispatched') ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   if (a.status == 'new')
                     Expanded(
-                      child: OutlinedButton(
+                      child: RButton(
+                        label: 'Acknowledge',
+                        small: true,
+                        variant: RButtonVariant.outline,
                         onPressed: () => state.setSosStatus(
                             a.id, 'acknowledged'),
-                        child: const Text('Acknowledge'),
                       ),
                     ),
                   if (a.status == 'new')
                     const SizedBox(width: 10),
                   Expanded(
-                    child: FilledButton(
+                    child: RButton(
+                      label: 'Dispatch',
+                      small: true,
+                      icon: Icons.emergency,
                       onPressed: () => state.setSosStatus(
                           a.id, 'dispatched'),
-                      child: const Text('Dispatch'),
                     ),
                   ),
                 ],

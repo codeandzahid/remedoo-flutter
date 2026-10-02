@@ -9,7 +9,11 @@ import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'cart_screen.dart';
 
-/// Pharmacy detail: info, category chips, medicine list, sticky cart bar.
+/// Pharmacy detail: hero header, overlapping info card, category chips,
+/// medicine list with ADD → stepper, sticky cart bar — matches PharmacyDetail.tsx.
+///
+/// ADD→stepper and detail-sheet add-to-cart behavior kept exactly as before;
+/// only the visuals changed.
 class PharmacyDetailScreen extends StatefulWidget {
   final Pharmacy pharmacy;
 
@@ -108,30 +112,52 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
       body: context.isCompact
           ? _compactBody(state, p, list, categories)
           : _wideBody(state, p, list, categories),
-      bottomSheet:
-          state.cartCount > 0 ? _cartBar(state) : null,
+      bottomSheet: state.cartCount > 0 ? _cartBar(state) : null,
     );
   }
 
-  Widget _appBar(Pharmacy p) {
-    return SliverAppBar(
-      expandedHeight: 150,
-      pinned: true,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Hero(
-          tag: 'pharmacy-image-${p.id}',
-          child: Container(
-            decoration:
-                const BoxDecoration(gradient: RemedooTheme.headerGradient),
+  Widget _hero(Pharmacy p) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
+      height: 190,
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: dark
+                    ? [RemedooTheme.darkSecondary, RemedooTheme.darkCard]
+                    : [
+                        const Color(0xFFF0E8DC),
+                        const Color(0xFFF9F5EE),
+                      ],
+              ),
+            ),
             child: const Center(
-              child: Icon(Icons.storefront,
-                  color: Colors.white54, size: 72),
+              child: Text('💊', style: TextStyle(fontSize: 76)),
             ),
           ),
-        ),
-        title: Text(p.name),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: [
+                  _CircleBtn(
+                    icon: Icons.arrow_back,
+                    onTap: () => Navigator.maybePop(context),
+                  ),
+                  const Spacer(),
+                  _CircleBtn(
+                    child: FavoriteButton(favKey: 'pharmacy:${p.id}'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
-      actions: [FavoriteButton(favKey: 'pharmacy:${p.id}')],
     );
   }
 
@@ -139,19 +165,22 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
       List<String> categories) {
     return CustomScrollView(
       slivers: [
-        _appBar(p),
+        SliverToBoxAdapter(child: _hero(p)),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _infoCard(p),
-                const SizedBox(height: 12),
-                _categoryChips(categories),
-                const SizedBox(height: 8),
-                _sortRow(list.length),
-              ],
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            child: Transform.translate(
+              offset: const Offset(0, -46),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _infoCard(p),
+                  const SizedBox(height: 12),
+                  _categoryChips(categories),
+                  const SizedBox(height: 8),
+                  _sortRow(list.length),
+                ],
+              ),
             ),
           ),
         ),
@@ -172,31 +201,34 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
       List<String> categories) {
     return CustomScrollView(
       slivers: [
-        _appBar(p),
+        SliverToBoxAdapter(child: _hero(p)),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: DetailSplit(
-              main: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _infoCard(p),
-                  const SizedBox(height: 12),
-                  _categoryChips(categories),
-                  const SizedBox(height: 8),
-                  _sortRow(list.length),
-                  const SizedBox(height: 8),
-                  for (var i = 0; i < list.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: StaggerItem(
-                          index: i % 6,
-                          child: _medCard(list[i], state)),
-                    ),
-                  const SizedBox(height: 16),
-                ],
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Transform.translate(
+              offset: const Offset(0, -46),
+              child: DetailSplit(
+                main: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _infoCard(p),
+                    const SizedBox(height: 12),
+                    _categoryChips(categories),
+                    const SizedBox(height: 8),
+                    _sortRow(list.length),
+                    const SizedBox(height: 8),
+                    for (var i = 0; i < list.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: StaggerItem(
+                            index: i % 6,
+                            child: _medCard(list[i], state)),
+                      ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+                side: _orderPanel(state, p),
               ),
-              side: _orderPanel(state, p),
             ),
           ),
         ),
@@ -205,75 +237,78 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
   }
 
   Widget _infoCard(Pharmacy p) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(p.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w800)),
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(p.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w800)),
+              ),
+              if (p.verified)
+                const Icon(Icons.verified,
+                    color: RemedooTheme.primary, size: 20),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('${p.deliveryTime} • ${p.itemCount} items • ${p.location}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 12.5, color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              RRatingPill(rating: p.rating),
+              const Spacer(),
+              GestureDetector(
+                onTap: _directions,
+                child: Row(
+                  children: [
+                    Icon(Icons.navigation_outlined,
+                        size: 14, color: scheme.primary),
+                    const SizedBox(width: 4),
+                    Text('Get Directions',
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.primary)),
+                  ],
                 ),
-                if (p.verified)
-                  const Icon(Icons.verified,
-                      color: RemedooTheme.primary),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text('${p.deliveryTime} • ${p.itemCount} items • ${p.location}',
-                maxLines: 2, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                RatingPill(rating: p.rating),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: _directions,
-                  icon: const Icon(Icons.directions),
-                  label: const Text('Get Directions'),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _categoryChips(List<String> categories) {
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: categories.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final c = categories[i];
-          final sel = c == _category;
-          return Center(
-            child: ChoiceChip(
-              label: Text(c),
-              selected: sel,
-              onSelected: (_) => setState(() => _category = c),
-              selectedColor: RemedooTheme.primary,
-              labelStyle: TextStyle(
-                  color: sel
-                      ? Colors.white
-                      : Theme.of(context).colorScheme.onSurface),
-            ),
-          );
-        },
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: categories
+            .map((c) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: RFilterChip(
+                    label: c,
+                    selected: _category == c,
+                    onTap: () => setState(() => _category = c),
+                  ),
+                ))
+            .toList(),
       ),
     );
   }
 
   Widget _sortRow(int count) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
         Expanded(
@@ -282,64 +317,76 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
-        DropdownButton<String>(
-          value: _sort,
-          underline: const SizedBox.shrink(),
-          items: const ['Popular', 'Price Low→High', 'Price High→Low']
-              .map((o) =>
-                  DropdownMenuItem(value: o, child: Text(o)))
-              .toList(),
-          onChanged: (v) => setState(() => _sort = v ?? 'Popular'),
+        Container(
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            border: Border.all(color: Theme.of(context).dividerColor),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _sort,
+              isDense: true,
+              icon: Icon(Icons.keyboard_arrow_down,
+                  size: 15, color: scheme.onSurfaceVariant),
+              style: TextStyle(
+                fontFamily: RemedooTheme.fontFamily,
+                fontSize: 12,
+                color: scheme.onSurface,
+              ),
+              items: const ['Popular', 'Price Low→High', 'Price High→Low']
+                  .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+                  .toList(),
+              onChanged: (v) => setState(() => _sort = v ?? 'Popular'),
+            ),
+          ),
         ),
       ],
     );
   }
 
   Widget _orderPanel(AppState state, Pharmacy p) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Your order',
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 12),
-            _orderRow('Delivery', p.deliveryTime),
-            _orderRow('Items in cart', '${state.cartCount}'),
-            const Divider(height: 20),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text('Total',
-                      style: TextStyle(fontWeight: FontWeight.w800)),
-                ),
-                Text(inr(state.cartTotal),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: RemedooTheme.primary)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (state.cartCount > 0)
-              BigTargetButton(
-                onPressed: () =>
-                    pushPage(context, const CartScreen()),
-                child: const Text('Review Cart'),
-              )
-            else
-              const Text(
-                'Your cart is empty — add medicines to get started.',
-                style: TextStyle(color: Colors.grey),
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Your order',
+              style:
+                  TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          _orderRow('Delivery', p.deliveryTime),
+          _orderRow('Items in cart', '${state.cartCount}'),
+          Divider(height: 20, color: Theme.of(context).dividerColor),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Total',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
               ),
-            const SizedBox(height: 8),
-            const Text(
-              'Free delivery on orders above ₹499.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
+              Text(inr(state.cartTotal),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: RemedooTheme.primary)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (state.cartCount > 0)
+            RButton(
+              label: 'Review Cart',
+              fullWidth: true,
+              onPressed: () => pushPage(context, const CartScreen()),
+            )
+          else
+            Text('Your cart is empty — add medicines to get started.',
+                style: TextStyle(
+                    fontSize: 13, color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 8),
+          Text('Free delivery on orders above ₹499.',
+              style: TextStyle(
+                  fontSize: 12, color: scheme.onSurfaceVariant)),
+        ],
       ),
     );
   }
@@ -365,38 +412,75 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
 
   Widget _cartBar(AppState state) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-      decoration: BoxDecoration(
-        color: RemedooTheme.primary,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
+      color: Colors.transparent,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: SafeArea(
-        child: InkWell(
-          onTap: () => pushPage(context, const CartScreen()),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${state.cartCount} items • ${inr(state.cartTotal)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16),
-                ),
+        child: Material(
+          color: RemedooTheme.primary,
+          borderRadius: BorderRadius.circular(18),
+          elevation: 6,
+          shadowColor: Colors.black.withValues(alpha: 0.2),
+          child: InkWell(
+            onTap: () => pushPage(context, const CartScreen()),
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color:
+                          Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                        Icons.shopping_cart_outlined,
+                        color: Colors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${state.cartCount} item${state.cartCount == 1 ? '' : 's'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14),
+                        ),
+                        Text('Free delivery above ₹499',
+                            style: TextStyle(
+                                color: Colors.white
+                                    .withValues(alpha: 0.85),
+                                fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  Text(inr(state.cartTotal),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17)),
+                  const SizedBox(width: 8),
+                  const Text('View Cart →',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13)),
+                  const SizedBox(width: 2),
+                  const Icon(Icons.arrow_forward_ios,
+                      color: Colors.white, size: 16),
+                ],
               ),
-              const Text('View Cart →',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700)),
-            ],
+            ),
           ),
         ),
       ),
@@ -404,96 +488,155 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
   }
 
   Widget _medCard(Medicine m, AppState state) {
+    final scheme = Theme.of(context).colorScheme;
     final qty = state.cartQty(m.id);
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => MedicineDetailSheet.show(context, m),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color:
-                      RemedooTheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.medication,
-                    color: RemedooTheme.primary),
+    return RCard(
+      padding: EdgeInsets.zero,
+      onTap: () => MedicineDetailSheet.show(context, m),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (m.rxRequired)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade100,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text('Rx',
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.orange)),
+              child: Icon(Icons.medication_outlined,
+                  color: scheme.primary, size: 26),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (m.rxRequired)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: RemedooTheme.warning
+                            .withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                    Text(m.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700)),
-                    Text('${m.pack} • ${m.brand}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.grey)),
-                    Row(
-                      children: [
-                        Text(inr(state.priceOf(m)),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: RemedooTheme.primary)),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(inr(m.mrp),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  decoration:
-                                      TextDecoration.lineThrough,
-                                  color: Colors.grey)),
-                        ),
-                      ],
+                      child: const Text('Rx',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFB45309))),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (qty == 0)
-                OutlinedButton(
-                  onPressed: () => _add(state, m),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(64, 34),
-                    padding: EdgeInsets.zero,
+                  Text(m.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 14)),
+                  Text('${m.pack} • ${m.brand}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant)),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Text(inr(state.priceOf(m)),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: RemedooTheme.primary)),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(inr(m.mrp),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 12,
+                                decoration:
+                                    TextDecoration.lineThrough,
+                                color: scheme.onSurfaceVariant)),
+                      ),
+                    ],
                   ),
-                  child: const Text('ADD'),
-                )
-              else
-                QtyStepper(
-                  qty: qty,
-                  onMinus: () => state.removeFromCart(m.id),
-                  onPlus: () => _add(state, m),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (qty == 0)
+              OutlinedButton(
+                onPressed: () => _add(state, m),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 32),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12),
+                  tapTargetSize:
+                      MaterialTapTargetSize.shrinkWrap,
+                  side: BorderSide(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary,
+                      width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
-            ],
-          ),
+                child: Text('ADD',
+                    style: TextStyle(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12)),
+              )
+            else
+              QtyStepper(
+                qty: qty,
+                onMinus: () => state.removeFromCart(m.id),
+                onPlus: () => _add(state, m),
+              ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _CircleBtn extends StatelessWidget {
+  final IconData? icon;
+  final Widget? child;
+  final VoidCallback? onTap;
+
+  const _CircleBtn({this.icon, this.child, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final btn = Container(
+      width: 38,
+      height: 38,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: child ?? Icon(icon, size: 19, color: Colors.black87),
+      ),
+    );
+    if (onTap == null) return btn;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: btn,
       ),
     );
   }

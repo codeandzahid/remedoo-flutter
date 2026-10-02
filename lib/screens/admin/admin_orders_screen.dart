@@ -33,22 +33,18 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           height: 52,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16),
             itemCount: statuses.length,
             separatorBuilder: (_, _) =>
                 const SizedBox(width: 8),
             itemBuilder: (_, i) {
               final s = statuses[i];
-              final sel = s == _filter;
               return Center(
-                child: ChoiceChip(
-                  label: Text(s.replaceAll('_', ' ')),
-                  selected: sel,
-                  onSelected: (_) =>
-                      setState(() => _filter = s),
-                  selectedColor: RemedooTheme.primary,
-                  labelStyle: TextStyle(
-                      color: sel ? Colors.white : null),
+                child: RFilterChip(
+                  label: s.replaceAll('_', ' '),
+                  selected: s == _filter,
+                  onTap: () => setState(() => _filter = s),
                 ),
               );
             },
@@ -56,13 +52,14 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         ),
         Expanded(
           child: list.isEmpty
-              ? const EmptyState(
+              ? const REmptyState(
                   icon: Icons.shopping_bag_outlined,
                   title: 'No orders',
                   subtitle: 'Orders will appear here.',
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(
+                      16, 4, 16, 16),
                   itemCount: list.length,
                   itemBuilder: (_, i) =>
                       _card(state, list[i]),
@@ -73,10 +70,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   }
 
   Widget _card(AppState state, MedOrder o) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: RCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -90,12 +87,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 StatusChip(status: o.status),
               ],
             ),
+            const SizedBox(height: 6),
             Text(
                 '${o.pharmacyName} • ${o.items.length} items • ${inr(o.total)}'),
             Text(o.address,
-                style:
-                    const TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 8),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: o.status,
               decoration: const InputDecoration(

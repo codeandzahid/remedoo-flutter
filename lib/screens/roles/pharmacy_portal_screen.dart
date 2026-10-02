@@ -42,10 +42,11 @@ class _PharmacyPortalScreenState
         title: Text(_me.name),
         bottom: TabBar(
           controller: _tabs,
-          labelColor: RemedooTheme.primary,
+          labelColor: Theme.of(context).colorScheme.primary,
           unselectedLabelColor:
               Theme.of(context).colorScheme.onSurfaceVariant,
-          indicatorColor: RemedooTheme.primary,
+          indicatorColor:
+              Theme.of(context).colorScheme.primary,
           tabs: const [
             Tab(text: 'Inventory'),
             Tab(text: 'Incoming Orders')
@@ -61,6 +62,7 @@ class _PharmacyPortalScreenState
 
   Widget _inventory() {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final list = medicinesForPharmacy(_me.id)
         .where((m) => m.active)
         .toList();
@@ -73,10 +75,9 @@ class _PharmacyPortalScreenState
           final stock = state.stockOf(m.id);
           return StaggerItem(
             index: i % 6,
-            child: Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: RCard(
                 child: Column(
                   crossAxisAlignment:
                       CrossAxisAlignment.start,
@@ -89,13 +90,17 @@ class _PharmacyPortalScreenState
                     Text('${m.pack} • ${m.brand}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey)),
-                    const SizedBox(height: 8),
+                            color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Text('Stock: '),
+                        Text('Stock: ',
+                            style: TextStyle(
+                                fontSize: 13,
+                                color:
+                                    scheme.onSurfaceVariant)),
                         Flexible(
                           child: QtyStepper(
                             qty: stock,
@@ -107,7 +112,7 @@ class _PharmacyPortalScreenState
                         ),
                         const Spacer(),
                         SizedBox(
-                          width: 90,
+                          width: 96,
                           child: TextFormField(
                             initialValue: state
                                 .priceOf(m)
@@ -142,11 +147,12 @@ class _PharmacyPortalScreenState
 
   Widget _orders() {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final list = state.orders
         .where((o) => o.pharmacyName == _me.name)
         .toList();
     if (list.isEmpty) {
-      return const EmptyState(
+      return const REmptyState(
         icon: Icons.shopping_bag_outlined,
         title: 'No incoming orders',
         subtitle:
@@ -161,10 +167,9 @@ class _PharmacyPortalScreenState
           final o = list[i];
           return StaggerItem(
             index: i % 6,
-            child: Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: RCard(
                 child: Column(
                   crossAxisAlignment:
                       CrossAxisAlignment.start,
@@ -189,20 +194,18 @@ class _PharmacyPortalScreenState
                     Text(o.address,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey)),
+                            color: scheme.onSurfaceVariant)),
                     if (o.status != 'delivered') ...[
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: () =>
-                              state.advanceOrderStatus(
-                                  o.id),
-                          child:
-                              Text(_nextLabel(o.status)),
-                        ),
+                      const SizedBox(height: 10),
+                      RButton(
+                        label: _nextLabel(o.status),
+                        fullWidth: true,
+                        small: true,
+                        onPressed: () =>
+                            state.advanceOrderStatus(
+                                o.id),
                       ),
                     ],
                   ],

@@ -3,13 +3,15 @@ import 'package:flutter/material.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../widgets/widgets.dart';
 
-/// "Under Maintenance" with Try Again.
+/// "Under Maintenance" with Refresh Page.
 class MaintenanceScreen extends StatelessWidget {
   const MaintenanceScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: Center(
         child: MaxWidthBox(
@@ -23,31 +25,34 @@ class MaintenanceScreen extends StatelessWidget {
                   width: 110,
                   height: 110,
                   decoration: BoxDecoration(
-                    color: RemedooTheme.primary.withValues(alpha: 0.1),
+                    color: RemedooTheme.primary
+                        .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(32),
                   ),
-                  child: const Icon(Icons.construction,
+                  child: const Icon(Icons.handyman_outlined,
                       size: 56, color: RemedooTheme.primary),
                 ),
                 const SizedBox(height: 24),
-                const Text('Under Maintenance',
+                const Text("We'll Be Right Back",
                     style: TextStyle(
-                        fontSize: 24, fontWeight: FontWeight.w800)),
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
-                const Text(
-                  'Remedoo is getting a quick tune-up. '
-                  'Please check back in a few minutes.',
+                Text(
+                  'Remedoo is undergoing scheduled maintenance to serve you better. '
+                  'We should be back shortly — please check back in a few minutes.',
                   textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: scheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 24),
-                FilledButton(
+                RButton(
+                  label: 'Refresh Page',
+                  icon: Icons.refresh,
                   onPressed: () {
-                    AppStateScope.of(context).setMaintenanceMode(false);
+                    AppStateScope.of(context)
+                        .setMaintenanceMode(false);
                   },
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(64, 48),
-                  ),
-                  child: const Text('Try Again'),
                 ),
               ],
             ),

@@ -43,6 +43,7 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final spec = widget.spec;
     final q = _search.text.trim().toLowerCase();
     var rows = spec.read();
@@ -56,49 +57,51 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
+                  child: RSearchBar(
+                    hint: 'Search ${spec.title.toLowerCase()}…',
                     controller: _search,
                     onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      hintText: 'Search…',
-                      prefixIcon: Icon(Icons.search),
-                      isDense: true,
-                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
+                const SizedBox(width: 10),
+                RButton(
+                  label: 'Add ${spec.singular}',
+                  icon: Icons.add,
+                  small: true,
                   onPressed: () => _editDialog(null),
-                  icon: const Icon(Icons.add),
-                  label: Text('Add ${spec.singular}'),
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text('${rows.length} ${spec.title.toLowerCase()}',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700)),
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurfaceVariant)),
             ),
           ),
           Expanded(
             child: rows.isEmpty
-                ? const EmptyState(
-                    icon: Icons.inbox,
+                ? REmptyState(
+                    icon: Icons.inbox_outlined,
                     title: 'Nothing here',
-                    subtitle: 'Add the first entry.',
+                    subtitle: 'Add the first ${spec.singular.toLowerCase()}.',
+                    actionLabel: 'Add ${spec.singular}',
+                    onAction: () => _editDialog(null),
                   )
                 : context.isDesktop
                     ? _dataTable(rows, spec)
                     : ListView.builder(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
                         itemCount: rows.length,
                         itemBuilder: (_, i) =>
                             _row(rows[i], spec),
@@ -109,81 +112,85 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
     );
   }
 
-  /// Desktop layout: real DataTable built from the entity field specs.
+  /// Desktop layout: real DataTable inside a white card.
   Widget _dataTable(
       List<Map<String, String>> rows, EntitySpec spec) {
+    final scheme = Theme.of(context).colorScheme;
     final hasToggle = spec.rowActive != null;
     return Scrollbar(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: [
-              for (final f in spec.fields)
-                DataColumn(
-                  label: Text(f.label,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800)),
-                ),
-              if (hasToggle)
-                const DataColumn(
-                    label: Text('Active',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800))),
-              const DataColumn(
-                  label: Text('Actions',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w800))),
-            ],
-            rows: [
-              for (final r in rows)
-                DataRow(cells: [
-                  for (final f in spec.fields)
-                    DataCell(
-                      ConstrainedBox(
-                        constraints:
-                            const BoxConstraints(maxWidth: 220),
-                        child: Text(
-                          f.type == 'toggle'
-                              ? ((r[f.key] ?? '0') == '1'
-                                  ? 'Yes'
-                                  : 'No')
-                              : (r[f.key] ?? ''),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        child: RCard(
+          padding: const EdgeInsets.all(8),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingTextStyle: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                letterSpacing: 0.4,
+                color: scheme.onSurfaceVariant,
+              ),
+              columns: [
+                for (final f in spec.fields)
+                  DataColumn(
+                    label: Text(f.label.toUpperCase()),
+                  ),
+                if (hasToggle)
+                  const DataColumn(
+                      label: Text('ACTIVE')),
+                const DataColumn(label: Text('ACTIONS')),
+              ],
+              rows: [
+                for (final r in rows)
+                  DataRow(cells: [
+                    for (final f in spec.fields)
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(
+                              maxWidth: 220),
+                          child: Text(
+                            f.type == 'toggle'
+                                ? ((r[f.key] ?? '0') == '1'
+                                    ? 'Yes'
+                                    : 'No')
+                                : (r[f.key] ?? ''),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
-                    ),
-                  if (hasToggle)
-                    DataCell(Switch(
-                      value: spec.rowActive!(r),
-                      activeThumbColor:
-                          RemedooTheme.ratingGreen,
-                      onChanged: (v) =>
-                          spec.setRowActive!(r['id'] ?? '', v),
+                    if (hasToggle)
+                      DataCell(Switch(
+                        value: spec.rowActive!(r),
+                        activeThumbColor:
+                            RemedooTheme.success,
+                        onChanged: (v) =>
+                            spec.setRowActive!(r['id'] ?? '', v),
+                      )),
+                    DataCell(Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.edit_outlined,
+                              size: 20,
+                              color: scheme.onSurfaceVariant),
+                          tooltip: 'Edit',
+                          onPressed: () => _editDialog(r),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              size: 20,
+                              color: RemedooTheme.emergency),
+                          tooltip: 'Delete',
+                          onPressed: () =>
+                              _confirmDelete(r, spec),
+                        ),
+                      ],
                     )),
-                  DataCell(Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined,
-                            size: 20),
-                        tooltip: 'Edit',
-                        onPressed: () => _editDialog(r),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline,
-                            size: 20,
-                            color: RemedooTheme.emergency),
-                        tooltip: 'Delete',
-                        onPressed: () =>
-                            _confirmDelete(r, spec),
-                      ),
-                    ],
-                  )),
-                ]),
-            ],
+                  ]),
+              ],
+            ),
           ),
         ),
       ),
@@ -191,39 +198,55 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
   }
 
   Widget _row(Map<String, String> r, EntitySpec spec) {
+    final scheme = Theme.of(context).colorScheme;
     final id = r['id'] ?? '';
     final hasToggle = spec.rowActive != null;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        title: Text(_title(r),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: _subtitle(r).isEmpty
-            ? null
-            : Text(_subtitle(r),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (hasToggle)
-              Switch(
-                value: spec.rowActive!(r),
-                activeThumbColor: RemedooTheme.ratingGreen,
-                onChanged: (v) =>
-                    spec.setRowActive!(id, v),
+    final title = _title(r);
+    final subtitle = _subtitle(r);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: RCard(
+        padding: const EdgeInsets.symmetric(
+            horizontal: 6, vertical: 4),
+        child: ListTile(
+          leading: InitialsAvatar(name: title, radius: 20),
+          title: Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: subtitle.isEmpty
+              ? null
+              : Text(subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant)),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (hasToggle)
+                Switch(
+                  value: spec.rowActive!(r),
+                  activeThumbColor: RemedooTheme.success,
+                  onChanged: (v) =>
+                      spec.setRowActive!(id, v),
+                ),
+              IconButton(
+                icon: Icon(Icons.edit_outlined,
+                    size: 20, color: scheme.onSurfaceVariant),
+                tooltip: 'Edit',
+                onPressed: () => _editDialog(r),
               ),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 20),
-              onPressed: () => _editDialog(r),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline,
-                  size: 20, color: RemedooTheme.emergency),
-              onPressed: () => _confirmDelete(r, spec),
-            ),
-          ],
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    size: 20, color: RemedooTheme.emergency),
+                tooltip: 'Delete',
+                onPressed: () => _confirmDelete(r, spec),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -255,7 +278,9 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
       (_) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
           title: Text(
-              '${row == null ? 'Add' : 'Edit'} ${spec.singular}'),
+              '${row == null ? 'Add' : 'Edit'} ${spec.singular}',
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w800)),
           content: SizedBox(
             width: 400,
             child: SingleChildScrollView(
@@ -273,16 +298,14 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
                   }
                   return Padding(
                     padding:
-                        const EdgeInsets.only(bottom: 10),
-                    child: TextField(
+                        const EdgeInsets.only(bottom: 12),
+                    child: RTextField(
+                      label:
+                          '${f.label}${f.required ? ' *' : ''}',
                       controller: ctrls[f.key],
                       keyboardType: f.type == 'number'
                           ? TextInputType.number
                           : TextInputType.text,
-                      decoration: InputDecoration(
-                        labelText:
-                            '${f.label}${f.required ? ' *' : ''}',
-                      ),
                     ),
                   );
                 }).toList(),
@@ -294,7 +317,9 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
-            FilledButton(
+            RButton(
+              label: 'Save',
+              small: true,
               onPressed: () {
                 for (final f in spec.fields) {
                   if (f.required &&
@@ -320,7 +345,6 @@ class _AdminCrudScreenState extends State<AdminCrudScreen> {
                 }
                 Navigator.pop(context);
               },
-              child: const Text('Save'),
             ),
           ],
         ),

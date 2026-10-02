@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
+import '../models.dart';
+import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
 
-const _contacts = [
+const _quickContacts = [
   ('Ambulance', '108', Icons.emergency),
   ('Women Helpline', '1091', Icons.woman),
   ('Police', '100', Icons.local_police),
@@ -15,7 +17,14 @@ const _contacts = [
   ('Disaster Mgmt', '1078', Icons.warning),
 ];
 
-/// Emergency SOS: big red button + quick contacts + nearby hospitals.
+const _emergencyGradient = LinearGradient(
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+  colors: [Color(0xFFE5484D), Color(0xFFF76B1C)],
+);
+
+/// Emergency SOS: gradient banner, big SOS dial, quick contacts,
+/// nearby hospitals. React Emergency.tsx replica.
 class EmergencyScreen extends StatelessWidget {
   const EmergencyScreen({super.key});
 
@@ -23,59 +32,65 @@ class EmergencyScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final nearby = hospitals.take(4).toList();
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                    gradient: RemedooTheme.emergencyGradient),
-                child: const SafeArea(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text('Emergency SOS',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800)),
-                        Text('Help is one tap away',
-                            style: TextStyle(
-                                color: Colors.white70)),
-                      ],
-                    ),
+      body: Column(
+        children: [
+          RGradientHeader(
+            gradient: _emergencyGradient,
+            padding:
+                const EdgeInsets.fromLTRB(12, 8, 20, 20),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back,
+                      color: Colors.white),
+                  onPressed: () =>
+                      Navigator.maybePop(context),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      const Text('Emergency SOS',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800)),
+                      Text(
+                          'Get help fast when every second counts',
+                          style: TextStyle(
+                              color: Colors.white
+                                  .withValues(alpha: 0.8),
+                              fontSize: 12)),
+                    ],
                   ),
                 ),
-              ),
+              ],
             ),
           ),
-          SliverToBoxAdapter(
+          Expanded(
             child: MaxWidthBox(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: FocusableScale(
-                        onTap: () => _sosConfirm(context),
-                        child: Container(
-                        width: 190,
-                        height: 190,
+              maxWidth: 760,
+              child: ListView(
+                padding:
+                    const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                children: [
+                  // Big SOS dial.
+                  Center(
+                    child: FocusableScale(
+                      onTap: () => _sosConfirm(context),
+                      child: Container(
+                        width: 148,
+                        height: 148,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient:
-                              RemedooTheme.emergencyGradient,
+                          color: RemedooTheme.emergency,
                           boxShadow: [
                             BoxShadow(
                               color: RemedooTheme.emergency
-                                  .withValues(alpha: 0.4),
-                              blurRadius: 30,
+                                  .withValues(alpha: 0.35),
+                              blurRadius: 24,
                               spreadRadius: 4,
                             ),
                           ],
@@ -84,237 +99,249 @@ class EmergencyScreen extends StatelessWidget {
                           mainAxisAlignment:
                               MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.sos,
-                                color: Colors.white, size: 52),
+                            Icon(Icons.warning_amber,
+                                color: Colors.white, size: 40),
+                            SizedBox(height: 6),
                             Text('SOS',
                                 style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 28,
-                                    fontWeight: FontWeight.w800)),
-                            Text('Tap to call 112',
+                                    fontWeight: FontWeight.w900)),
+                            Text('Tap to Call',
                                 style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12)),
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  const Text('Quick Contacts',
+                  const SizedBox(height: 10),
+                  Center(
+                    child: Text(
+                      'Calls 112 · Your location will be shared if available',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w800)),
+                          fontSize: 12,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  RSectionHeader(
+                      title: 'Quick Contacts',
+                      subtitle: 'Call your emergency contacts'),
                   const SizedBox(height: 8),
-                  FocusTraversalGroup(
-                    child: GridView.builder(
+                  GridView.builder(
                     shrinkWrap: true,
                     physics:
                         const NeverScrollableScrollPhysics(),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      childAspectRatio: 1.1,
-                      crossAxisSpacing: 10,
+                      crossAxisCount: 2,
                       mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 1.6,
                     ),
-                    itemCount: _contacts.length,
+                    itemCount: _quickContacts.length,
                     itemBuilder: (_, i) {
-                      final (name, number, icon) = _contacts[i];
-                      return InkWell(
-                        onTap: () => _callDialog(context, name, number),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Card(
+                      final name = _quickContacts[i].$1;
+                      final number = _quickContacts[i].$2;
+                      final icon = _quickContacts[i].$3;
+                      return StaggerItem(
+                        index: i % 6,
+                        child: RCard(
+                          onTap: () => _callDialog(
+                              context, name, number),
                           child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             mainAxisAlignment:
                                 MainAxisAlignment.center,
                             children: [
-                              Icon(icon,
-                                  color: RemedooTheme.emergency,
-                                  size: 28),
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: RemedooTheme.emergency
+                                      .withValues(alpha: 0.12),
+                                  borderRadius:
+                                      BorderRadius.circular(11),
+                                ),
+                                child: Icon(icon,
+                                    color:
+                                        RemedooTheme.emergency,
+                                    size: 19),
+                              ),
                               const SizedBox(height: 6),
                               Text(name,
-                                  textAlign: TextAlign.center,
-                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  overflow:
+                                      TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600)),
+                                      fontWeight:
+                                          FontWeight.w700,
+                                      fontSize: 13)),
                               Text(number,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      color: RemedooTheme
-                                          .emergency)),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant)),
                             ],
                           ),
                         ),
                       );
                     },
                   ),
-                  ),
                   const SizedBox(height: 20),
-                  const Text('Nearby Hospitals',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w800)),
+                  RSectionHeader(
+                      title: 'Nearby Hospitals',
+                      subtitle: 'Emergency-ready facilities'),
                   const SizedBox(height: 8),
-                  ...nearby.map((h) => Card(
-                        margin:
-                            const EdgeInsets.only(bottom: 10),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                      Icons.local_hospital,
-                                      color:
-                                          RemedooTheme.primary),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment
-                                              .start,
-                                      children: [
-                                        Text(h.name,
-                                            style: const TextStyle(
-                                                fontWeight:
-                                                    FontWeight
-                                                        .w700)),
-                                        Text(
-                                            '${h.location} • ${h.distanceKm.toStringAsFixed(1)} km',
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey)),
-                                      ],
-                                    ),
-                                  ),
-                                  RatingPill(rating: h.rating),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              FocusTraversalGroup(
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: _actionButton(
-                                        onPressed: () =>
-                                            _callDialog(
-                                                context,
-                                                h.name,
-                                                '0194-000000'),
-                                        icon: Icons.call,
-                                        label: 'Call',
-                                        backgroundColor:
-                                            RemedooTheme.emergency
-                                                .withValues(
-                                                    alpha: 0.12),
-                                        foregroundColor:
-                                            RemedooTheme.emergency,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: _actionButton(
-                                        onPressed: () => showDialog(
-                                          context: context,
-                                          builder: (_) =>
-                                              AlertDialog(
-                                            title: const Text(
-                                                'Directions'),
-                                            content: Text(
-                                                'Opening maps to ${h.name}… (demo)'),
-                                            actions: [
-                                              FilledButton(
-                                                onPressed: () =>
-                                                    Navigator.pop(
-                                                        context),
-                                                child: const Text(
-                                                    'OK'),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        icon: Icons.directions,
-                                        label: 'Directions',
-                                        backgroundColor:
-                                            RemedooTheme.primary
-                                                .withValues(
-                                                    alpha: 0.12),
-                                        foregroundColor:
-                                            RemedooTheme.primary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: _actionButton(
-                                        onPressed: () =>
-                                            Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                BookingScreen(
-                                              kind: 'hospital',
-                                              refId: h.id,
-                                              title: h.name,
-                                              subtitle:
-                                                  'Emergency Consultation',
-                                              place: h.location,
-                                              fee: 300,
-                                            ),
-                                          ),
-                                        ),
-                                        icon: Icons.calendar_month,
-                                        label: 'Book',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                  ...nearby.asMap().entries.map((e) =>
+                      StaggerItem(
+                        index: e.key % 6,
+                        child: _hospitalCard(context, e.value),
                       )),
                 ],
               ),
             ),
           ),
-          ),
         ],
       ),
     );
   }
 
-  /// 56px-minimum touch target button with icon + ellipsis-safe label.
-  Widget _actionButton({
-    required VoidCallback onPressed,
-    required IconData icon,
-    required String label,
-    Color? backgroundColor,
-    Color? foregroundColor,
-  }) {
-    return BigTargetButton(
-      onPressed: onPressed,
-      backgroundColor: backgroundColor,
-      foregroundColor: foregroundColor,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(label, overflow: TextOverflow.ellipsis),
-          ),
-        ],
+  Widget _hospitalCard(BuildContext context, Hospital h) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: RCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(h.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15)),
+                ),
+                if (h.hasIcu) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: RemedooTheme.success
+                          .withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text('ICU',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: RemedooTheme.success)),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+                '${h.location} • ${h.distanceKm.toStringAsFixed(1)} km',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                RStat(
+                    icon: Icons.star,
+                    text: h.rating.toStringAsFixed(1)),
+                const SizedBox(width: 14),
+                RStat(icon: Icons.hotel, text: '${h.beds} beds'),
+                const SizedBox(width: 14),
+                RStat(
+                    icon: Icons.schedule,
+                    text: '${h.waitMin} min wait'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: RButton(
+                    label: 'Call',
+                    icon: Icons.call,
+                    variant: RButtonVariant.danger,
+                    small: true,
+                    onPressed: () =>
+                        _callDialog(context, h.name, '0194-000000'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RButton(
+                    label: 'Directions',
+                    icon: Icons.navigation,
+                    small: true,
+                    onPressed: () => showResponsiveDialog(
+                      context,
+                      (_) => AlertDialog(
+                        title: const Text('Directions'),
+                        content: Text(
+                            'Opening maps to ${h.name}… (demo)'),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.pop(context),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RButton(
+                    label: 'Book',
+                    icon: Icons.calendar_month,
+                    variant: RButtonVariant.outline,
+                    small: true,
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BookingScreen(
+                          kind: 'hospital',
+                          refId: h.id,
+                          title: h.name,
+                          subtitle: 'Emergency Consultation',
+                          place: h.location,
+                          fee: 300,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   void _sosConfirm(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
+    showResponsiveDialog(
+      context,
+      (_) => AlertDialog(
         title: const Text('Call emergency services?'),
         content: const Text(
             'This will dial 112 and share your location with responders. (demo — no actual call is made)'),
@@ -323,18 +350,18 @@ class EmergencyScreen extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: RemedooTheme.emergency),
+          RButton(
+            label: 'Call 112',
+            variant: RButtonVariant.danger,
+            small: true,
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                     content: Text(
-                        'SOS alert sent to nearby responders! (demo)')),
+                        'SOS sent to responders (demo).')),
               );
             },
-            child: const Text('Call 112'),
           ),
         ],
       ),
@@ -343,24 +370,26 @@ class EmergencyScreen extends StatelessWidget {
 
   void _callDialog(
       BuildContext context, String name, String number) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
+    showResponsiveDialog(
+      context,
+      (_) => AlertDialog(
         title: Text('Call $name?'),
-        content: Text('Dialing $number… (demo)'),
+        content: Text(number),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          FilledButton(
+          RButton(
+            label: 'Call',
+            small: true,
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Calling $number… (demo)')),
+                SnackBar(
+                    content: Text('Calling $number… (demo)')),
               );
             },
-            child: const Text('Call'),
           ),
         ],
       ),

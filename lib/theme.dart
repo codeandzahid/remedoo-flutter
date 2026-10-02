@@ -1,24 +1,55 @@
 import 'package:flutter/material.dart';
 
-/// Remedoo design system: warm orange health super-app.
+/// Remedoo design system — rebuilt 1:1 from the React reference app
+/// (`remedoo-reskin/DESIGN_SPEC.md`, tokens from `src/index.css`).
+///
+/// Light theme: warm off-white `#F9F7F5` background, white cards, orange
+/// `#EC6A13` primary. Dark theme: warm charcoal surfaces, `#DC6A18` primary.
+/// Everything renders in Plus Jakarta Sans (bundled in assets/fonts).
 class RemedooTheme {
-  static const Color primary = Color(0xFFE86A1C);
-  static const Color primaryDark = Color(0xFFC85A12);
-  static const Color emergency = Color(0xFFD43D3D);
+  // ------------------------------------------------------------------
+  // Light-theme tokens (exact, from the design spec)
+  // ------------------------------------------------------------------
+  static const Color primary = Color(0xFFEC6A13);
+  static const Color primaryDark = Color(0xFFDC6A18);
+  static const Color background = Color(0xFFF9F7F5);
+  static const Color cardWhite = Color(0xFFFFFFFF);
+  static const Color ink = Color(0xFF201410);
+  static const Color mutedText = Color(0xFF8C7F76);
+  static const Color cardBorder = Color(0xFFE9E2DB);
+  static const Color success = Color(0xFF2BAD6E);
+  static const Color warning = Color(0xFFF5A623);
+  static const Color destructive = Color(0xFFDE3F3F);
+  static const Color emergency = Color(0xFFEE2B2B);
+  static const Color secondary = Color(0xFFF5F0EC);
+  static const Color mutedSurface = Color(0xFFF7F4F1);
+  static const Color accent = Color(0xFFF4E7DA);
+  static const Color accentForeground = Color(0xFF93490F);
+
+  /// Legacy aliases kept for screens written before the reskin.
+  static const Color pageBg = background;
+  static const Color ratingGreen = success;
   static const Color purple = Color(0xFF6B4FA0);
   static const Color teal = Color(0xFF2E9E6B);
-  static const Color ratingGreen = Color(0xFF1FA855);
-  static const Color pageBg = Color(0xFFFFF8F2);
-  static const Color ink = Color(0xFF1A2332);
-  static const Color cardBorder = Color(0xFFF0E4D8);
 
-  // Dark-mode surfaces.
-  static const Color darkBg = Color(0xFF14100C);
-  static const Color darkSurface = Color(0xFF1F1A14);
-  static const Color darkSurface2 = Color(0xFF2A221A);
-  static const Color darkBorder = Color(0xFF3A2E22);
+  // ------------------------------------------------------------------
+  // Dark-theme tokens (exact, from the design spec)
+  // ------------------------------------------------------------------
+  static const Color darkBg = Color(0xFF181210);
+  static const Color darkCard = Color(0xFF241B18);
+  static const Color darkText = Color(0xFFF7F4F1);
+  static const Color darkMutedText = Color(0xFFA89A90);
+  static const Color darkBorder = Color(0xFF3B2F2A);
+  static const Color darkSecondary = Color(0xFF352B27);
+  static const Color darkMutedSurface = Color(0xFF2F2722);
 
-  /// Soft card shadow (light mode).
+  /// Legacy dark aliases kept for screens written before the reskin.
+  static const Color darkSurface = darkCard;
+  static const Color darkSurface2 = darkSecondary;
+
+  static const String fontFamily = 'PlusJakartaSans';
+
+  /// Soft card shadow (light mode): thin warm-gray, very subtle.
   static List<BoxShadow> get softShadow => [
         BoxShadow(
           color: const Color(0xFF3A2410).withValues(alpha: 0.06),
@@ -40,28 +71,91 @@ class RemedooTheme {
     },
   );
 
+  static TextTheme _textTheme(Color text, Color muted) {
+    TextStyle s(TextStyle base, Color c) =>
+        base.copyWith(fontFamily: fontFamily, color: c);
+    return TextTheme(
+      displayLarge: s(RemedooType.displayLarge, text),
+      displayMedium: s(RemedooType.displayMedium, text),
+      headlineLarge: s(RemedooType.headlineLarge, text),
+      headlineMedium: s(RemedooType.headlineMedium, text),
+      headlineSmall: s(RemedooType.headlineSmall, text),
+      titleLarge: s(RemedooType.titleLarge, text),
+      titleMedium: s(RemedooType.titleMedium, text),
+      titleSmall: s(RemedooType.titleSmall, text),
+      bodyLarge: s(RemedooType.bodyLarge, text),
+      bodyMedium: s(RemedooType.bodyMedium, text),
+      bodySmall: s(RemedooType.bodySmall, muted),
+      labelLarge: s(RemedooType.labelLarge, text),
+      labelMedium: s(RemedooType.labelMedium, muted),
+      labelSmall: s(RemedooType.labelSmall, muted),
+    );
+  }
+
+  static ButtonStyle _pillButtonStyle(Color bg, Color fg) =>
+      ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return bg.withValues(alpha: 0.4);
+          }
+          return bg;
+        }),
+        foregroundColor: WidgetStateProperty.all(fg),
+        shape: WidgetStateProperty.all(const StadiumBorder()),
+        textStyle: WidgetStateProperty.all(
+          const TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        padding: WidgetStateProperty.all(
+          const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        ),
+      );
+
   static ThemeData light([Color? brand]) {
     final p = brand ?? primary;
-    final scheme = ColorScheme.fromSeed(
-      seedColor: p,
+    const text = ink;
+    const muted = mutedText;
+    const border = cardBorder;
+    final scheme = ColorScheme(
       brightness: Brightness.light,
+      primary: p,
+      onPrimary: Colors.white,
+      secondary: secondary,
+      onSecondary: ink,
+      tertiary: accent,
+      onTertiary: accentForeground,
+      error: destructive,
+      onError: Colors.white,
+      surface: cardWhite,
+      onSurface: ink,
+      surfaceContainerHighest: mutedSurface,
+      onSurfaceVariant: muted,
+      outline: border,
+      outlineVariant: border,
     );
     return ThemeData(
       useMaterial3: true,
-      colorScheme: scheme.copyWith(primary: p),
-      scaffoldBackgroundColor: pageBg,
+      fontFamily: fontFamily,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: background,
+      textTheme: _textTheme(text, muted),
       pageTransitionsTheme: RemedooTheme.pageTransitions,
       dividerTheme: const DividerThemeData(
-        color: cardBorder,
+        color: border,
         thickness: 1,
         space: 1,
       ),
       dialogTheme: DialogThemeData(
+        backgroundColor: cardWhite,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
         ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: cardWhite,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -69,6 +163,7 @@ class RemedooTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
+        backgroundColor: ink,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
         ),
@@ -80,6 +175,7 @@ class RemedooTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
+          fontFamily: fontFamily,
           color: ink,
           fontSize: 20,
           fontWeight: FontWeight.w700,
@@ -87,84 +183,131 @@ class RemedooTheme {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: Colors.white,
+        color: cardWhite,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: cardBorder),
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: border),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: cardWhite,
+        hintStyle: const TextStyle(
+          fontFamily: fontFamily,
+          color: muted,
+          fontSize: 14,
+        ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: cardBorder),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(24)),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: p, width: 1.6),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: destructive),
+        ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: p,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
+      filledButtonTheme:
+          FilledButtonThemeData(style: _pillButtonStyle(p, Colors.white)),
+      elevatedButtonTheme:
+          ElevatedButtonThemeData(style: _pillButtonStyle(p, Colors.white)),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: _pillButtonStyle(cardWhite, p).copyWith(
+          side: WidgetStateProperty.all(
+            BorderSide(color: p, width: 1.4),
           ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: p,
           textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+            fontFamily: fontFamily,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
           ),
         ),
       ),
       chipTheme: ChipThemeData(
+        backgroundColor: cardWhite,
+        side: const BorderSide(color: border),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        indicatorColor: p.withValues(alpha: 0.14),
-        labelTextStyle: WidgetStateProperty.all(
-          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        labelStyle: const TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: ink,
         ),
       ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: cardWhite,
+        indicatorColor: p.withValues(alpha: 0.14),
+        labelTextStyle: WidgetStateProperty.all(
+          const TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      iconTheme: const IconThemeData(color: ink),
     );
   }
 
   static ThemeData dark([Color? brand]) {
-    final p = brand ?? primary;
-    final scheme = ColorScheme.fromSeed(
-      seedColor: p,
+    final p = brand ?? primaryDark;
+    const text = darkText;
+    const muted = darkMutedText;
+    const border = darkBorder;
+    final scheme = ColorScheme(
       brightness: Brightness.dark,
+      primary: p,
+      onPrimary: Colors.white,
+      secondary: darkSecondary,
+      onSecondary: darkText,
+      tertiary: accent,
+      onTertiary: darkText,
+      error: destructive,
+      onError: Colors.white,
+      surface: darkCard,
+      onSurface: darkText,
+      surfaceContainerHighest: darkMutedSurface,
+      onSurfaceVariant: muted,
+      outline: border,
+      outlineVariant: border,
     );
     return ThemeData(
       useMaterial3: true,
-      colorScheme: scheme.copyWith(primary: p),
+      fontFamily: fontFamily,
+      colorScheme: scheme,
       scaffoldBackgroundColor: darkBg,
+      textTheme: _textTheme(text, muted),
       pageTransitionsTheme: RemedooTheme.pageTransitions,
       dividerTheme: const DividerThemeData(
-        color: darkBorder,
+        color: border,
         thickness: 1,
         space: 1,
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: darkSurface,
+        backgroundColor: darkCard,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
         ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: darkSurface,
+        backgroundColor: darkCard,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -172,84 +315,149 @@ class RemedooTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
+        backgroundColor: darkText,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
         ),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
+        foregroundColor: darkText,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
+          fontFamily: fontFamily,
+          color: darkText,
           fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: darkSurface,
+        color: darkCard,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: darkBorder),
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: border),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: darkSurface,
+        fillColor: darkMutedSurface,
+        hintStyle: const TextStyle(
+          fontFamily: fontFamily,
+          color: muted,
+          fontSize: 14,
+        ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: darkBorder),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(24)),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: p, width: 1.6),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: destructive),
+        ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: p,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
+      filledButtonTheme:
+          FilledButtonThemeData(style: _pillButtonStyle(p, Colors.white)),
+      elevatedButtonTheme:
+          ElevatedButtonThemeData(style: _pillButtonStyle(p, Colors.white)),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: _pillButtonStyle(darkCard, p).copyWith(
+          side: WidgetStateProperty.all(
+            BorderSide(color: p, width: 1.4),
           ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: p,
           textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+            fontFamily: fontFamily,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
           ),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: darkCard,
+        side: const BorderSide(color: border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        labelStyle: const TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: darkText,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: const Color(0xFF1F1A14),
+        backgroundColor: darkCard,
         indicatorColor: p.withValues(alpha: 0.22),
         labelTextStyle: WidgetStateProperty.all(
-          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          const TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
+      iconTheme: const IconThemeData(color: darkText),
     );
   }
 
-  /// Orange gradient used for headers.
+  /// Orange gradient used for headers (matches the React app's hero/header).
   static const LinearGradient headerGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFF07B1D), Color(0xFFE86A1C), Color(0xFFD95F10)],
+    colors: [Color(0xFFF2790F), Color(0xFFEC6A13), Color(0xFFD95F10)],
+  );
+
+  /// Teal-green gradient for health promo banners.
+  static const LinearGradient promoTealGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [Color(0xFF14B8A6), Color(0xFF059669)],
+  );
+
+  /// Red-orange gradient for emergency promo banners / headers.
+  static const LinearGradient promoEmergencyGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [Color(0xFFF04438), Color(0xFFEE2B2B)],
   );
 
   /// Red gradient for the emergency screen.
   static const LinearGradient emergencyGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFE05353), Color(0xFFD43D3D), Color(0xFFB92F2F)],
+    colors: [Color(0xFFF04438), Color(0xFFEE2B2B), Color(0xFFC81E1E)],
   );
+
+  /// Pastel tile backgrounds for the dashboard service grid
+  /// (bg + icon color pairs).
+  static const List<List<Color>> serviceTileColors = [
+    [Color(0xFFE0F2FE), Color(0xFF0284C7)], // blue
+    [Color(0xFFDCFCE7), Color(0xFF16A34A)], // green
+    [Color(0xFFF3E8FF), Color(0xFF9333EA)], // purple
+    [Color(0xFFFFEDD5), Color(0xFFEA580C)], // orange
+    [Color(0xFFFEE2E2), Color(0xFFDC2626)], // red
+    [Color(0xFFFCE7F3), Color(0xFFDB2777)], // pink
+    [Color(0xFFFEF9C3), Color(0xFFCA8A04)], // yellow
+    [Color(0xFFCCFBF1), Color(0xFF0D9488)], // teal
+  ];
 }
 
 /// 8pt spacing scale.
@@ -261,18 +469,25 @@ class RemedooSpacing {
   static const double xl = 24;
   static const double xxl = 32;
   static const double xxxl = 48;
+
+  /// Page padding used across the React app.
+  static const double page = 16;
+
+  /// Gap between sections.
+  static const double section = 22;
 }
 
-/// Corner radius scale.
+/// Corner radius scale (matches `--radius` language of the React app).
 class RemedooRadius {
   static const double sm = 8;
   static const double md = 12;
   static const double lg = 16;
   static const double xl = 20;
   static const double xxl = 28;
+  static const double card = 18;
 }
 
-/// Elevated type scale with proper weights.
+/// Type scale, always rendered in Plus Jakarta Sans via the ThemeData.
 class RemedooType {
   static const TextStyle displayLarge = TextStyle(
       fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.5);

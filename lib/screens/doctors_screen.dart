@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -6,6 +8,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import 'booking_screen.dart';
 import 'doctor_detail_screen.dart';
 
 const _specialties = [
@@ -33,6 +36,37 @@ const _sortOptions = [
   'Experience',
 ];
 
+/// Rotating offer banners, mirroring the React Doctors page carousel.
+class _BannerData {
+  final String emoji;
+  final String title;
+  final String subtitle;
+  final Gradient gradient;
+
+  const _BannerData(this.emoji, this.title, this.subtitle, this.gradient);
+}
+
+const _violetGradient = LinearGradient(
+  begin: Alignment.centerLeft,
+  end: Alignment.centerRight,
+  colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+);
+
+const _amberGradient = LinearGradient(
+  begin: Alignment.centerLeft,
+  end: Alignment.centerRight,
+  colors: [Color(0xFFF97316), Color(0xFFD97706)],
+);
+
+const _banners = [
+  _BannerData('🩺', 'Flat 30% OFF', 'On first doctor consultation',
+      RemedooTheme.promoTealGradient),
+  _BannerData('⚡', 'Instant Booking', 'No waiting, confirm in seconds',
+      _violetGradient),
+  _BannerData('📞', 'Free Follow-up', 'Within 7 days of consultation',
+      _amberGradient),
+];
+
 /// Doctor directory with search, filters and sorting.
 class DoctorsScreen extends StatefulWidget {
   final String initialQuery;
@@ -51,6 +85,8 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   bool _lowFee = false;
   bool _nearest = false;
   bool _loading = true;
+  int _bannerIdx = 0;
+  Timer? _bannerTimer;
 
   @override
   void initState() {
@@ -58,6 +94,9 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     _search = TextEditingController(text: widget.initialQuery);
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) setState(() => _loading = false);
+    });
+    _bannerTimer = Timer.periodic(const Duration(milliseconds: 3500), (_) {
+      if (mounted) setState(() => _bannerIdx = (_bannerIdx + 1) % _banners.length);
     });
   }
 
@@ -69,6 +108,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
 
   @override
   void dispose() {
+    _bannerTimer?.cancel();
     _search.dispose();
     super.dispose();
   }
@@ -115,23 +155,154 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     final state = AppStateScope.of(context);
     final list = _filtered(state);
     return Scaffold(
-      appBar: AppBar(title: const Text('Find Doctors')),
-      body: MaxWidthBox(
-        child: Column(
+      body: SafeArea(
+        bottom: false,
+        child: MaxWidthBox(
+          child: Column(
+            children: [
+              _header(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: _promoBanner(),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                child: RSectionHeader(
+                  title: '${list.length} doctors available',
+                  subtitle: 'Book consultation with best doctors',
+                ),
+              ),
+              Expanded(
+                child: _loading
+                    ? ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        itemCount: 4,
+                        itemBuilder: (_, _) => const SkeletonCard(),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _refresh,
+                        child: list.isEmpty
+                            ? ListView(
+                                physics:
+                                    const AlwaysScrollableScrollPhysics(),
+                                children: const [
+                                  SizedBox(height: 60),
+                                  EmptyState(
+                                    icon: Icons.person_search,
+                                    title: 'No doctors found',
+                                    subtitle:
+                                        'Try a different search or filter.',
+                                  ),
+                                ],
+                              )
+                            : context.isCompact
+                                ? ListView.separated(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 0, 16, 16),
+                                    itemCount: list.length,
+                                    separatorBuilder: (_, _) =>
+                                        const SizedBox(height: 12),
+                                    itemBuilder: (_, i) => StaggerItem(
+                                      index: i % 6,
+                                      child: _doctorCard(list[i], state),
+                                    ),
+                                  )
+                                : ResponsiveGrid(
+                                    compactCols: 1,
+                                    mediumCols: 2,
+                                    expandedCols: 2,
+                                    wideCols: 3,
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 0, 16, 16),
+                                    // Taller cells: the new cards carry a 120px
+                                    // photo header + content + CTA (~300px).
+                                    childAspectRatio: 0.9,
+                                    itemCount: list.length,
+                                    itemBuilder: (_, i) => StaggerItem(
+                                      index: i % 6,
+                                      child: _doctorCard(list[i], state),
+                                    ),
+                                  ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// White sticky-style header: back button + title, search, chip rows —
+  /// mirrors the React Doctors page header.
+  Widget _header() {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: TextField(
+            child: Row(
+              children: [
+                InkWell(
+                  onTap: () => Navigator.maybePop(context),
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHighest,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.arrow_back,
+                        size: 20, color: scheme.onSurface),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Doctors',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on,
+                              size: 12, color: scheme.primary),
+                          const SizedBox(width: 4),
+                          Text('Doctors near your location',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: scheme.onSurfaceVariant)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: RSearchBar(
+              hint: 'Search by name or specialization',
               controller: _search,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'Search doctors, specialties…',
-                prefixIcon: Icon(Icons.search),
-              ),
             ),
           ),
           SizedBox(
-            height: 48,
+            height: 52,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -139,263 +310,337 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
               separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (_, i) {
                 final s = _specialties[i];
-                final sel = s == _specialty;
                 return Center(
-                  child: ChoiceChip(
-                    label: Text(s),
-                    selected: sel,
-                    onSelected: (_) => setState(() => _specialty = s),
-                    selectedColor: RemedooTheme.primary,
-                    labelStyle: TextStyle(
-                        color: sel
-                            ? Colors.white
-                            : Theme.of(context).colorScheme.onSurface),
+                  child: RFilterChip(
+                    label: s,
+                    selected: s == _specialty,
+                    onTap: () => setState(() => _specialty = s),
                   ),
                 );
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
+          SizedBox(
+            height: 52,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _sort,
-                    decoration: const InputDecoration(
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 12)),
-                    items: _sortOptions
-                        .map((o) =>
-                            DropdownMenuItem(value: o, child: Text(o)))
-                        .toList(),
-                    onChanged: (v) =>
-                        setState(() => _sort = v ?? _sortOptions.first),
+                Center(
+                  // Decorative in the React app too (no action attached).
+                  child: RFilterChip(
+                    label: 'Filter',
+                    icon: Icons.tune,
+                    selected: false,
+                    onTap: () {},
+                  ),
+                ),
+                const SizedBox(width: 8),
+                for (final o in _sortOptions) ...[
+                  Center(
+                    child: RFilterChip(
+                      label: o,
+                      selected: _sort == o,
+                      onTap: () => setState(() => _sort = o),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Center(
+                  child: RFilterChip(
+                    label: 'Rating 4.0+',
+                    selected: _rating4,
+                    onTap: () => setState(() => _rating4 = !_rating4),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Center(
+                  child: RFilterChip(
+                    label: 'Fee: Low-High',
+                    selected: _lowFee,
+                    onTap: () => setState(() => _lowFee = !_lowFee),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Center(
+                  child: RFilterChip(
+                    label: 'Nearest First',
+                    selected: _nearest,
+                    onTap: () => setState(() => _nearest = !_nearest),
                   ),
                 ),
               ],
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                FilterChip(
-                  label: const Text('Rating 4.0+'),
-                  selected: _rating4,
-                  onSelected: (v) => setState(() => _rating4 = v),
-                ),
-                FilterChip(
-                  label: const Text('Fee Low-High'),
-                  selected: _lowFee,
-                  onSelected: (v) => setState(() => _lowFee = v),
-                ),
-                FilterChip(
-                  label: const Text('Nearest First'),
-                  selected: _nearest,
-                  onSelected: (v) => setState(() => _nearest = v),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [RemedooTheme.purple, Color(0xFF8B5CF6)]),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.local_offer, color: Colors.white),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Flat 30% OFF on your first consultation!',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '${list.length} doctors available',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-          Expanded(
-            child: _loading
-                ? ListView.builder(
-                    padding:
-                        const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                    itemCount: 4,
-                    itemBuilder: (_, _) => const SkeletonCard(),
-                  )
-                : RefreshIndicator(
-                    onRefresh: _refresh,
-                    child: list.isEmpty
-                        ? ListView(
-                            physics:
-                                const AlwaysScrollableScrollPhysics(),
-                            children: const [
-                              SizedBox(height: 60),
-                              EmptyState(
-                                icon: Icons.person_search,
-                                title: 'No doctors found',
-                                subtitle:
-                                    'Try a different search or filter.',
-                              ),
-                            ],
-                          )
-                        : context.isCompact
-                            ? ListView.separated(
-                                padding:
-                                    const EdgeInsets.fromLTRB(
-                                        16, 4, 16, 16),
-                                itemCount: list.length,
-                                separatorBuilder: (_, _) =>
-                                    const SizedBox(height: 12),
-                                itemBuilder: (_, i) => StaggerItem(
-                                  index: i % 6,
-                                  child: _doctorCard(
-                                      list[i], state),
-                                ),
-                              )
-                            : ResponsiveGrid(
-                                compactCols: 1,
-                                mediumCols: 2,
-                                expandedCols: 2,
-                                wideCols: 3,
-                                padding:
-                                    const EdgeInsets.fromLTRB(
-                                        16, 4, 16, 16),
-                                // Taller cells: card content (fee banner +
-                                // avatar row + wrapping info chips) needs
-                                // ~240px at grid widths.
-                                childAspectRatio: 1.5,
-                                itemCount: list.length,
-                                itemBuilder: (_, i) =>
-                                    StaggerItem(
-                                  index: i % 6,
-                                  child: _doctorCard(
-                                      list[i], state),
-                                ),
-                              ),
-                  ),
           ),
         ],
-        ),
+      ),
+    );
+  }
+
+  Widget _promoBanner() {
+    final b = _banners[_bannerIdx];
+    return Container(
+      height: 96,
+      decoration: BoxDecoration(
+        gradient: b.gradient,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Text(b.emoji, style: const TextStyle(fontSize: 40)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        b.title,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        b.subtitle,
+                        style: TextStyle(
+                            color:
+                                Colors.white.withValues(alpha: 0.85),
+                            fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            right: 16,
+            bottom: 10,
+            child: Row(
+              children: List.generate(_banners.length, (i) {
+                final active = i == _bannerIdx;
+                return Container(
+                  width: active ? 16 : 6,
+                  height: 6,
+                  margin: const EdgeInsets.only(left: 4),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _doctorCard(Doctor d, AppState state) {
-    // No bottom margin: list spacing comes from the separator, grid
-    // spacing from the grid itself, so cells never clip the card.
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => pushPage(
-          context,
-          DoctorDetailScreen(doctor: d),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                gradient: RemedooTheme.headerGradient,
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20)),
-              ),
-              child: Center(
-                child: Text(
-                  'Consultation fee ${inr(d.fee)}',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Hero(
-                    tag: 'doctor-avatar-${d.id}',
-                    child: InitialsAvatar(name: d.name, radius: 30),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(d.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16)),
-                            ),
-                            if (d.verified)
-                              const Icon(Icons.verified,
-                                  size: 18,
-                                  color: RemedooTheme.primary),
-                            FavoriteButton(
-                                favKey: 'doctor:${d.id}'),
-                          ],
-                        ),
-                        Text(d.specialty,
-                            style: const TextStyle(
-                                color: RemedooTheme.primary,
-                                fontWeight: FontWeight.w600)),
-                        Text(d.hospital,
-                            style: const TextStyle(
-                                fontSize: 13, color: Colors.grey)),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            RatingPill(rating: d.rating),
-                            _miniChip('${d.expYears} yrs exp'),
-                            _miniChip('${d.waitMin} min wait'),
-                            _miniChip(
-                                '${d.distanceKm.toStringAsFixed(1)} km'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      padding: EdgeInsets.zero,
+      onTap: () => pushPage(context, DoctorDetailScreen(doctor: d)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  RemedooTheme.primary.withValues(alpha: 0.14),
+                  RemedooTheme.accent.withValues(alpha: 0.55),
+                  RemedooTheme.primary.withValues(alpha: 0.08),
                 ],
               ),
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(RemedooRadius.card)),
             ),
-          ],
-        ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Hero(
+                    tag: 'doctor-avatar-${d.id}',
+                    child: InitialsAvatar(name: d.name, radius: 34),
+                  ),
+                ),
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: _favButton(state, d),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  d.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                              if (d.verified) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.verified,
+                                    size: 16,
+                                    color: RemedooTheme.primary),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            d.specialty,
+                            style: TextStyle(
+                                color: scheme.primary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Icons.location_on,
+                                  size: 13,
+                                  color: scheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  d.hospital,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: scheme.onSurfaceVariant),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    RRatingPill(rating: d.rating),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const _DashedDivider(),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RStat(
+                          icon: Icons.work_outline,
+                          text: '${d.expYears} yrs exp'),
+                    ),
+                    Expanded(
+                      child: RStat(
+                          icon: Icons.currency_rupee,
+                          text: inr(d.fee)),
+                    ),
+                    Expanded(
+                      child: RStat(
+                          icon: Icons.schedule,
+                          text: '${d.waitMin} min wait'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                RButton(
+                  label: 'Book Appointment',
+                  icon: Icons.calendar_month,
+                  small: true,
+                  fullWidth: true,
+                  onPressed: () => pushPage(
+                    context,
+                    BookingScreen(
+                      kind: 'doctor',
+                      refId: d.id,
+                      title: d.name,
+                      subtitle: d.specialty,
+                      place: d.hospital,
+                      fee: d.fee,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _miniChip(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(8),
+  Widget _favButton(AppState state, Doctor d) {
+    final fav = state.isFavorite('doctor:${d.id}');
+    return Material(
+      color: Theme.of(context).cardColor,
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => state.toggleFavorite('doctor:${d.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(
+            fav ? Icons.favorite : Icons.favorite_border,
+            size: 18,
+            color: fav ? RemedooTheme.emergency : RemedooTheme.mutedText,
+          ),
+        ),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 12)),
+    );
+  }
+}
+
+/// Dashed divider line like the React cards' `border-t border-dashed`.
+class _DashedDivider extends StatelessWidget {
+  const _DashedDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).dividerColor;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final n = (constraints.maxWidth / 10).floor().clamp(1, 100);
+        return Row(
+          children: List.generate(
+            n,
+            (_) => Container(
+              width: 5,
+              height: 1,
+              margin: const EdgeInsets.only(right: 5),
+              color: color,
+            ),
+          ),
+        );
+      },
     );
   }
 }

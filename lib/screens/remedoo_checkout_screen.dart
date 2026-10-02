@@ -3,8 +3,12 @@ import 'package:flutter/material.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../widgets/widgets.dart';
 
-/// Checkout for the Remedoo Pharmacy store.
+/// Checkout for the Remedoo Pharmacy store — matches RemedooCheckout.tsx:
+/// plain sticky header, order summary with (Rx) tags + dashed divider,
+/// amber Rx notice, address + GPS, prescription upload, payment boxes,
+/// notes, full-width Place Order CTA. Checkout logic kept exactly as before.
 class RemedooCheckoutScreen extends StatefulWidget {
   const RemedooCheckoutScreen({super.key});
 
@@ -13,14 +17,17 @@ class RemedooCheckoutScreen extends StatefulWidget {
       _RemedooCheckoutScreenState();
 }
 
-class _RemedooCheckoutScreenState extends State<RemedooCheckoutScreen> {
+class _RemedooCheckoutScreenState
+    extends State<RemedooCheckoutScreen> {
   final _address = TextEditingController();
+  final _notes = TextEditingController();
   String _payment = 'Cash on Delivery';
   bool _rxUploaded = false;
 
   @override
   void dispose() {
     _address.dispose();
+    _notes.dispose();
     super.dispose();
   }
 
@@ -28,41 +35,86 @@ class _RemedooCheckoutScreenState extends State<RemedooCheckoutScreen> {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final subtotal = state.cartTotal;
-    const delivery = 30.0;
+    // Matches React RemedooCheckout: free delivery above ₹499.
+    final delivery = subtotal >= 499 ? 0.0 : 30.0;
     final total = subtotal + delivery;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Checkout')),
-      body: MaxWidthBox(
-        maxWidth: context.isCompact ? 720 : 1200,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+    final hasRx =
+        state.cartLines.any((l) => l.medicine.rxRequired);
+    if (state.cartLines.isEmpty) {
+      return Scaffold(
+        body: Column(
           children: [
-            DetailSplit(
-              main: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _addressCard(),
-                  const SizedBox(height: 12),
-                  _prescriptionCard(context),
-                  const SizedBox(height: 12),
-                  _paymentCard(),
-                ],
+            _stickyHeader(),
+            const Expanded(
+              child: REmptyState(
+                icon: Icons.shopping_cart_outlined,
+                title: 'No items in cart',
+                subtitle:
+                    'Add medicines from Remedoo Pharmacy to check out.',
               ),
-              side: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            ),
+          ],
+        ),
+      );
+    }
+    return Scaffold(
+      body: Column(
+        children: [
+          _stickyHeader(),
+          Expanded(
+            child: MaxWidthBox(
+              maxWidth: context.isCompact ? 720 : 1200,
+              child: ListView(
+                padding:
+                    const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 children: [
-                  _billCard(state, subtotal, delivery, total),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: () => _placeOrder(state),
-                    child: Text('Place Order • ${inr(total)}'),
+                  DetailSplit(
+                    main: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.stretch,
+                      children: [
+                        _summaryCard(
+                            state, subtotal, delivery, total),
+                        if (hasRx) ...[
+                          const SizedBox(height: 12),
+                          _rxNotice(),
+                        ],
+                        const SizedBox(height: 12),
+                        _addressCard(),
+                        if (hasRx) ...[
+                          const SizedBox(height: 12),
+                          _prescriptionCard(),
+                        ],
+                        const SizedBox(height: 12),
+                        _paymentCard(),
+                        const SizedBox(height: 12),
+                        _notesCard(),
+                      ],
+                    ),
+                    side: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.stretch,
+                      children: [
+                        _payCard(total, state),
+                      ],
+                    ),
                   ),
+                  if (context.isCompact) ...[
+                    const SizedBox(height: 16),
+                    RButton(
+                      label:
+                          'Place Order • ${inr(total)}',
+                      fullWidth: true,
+                      onPressed: () =>
+                          _placeOrder(state),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -85,147 +137,455 @@ class _RemedooCheckoutScreenState extends State<RemedooCheckoutScreen> {
     Navigator.popUntil(context, (r) => r.isFirst);
   }
 
-  Widget _addressCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Delivery Address',
-                style: TextStyle(
-                    fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _address,
-              decoration: InputDecoration(
-                hintText: 'House no, street, area…',
-                suffixIcon: TextButton(
-                  onPressed: () {
-                    _address.text = '12, Residency Road, Srinagar';
-                    setState(() {});
-                  },
-                  child: const Text('Use GPS'),
-                ),
-              ),
-              maxLines: 2,
-            ),
-          ],
+  Widget _stickyHeader() {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Row(
+            children: [
+              _BackCircle(
+                  onTap: () =>
+                      Navigator.maybePop(context)),
+              const SizedBox(width: 12),
+              const Text('Checkout',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800)),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _prescriptionCard(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Prescription',
+  Widget _summaryCard(AppState state, double subtotal,
+      double delivery, double total) {
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Order Summary',
+              style: TextStyle(
+                  fontWeight: FontWeight.w800, fontSize: 14)),
+          const SizedBox(height: 8),
+          ...state.cartLines.map((l) {
+            final price = state.priceOf(l.medicine);
+            return Padding(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '${l.medicine.name} × ${l.qty}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 13.5),
+                          ),
+                        ),
+                        if (l.medicine.rxRequired) ...[
+                          const SizedBox(width: 4),
+                          const Text('(Rx)',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFFB45309))),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(inr(price * l.qty),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5)),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+          const _DashedDivider(),
+          const SizedBox(height: 8),
+          _row('Subtotal', inr(subtotal), scheme),
+          _row(
+            'Delivery',
+            delivery == 0 ? 'FREE' : inr(delivery),
+            scheme,
+            valueColor: delivery == 0
+                ? RemedooTheme.success
+                : null,
+            valueBold: delivery == 0,
+          ),
+          if (delivery > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                'Add ${inr(499 - subtotal)} more for free delivery',
                 style: TextStyle(
-                    fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
+                    fontSize: 10.5,
+                    color: scheme.onSurfaceVariant),
+              ),
+            ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Text('Total',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16)),
+              const Spacer(),
+              Text(inr(total),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rxNotice() {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: dark
+            ? const Color(0xFF3A2A12)
+            : const Color(0xFFFEF7E7),
+        border: Border.all(
+            color: dark
+                ? const Color(0xFF8A6D2B)
+                : const Color(0xFFF5D9A8)),
+        borderRadius:
+            BorderRadius.circular(RemedooRadius.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('📋 Prescription Verification Required',
+              style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: dark
+                      ? const Color(0xFFF5C86B)
+                      : const Color(0xFFB45309))),
+          const SizedBox(height: 4),
+          Text(
+            'Some items in your cart require a valid prescription. Your order will be held for pharmacist verification before processing.',
+            style: TextStyle(
+                fontSize: 12,
+                color: dark
+                    ? const Color(0xFFE8C87E)
+                    : const Color(0xFF92600A))),
+        ],
+      ),
+    );
+  }
+
+  Widget _addressCard() {
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Delivery Address',
+              style: TextStyle(
+                  fontWeight: FontWeight.w800, fontSize: 14)),
+          const SizedBox(height: 10),
+          RTextField(
+            hint: 'Enter your full address',
+            controller: _address,
+            maxLines: 2,
+          ),
+          const SizedBox(height: 8),
+          RButton(
+            label: 'Use GPS',
+            icon: Icons.my_location,
+            small: true,
+            variant: RButtonVariant.outline,
+            onPressed: () {
+              _address.text = '12, Residency Road, Srinagar';
+              setState(() {});
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content:
+                        Text('Location detected! (demo)')),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _prescriptionCard() {
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.upload_file_outlined,
+                  size: 16,
+                  color:
+                      Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('Upload Prescription *',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Upload a clear image of your prescription. Order will not proceed without approval.',
+            style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: RButton(
+              label: _rxUploaded
+                  ? 'Prescription Uploaded'
+                  : 'Upload Prescription',
+              icon: _rxUploaded
+                  ? Icons.check_circle
+                  : Icons.upload_file,
+              variant: RButtonVariant.outline,
               onPressed: () {
                 setState(() => _rxUploaded = true);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content:
-                          Text('Prescription uploaded! (demo)')),
+                      content: Text(
+                          'Prescription uploaded! (demo)')),
                 );
               },
-              icon: Icon(_rxUploaded
-                  ? Icons.check_circle
-                  : Icons.upload_file),
-              label: Text(_rxUploaded
-                  ? 'Prescription Uploaded'
-                  : 'Upload Prescription'),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _paymentCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Payment Method',
-                style: TextStyle(
-                    fontWeight: FontWeight.w800, fontSize: 16)),
-            RadioGroup<String>(
-              groupValue: _payment,
-              onChanged: (v) => setState(() => _payment = v!),
-              child: Column(
-                children: [
-                  for (final m in [
-                    'Cash on Delivery',
-                    'Pay Online',
-                    'UPI'
-                  ])
-                    RadioListTile<String>(
-                      value: m,
-                      title: Text(m),
-                      activeColor: RemedooTheme.primary,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _billCard(
-      AppState state, double subtotal, double delivery, double total) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Bill Summary',
-                style: TextStyle(
-                    fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: 8),
-            _row('Items (${state.cartCount})', inr(subtotal)),
-            _row('Delivery', inr(delivery)),
-            const Divider(),
-            _row('To Pay', inr(total), bold: true),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _row(String label, String value, {bool bold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+    final scheme = Theme.of(context).colorScheme;
+    const methods = [
+      'Cash on Delivery',
+      'Pay Online',
+      'UPI',
+    ];
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Flexible(
-            child: Text(label,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.grey)),
-          ),
-          const Spacer(),
-          Flexible(
-            child: Text(value,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontWeight:
-                        bold ? FontWeight.w800 : FontWeight.w600,
-                    fontSize: bold ? 16 : 14)),
+          const Text('Payment Method',
+              style: TextStyle(
+                  fontWeight: FontWeight.w800, fontSize: 14)),
+          const SizedBox(height: 10),
+          Row(
+            children: methods.map((m) {
+              final selected = _payment == m;
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                      right: m == methods.last ? 0 : 10),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () =>
+                          setState(() => _payment = m),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 6),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: selected
+                                ? scheme.primary
+                                : Theme.of(context)
+                                    .dividerColor,
+                            width: selected ? 2 : 1,
+                          ),
+                          color: selected
+                              ? scheme.primary
+                                  .withValues(alpha: 0.06)
+                              : null,
+                          borderRadius:
+                              BorderRadius.circular(12),
+                        ),
+                        child: Text(m,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: selected
+                                    ? scheme.primary
+                                    : scheme.onSurfaceVariant)),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _notesCard() {
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Notes (optional)',
+              style: TextStyle(
+                  fontWeight: FontWeight.w800, fontSize: 14)),
+          const SizedBox(height: 10),
+          RTextField(
+            hint: 'Any special instructions…',
+            controller: _notes,
+            maxLines: 2,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _payCard(double total, AppState state) {
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Text('To Pay',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15)),
+              const Spacer(),
+              Text(inr(total),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      color: RemedooTheme.primary)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+              '${state.cartCount} item${state.cartCount == 1 ? '' : 's'} • $_payment',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant)),
+          const SizedBox(height: 14),
+          RButton(
+            label: 'Place Order • ${inr(total)}',
+            fullWidth: true,
+            onPressed: () => _placeOrder(state),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value, ColorScheme scheme,
+      {Color? valueColor, bool valueBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13.5,
+                  color: scheme.onSurfaceVariant)),
+          const Spacer(),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: valueBold
+                      ? FontWeight.w700
+                      : FontWeight.w600,
+                  color: valueColor)),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashedDivider extends StatelessWidget {
+  const _DashedDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final count = (constraints.maxWidth / 12).floor();
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(
+            count,
+            (_) => Container(
+              width: 6,
+              height: 1,
+              color: Theme.of(context).dividerColor,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BackCircle extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _BackCircle({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark =
+        Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: dark
+          ? RemedooTheme.darkSecondary
+          : RemedooTheme.mutedSurface,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: const SizedBox(
+          width: 38,
+          height: 38,
+          child: Icon(Icons.arrow_back, size: 20),
+        ),
       ),
     );
   }

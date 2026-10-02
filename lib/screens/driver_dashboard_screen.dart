@@ -36,6 +36,7 @@ class _DriverDashboardScreenState
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final active = state.deliveries
         .where((d) => d.status != 'delivered')
         .toList();
@@ -51,11 +52,11 @@ class _DriverDashboardScreenState
           children: [
             Container(
               margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 gradient: state.driverOnline
                     ? const LinearGradient(colors: [
-                        RemedooTheme.ratingGreen,
+                        RemedooTheme.success,
                         Color(0xFF35C172)
                       ])
                     : LinearGradient(colors: [
@@ -63,6 +64,7 @@ class _DriverDashboardScreenState
                         Colors.grey.shade500
                       ]),
                 borderRadius: BorderRadius.circular(20),
+                boxShadow: RemedooTheme.softShadow,
               ),
               child: Row(
                 children: [
@@ -82,6 +84,7 @@ class _DriverDashboardScreenState
                               fontWeight: FontWeight.w800,
                               fontSize: 18),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           state.driverOnline
                               ? 'Accept deliveries to earn'
@@ -104,11 +107,10 @@ class _DriverDashboardScreenState
             ),
             TabBar(
               controller: _tabs,
-              labelColor: RemedooTheme.primary,
-              unselectedLabelColor: Theme.of(context)
-                  .colorScheme
-                  .onSurfaceVariant,
-              indicatorColor: RemedooTheme.primary,
+              labelColor: scheme.primary,
+              unselectedLabelColor:
+                  scheme.onSurfaceVariant,
+              indicatorColor: scheme.primary,
               tabs: const [
                 Tab(text: 'Deliveries'),
                 Tab(text: 'Earnings'),
@@ -134,8 +136,8 @@ class _DriverDashboardScreenState
   Widget _deliveries(List<DriverDelivery> list, AppState state,
       {bool history = false}) {
     if (list.isEmpty) {
-      return const EmptyState(
-        icon: Icons.delivery_dining,
+      return const REmptyState(
+        icon: Icons.delivery_dining_outlined,
         title: 'No deliveries',
         subtitle: 'Assigned deliveries will appear here.',
       );
@@ -145,66 +147,64 @@ class _DriverDashboardScreenState
       itemCount: list.length,
       itemBuilder: (_, i) => StaggerItem(
         index: i % 6,
-        child: _card(list[i], state, history),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _card(list[i], state, history),
+        ),
       ),
     );
   }
 
   Widget _card(
       DriverDelivery d, AppState state, bool history) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Order ${d.orderId}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16)),
-                ),
-                StatusChip(status: d.status),
-              ],
-            ),
-            const SizedBox(height: 6),
-            InfoRow(
-                icon: Icons.storefront,
-                label: 'Pickup',
-                value: d.pharmacyName),
-            InfoRow(
-                icon: Icons.location_on,
-                label: 'Drop',
-                value: d.address),
-            InfoRow(
-                icon: Icons.currency_rupee,
-                label: 'COD',
-                value: inr(d.amount)),
-            if (!history) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    state.advanceDelivery(d.id);
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(
-                      SnackBar(
-                          content: Text(
-                              'Status updated: ${d.status}')),
-                    );
-                  },
-                  child: Text(_nextLabel(d.status)),
-                ),
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('Order ${d.orderId}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16)),
               ),
+              StatusChip(status: d.status),
             ],
+          ),
+          const SizedBox(height: 10),
+          InfoRow(
+              icon: Icons.storefront,
+              label: 'Pickup',
+              value: d.pharmacyName),
+          InfoRow(
+              icon: Icons.location_on,
+              label: 'Drop',
+              value: d.address),
+          InfoRow(
+              icon: Icons.currency_rupee,
+              label: 'COD',
+              value: inr(d.amount)),
+          if (!history) ...[
+            const SizedBox(height: 12),
+            RButton(
+              label: _nextLabel(d.status),
+              fullWidth: true,
+              small: true,
+              onPressed: () {
+                state.advanceDelivery(d.id);
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(
+                  SnackBar(
+                      content: Text(
+                          'Status updated: ${d.status}')),
+                );
+              },
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -223,27 +223,44 @@ class _DriverDashboardScreenState
   }
 
   Widget _earnings(double earnings, int count) {
+    final scheme = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         StaggerItem(
           index: 0,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  const Text("Today's earnings",
-                      style: TextStyle(color: Colors.grey)),
-                  Text(inr(earnings),
-                      style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          color: RemedooTheme.ratingGreen)),
-                  const SizedBox(height: 8),
-                  Text('$count deliveries completed'),
-                ],
-              ),
+          child: RCard(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: RemedooTheme.success
+                        .withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.payments,
+                      color: RemedooTheme.success, size: 28),
+                ),
+                const SizedBox(height: 12),
+                Text("Today's earnings",
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 13)),
+                const SizedBox(height: 4),
+                Text(inr(earnings),
+                    style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: RemedooTheme.success)),
+                const SizedBox(height: 8),
+                Text('$count deliveries completed',
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 13)),
+              ],
             ),
           ),
         ),

@@ -14,6 +14,7 @@ class HospitalPortalScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final me = hospitals[0];
     final docs =
         doctors.where((d) => d.hospital == me.name).toList();
@@ -21,10 +22,12 @@ class HospitalPortalScreen extends StatelessWidget {
         .where((a) => a.kind == 'hospital')
         .toList();
     final stats = [
-      _card('${docs.length}', 'Doctors', Icons.person_search),
-      _card('${me.beds}', 'Beds', Icons.bed),
-      _card('${appts.length}', 'Appointments',
-          Icons.calendar_month),
+      _card(context, '${docs.length}', 'Doctors',
+          Icons.person_search, RemedooTheme.teal),
+      _card(context, '${me.beds}', 'Beds', Icons.bed,
+          scheme.primary),
+      _card(context, '${appts.length}', 'Appointments',
+          Icons.calendar_month, RemedooTheme.purple),
     ];
     return Scaffold(
       appBar: AppBar(title: Text(me.name)),
@@ -39,54 +42,61 @@ class HospitalPortalScreen extends StatelessWidget {
               wideCols: 3,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.5,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.25,
               itemCount: stats.length,
               itemBuilder: (_, i) =>
                   StaggerItem(index: i % 6, child: stats[i]),
             ),
-            const SizedBox(height: 16),
-            const Text('Doctors',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
+            const RSectionHeader(
+                title: 'Doctors', subtitle: 'Linked doctors'),
+            const SizedBox(height: 12),
             if (docs.isEmpty)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('No doctors linked yet.'),
-                ),
+              RCard(
+                child: Text('No doctors linked yet.',
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant)),
               )
             else
               ...docs.take(6).map((d) => StaggerItem(
                     index: 0,
-                    child: Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: InitialsAvatar(
-                            name: d.name, radius: 22),
-                        title: Text(d.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700)),
-                        subtitle: Text(d.specialty,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                        trailing:
-                            RatingPill(rating: d.rating),
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.only(bottom: 10),
+                      child: RCard(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
+                        child: ListTile(
+                          leading: InitialsAvatar(
+                              name: d.name, radius: 22),
+                          title: Text(d.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700)),
+                          subtitle: Text(d.specialty,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color:
+                                      scheme.onSurfaceVariant)),
+                          trailing:
+                              RRatingPill(rating: d.rating),
+                        ),
                       ),
                     ),
                   )),
-            const SizedBox(height: 16),
-            const Text('Appointments',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
+            const RSectionHeader(
+                title: 'Appointments',
+                subtitle: 'Patient bookings'),
+            const SizedBox(height: 12),
             if (appts.isEmpty)
-              const EmptyState(
-                icon: Icons.calendar_month,
+              const REmptyState(
+                icon: Icons.calendar_month_outlined,
                 title: 'No appointments',
                 subtitle:
                     'Patient bookings will appear here.',
@@ -94,20 +104,32 @@ class HospitalPortalScreen extends StatelessWidget {
             else
               ...appts.map((a) => StaggerItem(
                     index: 0,
-                    child: Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        title: Text(a.doctorName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700)),
-                        subtitle: Text(
-                            '${a.dateLabel} • ${a.timeLabel}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                        trailing:
-                            StatusChip(status: a.status),
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.only(bottom: 10),
+                      child: RCard(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
+                        child: ListTile(
+                          leading: InitialsAvatar(
+                              name: a.doctorName,
+                              radius: 22),
+                          title: Text(a.doctorName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700)),
+                          subtitle: Text(
+                              '${a.dateLabel} • ${a.timeLabel}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color:
+                                      scheme.onSurfaceVariant)),
+                          trailing:
+                              StatusChip(status: a.status),
+                        ),
                       ),
                     ),
                   )),
@@ -117,27 +139,40 @@ class HospitalPortalScreen extends StatelessWidget {
     );
   }
 
-  Widget _card(String value, String label, IconData icon) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: RemedooTheme.primary),
-            const SizedBox(height: 6),
-            Text(value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w800)),
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 11, color: Colors.grey)),
-          ],
-        ),
+  Widget _card(BuildContext context, String value, String label,
+      IconData icon, Color color) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return RCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: dark
+                  ? color.withValues(alpha: 0.18)
+                  : Color.lerp(color, Colors.white, 0.85),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 8),
+          Text(value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.w800)),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: scheme.onSurfaceVariant)),
+        ],
       ),
     );
   }

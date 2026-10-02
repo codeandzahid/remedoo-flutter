@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
-import '../../theme.dart';
 import '../../widgets/widgets.dart';
 
 /// Compose a broadcast → pushes a patient notification.
@@ -27,95 +26,93 @@ class _AdminBroadcastScreenState
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return ResponsiveBody(
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('New Broadcast',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Sent as a push notification to all patients.',
-                    style:
-                        TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _title,
-                    decoration: const InputDecoration(
-                        labelText: 'Title'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _message,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                        labelText: 'Message'),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: () {
-                      if (_title.text.trim().isEmpty ||
-                          _message.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  'Title and message are required')),
-                        );
-                        return;
-                      }
-                      AppStateScope.of(context).addNotification(
-                        title: _title.text.trim(),
-                        message: _message.text.trim(),
-                        category: 'system',
-                      );
-                      _title.clear();
-                      _message.clear();
+          RCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const RSectionHeader(
+                    title: 'New Broadcast',
+                    subtitle:
+                        'Sent as a push notification to all patients.'),
+                const SizedBox(height: 16),
+                RTextField(
+                  label: 'Title',
+                  hint: 'e.g. Monsoon health camp',
+                  controller: _title,
+                ),
+                const SizedBox(height: 12),
+                RTextField(
+                  label: 'Message',
+                  hint: 'Write your message…',
+                  controller: _message,
+                  maxLines: 4,
+                ),
+                const SizedBox(height: 16),
+                RButton(
+                  label: 'Send Broadcast',
+                  icon: Icons.send,
+                  fullWidth: true,
+                  onPressed: () {
+                    if (_title.text.trim().isEmpty ||
+                        _message.text.trim().isEmpty) {
                       ScaffoldMessenger.of(context)
                           .showSnackBar(
                         const SnackBar(
-                            content:
-                                Text('Broadcast sent!')),
+                            content: Text(
+                                'Title and message are required')),
                       );
-                    },
-                    icon: const Icon(Icons.send),
-                    label: const Text('Send Broadcast'),
-                  ),
-                ],
-              ),
+                      return;
+                    }
+                    AppStateScope.of(context).addNotification(
+                      title: _title.text.trim(),
+                      message: _message.text.trim(),
+                      category: 'system',
+                    );
+                    _title.clear();
+                    _message.clear();
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(
+                      const SnackBar(
+                          content:
+                              Text('Broadcast sent!')),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          const Text('Recent broadcasts',
-              style:
-                  TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 24),
+          const RSectionHeader(
+              title: 'Recent broadcasts',
+              subtitle: 'Last 5 system notifications'),
+          const SizedBox(height: 12),
           ...AppStateScope.of(context)
               .notifications
               .where((n) => n.category == 'system')
               .take(5)
-              .map((n) => Card(
-                    margin:
-                        const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: const Icon(Icons.campaign,
-                          color: RemedooTheme.primary),
-                      title: Text(n.title,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600)),
-                      subtitle: Text(n.body,
-                          maxLines: 1,
-                          overflow:
-                              TextOverflow.ellipsis),
+              .map((n) => Padding(
+                    padding:
+                        const EdgeInsets.only(bottom: 10),
+                    child: RCard(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 6),
+                      child: ListTile(
+                        leading: Icon(Icons.campaign,
+                            color: scheme.primary),
+                        title: Text(n.title,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600)),
+                        subtitle: Text(n.body,
+                            maxLines: 1,
+                            overflow:
+                                TextOverflow.ellipsis),
+                      ),
                     ),
                   )),
         ],
