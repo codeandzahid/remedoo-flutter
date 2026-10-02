@@ -209,8 +209,10 @@ class AppState extends ChangeNotifier {
     if (notify) notifyListeners();
   }
 
-  /// Signs out of Supabase (best-effort, fire-and-forget) and clears all
-  /// local session state including guest mode.
+  /// Signs out of Supabase (best-effort, never blocks the UI) and clears
+  /// all local session state including guest mode. The Supabase sign-out is
+  /// fire-and-forget: signOut() catches all its own errors, and the local
+  /// session is cleared synchronously below so logout is always instant.
   void logout() {
     unawaited(AuthService.instance.signOut());
     _supaUser = null;

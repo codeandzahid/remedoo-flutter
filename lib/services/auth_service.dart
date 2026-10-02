@@ -204,6 +204,9 @@ class AuthService {
   Future<void> signOut() async {
     if (!_initialized) return;
     try {
+      // Local-scope sign-out clears the session from device storage.
+      // Callers must treat this as best-effort and never await it for UI
+      // flow: the underlying call can block on a network round-trip.
       await _client.auth.signOut();
     } catch (e) {
       debugPrint('Supabase signOut failed: $e');

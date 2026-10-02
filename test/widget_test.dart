@@ -4,6 +4,7 @@ import 'package:remedoo_app/main.dart';
 import 'package:remedoo_app/state/app_state.dart';
 import 'package:remedoo_app/services/auth_service.dart';
 import 'package:remedoo_app/screens/doctors_screen.dart';
+import 'package:remedoo_app/screens/settings_screen.dart';
 import 'package:remedoo_app/screens/pharmacy_detail_screen.dart';
 import 'package:remedoo_app/screens/booking_screen.dart';
 import 'package:remedoo_app/screens/admin/admin_login_screen.dart';
@@ -21,6 +22,7 @@ void main() {
   // Supabase's token auto-refresh uses a periodic Timer that would keep
   // pumpAndSettle from ever settling; disable it in widget tests.
   AuthService.disableAutoRefresh = true;
+
 
   testWidgets('guest login lands on dashboard with greeting',
       (tester) async {
@@ -132,4 +134,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AdminShell), findsOneWidget);
   });
+
+
+  testWidgets('logout via settings clears the session', (tester) async {
+    final state = AppState();
+    state.loginAsGuest();
+    expect(state.isLoggedIn, isTrue);
+    await tester.pumpWidget(AppStateScope(
+        state: state, child: const MaterialApp(home: SettingsScreen())));
+    await tester.pumpAndSettle();
+    // Scroll the Log Out button into view and tap it.
+    final logoutFinder = find.text('Log Out');
+    await tester.scrollUntilVisible(logoutFinder, 200);
+    await tester.tap(logoutFinder);
+    await tester.pumpAndSettle();
+    // Confirmation dialog appears; confirm.
+    expect(find.text('Log out?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Log Out'));
+    await tester.pumpAndSettle();
+    expect(state.isLoggedIn, isFalse);
+  });
+
 }
+
