@@ -4,7 +4,6 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
-import 'login_screen.dart';
 
 /// My Profile: avatar, name/email, phone, gender, address.
 class ProfileScreen extends StatefulWidget {
@@ -41,12 +40,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: 'You are browsing as a guest',
             subtitle: 'Sign in to manage your profile.',
             actionLabel: 'Sign In',
-            onAction: () => Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const LoginScreen()),
-              (r) => r.isFirst,
-            ),
+            // Log out of guest mode; RootGate rebuilds straight to LoginScreen.
+            onAction: () => state.logout(),
           ),
         ),
       );

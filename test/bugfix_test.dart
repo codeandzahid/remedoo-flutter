@@ -4,6 +4,7 @@ import 'package:remedoo_app/data/mock_data.dart';
 import 'package:remedoo_app/screens/appointments_screen.dart';
 import 'package:remedoo_app/screens/booking_screen.dart';
 import 'package:remedoo_app/screens/main_shell.dart';
+import 'package:remedoo_app/screens/profile_screen.dart';
 import 'package:remedoo_app/screens/remedoo_pharmacy_screen.dart';
 import 'package:remedoo_app/state/app_state.dart';
 import 'package:remedoo_app/widgets/widgets.dart';
@@ -154,5 +155,23 @@ void main() {
     // Sheet now shows a quantity stepper instead of the button.
     expect(find.byType(QtyStepper), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Add to Cart'), findsNothing);
+  });
+
+  testWidgets('guest profile Sign In logs out to the login screen',
+      (tester) async {
+    usePhoneSize(tester);
+    final state = AppState();
+    state.loginAsGuest();
+    expect(state.isGuest, isTrue);
+    await tester.pumpWidget(_wrap(const ProfileScreen(), state));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign In'), findsOneWidget);
+    await tester.tap(find.text('Sign In'));
+    await tester.pumpAndSettle();
+
+    // Guest session ends; RootGate rebuilds straight to LoginScreen.
+    expect(state.isLoggedIn, isFalse);
+    expect(state.isGuest, isFalse);
   });
 }
