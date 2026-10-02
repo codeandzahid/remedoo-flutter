@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import '../models.dart';
+import '../data/mock_data.dart';
 import '../state/app_state.dart';
 
 // Shared building blocks for the Remedoo app.
@@ -188,9 +189,14 @@ class SectionHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
         ),
         if (actionLabel != null)
           TextButton(
@@ -539,6 +545,74 @@ class MedicineDetailSheet extends StatelessWidget {
                 : 'No prescription needed for this product.',
             style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 20),
+          _cartAction(context, m),
+        ],
+      ),
+    );
+  }
+
+  /// Add-to-cart control for the detail sheet: a full-width button that
+  /// morphs into a quantity stepper once the item is in the cart, so
+  /// checkout is always reachable from here.
+  Widget _cartAction(BuildContext context, Medicine m) {
+    final state = AppStateScope.of(context);
+    final qty = state.cartQty(m.id);
+    if (qty == 0) {
+      return SizedBox(
+        width: double.infinity,
+        child: FilledButton(
+          onPressed: () => _addToCart(context, state, m),
+          child: const Text('Add to Cart'),
+        ),
+      );
+    }
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '$qty in cart • ${inr(state.priceOf(m) * qty)}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        QtyStepper(
+          qty: qty,
+          onMinus: () => state.removeFromCart(m.id),
+          onPlus: () => _addToCart(context, state, m),
+        ),
+      ],
+    );
+  }
+
+  /// Adds [m] to the cart, asking to switch pharmacies when the cart holds
+  /// another vendor's items (same behavior as the storefront cards).
+  void _addToCart(BuildContext context, AppState state, Medicine m) {
+    final match = pharmacies.where((p) => p.id == m.pharmacyId);
+    final pharmacyName = match.isEmpty ? 'Pharmacy' : match.first.name;
+    if (state.addToCart(
+        m, pharmacyId: m.pharmacyId, pharmacyName: pharmacyName)) {
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Switch pharmacy?'),
+        content: const Text(
+            'Your cart has items from another pharmacy. Clear it and add this item?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Keep cart'),
+          ),
+          FilledButton(
+            onPressed: () {
+              state.clearCart();
+              state.addToCart(m,
+                  pharmacyId: m.pharmacyId, pharmacyName: pharmacyName);
+              Navigator.pop(c);
+            },
+            child: const Text('Clear & add'),
           ),
         ],
       ),

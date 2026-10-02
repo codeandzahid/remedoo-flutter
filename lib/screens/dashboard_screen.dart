@@ -272,9 +272,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           padding: const EdgeInsets.fromLTRB(4, 8, 8, 20),
           child: Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.menu, color: Colors.white),
-                onPressed: () => Scaffold.of(context).openDrawer(),
+              Builder(
+                builder: (drawerContext) => IconButton(
+                  icon: const Icon(Icons.menu, color: Colors.white),
+                  tooltip: 'Menu',
+                  // NOTE: must use the Builder's context (inside this
+                  // screen's own Scaffold) — the State's context resolves
+                  // to the outer ResponsiveScaffold, which has no drawer.
+                  onPressed: () =>
+                      Scaffold.of(drawerContext).openDrawer(),
+                ),
               ),
               const Text(
                 'Remedoo',
@@ -976,16 +983,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Icon(icon, color: RemedooTheme.teal),
                     ),
                     const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(t,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700)),
-                        Text(sub,
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.grey)),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(t,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700)),
+                          Text(sub,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
                     ),
                   ],
                 ),
