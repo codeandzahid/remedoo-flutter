@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../state/app_state.dart';
 import '../theme.dart';
 import 'widgets.dart';
 import '../screens/appointments_screen.dart';
@@ -87,7 +88,12 @@ class RQuickActionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actions = patientQuickActions();
+    // Guests never see the Book Appointment tile.
+    final actions = AppStateScope.of(context).isGuest
+        ? patientQuickActions()
+            .where((a) => a.title != 'Book Appointment')
+            .toList()
+        : patientQuickActions();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
