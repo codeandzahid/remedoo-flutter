@@ -27,14 +27,15 @@ const _sortOptions = [
   'Name A→Z',
 ];
 
-const _banners = [
-  ('🏥', 'Free Health Checkup', 'On first hospital visit',
-      RemedooTheme.promoTealGradient),
-  ('🛏️', 'ICU Available 24/7', 'Critical care at your service',
-      LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)])),
-  ('🚑', 'Free Ambulance', 'For emergency admissions',
-      LinearGradient(colors: [Color(0xFFF2790F), Color(0xFFF5A623)])),
-];
+/// Promo banners tinted by the active theme.
+List<(String, String, String, Gradient)> get _banners => [
+      ('🏥', 'Free Health Checkup', 'On first hospital visit',
+          RemedooTheme.bannerGradientA),
+      ('🛏️', 'ICU Available 24/7', 'Critical care at your service',
+          RemedooTheme.bannerGradientB),
+      ('🚑', 'Free Ambulance', 'For emergency admissions',
+          RemedooTheme.bannerGradientC),
+    ];
 
 /// Hospital directory with search, filters and sorting — reskinned to match
 /// the React "Swiggy-style" listing (09-hospitals.png).

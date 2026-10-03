@@ -12,6 +12,7 @@ import '../screens/orders_screen.dart';
 import '../screens/pharmacies_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/reminders_screen.dart';
+import '../screens/care_match_screen.dart';
 import '../screens/settings_screen.dart';
 
 /// A quick-action tile definition: gradient tile with emoji + label that
@@ -83,6 +84,15 @@ List<QuickActionDef> patientQuickActions() => [
         ],
         page: () => const OrdersScreen(),
         requiresLogin: true,
+      ),
+      QuickActionDef(
+        title: 'Smart Care',
+        emoji: '✨',
+        gradient: [
+          RemedooTheme.primary,
+          RemedooTheme.primaryDark,
+        ],
+        page: () => const CareMatchScreen(),
       ),
     ];
 

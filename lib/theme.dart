@@ -684,6 +684,25 @@ class RemedooTheme {
     );
   }
 
+  /// Theme-tinted promo banner gradients for the listing screens.
+  /// These follow the active theme pack (unlike the old hardcoded
+  /// orange/purple banner gradients).
+  static LinearGradient get bannerGradientA => LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [primary, primaryDark],
+      );
+  static LinearGradient get bannerGradientB => LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [primaryDark, primary],
+      );
+  static LinearGradient get bannerGradientC => LinearGradient(
+        begin: Alignment.centerRight,
+        end: Alignment.centerLeft,
+        colors: [primary, primaryDark],
+      );
+
   /// Teal-green gradient for health promo banners.
   static const LinearGradient promoTealGradient = LinearGradient(
     begin: Alignment.centerLeft,
@@ -716,6 +735,7 @@ class RemedooTheme {
     [Color(0xFFFCE7F3), Color(0xFFDB2777)], // pink
     [Color(0xFFFEF9C3), Color(0xFFCA8A04)], // yellow
     [Color(0xFFCCFBF1), Color(0xFF0D9488)], // teal
+    [Color(0xFFEDE9FE), Color(0xFF7C3AED)], // violet
   ];
 }
 

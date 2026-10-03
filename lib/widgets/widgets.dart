@@ -1132,7 +1132,7 @@ class RStarRating extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.star, size: size, color: const Color(0xFFF5A623)),
+        Icon(Icons.star, size: size, color: RemedooTheme.primary),
         const SizedBox(width: 4),
         Text(
           rating.toStringAsFixed(1),

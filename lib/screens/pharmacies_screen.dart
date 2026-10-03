@@ -25,14 +25,15 @@ const _sortOptions = [
   'Distance Nearest',
 ];
 
-const _banners = [
-  ('💊', 'Flat 20% OFF', 'On first medicine order',
-      RemedooTheme.promoTealGradient),
-  ('🚚', 'Free Delivery', 'On orders above ₹199',
-      LinearGradient(colors: [Color(0xFFF2790F), Color(0xFFF5A623)])),
-  ('⚡', 'Express 15 min', 'Get meds super fast',
-      LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)])),
-];
+/// Promo banners tinted by the active theme.
+List<(String, String, String, Gradient)> get _banners => [
+      ('💊', 'Flat 20% OFF', 'On first medicine order',
+          RemedooTheme.bannerGradientA),
+      ('🚚', 'Free Delivery', 'On orders above ₹199',
+          RemedooTheme.bannerGradientB),
+      ('⚡', 'Express 15 min', 'Get meds super fast',
+          RemedooTheme.bannerGradientC),
+    ];
 
 /// Medicines & More: pharmacy directory — reskinned to match the React
 /// "Swiggy-style" listing (11-pharmacies.png).

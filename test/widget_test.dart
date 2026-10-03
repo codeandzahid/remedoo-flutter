@@ -56,7 +56,7 @@ void main() {
     await tester.tap(find.text('Skip, continue as guest'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Good '), findsOneWidget);
-    expect(find.text('Smart Care Finder'), findsOneWidget);
+    expect(find.text('Smart Care'), findsOneWidget);
   });
 
   testWidgets('doctor search filters the list', (tester) async {

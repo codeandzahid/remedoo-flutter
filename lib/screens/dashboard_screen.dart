@@ -24,7 +24,7 @@ import 'notifications_screen.dart';
 import 'care_match_screen.dart';
 
 /// Home tab: orange hero header (menu / Remedoo / bell, greeting, translucent
-/// search, Smart Care Finder), service grid, promo carousel, feature trio,
+/// search), service grid, promo carousel, feature trio,
 /// stats, and listing rails — matching the React dashboard.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -240,8 +240,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 12),
             _translucentSearch(),
-            const SizedBox(height: 12),
-            _careFinderCard(),
           ],
         ),
       ),
@@ -272,53 +270,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: Colors.white.withValues(alpha: 0.85),
                   fontSize: 14,
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Translucent Smart Care Finder card.
-  Widget _careFinderCard() {
-    return InkWell(
-      onTap: () => _go(const CareMatchScreen()),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(16),
-          border:
-              Border.all(color: Colors.white.withValues(alpha: 0.25)),
-        ),
-        child: Row(
-          children: [
-            const Text('✨', style: TextStyle(fontSize: 20)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Smart Care Finder',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    'Describe symptoms, get matched doctors, hospitals & labs',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
@@ -381,6 +332,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ('Favorites', Icons.favorite, 5, () => _goGated(const FavoritesScreen())),
       ('Orders', Icons.shopping_bag, 6, () => _goGated(const OrdersScreen())),
       ('Reports', Icons.description, 7, () => _goGated(const LabReportsScreen())),
+      ('Smart Care', Icons.auto_awesome, 8, () => _go(const CareMatchScreen())),
     ];
     return ResponsiveGrid(
       compactCols: 4,

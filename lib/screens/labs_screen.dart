@@ -25,14 +25,15 @@ const _sortOptions = [
   'Most Tests',
 ];
 
-const _banners = [
-  ('🔬', 'Flat 30% OFF', 'On first lab test booking',
-      RemedooTheme.promoTealGradient),
-  ('🏠', 'Free Home Collection', 'On orders above ₹499',
-      LinearGradient(colors: [Color(0xFFF2790F), Color(0xFFF5A623)])),
-  ('⚡', 'Reports in 6 hrs', 'Express test results',
-      LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)])),
-];
+/// Promo banners tinted by the active theme.
+List<(String, String, String, Gradient)> get _banners => [
+      ('🔬', 'Flat 30% OFF', 'On first lab test booking',
+          RemedooTheme.bannerGradientA),
+      ('🏠', 'Free Home Collection', 'On orders above ₹499',
+          RemedooTheme.bannerGradientB),
+      ('⚡', 'Reports in 6 hrs', 'Express test results',
+          RemedooTheme.bannerGradientC),
+    ];
 
 /// Labs & diagnostics directory — reskinned to match the React
 /// "Swiggy-style" listing (10-labs.png).
