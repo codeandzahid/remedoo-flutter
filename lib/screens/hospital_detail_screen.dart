@@ -39,6 +39,7 @@ class HospitalDetailScreen extends StatelessWidget {
   const HospitalDetailScreen({super.key, required this.hospital});
 
   void _book(BuildContext context, Hospital h) {
+    if (!checkLogin(context, 'Please login to book appointments')) return;
     pushPage(
       context,
       BookingScreen(
@@ -80,20 +81,18 @@ class HospitalDetailScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: h.government
-          ? null
-          : Container(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-              color: scheme.surface,
-              child: SafeArea(
-                child: RButton(
-                  label: 'Book Appointment',
-                  icon: Icons.calendar_month_outlined,
-                  fullWidth: true,
-                  onPressed: () => _book(context, h),
-                ),
-              ),
-            ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        color: scheme.surface,
+        child: SafeArea(
+          child: RButton(
+            label: 'Book Appointment',
+            icon: Icons.calendar_month_outlined,
+            fullWidth: true,
+            onPressed: () => _book(context, h),
+          ),
+        ),
+      ),
     );
   }
 
