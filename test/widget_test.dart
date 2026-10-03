@@ -263,5 +263,28 @@ void main() {
     expect(ThemePack.byId('nope'), isNull);
   });
 
+  testWidgets('each theme has its own design personality', (tester) async {
+    // Beyond color: distinct shape language, shadows, button style,
+    // and header artwork per theme.
+    final radii = ThemePack.all.map((p) => p.cardRadius).toSet();
+    expect(radii.length, greaterThan(1),
+        reason: 'themes should not all share one card radius');
+    final backdrops = ThemePack.all.map((p) => p.backdrop).toSet();
+    expect(backdrops.length, 6,
+        reason: 'each theme needs its own header artwork');
+    // Sky Pulse is the puffy claymorphism primary theme.
+    expect(ThemePack.skyPulse.pillButtons, isTrue);
+    expect(ThemePack.skyPulse.cardRadius, 28);
+    expect(ThemePack.skyPulse.backdrop, ThemeBackdrop.clouds);
+    // Switching packs changes the live design tokens too.
+    final state = AppState();
+    await state.setThemePack(ThemePack.emeraldHeal);
+    expect(RemedooTheme.cardRadius, ThemePack.emeraldHeal.cardRadius);
+    expect(RemedooTheme.pillButtons, isFalse);
+    expect(RemedooTheme.backdrop, ThemeBackdrop.leaves);
+    await state.setThemePack(ThemePack.skyPulse);
+    expect(RemedooTheme.cardRadius, 28);
+  });
+
 }
 

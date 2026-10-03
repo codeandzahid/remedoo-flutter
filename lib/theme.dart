@@ -7,6 +7,10 @@ import 'package:flutter/material.dart';
 /// The active pack is held by [RemedooTheme] and switched at runtime; every
 /// `RemedooTheme.<token>` getter below reads from it, so all call sites
 /// follow the selected theme with no per-screen changes.
+/// Decorative header artwork style, one per theme. Each theme paints its
+/// own subtle motif behind gradient headers (see ThemeBackdrop).
+enum ThemeBackdrop { clouds, wash, mist, petals, glow, leaves }
+
 class ThemePack {
   final String id;
   final String name;
@@ -23,6 +27,15 @@ class ThemePack {
   final Color accentForeground;
   final Color shadowTint;
 
+  /// Design personality (beyond color): corner roundness of cards,
+  /// whether buttons are fully pill-shaped, shadow softness/strength,
+  /// and the header artwork motif.
+  final double cardRadius;
+  final bool pillButtons;
+  final double shadowBlur;
+  final double shadowOpacity;
+  final ThemeBackdrop backdrop;
+
   const ThemePack({
     required this.id,
     required this.name,
@@ -38,9 +51,16 @@ class ThemePack {
     required this.accent,
     required this.accentForeground,
     required this.shadowTint,
+    required this.cardRadius,
+    required this.pillButtons,
+    required this.shadowBlur,
+    required this.shadowOpacity,
+    required this.backdrop,
   });
 
   /// Airy sky-blue on near-white. Breezy, optimistic, fresh.
+  /// Playful claymorphism: puffy ultra-round cards, pill buttons,
+  /// soft cloud shadows, cloud artwork.
   static const skyPulse = ThemePack(
     id: 'sky_pulse',
     name: 'Sky Pulse',
@@ -56,6 +76,11 @@ class ThemePack {
     accent: Color(0xFFDFF1FB),
     accentForeground: Color(0xFF075985),
     shadowTint: Color(0xFF0284C7),
+    cardRadius: 28,
+    pillButtons: true,
+    shadowBlur: 24,
+    shadowOpacity: 0.12,
+    backdrop: ThemeBackdrop.clouds,
   );
 
   /// Warm sand background, ocean-teal brand. Coastal calm.
@@ -74,6 +99,11 @@ class ThemePack {
     accent: Color(0xFFDFF5F6),
     accentForeground: Color(0xFF0B6E78),
     shadowTint: Color(0xFF0E9AA7),
+    cardRadius: 22,
+    pillButtons: true,
+    shadowBlur: 14,
+    shadowOpacity: 0.08,
+    backdrop: ThemeBackdrop.wash,
   );
 
   /// Lavender-cream background, lilac brand. Dreamy serenity.
@@ -92,6 +122,11 @@ class ThemePack {
     accent: Color(0xFFE9E2FA),
     accentForeground: Color(0xFF6D28D9),
     shadowTint: Color(0xFF8B5CF6),
+    cardRadius: 20,
+    pillButtons: false,
+    shadowBlur: 8,
+    shadowOpacity: 0.05,
+    backdrop: ThemeBackdrop.mist,
   );
 
   /// Blush-pink cream, rose brand. Soft and caring.
@@ -110,6 +145,11 @@ class ThemePack {
     accent: Color(0xFFFADCE4),
     accentForeground: Color(0xFFB91C4A),
     shadowTint: Color(0xFFE84A6F),
+    cardRadius: 24,
+    pillButtons: true,
+    shadowBlur: 16,
+    shadowOpacity: 0.1,
+    backdrop: ThemeBackdrop.petals,
   );
 
   /// Warm cream background, honey-amber brand. Cozy glow.
@@ -128,6 +168,11 @@ class ThemePack {
     accent: Color(0xFFFBEFD8),
     accentForeground: Color(0xFF92400E),
     shadowTint: Color(0xFFD97706),
+    cardRadius: 22,
+    pillButtons: false,
+    shadowBlur: 18,
+    shadowOpacity: 0.1,
+    backdrop: ThemeBackdrop.glow,
   );
 
   /// Mint-white background, emerald brand. Fresh healing.
@@ -146,6 +191,11 @@ class ThemePack {
     accent: Color(0xFFD7F2E2),
     accentForeground: Color(0xFF065F46),
     shadowTint: Color(0xFF059669),
+    cardRadius: 16,
+    pillButtons: false,
+    shadowBlur: 10,
+    shadowOpacity: 0.07,
+    backdrop: ThemeBackdrop.leaves,
   );
 
   static const List<ThemePack> all = [
@@ -235,15 +285,29 @@ class RemedooTheme {
 
   static const String fontFamily = 'PlusJakartaSans';
 
-  /// Soft card shadow (light mode): tinted from the active pack's brand color,
-  /// very subtle — the "cloud card" feel.
+  /// Soft card shadow (light mode): tinted from the active pack's brand color.
+  /// Blur and strength follow the pack's design personality — puffy for
+  /// Sky Pulse, barely-there for Lavender Mist.
   static List<BoxShadow> get softShadow => [
         BoxShadow(
-          color: _pack.shadowTint.withValues(alpha: 0.08),
-          blurRadius: 18,
-          offset: const Offset(0, 8),
+          color: _pack.shadowTint.withValues(alpha: _pack.shadowOpacity),
+          blurRadius: _pack.shadowBlur,
+          offset: Offset(0, _pack.shadowBlur / 2.2),
         ),
       ];
+
+  /// Corner radius for cards — each theme has its own shape language.
+  static double get cardRadius => _pack.cardRadius;
+
+  /// Corner radius for buttons: full pill for some themes, soft
+  /// rectangle for others.
+  static double get buttonRadius => _pack.pillButtons ? 999 : 16;
+
+  /// Whether the active theme uses fully pill-shaped buttons.
+  static bool get pillButtons => _pack.pillButtons;
+
+  /// The active theme's header artwork motif.
+  static ThemeBackdrop get backdrop => _pack.backdrop;
 
   /// Fade + slide page transition used on every platform.
   static const PageTransitionsTheme pageTransitions =

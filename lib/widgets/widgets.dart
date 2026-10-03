@@ -4,6 +4,7 @@ import '../theme.dart';
 import '../models.dart';
 import '../data/mock_data.dart';
 import '../state/app_state.dart';
+import 'theme_backdrop.dart';
 
 // Shared building blocks for the Remedoo app.
 //
@@ -1038,10 +1039,21 @@ class RButton extends StatelessWidget {
     );
     final button = Material(
       color: bg,
-      shape: StadiumBorder(side: side ?? BorderSide.none),
+      shape: RemedooTheme.pillButtons
+          ? StadiumBorder(side: side ?? BorderSide.none)
+          : RoundedRectangleBorder(
+              side: side ?? BorderSide.none,
+              borderRadius:
+                  BorderRadius.circular(RemedooTheme.buttonRadius),
+            ),
       child: InkWell(
         onTap: onPressed,
-        customBorder: const StadiumBorder(),
+        customBorder: RemedooTheme.pillButtons
+            ? const StadiumBorder()
+            : RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(RemedooTheme.buttonRadius),
+              ),
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: small ? 18 : 24,
@@ -1079,7 +1091,7 @@ class RCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(RemedooRadius.card),
+        borderRadius: BorderRadius.circular(RemedooTheme.cardRadius),
         border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: _isDark(context) ? null : RemedooTheme.softShadow,
       ),
@@ -1093,7 +1105,7 @@ class RCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(RemedooRadius.card),
+        borderRadius: BorderRadius.circular(RemedooTheme.cardRadius),
         child: card,
       ),
     );
@@ -1646,9 +1658,15 @@ class RGradientHeader extends StatelessWidget {
           bottom: Radius.circular(RemedooRadius.xxl),
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(padding: padding, child: child),
+      child: Stack(
+        children: [
+          // Per-theme decorative artwork (clouds, waves, petals...).
+          const HeaderArtwork(),
+          SafeArea(
+            bottom: false,
+            child: Padding(padding: padding, child: child),
+          ),
+        ],
       ),
     );
   }
