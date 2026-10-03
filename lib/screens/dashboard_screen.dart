@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../data/mock_data.dart';
 import '../models.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
@@ -12,7 +11,6 @@ import '../widgets/widgets.dart';
 import '../widgets/patient_sidebar.dart';
 import 'doctors_screen.dart';
 import 'doctor_detail_screen.dart';
-import 'hospital_detail_screen.dart';
 import 'hospitals_screen.dart';
 import 'labs_screen.dart';
 import 'pharmacies_screen.dart';
@@ -21,7 +19,7 @@ import 'appointments_screen.dart';
 import 'emergency_screen.dart';
 import 'favorites_screen.dart';
 import 'lab_reports_screen.dart';
-import 'medical_history_screen.dart';
+import 'family_screen.dart';
 import 'notifications_screen.dart';
 import 'care_match_screen.dart';
 
@@ -89,8 +87,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final upcoming =
         state.appointments.where((a) => a.status == 'upcoming').take(2).toList();
     final popularDoctors = state.activeDoctors.take(8).toList();
-    final popularHospitals = state.activeHospitals.take(6).toList();
-    final popularMeds = state.activeMedicines.take(8).toList();
 
     return Scaffold(
       drawer: _drawer(),
@@ -111,16 +107,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          StaggerItem(index: 0, child: _categories()),
-                          const SizedBox(height: 20),
-                          StaggerItem(index: 1, child: _promoCarousel()),
-                          const SizedBox(height: 20),
-                          StaggerItem(index: 2, child: _featureTrio()),
-                          const SizedBox(height: 20),
-                          StaggerItem(index: 3, child: _statsRow(state)),
+                          StaggerItem(index: 0, child: _illustratedBanner()),
                           const SizedBox(height: 22),
                           StaggerItem(
-                            index: 4,
+                            index: 1,
+                            child: RSectionHeader(
+                              title: 'Doctors near you',
+                              onSeeAll: () => _go(const DoctorsScreen()),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          StaggerItem(
+                              index: 2, child: _doctorCards(popularDoctors)),
+                          if (!state.isGuest) ...[
+                            const SizedBox(height: 22),
+                            StaggerItem(
+                              index: 3,
+                              child: RSectionHeader(
+                                title: 'Family Health',
+                                onSeeAll: () =>
+                                    _goGated(const FamilyScreen()),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            StaggerItem(index: 4, child: _familyRow(state)),
+                          ],
+                          const SizedBox(height: 22),
+                          const StaggerItem(
+                              index: 5,
+                              child: RSectionHeader(title: 'Services')),
+                          const SizedBox(height: 10),
+                          StaggerItem(index: 6, child: _categories()),
+                          const SizedBox(height: 22),
+                          StaggerItem(
+                            index: 7,
                             child: RSectionHeader(
                               title: 'Upcoming Appointments',
                               onSeeAll: upcoming.isNotEmpty
@@ -130,7 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                           const SizedBox(height: 10),
                           StaggerItem(
-                            index: 5,
+                            index: 8,
                             child: upcoming.isEmpty
                                 ? _emptyAppointments()
                                 : Column(
@@ -138,73 +158,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         upcoming.map(_appointmentCard).toList(),
                                   ),
                           ),
-                          const SizedBox(height: 22),
-                          StaggerItem(
-                            index: 6,
-                            child: RSectionHeader(
-                              title: 'Popular Doctors',
-                              onSeeAll: () => _go(const DoctorsScreen()),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          StaggerItem(
-                              index: 7, child: _doctorRail(popularDoctors)),
-                          const SizedBox(height: 22),
-                          StaggerItem(
-                            index: 8,
-                            child: RSectionHeader(
-                              title: 'Popular Hospitals',
-                              onSeeAll: () => _go(const HospitalsScreen()),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          StaggerItem(
-                              index: 9, child: _hospitalRail(popularHospitals)),
-                          const SizedBox(height: 22),
-                          StaggerItem(
-                            index: 10,
-                            child: RSectionHeader(
-                              title: 'Popular Medicines',
-                              onSeeAll: () => _go(const PharmaciesScreen()),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          StaggerItem(
-                              index: 11,
-                              child: _medicineGrid(popularMeds, state)),
-                          const SizedBox(height: 22),
-                          StaggerItem(
-                            index: 12,
-                            child: RSectionHeader(
-                              title: 'Pharmacy Benefits',
-                              onSeeAll: () => _go(const PharmaciesScreen()),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          StaggerItem(index: 13, child: _pharmacyBenefits()),
-                          const SizedBox(height: 22),
-                          const StaggerItem(
-                              index: 14,
-                              child: RSectionHeader(title: 'Explore More')),
-                          const SizedBox(height: 10),
-                          StaggerItem(index: 15, child: _exploreMore()),
-                          const SizedBox(height: 22),
-                          const StaggerItem(
-                              index: 16,
-                              child: RSectionHeader(title: 'Browse Services')),
-                          const SizedBox(height: 10),
-                          StaggerItem(index: 17, child: _browseServices()),
-                          const SizedBox(height: 22),
-                          const StaggerItem(
-                              index: 18,
-                              child: RSectionHeader(title: 'Health Tips')),
-                          const SizedBox(height: 10),
-                          StaggerItem(index: 19, child: _healthTips()),
-                          const SizedBox(height: 22),
-                          const StaggerItem(
-                              index: 20, child: RSectionHeader(title: 'Sponsored')),
-                          const SizedBox(height: 10),
-                          StaggerItem(index: 21, child: _sponsored()),
                         ],
                       ),
                     ),
@@ -263,20 +216,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              'Hello,',
+              _greeting(),
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
             ),
-            Text(
-              '${state.displayName} 👋',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${state.displayName} 👋',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                _upcomingPill(state),
+              ],
             ),
             const SizedBox(height: 12),
             _translucentSearch(),
@@ -446,243 +406,201 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  /// Promo banners tinted by the active theme (like the mockup artwork).
   List<({String title, String subtitle, Gradient gradient, String emoji})>
-      get _promos => [
-            (
-              title: 'Flat 30% OFF',
-              subtitle: 'on first doctor consultation',
-              gradient: const LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [Color(0xFF7E57E8), Color(0xFF8B45B8)],
-              ),
-              emoji: '🩺',
-            ),
-            (
-              title: 'Free Delivery',
-              subtitle: 'on medicine orders above ₹199',
-              gradient: RemedooTheme.promoTealGradient,
-              emoji: '💊',
-            ),
-            (
-              title: 'Health Packages',
-              subtitle: 'starting at ₹299 only',
-              gradient: const LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [Color(0xFF28A0DC), Color(0xFF267FEB)],
-              ),
-              emoji: '🧪',
-            ),
-            (
-              title: 'Emergency SOS',
-              subtitle: 'ambulance in under 10 mins',
-              gradient: RemedooTheme.promoEmergencyGradient,
-              emoji: '🚑',
-            ),
-          ];
+      get _promos {
+    Gradient g(List<Color> c, AlignmentGeometry b, AlignmentGeometry e) =>
+        LinearGradient(begin: b, end: e, colors: c);
+    final p = RemedooTheme.primary;
+    final pd = RemedooTheme.primaryDark;
+    return [
+      (
+        title: 'Flat 30% OFF',
+        subtitle: 'on first doctor consultation',
+        gradient: g([p, pd], Alignment.centerLeft, Alignment.centerRight),
+        emoji: '🩺',
+      ),
+      (
+        title: 'Free Delivery',
+        subtitle: 'on medicine orders above ₹199',
+        gradient: g([pd, p], Alignment.topLeft, Alignment.bottomRight),
+        emoji: '💊',
+      ),
+      (
+        title: 'Health Packages',
+        subtitle: 'starting at ₹299 only',
+        gradient: g([p, pd], Alignment.topCenter, Alignment.bottomCenter),
+        emoji: '🧪',
+      ),
+      (
+        title: 'Emergency SOS',
+        subtitle: 'ambulance in under 10 mins',
+        gradient: g([pd, p], Alignment.centerRight, Alignment.centerLeft),
+        emoji: '🚑',
+      ),
+    ];
+  }
 
-  /// Auto-advancing promo carousel with dot indicators.
-  Widget _promoCarousel() {
+  /// Illustrated promo banner carousel (mockup style): theme-tinted
+  /// gradient, soft decorative circles, big emoji artwork, dot indicators.
+  Widget _illustratedBanner() {
     return SizedBox(
-      height: 148,
+      height: 168,
       child: PageView.builder(
         controller: _promoCtrl,
         itemCount: _promos.length,
         onPageChanged: (i) => setState(() => _promoPage = i),
         itemBuilder: (_, i) {
           final p = _promos[i];
-          return RPromoBanner(
-            gradient: p.gradient,
-            title: p.title,
-            subtitle: p.subtitle,
-            illustration:
-                Text(p.emoji, style: const TextStyle(fontSize: 54)),
-            pageCount: _promos.length,
-            pageIndex: _promoPage,
+          return Container(
+            decoration: BoxDecoration(
+              gradient: p.gradient,
+              borderRadius:
+                  BorderRadius.circular(RemedooTheme.cardRadius),
+              boxShadow: RemedooTheme.softShadow,
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -34,
+                  top: -34,
+                  child: Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 70,
+                  bottom: -44,
+                  child: Container(
+                    width: 104,
+                    height: 104,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              p.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              p.subtitle,
+                              style: TextStyle(
+                                color:
+                                    Colors.white.withValues(alpha: 0.85),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(p.emoji,
+                          style: const TextStyle(fontSize: 64)),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  left: 20,
+                  bottom: 12,
+                  child: Row(
+                    children: List.generate(
+                      _promos.length,
+                      (d) => Container(
+                        width: d == _promoPage ? 18 : 6,
+                        height: 6,
+                        margin: const EdgeInsets.only(right: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(
+                              alpha: d == _promoPage ? 0.95 : 0.4),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
     );
+  }
+
+  /// Time-based greeting, mockup style ("Good evening,").
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good morning,';
+    if (h < 17) return 'Good afternoon,';
+    return 'Good evening,';
+  }
+
+  /// Pill showing the upcoming-appointments count (taps through to
+  /// appointments, login-gated like the mockup's streak pill).
+  Widget _upcomingPill(AppState state) {
+    final n =
+        state.appointments.where((a) => a.status == 'upcoming').length;
+    return GestureDetector(
+      onTap: () => _goGated(const AppointmentsScreen()),
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.20),
+          borderRadius: BorderRadius.circular(999),
+          border:
+              Border.all(color: Colors.white.withValues(alpha: 0.30)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.calendar_month,
+                color: Colors.white, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              '$n Upcoming',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Initials for avatar circles ("Dr. Meera Rao" -> "MR").
+  String _initials(String name) {
+    final parts =
+        name.replaceFirst(RegExp(r'^Dr.\s*'), '').split(' ');
+    final keep = parts.where((w) => w.isNotEmpty).take(2).toList();
+    if (keep.isEmpty) return '?';
+    return keep.map((w) => w[0].toUpperCase()).join();
   }
 
   /// Three gradient "image" promo cards (Find Expert Doctors / Nearby
   /// Hospitals / Lab Tests at Home) — horizontal scroll on phones.
-  Widget _featureTrio() {
-    final cards = [
-      (
-        'Find Expert Doctors',
-        'Book appointments with top specialists',
-        '👨‍⚕️',
-        const [Color(0xFF06B6D4), Color(0xFF0284C7)],
-        () => _go(const DoctorsScreen()),
-      ),
-      (
-        'Nearby Hospitals',
-        'Find the best healthcare facilities',
-        '🏥',
-        const [Color(0xFF10B981), Color(0xFF059669)],
-        () => _go(const HospitalsScreen()),
-      ),
-      (
-        'Lab Tests at Home',
-        'Convenient diagnostic testing',
-        '🔬',
-        const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
-        () => _go(const LabsScreen()),
-      ),
-    ];
-
-    Widget card(
-        (String, String, String, List<Color>, VoidCallback) c, double? width) {
-      return InkWell(
-        onTap: c.$5,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          width: width,
-          height: 132,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: c.$4,
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: 0,
-                top: 0,
-                child: Text(c.$3, style: const TextStyle(fontSize: 50)),
-              ),
-              Positioned(
-                left: 0,
-                bottom: 0,
-                right: 56,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      c.$1,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      c.$2,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (context.isCompact) {
-      return SizedBox(
-        height: 132,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: cards.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 12),
-          itemBuilder: (_, i) => card(cards[i], 208),
-        ),
-      );
-    }
-    return Row(
-      children: [
-        for (var i = 0; i < cards.length; i++) ...[
-          if (i > 0) const SizedBox(width: 12),
-          Expanded(child: card(cards[i], null)),
-        ],
-      ],
-    );
-  }
-
-  /// Live status strip: 4 mini tiles with pastel icon, bold count, gray label.
-  Widget _statsRow(AppState state) {
-    final scheme = Theme.of(context).colorScheme;
-    final tiles = RemedooTheme.serviceTileColors;
-    final items = [
-      ('Appointments', '${state.appointments.length}', Icons.calendar_month,
-          tiles[3], () => _goGated(const AppointmentsScreen())),
-      ('Active Orders', '${state.activeOrders.length}', Icons.shopping_bag,
-          tiles[1], () => _goGated(const OrdersScreen())),
-      ('Prescriptions', '${state.prescriptions.length}', Icons.description,
-          tiles[2], () => _goGated(const MedicalHistoryScreen())),
-      ('Reports', '${state.reports.length}', Icons.science, tiles[0],
-          () => _goGated(const LabReportsScreen())),
-    ];
-    return SizedBox(
-      height: 86,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (_, i) {
-          final (label, value, icon, colors, onTap) = items[i];
-          return SizedBox(
-            width: 152,
-            child: RCard(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              onTap: onTap,
-              child: Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: colors[0],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, size: 20, color: colors[1]),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          value,
-                          style: const TextStyle(
-                              fontSize: 17, fontWeight: FontWeight.w800),
-                        ),
-                        Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _emptyAppointments() {
     return REmptyState(
       icon: Icons.calendar_month,
@@ -746,584 +664,177 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _doctorRail(List<Doctor> list) {
-    if (!context.isCompact) {
-      // Tablets and larger: adaptive grid with visible TV focus.
-      return ResponsiveGrid(
-        compactCols: 2,
-        mediumCols: 3,
-        expandedCols: 4,
-        wideCols: 5,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 0.78,
-        itemCount: list.length,
-        itemBuilder: (_, i) => FocusableScale(
-          autofocus: i == 0,
-          onTap: () => _goGated(DoctorDetailScreen(doctor: list[i])),
-          child: _doctorCard(list[i]),
-        ),
-      );
-    }
+  /// "Doctors near you" — mockup-style horizontal cards: circular
+  /// initial avatar, name, specialty, star rating, Visit pill button.
+  Widget _doctorCards(List<Doctor> list) {
     return SizedBox(
-      height: 204,
+      height: 212,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: list.length,
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (_, i) => SizedBox(
-          width: 150,
-          child: _doctorCard(list[i]),
+          width: 158,
+          child: _mockupDoctorCard(list[i]),
         ),
       ),
     );
   }
 
-  Widget _doctorCard(Doctor d) {
+  Widget _mockupDoctorCard(Doctor d) {
     final scheme = Theme.of(context).colorScheme;
     return RCard(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.all(14),
       onTap: () => _goGated(DoctorDetailScreen(doctor: d)),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            height: 88,
+            width: 62,
+            height: 62,
             decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest,
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(RemedooRadius.card)),
-            ),
-            child: Center(child: InitialsAvatar(name: d.name, radius: 26)),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(d.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 13)),
-                Text(d.specialty,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 11, color: scheme.onSurfaceVariant)),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    RRatingPill(rating: d.rating),
-                    const Spacer(),
-                    Flexible(
-                      child: Text(inr(d.fee),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                              color: RemedooTheme.primary)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _hospitalRail(List<Hospital> list) {
-    if (!context.isCompact) {
-      return ResponsiveGrid(
-        compactCols: 1,
-        mediumCols: 2,
-        expandedCols: 3,
-        wideCols: 4,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 1.9,
-        itemCount: list.length,
-        itemBuilder: (_, i) => _hospitalCard(list[i]),
-      );
-    }
-    return SizedBox(
-      height: 196,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: list.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => SizedBox(
-          width: 250,
-          child: _hospitalCard(list[i]),
-        ),
-      ),
-    );
-  }
-
-  Widget _hospitalCard(Hospital h) {
-    final scheme = Theme.of(context).colorScheme;
-    return RCard(
-      padding: EdgeInsets.zero,
-      onTap: () => _goGated(HospitalDetailScreen(hospital: h)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 104,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  RemedooTheme.primary.withValues(alpha: 0.14),
-                  RemedooTheme.primary.withValues(alpha: 0.05),
-                ],
-              ),
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(RemedooRadius.card)),
-            ),
-            child: Stack(
-              children: [
-                Center(
-                  child: Icon(Icons.local_hospital,
-                      size: 44, color: RemedooTheme.primary),
-                ),
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: RRatingPill(rating: h.rating),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(h.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 14)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.location_on,
-                        size: 12, color: scheme.onSurfaceVariant),
-                    const SizedBox(width: 3),
-                    Expanded(
-                      child: Text(h.location,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 11, color: scheme.onSurfaceVariant)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${h.beds} beds',
-                    style: TextStyle(
-                        fontSize: 10, color: scheme.onSurfaceVariant),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _medicineGrid(List<Medicine> list, AppState state) {
-    return ResponsiveGrid(
-      compactCols: 2,
-      mediumCols: 3,
-      expandedCols: 4,
-      wideCols: 6,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.35,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      itemCount: list.length,
-      itemBuilder: (_, i) {
-        final m = list[i];
-        final qty = state.cartQty(m.id);
-        final discount =
-            m.mrp > m.price ? ((m.mrp - m.price) / m.mrp * 100).round() : 0;
-        return Stack(
-          children: [
-            RCard(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(m.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
-                  Text(m.pack,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant)),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      Text(inr(state.priceOf(m)),
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: RemedooTheme.primary)),
-                      const Spacer(),
-                      if (qty == 0)
-                        OutlinedButton(
-                          onPressed: () => _addMed(state, m),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(64, 32),
-                            padding: EdgeInsets.zero,
-                          ),
-                          child: const Text('ADD'),
-                        )
-                      else
-                        QtyStepper(
-                          qty: qty,
-                          onMinus: () => state.removeFromCart(m.id),
-                          onPlus: () => _addMed(state, m),
-                        ),
-                    ],
-                  ),
-                ],
+              color: RemedooTheme.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: RemedooTheme.primary.withValues(alpha: 0.30),
+                width: 2,
               ),
             ),
-            if (discount > 0)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: RemedooTheme.success,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '$discount% OFF',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800),
-                  ),
+            child: Center(
+              child: Text(
+                _initials(d.name),
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: RemedooTheme.primary,
                 ),
               ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _addMed(AppState state, Medicine m) {
-    if (!checkLogin(context)) return;
-    final pharmName = pharmacyById(m.pharmacyId).name;
-    if (state.addToCart(m, pharmacyId: m.pharmacyId, pharmacyName: pharmName)) {
-      return;
-    }
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Switch pharmacy?'),
-        content: const Text(
-            'Your cart has items from another pharmacy. Clear it and add this item?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Keep cart'),
+            ),
           ),
-          FilledButton(
-            onPressed: () {
-              state.clearCart();
-              state.addToCart(m,
-                  pharmacyId: m.pharmacyId,
-                  pharmacyName: pharmacyById(m.pharmacyId).name);
-              Navigator.pop(context);
-            },
-            child: const Text('Clear & add'),
+          const SizedBox(height: 8),
+          Text(
+            d.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                fontWeight: FontWeight.w700, fontSize: 13),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _pharmacyBenefits() {
-    const steps = [
-      ('Upload prescription', Icons.upload_file, 'Snap & upload in seconds'),
-      ('Pharmacist verifies', Icons.verified, 'Licensed review, always'),
-      ('Doorstep delivery', Icons.delivery_dining, 'In under 45 minutes'),
-    ];
-    return RCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Order in 3 Easy Steps',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
-          ...steps.map((s) {
-            final (t, icon, sub) = s;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: RemedooTheme.teal.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child:
-                        Icon(icon, color: RemedooTheme.teal),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(t,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700)),
-                        Text(sub,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _exploreMore() {
-    final items = [
-      ('Find Doctors', Icons.person_search, () => _go(const DoctorsScreen())),
-      ('Ambulance Service', Icons.emergency, () => _go(const EmergencyScreen())),
-      ('Medicine Delivery', Icons.delivery_dining,
-          () => _go(const PharmaciesScreen())),
-      ('Health Packages', Icons.health_and_safety, () => _go(const LabsScreen())),
-    ];
-    return ResponsiveGrid(
-      compactCols: 2,
-      mediumCols: 3,
-      expandedCols: 4,
-      wideCols: 4,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 2.6,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      itemCount: items.length,
-      itemBuilder: (_, i) {
-        final (label, icon, onTap) = items[i];
-        return RCard(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          onTap: onTap,
-          child: Row(
+          Text(
+            d.specialty,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style:
+                TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: RemedooTheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon,
-                    color: RemedooTheme.primary, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(label,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 13)),
+              const Icon(Icons.star, size: 14, color: Color(0xFFF5A623)),
+              const SizedBox(width: 4),
+              Text(
+                d.rating.toStringAsFixed(1),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 12),
               ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _browseServices() {
-    final items = [
-      ('Doctors', Icons.person_search, RemedooTheme.primary,
-          () => _go(const DoctorsScreen())),
-      ('Hospitals', Icons.local_hospital, RemedooTheme.teal,
-          () => _go(const HospitalsScreen())),
-      ('Labs', Icons.science, RemedooTheme.purple,
-          () => _go(const LabsScreen())),
-      ('Pharmacy', Icons.medication, Colors.blue,
-          () => _go(const PharmaciesScreen())),
-    ];
-    return ResponsiveGrid(
-      compactCols: 2,
-      mediumCols: 3,
-      expandedCols: 4,
-      wideCols: 4,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.6,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      itemCount: items.length,
-      itemBuilder: (_, i) {
-        final (label, icon, color, onTap) = items[i];
-        return InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: [color, color.withValues(alpha: 0.7)]),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: Colors.white, size: 36),
-                const SizedBox(height: 8),
-                Text(label,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15)),
-              ],
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: RButton(
+              label: 'Visit',
+              small: true,
+              onPressed: () =>
+                  _goGated(DoctorDetailScreen(doctor: d)),
             ),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _healthTips() {
-    final tips = healthTips.take(4).toList();
-    return Column(
-      children: tips
-          .map((t) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: RCard(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: RemedooTheme.ratingGreen
-                              .withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.lightbulb_outline,
-                            color: RemedooTheme.ratingGreen),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(t['title']!,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700)),
-                            Text(t['text']!,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ))
-          .toList(),
-    );
-  }
-
-  Widget _sponsored() {
-    final sponsors = [
-      ('CityCare Diagnostics', 'Flat 25% off on all lab tests', Icons.science),
-      ('MediPlus Pharmacy', 'Extra 10% off on first order', Icons.medication),
-      ('Smile Dental Studio', 'Free dental checkup this month', Icons.mood),
-      (
-        'FitLife Gym',
-        '1 month free trial for Remedoo users',
-        Icons.fitness_center
+        ],
       ),
-    ];
-    return Column(
-      children: sponsors
-          .map((s) {
-            final (name, offer, icon) = s;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: RCard(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(icon, color: RemedooTheme.purple),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700)),
-                          Text(offer,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant)),
-                        ],
-                      ),
-                    ),
-                    Text('Ad',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant)),
-                  ],
+    );
+  }
+
+  /// "Family Health" avatar row (mockup style). Logged-in users only.
+  Widget _familyRow(AppState state) {
+    final members = state.family;
+    return SizedBox(
+      height: 92,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: members.length + 1,
+        separatorBuilder: (_, _) => const SizedBox(width: 18),
+        itemBuilder: (_, i) {
+          if (i == members.length) {
+            return _familyAvatar(
+              '+',
+              'Add',
+              true,
+              () => _goGated(const FamilyScreen()),
+            );
+          }
+          final m = members[i];
+          return _familyAvatar(
+            _initials(m.name),
+            m.name.split(' ').first,
+            false,
+            () => _goGated(const FamilyScreen()),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _familyAvatar(
+      String label, String name, bool isAdd, VoidCallback onTap) {
+    final scheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: isAdd
+                  ? scheme.surfaceContainerHighest
+                  : RemedooTheme.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isAdd
+                    ? scheme.outlineVariant
+                    : RemedooTheme.primary.withValues(alpha: 0.30),
+                width: 2,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: isAdd ? 26 : 20,
+                  fontWeight: FontWeight.w800,
+                  color: isAdd
+                      ? scheme.onSurfaceVariant
+                      : RemedooTheme.primary,
                 ),
               ),
-            );
-          })
-          .toList(),
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: 64,
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
+
 }

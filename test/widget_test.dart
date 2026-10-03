@@ -55,7 +55,7 @@ void main() {
     // Sign in as guest
     await tester.tap(find.text('Skip, continue as guest'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Hello,'), findsOneWidget);
+    expect(find.textContaining('Good '), findsOneWidget);
     expect(find.text('Smart Care Finder'), findsOneWidget);
   });
 
