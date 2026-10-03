@@ -315,19 +315,25 @@ class EmergencyScreen extends StatelessWidget {
                     icon: Icons.calendar_month,
                     variant: RButtonVariant.outline,
                     small: true,
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => BookingScreen(
-                          kind: 'hospital',
-                          refId: h.id,
-                          title: h.name,
-                          subtitle: 'Emergency Consultation',
-                          place: h.location,
-                          fee: 300,
+                    onPressed: () {
+                      if (!checkLogin(
+                          context, 'Please login to book appointments')) {
+                        return;
+                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BookingScreen(
+                            kind: 'hospital',
+                            refId: h.id,
+                            title: h.name,
+                            subtitle: 'Emergency Consultation',
+                            place: h.location,
+                            fee: 300,
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               ],

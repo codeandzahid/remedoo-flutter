@@ -434,17 +434,23 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
                     icon: Icons.calendar_month_outlined,
                     small: true,
                     fullWidth: true,
-                    onPressed: () => pushPage(
-                      context,
-                      BookingScreen(
-                        kind: 'hospital',
-                        refId: h.id,
-                        title: h.name,
-                        subtitle: 'General Consultation',
-                        place: h.location,
-                        fee: 300,
-                      ),
-                    ),
+                    onPressed: () {
+                      if (!checkLogin(
+                          context, 'Please login to book appointments')) {
+                        return;
+                      }
+                      pushPage(
+                        context,
+                        BookingScreen(
+                          kind: 'hospital',
+                          refId: h.id,
+                          title: h.name,
+                          subtitle: 'General Consultation',
+                          place: h.location,
+                          fee: 300,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ],

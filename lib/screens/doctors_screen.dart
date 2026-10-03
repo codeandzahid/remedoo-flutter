@@ -580,17 +580,23 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                   icon: Icons.calendar_month,
                   small: true,
                   fullWidth: true,
-                  onPressed: () => pushPage(
-                    context,
-                    BookingScreen(
-                      kind: 'doctor',
-                      refId: d.id,
-                      title: d.name,
-                      subtitle: d.specialty,
-                      place: d.hospital,
-                      fee: d.fee,
-                    ),
-                  ),
+                  onPressed: () {
+                    if (!checkLogin(
+                        context, 'Please login to book appointments')) {
+                      return;
+                    }
+                    pushPage(
+                      context,
+                      BookingScreen(
+                        kind: 'doctor',
+                        refId: d.id,
+                        title: d.name,
+                        subtitle: d.specialty,
+                        place: d.hospital,
+                        fee: d.fee,
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

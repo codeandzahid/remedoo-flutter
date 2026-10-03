@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remedoo_app/main.dart';
 import 'package:remedoo_app/state/app_state.dart';
+import 'package:remedoo_app/widgets/widgets.dart';
 import 'package:remedoo_app/services/auth_service.dart';
 import 'package:remedoo_app/screens/doctors_screen.dart';
 import 'package:remedoo_app/screens/settings_screen.dart';
@@ -198,6 +199,27 @@ void main() {
     await tester.pump();
     expect(state.isLoggedIn, isFalse);
     expect(state.appointments, isEmpty);
+  });
+
+  testWidgets('guest book-appointment button asks login first', (tester) async {
+    final state = AppState();
+    state.loginAsGuest();
+    await tester.pumpWidget(AppStateScope(
+        state: state, child: const MaterialApp(home: DoctorsScreen())));
+    await tester.pumpAndSettle();
+    // The "Book Appointment" button on a doctor card.
+    final book = find.widgetWithText(RButton, 'Book Appointment');
+    expect(book, findsWidgets);
+    await tester.ensureVisible(book.at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(book.at(0));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Please login to book appointments'), findsOneWidget);
+    expect(state.appointments, isEmpty);
+    await tester.pump(const Duration(milliseconds: 1300));
+    await tester.pump();
+    expect(state.isLoggedIn, isFalse);
   });
 
   testWidgets('guest tapping a doctor card is sent to login', (tester) async {
