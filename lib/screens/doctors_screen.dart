@@ -8,7 +8,6 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
-import 'booking_screen.dart';
 import 'doctor_detail_screen.dart';
 
 const _specialties = [
@@ -445,166 +444,16 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   }
 
   Widget _doctorCard(Doctor d, AppState state) {
-    final scheme = Theme.of(context).colorScheme;
-    return RCard(
-      padding: EdgeInsets.zero,
-      onTap: () {
-        if (!checkLogin(context, 'Please login to view details')) return;
-        pushPage(context, DoctorDetailScreen(doctor: d));
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            height: 120,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  RemedooTheme.primary.withValues(alpha: 0.14),
-                  RemedooTheme.accent.withValues(alpha: 0.55),
-                  RemedooTheme.primary.withValues(alpha: 0.08),
-                ],
-              ),
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(RemedooRadius.card)),
-            ),
-            child: Stack(
-              children: [
-                Center(
-                  child: Hero(
-                    tag: 'doctor-avatar-${d.id}',
-                    child: InitialsAvatar(name: d.name, radius: 34),
-                  ),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: _favButton(state, d),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  d.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              if (d.verified) ...[
-                                const SizedBox(width: 4),
-                                Icon(Icons.verified,
-                                    size: 16,
-                                    color: RemedooTheme.primary),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            d.specialty,
-                            style: TextStyle(
-                                color: scheme.primary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Icon(Icons.location_on,
-                                  size: 13,
-                                  color: scheme.onSurfaceVariant),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  d.hospital,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: scheme.onSurfaceVariant),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    RRatingPill(rating: d.rating),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                const _DashedDivider(),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: RStat(
-                          icon: Icons.work_outline,
-                          text: '${d.expYears} yrs exp'),
-                    ),
-                    Expanded(
-                      child: RStat(
-                          icon: Icons.currency_rupee,
-                          text: inr(d.fee)),
-                    ),
-                    Expanded(
-                      child: RStat(
-                          icon: Icons.schedule,
-                          text: '${d.waitMin} min wait'),
-                    ),
-                  ],
-                ),
-                if (!state.isGuest) ...[
-                  const SizedBox(height: 12),
-                  RButton(
-                    label: 'Book Appointment',
-                    icon: Icons.calendar_month,
-                    small: true,
-                    fullWidth: true,
-                    onPressed: () {
-                      if (!checkLogin(
-                          context, 'Please login to book appointments')) {
-                        return;
-                      }
-                      pushPage(
-                        context,
-                        BookingScreen(
-                          kind: 'doctor',
-                          refId: d.id,
-                          title: d.name,
-                          subtitle: d.specialty,
-                          place: d.hospital,
-                          fee: d.fee,
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+    void openDetail() {
+      if (!checkLogin(context, 'Please login to view details')) return;
+      pushPage(context, DoctorDetailScreen(doctor: d));
+    }
+
+    return RDoctorCard(
+      doctor: d,
+      trailing: _favButton(state, d),
+      onTap: openDetail,
+      onVisit: openDetail,
     );
   }
 
@@ -629,32 +478,6 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Dashed divider line like the React cards' `border-t border-dashed`.
-class _DashedDivider extends StatelessWidget {
-  const _DashedDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).dividerColor;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final n = (constraints.maxWidth / 10).floor().clamp(1, 100);
-        return Row(
-          children: List.generate(
-            n,
-            (_) => Container(
-              width: 5,
-              height: 1,
-              margin: const EdgeInsets.only(right: 5),
-              color: color,
-            ),
-          ),
-        );
-      },
     );
   }
 }

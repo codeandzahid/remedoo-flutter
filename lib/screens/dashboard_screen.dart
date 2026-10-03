@@ -675,81 +675,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (_, i) => SizedBox(
           width: 158,
-          child: _mockupDoctorCard(list[i]),
+          child: RDoctorCard(
+            compact: true,
+            doctor: list[i],
+            onTap: () => _goGated(DoctorDetailScreen(doctor: list[i])),
+            onVisit: () => _goGated(DoctorDetailScreen(doctor: list[i])),
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _mockupDoctorCard(Doctor d) {
-    final scheme = Theme.of(context).colorScheme;
-    return RCard(
-      padding: const EdgeInsets.all(14),
-      onTap: () => _goGated(DoctorDetailScreen(doctor: d)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 62,
-            height: 62,
-            decoration: BoxDecoration(
-              color: RemedooTheme.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: RemedooTheme.primary.withValues(alpha: 0.30),
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                _initials(d.name),
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: RemedooTheme.primary,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            d.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontWeight: FontWeight.w700, fontSize: 13),
-          ),
-          Text(
-            d.specialty,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style:
-                TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.star, size: 14, color: Color(0xFFF5A623)),
-              const SizedBox(width: 4),
-              Text(
-                d.rating.toStringAsFixed(1),
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: RButton(
-              label: 'Visit',
-              small: true,
-              onPressed: () =>
-                  _goGated(DoctorDetailScreen(doctor: d)),
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -1072,6 +1072,381 @@ class RButton extends StatelessWidget {
   }
 }
 
+/// Mockup-style avatar: theme-tinted circle with initials or icon.
+class RAvatarCircle extends StatelessWidget {
+  final String name;
+  final double size;
+  final IconData? icon;
+
+  const RAvatarCircle(
+      {super.key, required this.name, this.size = 60, this.icon});
+
+  /// "Dr. Meera Rao" -> "MR".
+  static String initialsOf(String name) {
+    final parts =
+        name.replaceFirst(RegExp(r'^Dr\.\s*'), '').split(' ');
+    final keep = parts.where((w) => w.isNotEmpty).take(2).toList();
+    if (keep.isEmpty) return '?';
+    return keep.map((w) => w[0].toUpperCase()).join();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: RemedooTheme.primary.withValues(alpha: 0.12),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: RemedooTheme.primary.withValues(alpha: 0.30),
+          width: 2,
+        ),
+      ),
+      child: Center(
+        child: icon != null
+            ? Icon(icon,
+                size: size * 0.42, color: RemedooTheme.primary)
+            : Text(
+                initialsOf(name),
+                style: TextStyle(
+                  fontSize: size * 0.32,
+                  fontWeight: FontWeight.w800,
+                  color: RemedooTheme.primary,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+/// Mockup-style star rating row.
+class RStarRating extends StatelessWidget {
+  final double rating;
+  final double size;
+
+  const RStarRating({super.key, required this.rating, this.size = 14});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.star, size: size, color: const Color(0xFFF5A623)),
+        const SizedBox(width: 4),
+        Text(
+          rating.toStringAsFixed(1),
+          style:
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+/// Mockup-style doctor card (like the theme mockups): circular avatar,
+/// name, specialty, star rating, Visit button. Compact mode is the
+/// dashboard rail card.
+class RDoctorCard extends StatelessWidget {
+  final Doctor doctor;
+  final bool compact;
+  final VoidCallback? onTap;
+  final VoidCallback? onVisit;
+  final Widget? trailing;
+
+  const RDoctorCard({
+    super.key,
+    required this.doctor,
+    this.compact = false,
+    this.onTap,
+    this.onVisit,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (compact) return _compact(context, scheme);
+    return _row(context, scheme);
+  }
+
+  Widget _compact(BuildContext context, ColorScheme scheme) {
+    return RCard(
+      padding: const EdgeInsets.all(14),
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RAvatarCircle(name: doctor.name, size: 62),
+          const SizedBox(height: 8),
+          Text(
+            doctor.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style:
+                const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+          Text(
+            doctor.specialty,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style:
+                TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 4),
+          RStarRating(rating: doctor.rating),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: RButton(
+              label: 'Visit',
+              small: true,
+              onPressed: onVisit,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(BuildContext context, ColorScheme scheme) {
+    return RCard(
+      padding: const EdgeInsets.all(14),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              RAvatarCircle(name: doctor.name, size: 58),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            doctor.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15),
+                          ),
+                        ),
+                        trailing ?? const SizedBox.shrink(),
+                      ],
+                    ),
+                    Text(
+                      doctor.specialty,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: RemedooTheme.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on,
+                            size: 13,
+                            color: scheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            doctor.hospital,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: scheme.onSurfaceVariant),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              RStarRating(rating: doctor.rating),
+              _dot(scheme),
+              Text('${doctor.expYears} yrs exp',
+                  style:
+                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+              _dot(scheme),
+              Text(inr(doctor.fee),
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: RButton(
+              label: 'Visit',
+              icon: Icons.arrow_forward,
+              small: true,
+              onPressed: onVisit,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dot(ColorScheme scheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Text('·',
+          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 16)),
+    );
+  }
+}
+
+/// Mockup-style hospital card: circular avatar, name, location, rating
+/// line, View/Book buttons. Government hospitals never show Book.
+class RHospitalCard extends StatelessWidget {
+  final Hospital hospital;
+  final bool isGuest;
+  final VoidCallback? onTap;
+  final VoidCallback? onView;
+  final VoidCallback? onBook;
+  final Widget? trailing;
+
+  const RHospitalCard({
+    super.key,
+    required this.hospital,
+    this.isGuest = false,
+    this.onTap,
+    this.onView,
+    this.onBook,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final h = hospital;
+    return RCard(
+      padding: const EdgeInsets.all(14),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              RAvatarCircle(
+                  name: h.name, size: 58, icon: Icons.local_hospital),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            h.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15),
+                          ),
+                        ),
+                        trailing ?? const SizedBox.shrink(),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on,
+                            size: 13,
+                            color: scheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            h.location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: scheme.onSurfaceVariant),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              RStarRating(rating: h.rating),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text('·',
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant, fontSize: 16)),
+              ),
+              Text('${h.beds} beds',
+                  style:
+                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text('·',
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant, fontSize: 16)),
+              ),
+              Text(h.government ? 'Government' : 'Private',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurfaceVariant)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: RButton(
+                  label: 'View',
+                  small: true,
+                  variant: RButtonVariant.outline,
+                  onPressed: onView,
+                ),
+              ),
+              if (!h.government && !isGuest) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RButton(
+                    label: 'Book',
+                    icon: Icons.calendar_month,
+                    small: true,
+                    onPressed: onBook,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// White card: 18px radius, thin warm-gray border, soft subtle shadow.
 class RCard extends StatelessWidget {
   final Widget child;

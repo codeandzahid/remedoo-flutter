@@ -298,178 +298,34 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
   }
 
   Widget _card(Hospital h) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return RCard(
-      padding: EdgeInsets.zero,
-      onTap: () {
-        if (!checkLogin(context, 'Please login to view details')) return;
-        pushPage(context, HospitalDetailScreen(hospital: h));
+    void openDetail() {
+      if (!checkLogin(context, 'Please login to view details')) return;
+      pushPage(context, HospitalDetailScreen(hospital: h));
+    }
+
+    return RHospitalCard(
+      hospital: h,
+      isGuest: AppStateScope.of(context).isGuest,
+      trailing: FavoriteButton(favKey: 'hospital:${h.id}'),
+      onTap: openDetail,
+      onView: openDetail,
+      onBook: () {
+        if (!checkLogin(context, 'Please login to book appointments')) return;
+        pushPage(
+          context,
+          BookingScreen(
+            kind: 'hospital',
+            refId: h.id,
+            title: h.name,
+            subtitle: 'General Consultation',
+            place: h.location,
+            fee: 300,
+          ),
+        );
       },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: 130,
-            child: Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: dark
-                        ? RemedooTheme.darkSecondary
-                        : const Color(0xFFEAF3FC),
-                    borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(RemedooRadius.card)),
-                  ),
-                  child: const Center(
-                    child: Text('🏥', style: TextStyle(fontSize: 60)),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x1A000000),
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: FavoriteButton(favKey: 'hospital:${h.id}'),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: h.government
-                      ? const RRibbon(
-                          label: 'Government Hospital',
-                          icon: Icons.account_balance_outlined)
-                      : (h.hasIcu
-                          ? const RRibbon(
-                              label: 'ICU Available 24/7',
-                              icon: Icons.shield_outlined)
-                          : const SizedBox.shrink()),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Text(h.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14)),
-                          ),
-                          if (h.verified) ...[
-                            const SizedBox(width: 4),
-                            Icon(Icons.verified,
-                                size: 16, color: RemedooTheme.primary),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    RRatingPill(rating: h.rating),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(h.location,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 12.5,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant)),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.only(top: 8),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: BorderSide(
-                          color: Theme.of(context).dividerColor),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      RStat(
-                          icon: Icons.bed_outlined,
-                          text: '${h.beds} beds'),
-                      _dot(),
-                      RStat(
-                          icon: Icons.shield_outlined,
-                          text: h.hasIcu ? 'ICU' : 'No ICU'),
-                      _dot(),
-                      RStat(
-                          icon: Icons.access_time,
-                          text: '${h.waitMin}–${h.waitMin + 10} min'),
-                    ],
-                  ),
-                ),
-                if (!h.government && !AppStateScope.of(context).isGuest) ...[
-                  const SizedBox(height: 10),
-                  RButton(
-                    label: 'Book Appointment',
-                    icon: Icons.calendar_month_outlined,
-                    small: true,
-                    fullWidth: true,
-                    onPressed: () {
-                      if (!checkLogin(
-                          context, 'Please login to book appointments')) {
-                        return;
-                      }
-                      pushPage(
-                        context,
-                        BookingScreen(
-                          kind: 'hospital',
-                          refId: h.id,
-                          title: h.name,
-                          subtitle: 'General Consultation',
-                          place: h.location,
-                          fee: 300,
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _dot() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Text('•',
-          style: TextStyle(
-              color:
-                  Theme.of(context).colorScheme.onSurfaceVariant)),
-    );
-  }
 }
 
 /// Circular back button on a muted circle, like the React listing headers.
