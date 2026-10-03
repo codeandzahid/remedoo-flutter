@@ -330,8 +330,14 @@ class HospitalDetailScreen extends StatelessWidget {
                         ),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => pushPage(
-                              context, DoctorDetailScreen(doctor: d)),
+                          onTap: () {
+                            if (!checkLogin(context,
+                                'Please login to view details')) {
+                              return;
+                            }
+                            pushPage(context,
+                                DoctorDetailScreen(doctor: d));
+                          },
                           child: Padding(
                             padding: const EdgeInsets.all(10),
                             child: Row(

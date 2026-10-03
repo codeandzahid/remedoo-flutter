@@ -329,17 +329,23 @@ class DoctorDetailScreen extends StatelessWidget {
             label: 'Book Appointment',
             icon: Icons.calendar_month,
             fullWidth: true,
-            onPressed: () => pushPage(
-              context,
-              BookingScreen(
-                kind: 'doctor',
-                refId: d.id,
-                title: d.name,
-                subtitle: d.specialty,
-                place: d.hospital,
-                fee: d.fee,
-              ),
-            ),
+            onPressed: () {
+              if (!checkLogin(
+                  context, 'Please login to book appointments')) {
+                return;
+              }
+              pushPage(
+                context,
+                BookingScreen(
+                  kind: 'doctor',
+                  refId: d.id,
+                  title: d.name,
+                  subtitle: d.specialty,
+                  place: d.hospital,
+                  fee: d.fee,
+                ),
+              );
+            },
           ),
           const SizedBox(height: 10),
           RButton(
@@ -387,17 +393,23 @@ class DoctorDetailScreen extends StatelessWidget {
           label: 'Book Appointment',
           icon: Icons.calendar_month,
           fullWidth: true,
-          onPressed: () => pushPage(
-            context,
-            BookingScreen(
-              kind: 'doctor',
-              refId: d.id,
-              title: d.name,
-              subtitle: d.specialty,
-              place: d.hospital,
-              fee: d.fee,
-            ),
-          ),
+          onPressed: () {
+            if (!checkLogin(
+                context, 'Please login to book appointments')) {
+              return;
+            }
+            pushPage(
+              context,
+              BookingScreen(
+                kind: 'doctor',
+                refId: d.id,
+                title: d.name,
+                subtitle: d.specialty,
+                place: d.hospital,
+                fee: d.fee,
+              ),
+            );
+          },
         ),
       ),
     );
