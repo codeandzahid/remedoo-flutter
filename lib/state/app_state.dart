@@ -139,6 +139,9 @@ class AppState extends ChangeNotifier {
     _mockLoggedIn = false;
     _guest = true;
     _name = 'Patient';
+    // Guests have no account: drop the seeded demo notifications (e.g. the
+    // fake "Order Update") so a guest never sees order/booking alerts.
+    notifications.clear();
     notifyListeners();
   }
 
