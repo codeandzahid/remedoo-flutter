@@ -35,6 +35,12 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    if (state.isGuest) {
+      return const GuestGate(
+        title: 'Lab Reports',
+        subtitle: 'Sign in to view your lab reports.',
+      );
+    }
     var list = state.reports.toList();
     final q = _search.text.trim().toLowerCase();
     if (q.isNotEmpty) {

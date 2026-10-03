@@ -21,6 +21,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    if (state.isGuest) {
+      return const GuestGate(
+        title: 'Health Reminders',
+        subtitle: 'Sign in to manage your health reminders.',
+      );
+    }
     return Scaffold(
       body: Column(
         children: [

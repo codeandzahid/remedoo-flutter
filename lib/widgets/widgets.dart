@@ -4,6 +4,7 @@ import '../theme.dart';
 import '../models.dart';
 import '../data/mock_data.dart';
 import '../state/app_state.dart';
+import '../responsive/responsive.dart';
 
 // Shared building blocks for the Remedoo app.
 //
@@ -896,6 +897,69 @@ Future<bool> confirmDialog(
     ),
   );
   return res ?? false;
+}
+
+/// Full-screen gate for guests on screens that require a signed-in account
+/// (appointments, orders, family, reminders, ...). Guests may browse the app
+/// freely, but personal/transactional areas ask them to sign in first.
+class GuestGate extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  const GuestGate({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    this.icon = Icons.lock_outline,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppStateScope.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: MaxWidthBox(
+        child: REmptyState(
+          icon: icon,
+          title: 'Sign in required',
+          subtitle: subtitle,
+          actionLabel: 'Sign In',
+          // Log out of guest mode; RootGate rebuilds straight to LoginScreen.
+          onAction: () => state.logout(),
+        ),
+      ),
+    );
+  }
+}
+
+/// Call at the top of an `onPressed` that a guest must not perform
+/// (book appointment, place order, ...). Returns true when the user is
+/// signed in; otherwise shows a "Sign in required" dialog and returns false.
+/// If the user chooses Sign In, guest mode is exited to the login screen.
+Future<bool> requireSignIn(BuildContext context) async {
+  final state = AppStateScope.of(context);
+  if (!state.isGuest) return true;
+  final go = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Sign in required'),
+      content: const Text(
+          'Please sign in to continue. Guests can browse, but booking and ordering need an account.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Sign In'),
+        ),
+      ],
+    ),
+  );
+  if (go == true) state.logout();
+  return false;
 }
 
 // ============================================================================

@@ -7,6 +7,7 @@ import 'package:remedoo_app/screens/doctors_screen.dart';
 import 'package:remedoo_app/screens/settings_screen.dart';
 import 'package:remedoo_app/screens/pharmacy_detail_screen.dart';
 import 'package:remedoo_app/screens/booking_screen.dart';
+import 'package:remedoo_app/screens/appointments_screen.dart';
 import 'package:remedoo_app/screens/admin/admin_login_screen.dart';
 import 'package:remedoo_app/screens/admin/admin_shell.dart';
 import 'package:remedoo_app/data/mock_data.dart';
@@ -151,6 +152,46 @@ void main() {
     // Confirmation dialog appears; confirm.
     expect(find.text('Log out?'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Log Out'));
+    await tester.pumpAndSettle();
+    expect(state.isLoggedIn, isFalse);
+  });
+
+  testWidgets('guest sees sign-in gate on appointments screen', (tester) async {
+    final state = AppState();
+    state.loginAsGuest();
+    await tester.pumpWidget(AppStateScope(
+        state: state, child: const MaterialApp(home: AppointmentsScreen())));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign in required'), findsOneWidget);
+    expect(find.text('Sign In'), findsOneWidget);
+  });
+
+  testWidgets('guest booking shows sign-in dialog and can exit to login',
+      (tester) async {
+    final state = AppState();
+    state.loginAsGuest();
+    await tester.pumpWidget(AppStateScope(
+        state: state,
+        child: const MaterialApp(
+            home: BookingScreen(
+          kind: 'doctor',
+          refId: 'd1',
+          title: 'Dr. Test',
+          subtitle: 'Cardiologist',
+          place: 'Test Clinic',
+          fee: 500,
+        ))));
+    await tester.pumpAndSettle();
+    // Tap the confirm booking button.
+    final confirm = find.textContaining('Confirm Booking');
+    expect(confirm, findsOneWidget);
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    // Sign-in required dialog appears; no appointment is booked.
+    expect(find.text('Sign in required'), findsOneWidget);
+    expect(state.appointments, isEmpty);
+    // Choosing Sign In exits guest mode.
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign In'));
     await tester.pumpAndSettle();
     expect(state.isLoggedIn, isFalse);
   });

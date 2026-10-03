@@ -83,7 +83,9 @@ class _BookingScreenState extends State<BookingScreen> {
     super.dispose();
   }
 
-  void _confirm(bool isReschedule) {
+  void _confirm(bool isReschedule) async {
+    if (!await requireSignIn(context)) return;
+    if (!mounted) return;
     final state = AppStateScope.of(context);
     if (isReschedule) {
       state.rescheduleAppointment(
