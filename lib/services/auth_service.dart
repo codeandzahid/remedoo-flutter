@@ -47,6 +47,10 @@ class AuthService {
 
   SupabaseClient get _client => Supabase.instance.client;
 
+  /// Public accessor for the data layer (repository). Only valid after
+  /// [init] succeeded ([isInitialized]); guard with that flag.
+  SupabaseClient get client => _client;
+
   /// Must be called once during app boot (RootGate shows the splash meanwhile).
   /// Never throws and never hangs: after [initTimeout] without a result the
   /// app falls back to guest/mock mode (offline).

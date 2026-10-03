@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models.dart';
 import '../data/mock_data.dart';
 import '../services/auth_service.dart';
+import '../services/supabase_repository.dart';
 
 /// Inherited access to the single AppState for the whole app.
 class AppStateScope extends InheritedNotifier<AppState> {
@@ -57,12 +58,16 @@ class AppState extends ChangeNotifier {
     // Offline / init failed (e.g. widget tests): stay in mock/guest mode.
     if (!AuthService.instance.isInitialized) return;
     _syncUserFromSession();
+    // Production catalog for everyone (guests browse it too); user data
+    // loads inside _syncUserFromSession when a session exists.
+    unawaited(loadProductionCatalog());
     // AppState lives for the whole app lifetime, so the subscription is
     // intentionally never cancelled.
     AuthService.instance.authStateChanges.listen((data) {
       final event = data.event;
       if (event == AuthChangeEvent.signedOut) {
         _supaUser = null;
+        _resetProductionFlags();
         _clearAuthLocal(notify: false);
         notifyListeners();
       } else if (event == AuthChangeEvent.signedIn ||
@@ -75,12 +80,14 @@ class AppState extends ChangeNotifier {
           _guest = false;
           _mockLoggedIn = false;
           notifyListeners();
+          unawaited(loadUserProductionData());
         }
       } else if (event == AuthChangeEvent.passwordRecovery) {
         _supaUser = data.session?.user;
         _guest = false;
         _mockLoggedIn = false;
         notifyListeners();
+        unawaited(loadUserProductionData());
         final cb = onPasswordRecovery;
         if (cb != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) => cb());
@@ -100,6 +107,7 @@ class AppState extends ChangeNotifier {
       _guest = false;
       _mockLoggedIn = false;
       notifyListeners();
+      unawaited(loadUserProductionData());
     }
   }
 
@@ -219,6 +227,306 @@ class AppState extends ChangeNotifier {
     _clearAuthLocal();
   }
 
+  // ---------- Production data (Supabase) ----------
+  //
+  // The catalog (doctors, hospitals, labs, pharmacies, medicines, lab tests)
+  // loads from the live Supabase tables at boot, replacing the bundled demo
+  // data. User data (appointments, orders, favorites, family, profile) loads
+  // when a real Supabase session is present, and every mutation below writes
+  // through to Supabase (fire-and-forget; local state updates instantly so
+  // the UI never waits on the network). Demo data stays as the offline
+  // fallback when Supabase is unreachable.
+
+  final SupabaseRepository _repo = SupabaseRepository.instance;
+
+  /// Local model id -> Supabase row id, for rows created this session
+  /// (Supabase generates its own UUIDs on insert).
+  final Map<String, String> _remoteAppointmentIds = {};
+  final Map<String, String> _remoteOrderIds = {};
+  final Map<String, String> _remoteFamilyIds = {};
+
+  bool _catalogLoaded = false;
+  bool _userDataLoaded = false;
+
+  /// One-time catalog load at boot (guests browse it too).
+  Future<void> loadProductionCatalog() async {
+    if (_catalogLoaded) return;
+    _catalogLoaded = true;
+    final results = await Future.wait([
+      _repo.fetchDoctors(),
+      _repo.fetchHospitals(),
+      _repo.fetchLabs(),
+      _repo.fetchPharmacies(),
+      _repo.fetchMedicines(),
+      _repo.fetchLabTests(),
+    ]);
+    final ds = results[0] as List<Doctor>;
+    final hs = results[1] as List<Hospital>;
+    final ls = results[2] as List<Lab>;
+    final ps = results[3] as List<Pharmacy>;
+    final ms = results[4] as List<Medicine>;
+    final ts = results[5] as List<LabTest>;
+    var changed = false;
+    if (ds.isNotEmpty) {
+      doctors
+        ..clear()
+        ..addAll(ds);
+      changed = true;
+    }
+    if (hs.isNotEmpty) {
+      hospitals
+        ..clear()
+        ..addAll(hs);
+      changed = true;
+    }
+    if (ls.isNotEmpty) {
+      labs
+        ..clear()
+        ..addAll(ls);
+      changed = true;
+    }
+    if (ps.isNotEmpty) {
+      pharmacies
+        ..clear()
+        ..addAll(ps);
+      changed = true;
+    }
+    if (ms.isNotEmpty) {
+      medicines
+        ..clear()
+        ..addAll(ms);
+      changed = true;
+    }
+    if (ts.isNotEmpty) {
+      labTests
+        ..clear()
+        ..addAll(ts);
+      changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+
+  /// Loads the signed-in user's data from Supabase. Called whenever a real
+  /// session is established (sign-in, session restore, recovery).
+  Future<void> loadUserProductionData() async {
+    if (_supaUser == null || _userDataLoaded) return;
+    _userDataLoaded = true;
+    final arows = await _repo.fetchAppointments();
+    if (arows.isNotEmpty) {
+      appointments
+        ..clear()
+        ..addAll(arows.map(_apptFromRow));
+      appointments.sort((a, b) => b.date.compareTo(a.date));
+    }
+    final orows = await _repo.fetchOrders();
+    if (orows.isNotEmpty) {
+      orders
+        ..clear()
+        ..addAll(orows.map(_orderFromRow));
+    }
+    final favs = await _repo.fetchFavorites();
+    if (favs.isNotEmpty) {
+      _favorites
+        ..clear()
+        ..addAll(favs);
+    }
+    final frows = await _repo.fetchFamily();
+    if (frows.isNotEmpty) {
+      family
+        ..clear()
+        ..addAll(frows.map(_familyFromRow));
+    }
+    final prof = await _repo.fetchProfile();
+    if (prof != null) {
+      final n = '${prof['full_name'] ?? ''}';
+      final p = '${prof['phone'] ?? ''}';
+      if (n.isNotEmpty) _name = n;
+      if (p.isNotEmpty) _phone = p;
+    }
+    notifyListeners();
+  }
+
+  /// Resets production flags so the next real sign-in reloads user data.
+  void _resetProductionFlags() {
+    _userDataLoaded = false;
+    _remoteAppointmentIds.clear();
+    _remoteOrderIds.clear();
+    _remoteFamilyIds.clear();
+  }
+
+  static String _embeddedName(Map<String, dynamic> r, String key) {
+    final v = r[key];
+    return v is Map ? '${v['name'] ?? ''}' : '';
+  }
+
+  Appointment _apptFromRow(Map<String, dynamic> r) {
+    final kind = '${r['service_type'] ?? 'doctor'}';
+    String refId = '';
+    String title = 'Appointment';
+    if (kind == 'doctor') {
+      refId = '${r['doctor_id'] ?? ''}';
+      final n = _embeddedName(r, 'doctors');
+      if (n.isNotEmpty) title = n;
+    } else if (kind == 'hospital') {
+      refId = '${r['hospital_id'] ?? ''}';
+      final n = _embeddedName(r, 'hospitals');
+      if (n.isNotEmpty) title = n;
+    } else if (kind == 'lab') {
+      refId = '${r['lab_id'] ?? ''}';
+      final n = _embeddedName(r, 'labs');
+      if (n.isNotEmpty) title = n;
+    } else {
+      refId = '${r['pharmacy_id'] ?? ''}';
+    }
+    DateTime date;
+    try {
+      date = DateTime.parse('${r['appointment_date']}');
+    } catch (_) {
+      date = DateTime.now();
+    }
+    var timeLabel = '${r['appointment_time'] ?? ''}';
+    if (timeLabel.length >= 5) timeLabel = timeLabel.substring(0, 5);
+    final st = '${r['status'] ?? 'pending'}';
+    return Appointment(
+      id: '${r['id']}',
+      doctorName: title,
+      specialty: kind,
+      place: '',
+      date: date,
+      timeLabel: timeLabel,
+      fee: 0,
+      payment: 'online',
+      kind: kind,
+      refId: refId,
+      notes: '${r['notes'] ?? ''}',
+      status: st == 'cancelled' ? 'cancelled' : 'upcoming',
+    );
+  }
+
+  MedOrder _orderFromRow(Map<String, dynamic> r) {
+    final items = <CartLine>[];
+    final raw = r['order_items'];
+    if (raw is List) {
+      for (final it in raw) {
+        if (it is Map) {
+          final price = (it['unit_price'] as num?)?.toDouble() ?? 0;
+          items.add(CartLine(
+            medicine: Medicine(
+              id: '${it['medicine_id'] ?? ''}',
+              pharmacyId: '${r['pharmacy_id'] ?? ''}',
+              name: '${it['medicine_name'] ?? ''}',
+              pack: 'strip',
+              brand: '',
+              price: price,
+              mrp: price,
+              rxRequired: false,
+              category: 'General',
+            ),
+            qty: (it['quantity'] as num?)?.toInt() ?? 1,
+          ));
+        }
+      }
+    }
+    DateTime placed;
+    try {
+      placed = DateTime.parse('${r['placed_at']}');
+    } catch (_) {
+      placed = DateTime.now();
+    }
+    return MedOrder(
+      id: '${r['id']}',
+      pharmacyName: _embeddedName(r, 'pharmacies').isNotEmpty
+          ? _embeddedName(r, 'pharmacies')
+          : 'Pharmacy',
+      items: items,
+      subtotal: (r['subtotal'] as num?)?.toDouble() ?? 0,
+      deliveryFee: (r['delivery_fee'] as num?)?.toDouble() ?? 0,
+      total: (r['total'] as num?)?.toDouble() ?? 0,
+      address: '${r['delivery_address'] ?? ''}',
+      payment: '${r['payment_method'] ?? 'cod'}',
+      placedAt: placed,
+      status: '${r['status'] ?? 'placed'}',
+    );
+  }
+
+  FamilyMember _familyFromRow(Map<String, dynamic> r) {
+    var age = 0;
+    final dob = '${r['date_of_birth'] ?? ''}';
+    try {
+      if (dob.isNotEmpty) {
+        final d = DateTime.parse(dob);
+        age = DateTime.now().year - d.year;
+      }
+    } catch (_) {}
+    return FamilyMember(
+      id: '${r['id']}',
+      name: '${r['name'] ?? ''}',
+      relation: '${r['relationship'] ?? ''}',
+      age: age,
+    );
+  }
+
+  // ---------- Production write-through helpers ----------
+
+  /// Fire-and-forget Supabase insert for a new appointment; records the real
+  /// row id so cancel works against the production table.
+  void _syncBookAppointment(Appointment appt) {
+    if (_supaUser == null) return;
+    _repo
+        .bookAppointment(
+      serviceType: appt.kind,
+      doctorId: appt.kind == 'doctor' ? appt.refId : null,
+      hospitalId: appt.kind == 'hospital' ? appt.refId : null,
+      labId: appt.kind == 'lab' ? appt.refId : null,
+      pharmacyId: appt.kind == 'pharmacy' ? appt.refId : null,
+      date: appt.date,
+      timeLabel: appt.timeLabel,
+      notes: appt.notes.isEmpty ? null : appt.notes,
+    )
+        .then((remoteId) {
+      if (remoteId != null) _remoteAppointmentIds[appt.id] = remoteId;
+    });
+  }
+
+  void _syncCancelAppointment(String localId) {
+    if (_supaUser == null) return;
+    _repo.cancelAppointment(_remoteAppointmentIds[localId] ?? localId);
+  }
+
+  void _syncPlaceOrder(MedOrder order, String? pharmacyId) {
+    if (_supaUser == null || pharmacyId == null || pharmacyId.isEmpty) return;
+    _repo
+        .placeOrder(
+      pharmacyId: pharmacyId,
+      lines: order.items,
+      subtotal: order.subtotal,
+      deliveryFee: order.deliveryFee,
+      total: order.total,
+      address: order.address,
+      payment: order.payment,
+      notes: null,
+    )
+        .then((remoteId) {
+      if (remoteId != null) _remoteOrderIds[order.id] = remoteId;
+    });
+  }
+
+  void _syncToggleFavorite(String key, bool added) {
+    if (_supaUser == null) return;
+    final parts = key.split(':');
+    if (parts.length != 2) return;
+    if (added) {
+      _repo.addFavorite(parts[0], parts[1]);
+    } else {
+      _repo.removeFavorite(parts[0], parts[1]);
+    }
+  }
+
+  void _syncSaveProfile() {
+    if (_supaUser == null) return;
+    _repo.saveProfile({'full_name': _name, 'phone': _phone});
+  }
+
   void saveProfile({
     required String name,
     required String phone,
@@ -229,6 +537,7 @@ class AppState extends ChangeNotifier {
     _phone = phone;
     _gender = gender;
     _address = address;
+    _syncSaveProfile();
     notifyListeners();
   }
 
@@ -279,11 +588,13 @@ class AppState extends ChangeNotifier {
   bool isFavorite(String key) => _favorites.contains(key);
 
   void toggleFavorite(String key) {
-    if (_favorites.contains(key)) {
-      _favorites.remove(key);
-    } else {
+    final added = !_favorites.contains(key);
+    if (added) {
       _favorites.add(key);
+    } else {
+      _favorites.remove(key);
     }
+    _syncToggleFavorite(key, added);
     notifyListeners();
   }
 
@@ -341,6 +652,7 @@ class AppState extends ChangeNotifier {
     );
     appointments.add(appt);
     _takenSlots.add(_slotKey(title, date, timeLabel));
+    _syncBookAppointment(appt);
     addNotification(
       title: 'Appointment booked',
       message: '$title on ${date.day}/${date.month} at $timeLabel',
@@ -353,6 +665,7 @@ class AppState extends ChangeNotifier {
   void cancelAppointment(String id) {
     final appt = appointments.firstWhere((a) => a.id == id);
     appt.status = 'cancelled';
+    _syncCancelAppointment(id);
     addNotification(
       title: 'Appointment cancelled',
       message: '${appt.doctorName} on ${appt.date.day}/${appt.date.month}',
@@ -464,6 +777,7 @@ class AppState extends ChangeNotifier {
   MedOrder placeOrder({required String address, required String payment}) {
     final subtotal = cartSubtotal;
     final deliveryFee = subtotal >= 499 ? 0.0 : 30.0;
+    final pharmacyId = cartPharmacyId;
     final order = MedOrder(
       id: 'R${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
       pharmacyName: cartPharmacyName ?? 'Pharmacy',
@@ -479,6 +793,7 @@ class AppState extends ChangeNotifier {
     cart.clear();
     cartPharmacyId = null;
     cartPharmacyName = null;
+    _syncPlaceOrder(order, pharmacyId);
     addNotification(
       title: 'Order placed',
       message: '${order.pharmacyName} • ${order.id} • ₹${order.total.toStringAsFixed(0)}',
@@ -562,17 +877,29 @@ class AppState extends ChangeNotifier {
     required String relation,
     required int age,
   }) {
-    family.add(FamilyMember(
+    final member = FamilyMember(
       id: 'F${DateTime.now().millisecondsSinceEpoch}',
       name: name,
       relation: relation,
       age: age,
-    ));
+    );
+    family.add(member);
+    if (_supaUser != null) {
+      _repo.addFamilyMember({
+        'name': name,
+        'relationship': relation,
+      }).then((remoteId) {
+        if (remoteId != null) _remoteFamilyIds[member.id] = remoteId;
+      });
+    }
     notifyListeners();
   }
 
   void removeFamilyMember(String id) {
     family.removeWhere((f) => f.id == id);
+    if (_supaUser != null) {
+      _repo.deleteFamilyMember(_remoteFamilyIds[id] ?? id);
+    }
     notifyListeners();
   }
 
