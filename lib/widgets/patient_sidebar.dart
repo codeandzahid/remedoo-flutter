@@ -22,11 +22,16 @@ class QuickActionDef {
   final List<Color> gradient;
   final Widget Function() page;
 
+  /// When true, guests see the tile but tapping it asks them to sign in
+  /// instead of opening the page.
+  final bool requiresLogin;
+
   const QuickActionDef({
     required this.title,
     required this.emoji,
     required this.gradient,
     required this.page,
+    this.requiresLogin = false,
   });
 }
 
@@ -67,6 +72,7 @@ List<QuickActionDef> patientQuickActions() => [
           RemedooTheme.warning.withValues(alpha: 0.8),
         ],
         page: () => const FavoritesScreen(),
+        requiresLogin: true,
       ),
       QuickActionDef(
         title: 'My Orders',
@@ -76,6 +82,7 @@ List<QuickActionDef> patientQuickActions() => [
           RemedooTheme.success.withValues(alpha: 0.8),
         ],
         page: () => const OrdersScreen(),
+        requiresLogin: true,
       ),
     ];
 
@@ -120,7 +127,14 @@ class RQuickActionsGrid extends StatelessWidget {
                 emoji: a.emoji,
                 label: a.title,
                 gradient: a.gradient,
-                onTap: () => onPush(a.page()),
+                onTap: () {
+                  if (a.requiresLogin &&
+                      !checkLogin(c,
+                          'Please login to access ${a.title.toLowerCase()}')) {
+                    return;
+                  }
+                  onPush(a.page());
+                },
               );
             },
           ),
@@ -138,22 +152,31 @@ class _NavDef {
   /// Null page = already there (Home): tapping just closes the drawer.
   final Widget Function()? page;
 
-  const _NavDef(this.title, this.icon, this.route, this.page);
+  /// When true, guests see the item but tapping it asks them to sign in
+  /// instead of opening the page.
+  final bool requiresLogin;
+
+  const _NavDef(this.title, this.icon, this.route, this.page,
+      {this.requiresLogin = false});
 }
 
 /// The React sidebar's Navigate section, mapped to the Flutter screens.
 List<_NavDef> _patientNav() => const [
       _NavDef('Home', Icons.home_outlined, 'home', null),
       _NavDef('Appointments', Icons.calendar_month_outlined,
-          'appointments', AppointmentsScreen.new),
+          'appointments', AppointmentsScreen.new,
+          requiresLogin: true),
       _NavDef('Family Members', Icons.people_outline, 'family',
-          FamilyScreen.new),
+          FamilyScreen.new,
+          requiresLogin: true),
       _NavDef('Health Reminders', Icons.notifications_outlined,
-          'reminders', RemindersScreen.new),
+          'reminders', RemindersScreen.new,
+          requiresLogin: true),
       _NavDef('Emergency', Icons.pin_drop_outlined, 'emergency',
           EmergencyScreen.new),
-      _NavDef(
-          'Profile', Icons.person_outline, 'profile', ProfileScreen.new),
+      _NavDef('Profile', Icons.person_outline, 'profile',
+          ProfileScreen.new,
+          requiresLogin: true),
       _NavDef('Settings', Icons.settings_outlined, 'settings',
           SettingsScreen.new),
     ];
@@ -210,6 +233,11 @@ class RPatientSidebar extends StatelessWidget {
                       label: item.title,
                       active: activeRoute == item.route,
                       onTap: () {
+                        if (item.requiresLogin &&
+                            !checkLogin(context,
+                                'Please login to access ${item.title.toLowerCase()}')) {
+                          return;
+                        }
                         final builder = item.page;
                         if (builder == null) {
                           onClose();
