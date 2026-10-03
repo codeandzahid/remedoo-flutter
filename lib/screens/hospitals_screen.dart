@@ -301,7 +301,10 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return RCard(
       padding: EdgeInsets.zero,
-      onTap: () => pushPage(context, HospitalDetailScreen(hospital: h)),
+      onTap: () {
+        if (!checkLogin(context, 'Please login to view details')) return;
+        pushPage(context, HospitalDetailScreen(hospital: h));
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

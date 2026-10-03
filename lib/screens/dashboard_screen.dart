@@ -70,6 +70,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     pushPage(context, page);
   }
 
+  /// Reference-style navigation for guests: toast + redirect to login.
+  void _goGated(Widget page,
+      [String message = 'Please login to access this feature']) {
+    if (!checkLogin(context, message)) return;
+    _go(page);
+  }
+
   Future<void> _refresh() async {
     setState(() => _loading = true);
     await Future.delayed(const Duration(milliseconds: 700));
@@ -411,9 +418,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ('Labs', Icons.science, 2, () => _go(const LabsScreen())),
       ('Pharmacy', Icons.storefront, 3, () => _go(const PharmaciesScreen())),
       ('Emergency', Icons.sos, 4, () => _go(const EmergencyScreen())),
-      ('Favorites', Icons.favorite, 5, () => _go(const FavoritesScreen())),
-      ('Orders', Icons.shopping_bag, 6, () => _go(const OrdersScreen())),
-      ('Reports', Icons.description, 7, () => _go(const LabReportsScreen())),
+      ('Favorites', Icons.favorite, 5, () => _goGated(const FavoritesScreen())),
+      ('Orders', Icons.shopping_bag, 6, () => _goGated(const OrdersScreen())),
+      ('Reports', Icons.description, 7, () => _goGated(const LabReportsScreen())),
     ];
     return ResponsiveGrid(
       compactCols: 4,
@@ -611,13 +618,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final tiles = RemedooTheme.serviceTileColors;
     final items = [
       ('Appointments', '${state.appointments.length}', Icons.calendar_month,
-          tiles[3], () => _go(const AppointmentsScreen())),
+          tiles[3], () => _goGated(const AppointmentsScreen())),
       ('Active Orders', '${state.activeOrders.length}', Icons.shopping_bag,
-          tiles[1], () => _go(const OrdersScreen())),
+          tiles[1], () => _goGated(const OrdersScreen())),
       ('Prescriptions', '${state.prescriptions.length}', Icons.description,
-          tiles[2], () => _go(const MedicalHistoryScreen())),
+          tiles[2], () => _goGated(const MedicalHistoryScreen())),
       ('Reports', '${state.reports.length}', Icons.science, tiles[0],
-          () => _go(const LabReportsScreen())),
+          () => _goGated(const LabReportsScreen())),
     ];
     return SizedBox(
       height: 86,
@@ -682,7 +689,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       title: 'No upcoming appointments',
       subtitle: 'Book your visit today!',
       actionLabel: 'Book Now',
-      onAction: () => _go(const DoctorsScreen()),
+      onAction: () => _goGated(const DoctorsScreen()),
     );
   }
 
@@ -692,7 +699,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.only(bottom: 10),
       child: RCard(
         padding: const EdgeInsets.all(14),
-        onTap: () => _go(const AppointmentsScreen()),
+        onTap: () => _goGated(const AppointmentsScreen()),
         child: Row(
           children: [
             Container(
@@ -753,7 +760,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         itemCount: list.length,
         itemBuilder: (_, i) => FocusableScale(
           autofocus: i == 0,
-          onTap: () => _go(DoctorDetailScreen(doctor: list[i])),
+          onTap: () => _goGated(DoctorDetailScreen(doctor: list[i])),
           child: _doctorCard(list[i]),
         ),
       );
@@ -776,7 +783,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final scheme = Theme.of(context).colorScheme;
     return RCard(
       padding: EdgeInsets.zero,
-      onTap: () => _go(DoctorDetailScreen(doctor: d)),
+      onTap: () => _goGated(DoctorDetailScreen(doctor: d)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -860,7 +867,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final scheme = Theme.of(context).colorScheme;
     return RCard(
       padding: EdgeInsets.zero,
-      onTap: () => _go(HospitalDetailScreen(hospital: h)),
+      onTap: () => _goGated(HospitalDetailScreen(hospital: h)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1028,6 +1035,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _addMed(AppState state, Medicine m) {
+    if (!checkLogin(context)) return;
     final pharmName = pharmacyById(m.pharmacyId).name;
     if (state.addToCart(m, pharmacyId: m.pharmacyId, pharmacyName: pharmName)) {
       return;

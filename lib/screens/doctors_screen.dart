@@ -448,7 +448,10 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     final scheme = Theme.of(context).colorScheme;
     return RCard(
       padding: EdgeInsets.zero,
-      onTap: () => pushPage(context, DoctorDetailScreen(doctor: d)),
+      onTap: () {
+        if (!checkLogin(context, 'Please login to view details')) return;
+        pushPage(context, DoctorDetailScreen(doctor: d));
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -605,7 +608,10 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
       elevation: 2,
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: () => state.toggleFavorite('doctor:${d.id}'),
+        onTap: () {
+          if (!checkLogin(context, 'Please sign in to add favorites')) return;
+          state.toggleFavorite('doctor:${d.id}');
+        },
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Icon(

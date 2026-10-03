@@ -156,17 +156,20 @@ void main() {
     expect(state.isLoggedIn, isFalse);
   });
 
-  testWidgets('guest sees sign-in gate on appointments screen', (tester) async {
+  testWidgets('guest appointments screen shows sign-in gate', (tester) async {
     final state = AppState();
     state.loginAsGuest();
     await tester.pumpWidget(AppStateScope(
         state: state, child: const MaterialApp(home: AppointmentsScreen())));
     await tester.pumpAndSettle();
-    expect(find.text('Sign in required'), findsOneWidget);
-    expect(find.text('Sign In'), findsOneWidget);
+    // Passive gate (no auto-redirect): message + Sign In button.
+    expect(find.text('Please login to access this feature'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign In'));
+    await tester.pumpAndSettle();
+    expect(state.isLoggedIn, isFalse);
   });
 
-  testWidgets('guest booking shows sign-in dialog and can exit to login',
+  testWidgets('guest booking shows login toast and blocks booking',
       (tester) async {
     final state = AppState();
     state.loginAsGuest();
@@ -182,17 +185,36 @@ void main() {
           fee: 500,
         ))));
     await tester.pumpAndSettle();
-    // Tap the confirm booking button.
     final confirm = find.textContaining('Confirm Booking');
     expect(confirm, findsOneWidget);
     await tester.tap(confirm);
-    await tester.pumpAndSettle();
-    // Sign-in required dialog appears; no appointment is booked.
-    expect(find.text('Sign in required'), findsOneWidget);
+    await tester.pump();
+    await tester.pump();
+    // Reference-style toast appears; no appointment is booked.
+    expect(find.text('Please login to book appointments'), findsOneWidget);
     expect(state.appointments, isEmpty);
-    // Choosing Sign In exits guest mode.
-    await tester.tap(find.widgetWithText(FilledButton, 'Sign In'));
+    // After the redirect delay the guest lands on the login screen.
+    await tester.pump(const Duration(milliseconds: 1300));
+    await tester.pump();
+    expect(state.isLoggedIn, isFalse);
+    expect(state.appointments, isEmpty);
+  });
+
+  testWidgets('guest tapping a doctor card is sent to login', (tester) async {
+    final state = AppState();
+    state.loginAsGuest();
+    await tester.pumpWidget(AppStateScope(
+        state: state, child: const MaterialApp(home: DoctorsScreen())));
     await tester.pumpAndSettle();
+    // Tap the first doctor card (not the Book button).
+    final card = find.text('Dr. Aarav Malhotra');
+    expect(card, findsOneWidget);
+    await tester.tap(card);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Please login to view details'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1300));
+    await tester.pump();
     expect(state.isLoggedIn, isFalse);
   });
 

@@ -4,6 +4,7 @@ import '../data/mock_data.dart';
 import '../models.dart';
 import '../responsive/animations.dart';
 import '../theme.dart';
+import '../state/app_state.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
 
@@ -84,6 +85,9 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (AppStateScope.of(context).isGuest) {
+      return const GuestGate(message: 'Please login to view details');
+    }
     final l = widget.lab;
     final tests = _tests();
     final selectedTests =

@@ -132,9 +132,8 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _placeOrder(AppState state, double total) async {
-    if (!await requireSignIn(context)) return;
-    if (!mounted) return;
+  void _placeOrder(AppState state, double total) {
+    if (!checkLogin(context)) return;
     if (_address.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

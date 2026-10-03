@@ -43,10 +43,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     if (state.isGuest) {
-      return const GuestGate(
-        title: 'My Appointments',
-        subtitle: 'Sign in to view and manage your appointments.',
-      );
+      return const GuestGate();
     }
     final upcoming =
         state.appointments.where((a) => a.status == 'upcoming').toList();

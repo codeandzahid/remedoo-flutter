@@ -106,10 +106,7 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     if (state.isGuest) {
-      return const GuestGate(
-        title: 'Medical History',
-        subtitle: 'Sign in to view your medical history.',
-      );
+      return const GuestGate();
     }
     final items = _timeline(state)
         .where((t) => _filter == 'all' || t.type == _filter)

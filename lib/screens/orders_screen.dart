@@ -47,10 +47,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     if (state.isGuest) {
-      return const GuestGate(
-        title: 'My Orders',
-        subtitle: 'Sign in to view and track your orders.',
-      );
+      return const GuestGate();
     }
     final active = state.activeOrders;
     final past = state.pastOrders;

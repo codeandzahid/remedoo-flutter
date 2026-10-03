@@ -4,6 +4,7 @@ import '../models.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../theme.dart';
+import '../state/app_state.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
 
@@ -17,6 +18,9 @@ class DoctorDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (AppStateScope.of(context).isGuest) {
+      return const GuestGate(message: 'Please login to view details');
+    }
     final d = doctor;
     final compact = context.isCompact;
     return Scaffold(

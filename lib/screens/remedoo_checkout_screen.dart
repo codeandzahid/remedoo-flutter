@@ -119,9 +119,8 @@ class _RemedooCheckoutScreenState
     );
   }
 
-  void _placeOrder(AppState state) async {
-    if (!await requireSignIn(context)) return;
-    if (!mounted) return;
+  void _placeOrder(AppState state) {
+    if (!checkLogin(context)) return;
     if (_address.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

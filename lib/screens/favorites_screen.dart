@@ -19,6 +19,9 @@ class FavoritesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
+    if (state.isGuest) {
+      return const GuestGate();
+    }
     final favs = state.favorites.toList();
     return Scaffold(
       body: Column(

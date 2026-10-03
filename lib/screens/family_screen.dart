@@ -15,10 +15,7 @@ class FamilyScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     if (state.isGuest) {
-      return const GuestGate(
-        title: 'Family Members',
-        subtitle: 'Sign in to manage your family members.',
-      );
+      return const GuestGate();
     }
     return Scaffold(
       body: Column(

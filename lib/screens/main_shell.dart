@@ -12,6 +12,11 @@ import 'hospitals_screen.dart';
 import 'labs_screen.dart';
 import 'orders_screen.dart';
 import 'pharmacies_screen.dart';
+import 'favorites_screen.dart';
+import 'appointments_screen.dart';
+import 'family_screen.dart';
+import 'reminders_screen.dart';
+import 'profile_screen.dart';
 
 /// Adaptive shell: floating white bottom bar on phones (the React 5-tab set:
 /// Home / Hospitals / Labs / Pharmacy / Orders), rail on tablets, permanent
@@ -51,6 +56,31 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _index = widget.initialIndex;
+  }
+
+  /// Reference-style tab switch: guests get the login toast + redirect when
+  /// heading to a gated page (Orders). Must run before setState — the
+  /// IndexedStack builds every page eagerly, so the gate cannot live in the
+  /// page's own initState.
+  void _switchTab(int pageIndex) {
+    if (pageIndex == 5) {
+      if (!checkLogin(context)) return;
+    }
+    setState(() => _index = pageIndex);
+  }
+
+  /// Drawer navigation with the reference-style guest gate: toast + redirect
+  /// to login for Favorites, Orders, Appointments, Family, Reminders, Profile.
+  void _pushDrawer(BuildContext context, Widget page) {
+    if (page is FavoritesScreen ||
+        page is OrdersScreen ||
+        page is AppointmentsScreen ||
+        page is FamilyScreen ||
+        page is RemindersScreen ||
+        page is ProfileScreen) {
+      if (!checkLogin(context)) return;
+    }
+    pushPage(context, page);
   }
 
   List<NavDestinationItem> _destinations(AppState state) => [
@@ -93,7 +123,10 @@ class _MainShellState extends State<MainShell> {
       foregroundColor: Colors.white,
       shape: const CircleBorder(),
       tooltip: 'Support',
-      onPressed: () => showHelpDialog(context),
+      onPressed: () {
+        if (!checkLogin(context, 'Please login to access support')) return;
+        showHelpDialog(context);
+      },
       child: const Icon(Icons.support_agent),
     );
   }
@@ -117,7 +150,7 @@ class _MainShellState extends State<MainShell> {
         ),
         bottomNavigationBar: RBottomNav(
           currentIndex: _navIndexFor(_index),
-          onTap: (i) => setState(() => _index = _navToPage[i]),
+          onTap: (i) => _switchTab(_navToPage[i]),
         ),
         floatingActionButton: _supportFab(context),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -128,12 +161,12 @@ class _MainShellState extends State<MainShell> {
     // React sidebar: quick-actions grid on top, React-style nav rows).
     return ResponsiveScaffold(
       selectedIndex: _index,
-      onDestinationSelected: (i) => setState(() => _index = i),
+      onDestinationSelected: (i) => _switchTab(i),
       sections: [NavSection('', _destinations(state))],
       pages: _pages,
       drawerHeader: _drawerHeader(context),
       drawerLeading: RQuickActionsGrid(
-        onPush: (page) => pushPage(context, page),
+        onPush: (page) => _pushDrawer(context, page),
       ),
       floatingActionButton: _supportFab(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

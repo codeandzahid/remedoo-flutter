@@ -302,6 +302,7 @@ class _LabsScreenState extends State<LabsScreen> {
           LabCompareSheet.show(context, _compareA!, l);
           setState(() => _compareA = null);
         } else {
+          if (!checkLogin(context, 'Please login to view details')) return;
           pushPage(context, LabDetailScreen(lab: l));
         }
       },

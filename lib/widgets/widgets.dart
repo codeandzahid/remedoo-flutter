@@ -4,7 +4,6 @@ import '../theme.dart';
 import '../models.dart';
 import '../data/mock_data.dart';
 import '../state/app_state.dart';
-import '../responsive/responsive.dart';
 
 // Shared building blocks for the Remedoo app.
 //
@@ -899,67 +898,70 @@ Future<bool> confirmDialog(
   return res ?? false;
 }
 
-/// Full-screen gate for guests on screens that require a signed-in account
-/// (appointments, orders, family, reminders, ...). Guests may browse the app
-/// freely, but personal/transactional areas ask them to sign in first.
+/// Reference-style guest gate (matches remedoo.inboxxahid.workers.dev):
+/// no modal dialogs — a toast is shown and the guest is redirected to the
+/// login page, which always offers "Skip, continue as guest".
+///
+/// Returns true when the user is signed in. For guests it shows [message] as
+/// a toast, redirects to login after a beat, and returns false so callers
+/// can bail out of the tapped action.
+bool checkLogin(BuildContext context,
+    [String message = 'Please login to access this feature']) {
+  final state = AppStateScope.of(context);
+  if (!state.isGuest) return true;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message)),
+  );
+  // Let the toast show, then exit guest mode → RootGate → LoginScreen.
+  Future.delayed(const Duration(milliseconds: 1200), () {
+    if (state.isGuest) state.logout();
+  });
+  return false;
+}
+
+/// Passive full-screen guest gate (backstop for screens that require a
+/// signed-in account). Shows the message with a Sign In action that exits
+/// guest mode to the login page. Intentionally passive (no auto-redirect):
+/// it must be safe to build eagerly inside an IndexedStack. The
+/// reference-style toast + redirect happens at navigation time via
+/// [checkLogin].
 class GuestGate extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
+  final String message;
 
   const GuestGate({
     super.key,
-    required this.title,
-    required this.subtitle,
-    this.icon = Icons.lock_outline,
+    this.message = 'Please login to access this feature',
   });
 
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: MaxWidthBox(
-        child: REmptyState(
-          icon: icon,
-          title: 'Sign in required',
-          subtitle: subtitle,
-          actionLabel: 'Sign In',
-          // Log out of guest mode; RootGate rebuilds straight to LoginScreen.
-          onAction: () => state.logout(),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                // Exit guest mode; RootGate rebuilds straight to LoginScreen.
+                onPressed: () => state.logout(),
+                child: const Text('Sign In'),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
-}
-
-/// Call at the top of an `onPressed` that a guest must not perform
-/// (book appointment, place order, ...). Returns true when the user is
-/// signed in; otherwise shows a "Sign in required" dialog and returns false.
-/// If the user chooses Sign In, guest mode is exited to the login screen.
-Future<bool> requireSignIn(BuildContext context) async {
-  final state = AppStateScope.of(context);
-  if (!state.isGuest) return true;
-  final go = await showDialog<bool>(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text('Sign in required'),
-      content: const Text(
-          'Please sign in to continue. Guests can browse, but booking and ordering need an account.'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('Sign In'),
-        ),
-      ],
-    ),
-  );
-  if (go == true) state.logout();
-  return false;
 }
 
 // ============================================================================
