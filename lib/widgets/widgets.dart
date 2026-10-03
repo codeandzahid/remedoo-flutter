@@ -853,7 +853,7 @@ class LabCompareSheet extends StatelessWidget {
 void showHelpDialog(BuildContext context) {
   showDialog(
     context: context,
-    builder: (_) => AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       title: const Text('Need help?'),
       content: const Text(
         'Our support team is available 24x7.\n\n'
@@ -863,7 +863,7 @@ void showHelpDialog(BuildContext context) {
       ),
       actions: [
         FilledButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(dialogContext),
           child: const Text('OK'),
         ),
       ],
@@ -880,16 +880,16 @@ Future<bool> confirmDialog(
 }) async {
   final res = await showDialog<bool>(
     context: context,
-    builder: (_) => AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       title: Text(title),
       content: Text(message),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context, false),
+          onPressed: () => Navigator.pop(dialogContext, false),
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: () => Navigator.pop(context, true),
+          onPressed: () => Navigator.pop(dialogContext, true),
           child: Text(confirmLabel),
         ),
       ],
