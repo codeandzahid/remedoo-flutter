@@ -574,30 +574,32 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                RButton(
-                  label: 'Book Appointment',
-                  icon: Icons.calendar_month,
-                  small: true,
-                  fullWidth: true,
-                  onPressed: () {
-                    if (!checkLogin(
-                        context, 'Please login to book appointments')) {
-                      return;
-                    }
-                    pushPage(
-                      context,
-                      BookingScreen(
-                        kind: 'doctor',
-                        refId: d.id,
-                        title: d.name,
-                        subtitle: d.specialty,
-                        place: d.hospital,
-                        fee: d.fee,
-                      ),
-                    );
-                  },
-                ),
+                if (!state.isGuest) ...[
+                  const SizedBox(height: 12),
+                  RButton(
+                    label: 'Book Appointment',
+                    icon: Icons.calendar_month,
+                    small: true,
+                    fullWidth: true,
+                    onPressed: () {
+                      if (!checkLogin(
+                          context, 'Please login to book appointments')) {
+                        return;
+                      }
+                      pushPage(
+                        context,
+                        BookingScreen(
+                          kind: 'doctor',
+                          refId: d.id,
+                          title: d.name,
+                          subtitle: d.specialty,
+                          place: d.hospital,
+                          fee: d.fee,
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
           ),

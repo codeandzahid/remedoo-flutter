@@ -201,25 +201,16 @@ void main() {
     expect(state.appointments, isEmpty);
   });
 
-  testWidgets('guest book-appointment button asks login first', (tester) async {
+  testWidgets('guest does not see book-appointment buttons', (tester) async {
     final state = AppState();
     state.loginAsGuest();
     await tester.pumpWidget(AppStateScope(
         state: state, child: const MaterialApp(home: DoctorsScreen())));
     await tester.pumpAndSettle();
-    // The "Book Appointment" button on a doctor card.
-    final book = find.widgetWithText(RButton, 'Book Appointment');
-    expect(book, findsWidgets);
-    await tester.ensureVisible(book.at(0));
-    await tester.pumpAndSettle();
-    await tester.tap(book.at(0));
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Please login to book appointments'), findsOneWidget);
+    // No "Book Appointment" button is shown to guests at all.
+    expect(find.widgetWithText(RButton, 'Book Appointment'), findsNothing);
     expect(state.appointments, isEmpty);
-    await tester.pump(const Duration(milliseconds: 1300));
-    await tester.pump();
-    expect(state.isLoggedIn, isFalse);
+    expect(state.isGuest, isTrue);
   });
 
   testWidgets('guest tapping a doctor card is sent to login', (tester) async {

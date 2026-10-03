@@ -4,6 +4,7 @@ import '../data/mock_data.dart';
 import '../models.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
+import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
@@ -308,14 +309,15 @@ class EmergencyScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: RButton(
-                    label: 'Book',
-                    icon: Icons.calendar_month,
-                    variant: RButtonVariant.outline,
-                    small: true,
-                    onPressed: () {
+                if (!AppStateScope.of(context).isGuest) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RButton(
+                      label: 'Book',
+                      icon: Icons.calendar_month,
+                      variant: RButtonVariant.outline,
+                      small: true,
+                      onPressed: () {
                       if (!checkLogin(
                           context, 'Please login to book appointments')) {
                         return;
@@ -335,7 +337,8 @@ class EmergencyScreen extends StatelessWidget {
                       );
                     },
                   ),
-                ),
+                  ),
+                ],
               ],
             ),
           ],

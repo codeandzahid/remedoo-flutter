@@ -427,7 +427,7 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
                     ],
                   ),
                 ),
-                if (!h.government) ...[
+                if (!h.government && !AppStateScope.of(context).isGuest) ...[
                   const SizedBox(height: 10),
                   RButton(
                     label: 'Book Appointment',
