@@ -1,4 +1,4 @@
--- medicines rows 50-99
+-- medicines rows 50-99 (user_id excluded)
 INSERT INTO public."medicines" ("id", "pharmacy_id", "name", "generic_name", "category", "description", "price", "discount_percent", "image_url", "requires_prescription", "in_stock", "stock_quantity", "unit", "created_at", "batch_number", "expiry_date", "low_stock_threshold", "manufacturer", "is_featured", "featured_sort_order", "brand_name") VALUES
 ('2d024f5f-5520-4aee-a674-20dc79174562', 'e5d02cdf-ed07-4ea5-9247-69cb507fd398', 'Metformin 500 Generic', 'Metformin', 'Diabetes', 'Generic diabetes medication', 15, 0, 'https://suicqpfijnsortcszqep.supabase.co/storage/v1/object/public/medicine-images/diabetes.png', TRUE, TRUE, 0, 'strip', '2026-03-05T14:08:57.663481+00:00', NULL, NULL, 10, 'Generic', FALSE, 0, NULL),
 ('61b51e28-e810-4797-860c-5ccd225e87f2', '3da9d98d-6f7c-4bbd-b24e-ac475ee5ac04', 'Insulin Glargine', 'Insulin Glargine', 'Diabetes', 'Long-acting insulin injection', 1200, 0, 'https://suicqpfijnsortcszqep.supabase.co/storage/v1/object/public/medicine-images/diabetes.png', TRUE, TRUE, 0, 'strip', '2026-03-05T14:08:57.663481+00:00', NULL, NULL, 10, 'Sanofi', FALSE, 0, NULL),

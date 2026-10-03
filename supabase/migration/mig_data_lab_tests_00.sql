@@ -1,4 +1,4 @@
--- lab_tests rows 0-32
+-- lab_tests rows 0-32 (user_id excluded)
 INSERT INTO public."lab_tests" ("id", "name", "category", "description", "sample_type", "turnaround_time", "price", "discount_percent", "is_popular", "requires_fasting", "home_collection", "lab_id", "created_at", "home_collection_fee") VALUES
 ('d03d8d77-c50e-4d25-a45b-c0d0ca08090a', 'Complete Blood Count (CBC)', 'Hematology', 'Measures red & white blood cells, hemoglobin, platelets', 'Blood', '4 hours', 350, 10, TRUE, FALSE, TRUE, '063756ad-7604-4269-9295-67169edda6db', '2026-03-05T14:07:18.417177+00:00', 50),
 ('ea0bbb5f-abd9-46d6-a4f3-883f7b9f60c0', 'Thyroid Profile (T3, T4, TSH)', 'Endocrinology', 'Comprehensive thyroid function assessment', 'Blood', '6 hours', 650, 15, TRUE, FALSE, TRUE, '063756ad-7604-4269-9295-67169edda6db', '2026-03-05T14:07:18.417177+00:00', 50),
