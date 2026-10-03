@@ -1,237 +1,4 @@
-    ELSIF NEW.pharmacy_id IS NOT NULL THEN
-      SELECT name INTO provider_name FROM pharmacies WHERE id = NEW.pharmacy_id;
-    END IF;
-    provider_name := COALESCE(provider_name, 'your provider');
-
-    notif_title := CASE NEW.status
-      WHEN 'confirmed' THEN 'Appointment Confirmed ✅'
-      WHEN 'cancelled' THEN 'Appointment Cancelled ❌'
-    END;
-    notif_message := 'Your ' || NEW.service_type || ' appointment with ' || provider_name || ' on ' || NEW.appointment_date || ' at ' || NEW.appointment_time || ' has been ' || NEW.status || '.';
-
-    PERFORM net.http_post(
-      url := 'https://zjlznbgcfzpcveqyjglf.supabase.co/functions/v1/send-push-notification',
-      body := jsonb_build_object(
-        'user_id', NEW.patient_id,
-        'title', notif_title,
-        'message', notif_message,
-        'path', '/appointments'
-      ),
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1aWNxcGZpam5zb3J0Y3N6cWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMDc4MjQsImV4cCI6MjA4Nzc4MzgyNH0.teNIccPIhtIoPmAHd9OtNHi0XyPOXsJcoiHygjuA1RQ'
-      )
-    );
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
--- ===== 20260228174411_b8943079-e2f0-45e3-80a4-95e5d719c7cb.sql =====
-
-CREATE OR REPLACE FUNCTION public.push_notify_appointment_confirmed()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-DECLARE
-  provider_name TEXT;
-  notif_title TEXT;
-  notif_message TEXT;
-BEGIN
-  IF TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM NEW.status AND NEW.status IN ('confirmed', 'cancelled', 'completed') THEN
-    IF NEW.doctor_id IS NOT NULL THEN
-      SELECT name INTO provider_name FROM doctors WHERE id = NEW.doctor_id;
-    ELSIF NEW.hospital_id IS NOT NULL THEN
-      SELECT name INTO provider_name FROM hospitals WHERE id = NEW.hospital_id;
-    ELSIF NEW.lab_id IS NOT NULL THEN
-      SELECT name INTO provider_name FROM labs WHERE id = NEW.lab_id;
-    ELSIF NEW.pharmacy_id IS NOT NULL THEN
-      SELECT name INTO provider_name FROM pharmacies WHERE id = NEW.pharmacy_id;
-    END IF;
-    provider_name := COALESCE(provider_name, 'your provider');
-
-    notif_title := CASE NEW.status
-      WHEN 'confirmed' THEN 'Appointment Confirmed ✅'
-      WHEN 'cancelled' THEN 'Appointment Cancelled ❌'
-      WHEN 'completed' THEN 'Appointment Completed 🎉'
-    END;
-    notif_message := 'Your ' || NEW.service_type || ' appointment with ' || provider_name || ' on ' || NEW.appointment_date || ' at ' || NEW.appointment_time || ' has been ' || NEW.status || '.';
-
-    PERFORM net.http_post(
-      url := 'https://zjlznbgcfzpcveqyjglf.supabase.co/functions/v1/send-push-notification',
-      body := jsonb_build_object(
-        'user_id', NEW.patient_id,
-        'title', notif_title,
-        'message', notif_message,
-        'path', '/appointments'
-      ),
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1aWNxcGZpam5zb3J0Y3N6cWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMDc4MjQsImV4cCI6MjA4Nzc4MzgyNH0.teNIccPIhtIoPmAHd9OtNHi0XyPOXsJcoiHygjuA1RQ'
-      )
-    );
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
--- ===== 20260228181734_2cbe7bf1-5a2d-4c1c-a2cb-4a711c892837.sql =====
-
--- Add approval_status to provider tables
-ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'approved';
-ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'approved';
-ALTER TABLE public.labs ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'approved';
-ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'approved';
-
--- Add status to profiles for user management
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
-
--- Add indexes for filtering
-CREATE INDEX IF NOT EXISTS idx_doctors_approval ON public.doctors(approval_status);
-CREATE INDEX IF NOT EXISTS idx_hospitals_approval ON public.hospitals(approval_status);
-CREATE INDEX IF NOT EXISTS idx_labs_approval ON public.labs(approval_status);
-CREATE INDEX IF NOT EXISTS idx_pharmacies_approval ON public.pharmacies(approval_status);
-CREATE INDEX IF NOT EXISTS idx_profiles_status ON public.profiles(status);
-
--- Allow admins to manage emergency_requests (update status, assign ambulance)
-CREATE POLICY "Admins can update emergency requests"
-ON public.emergency_requests
-FOR UPDATE
-USING (has_role(auth.uid(), 'admin'::app_role));
-
--- Allow admins to manage ambulances
-CREATE POLICY "Admins can update ambulances"
-ON public.ambulances
-FOR UPDATE
-USING (has_role(auth.uid(), 'admin'::app_role));
-
--- Allow admins to delete appointments
-CREATE POLICY "Admins can delete appointments"
-ON public.appointments
-FOR DELETE
-USING (has_role(auth.uid(), 'admin'::app_role));
-
--- ===== 20260301005104_7908edf2-cfd9-4ca5-aaa2-caad771e25ee.sql =====
-
--- Add new provider roles to the app_role enum
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'doctor';
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'hospital_admin';
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'lab_admin';
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'pharmacy_admin';
-
--- Add user_id column to doctors table
-ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
-
--- Add user_id column to hospitals table
-ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
-
--- Add user_id column to labs table
-ALTER TABLE public.labs ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
-
--- Add user_id column to pharmacies table
-ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
-
--- Create indexes for user_id lookups
-CREATE INDEX IF NOT EXISTS idx_doctors_user_id ON public.doctors(user_id);
-CREATE INDEX IF NOT EXISTS idx_hospitals_user_id ON public.hospitals(user_id);
-CREATE INDEX IF NOT EXISTS idx_labs_user_id ON public.labs(user_id);
-CREATE INDEX IF NOT EXISTS idx_pharmacies_user_id ON public.pharmacies(user_id);
-
--- RLS: Allow providers to view/update their own records
-CREATE POLICY "Doctors can view own record" ON public.doctors FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Doctors can update own record" ON public.doctors FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Hospital admins can view own record" ON public.hospitals FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Hospital admins can update own record" ON public.hospitals FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Lab admins can view own record" ON public.labs FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Lab admins can update own record" ON public.labs FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Pharmacy admins can view own record" ON public.pharmacies FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Pharmacy admins can update own record" ON public.pharmacies FOR UPDATE USING (auth.uid() = user_id);
-
--- Allow providers to view their own appointments
-CREATE POLICY "Doctors can view their appointments" ON public.appointments FOR SELECT USING (
-  doctor_id IN (SELECT id FROM public.doctors WHERE user_id = auth.uid())
-);
-CREATE POLICY "Doctors can update their appointments" ON public.appointments FOR UPDATE USING (
-  doctor_id IN (SELECT id FROM public.doctors WHERE user_id = auth.uid())
-);
-
-CREATE POLICY "Hospital admins can view their appointments" ON public.appointments FOR SELECT USING (
-  hospital_id IN (SELECT id FROM public.hospitals WHERE user_id = auth.uid())
-);
-
-CREATE POLICY "Lab admins can view their appointments" ON public.appointments FOR SELECT USING (
-  lab_id IN (SELECT id FROM public.labs WHERE user_id = auth.uid())
-);
-
-CREATE POLICY "Pharmacy admins can view their appointments" ON public.appointments FOR SELECT USING (
-  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
-);
-
--- Allow pharmacy admins to view orders for their pharmacy
-CREATE POLICY "Pharmacy admins can view their orders" ON public.orders FOR SELECT USING (
-  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
-);
-CREATE POLICY "Pharmacy admins can update their orders" ON public.orders FOR UPDATE USING (
-  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
-);
-
--- Allow pharmacy admins to manage their medicines
-CREATE POLICY "Pharmacy admins can view their medicines" ON public.medicines FOR SELECT USING (
-  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
-);
-CREATE POLICY "Pharmacy admins can insert medicines" ON public.medicines FOR INSERT WITH CHECK (
-  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
-);
-CREATE POLICY "Pharmacy admins can update their medicines" ON public.medicines FOR UPDATE USING (
-  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
-);
-CREATE POLICY "Pharmacy admins can delete their medicines" ON public.medicines FOR DELETE USING (
-  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
-);
-
--- ===== 20260301010615_09e53e49-55f7-4b0f-9503-6d9814380b98.sql =====
-
--- Allow users to view their own roles
-CREATE POLICY "Users can view own roles"
-ON public.user_roles FOR SELECT
-TO authenticated
-USING (auth.uid() = user_id);
-
--- Allow authenticated users to insert themselves as providers (pending approval)
-CREATE POLICY "Users can register as doctor"
-ON public.doctors FOR INSERT
-TO authenticated
-WITH CHECK (auth.uid() = user_id AND approval_status = 'pending');
-
-CREATE POLICY "Users can register as hospital"
-ON public.hospitals FOR INSERT
-TO authenticated
-WITH CHECK (auth.uid() = user_id AND approval_status = 'pending');
-
-CREATE POLICY "Users can register as lab"
-ON public.labs FOR INSERT
-TO authenticated
-WITH CHECK (auth.uid() = user_id AND approval_status = 'pending');
-
-CREATE POLICY "Users can register as pharmacy"
-ON public.pharmacies FOR INSERT
-TO authenticated
-WITH CHECK (auth.uid() = user_id AND approval_status = 'pending');
-
--- Allow users to assign themselves a provider role (only provider roles, not admin)
-CREATE POLICY "Users can self-assign provider role"
-ON public.user_roles FOR INSERT
-TO authenticated
-WITH CHECK (
-  auth.uid() = user_id 
-  AND role IN ('doctor'::app_role, 'hospital_admin'::app_role, 'lab_admin'::app_role, 'pharmacy_admin'::app_role)
-);
-
+-- chunk 2
 -- ===== 20260301032454_07c293fa-22bb-4aa4-aec6-75e7ba5bcac2.sql =====
 
 -- =============================================
@@ -1198,3 +965,481 @@ CREATE TABLE public.payout_requests (
   provider_id UUID NOT NULL,
   user_id UUID NOT NULL,
   amount NUMERIC NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending, approved, rejected, paid
+  bank_details JSONB,
+  admin_notes TEXT,
+  requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by UUID,
+  paid_at TIMESTAMPTZ,
+  transaction_reference TEXT
+);
+
+ALTER TABLE public.payout_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can manage all payouts"
+ON public.payout_requests FOR ALL
+USING (public.has_role(auth.uid(), 'admin'))
+WITH CHECK (public.has_role(auth.uid(), 'admin'));
+
+CREATE POLICY "Providers can view own payouts"
+ON public.payout_requests FOR SELECT
+USING (user_id = auth.uid());
+
+CREATE POLICY "Providers can create own payouts"
+ON public.payout_requests FOR INSERT
+WITH CHECK (user_id = auth.uid());
+
+-- =============================================
+-- 5. MEDICINE BATCH + EXPIRY TRACKING
+-- =============================================
+ALTER TABLE public.medicines
+ADD COLUMN IF NOT EXISTS batch_number TEXT,
+ADD COLUMN IF NOT EXISTS expiry_date DATE,
+ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER DEFAULT 10,
+ADD COLUMN IF NOT EXISTS manufacturer TEXT;
+
+-- =============================================
+-- 6. LAB SAMPLE COLLECTIONS
+-- =============================================
+CREATE TABLE public.lab_sample_collections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  appointment_id UUID NOT NULL REFERENCES appointments(id),
+  lab_id UUID NOT NULL REFERENCES labs(id),
+  patient_id UUID NOT NULL,
+  test_name TEXT NOT NULL,
+  sample_type TEXT NOT NULL DEFAULT 'Blood',
+  collection_type TEXT NOT NULL DEFAULT 'walk_in', -- walk_in, home
+  collection_address TEXT,
+  scheduled_date DATE NOT NULL,
+  scheduled_time TIME,
+  collected_at TIMESTAMPTZ,
+  status TEXT NOT NULL DEFAULT 'scheduled', -- scheduled, collected, processing, completed, cancelled
+  collector_name TEXT,
+  collector_phone TEXT,
+  report_url TEXT,
+  report_version INTEGER NOT NULL DEFAULT 1,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.lab_sample_collections ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can manage all samples"
+ON public.lab_sample_collections FOR ALL
+USING (public.has_role(auth.uid(), 'admin'))
+WITH CHECK (public.has_role(auth.uid(), 'admin'));
+
+CREATE POLICY "Labs can manage own samples"
+ON public.lab_sample_collections FOR ALL
+USING (lab_id IN (SELECT id FROM labs WHERE user_id = auth.uid()))
+WITH CHECK (lab_id IN (SELECT id FROM labs WHERE user_id = auth.uid()));
+
+CREATE POLICY "Patients can view own samples"
+ON public.lab_sample_collections FOR SELECT
+USING (patient_id = auth.uid());
+
+-- =============================================
+-- 7. SUPPORT TICKETS
+-- =============================================
+CREATE TABLE public.support_tickets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  subject TEXT NOT NULL,
+  description TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'general', -- general, payment, appointment, order, technical
+  priority TEXT NOT NULL DEFAULT 'medium', -- low, medium, high, urgent
+  status TEXT NOT NULL DEFAULT 'open', -- open, in_progress, resolved, closed
+  admin_response TEXT,
+  resolved_by UUID,
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can manage all tickets"
+ON public.support_tickets FOR ALL
+USING (public.has_role(auth.uid(), 'admin'))
+WITH CHECK (public.has_role(auth.uid(), 'admin'));
+
+CREATE POLICY "Users can create own tickets"
+ON public.support_tickets FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own tickets"
+ON public.support_tickets FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own tickets"
+ON public.support_tickets FOR UPDATE
+USING (auth.uid() = user_id);
+
+-- =============================================
+-- 8. SUSPICIOUS ACTIVITY LOGS
+-- =============================================
+CREATE TABLE public.suspicious_activity_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID,
+  activity_type TEXT NOT NULL, -- failed_login, unusual_access, rate_limit, data_anomaly
+  description TEXT NOT NULL,
+  ip_address TEXT,
+  severity TEXT NOT NULL DEFAULT 'low', -- low, medium, high, critical
+  resolved BOOLEAN NOT NULL DEFAULT false,
+  resolved_by UUID,
+  resolved_at TIMESTAMPTZ,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.suspicious_activity_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Only admins can manage suspicious logs"
+ON public.suspicious_activity_logs FOR ALL
+USING (public.has_role(auth.uid(), 'admin'))
+WITH CHECK (public.has_role(auth.uid(), 'admin'));
+
+-- =============================================
+-- 9. COMMISSION ENGINE: Auto-create earnings on appointment completion
+-- =============================================
+CREATE OR REPLACE FUNCTION public.auto_create_provider_earning()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_commission_percent NUMERIC := 10;
+  v_gross NUMERIC := 0;
+  v_provider_type TEXT;
+  v_provider_id UUID;
+  v_config RECORD;
+  v_wallet RECORD;
+BEGIN
+  -- Only trigger on completion
+  IF NEW.status = 'completed' AND (OLD.status IS DISTINCT FROM 'completed') THEN
+    -- Determine provider
+    IF NEW.doctor_id IS NOT NULL THEN
+      v_provider_type := 'doctor';
+      v_provider_id := NEW.doctor_id;
+      SELECT consultation_fee INTO v_gross FROM doctors WHERE id = NEW.doctor_id;
+      v_gross := COALESCE(v_gross, 0);
+    ELSIF NEW.lab_id IS NOT NULL THEN
+      v_provider_type := 'lab';
+      v_provider_id := NEW.lab_id;
+      v_gross := 0; -- Lab tests priced differently
+    ELSE
+      RETURN NEW;
+    END IF;
+
+    -- Get commission rate from config
+    SELECT commission_percent INTO v_commission_percent
+    FROM platform_commission_config
+    WHERE provider_type = v_provider_type AND service_type = 'appointment' AND is_active = true
+    LIMIT 1;
+    v_commission_percent := COALESCE(v_commission_percent, 10);
+
+    IF v_gross > 0 THEN
+      -- Insert earning (ignore if duplicate)
+      INSERT INTO provider_earnings (provider_type, provider_id, reference_type, reference_id, gross_amount, commission_percent, commission_amount, net_amount, description)
+      VALUES (v_provider_type, v_provider_id, 'appointment', NEW.id, v_gross, v_commission_percent, ROUND(v_gross * v_commission_percent / 100, 2), ROUND(v_gross * (100 - v_commission_percent) / 100, 2), NEW.service_type || ' appointment')
+      ON CONFLICT (reference_type, reference_id) DO NOTHING;
+
+      -- Upsert wallet
+      INSERT INTO provider_wallets (provider_type, provider_id, user_id, total_earned, available_balance)
+      SELECT v_provider_type, v_provider_id, 
+        CASE v_provider_type WHEN 'doctor' THEN (SELECT user_id FROM doctors WHERE id = v_provider_id) WHEN 'lab' THEN (SELECT user_id FROM labs WHERE id = v_provider_id) END,
+        ROUND(v_gross * (100 - v_commission_percent) / 100, 2),
+        ROUND(v_gross * (100 - v_commission_percent) / 100, 2)
+      ON CONFLICT (provider_type, provider_id) DO UPDATE SET
+        total_earned = provider_wallets.total_earned + ROUND(v_gross * (100 - v_commission_percent) / 100, 2),
+        available_balance = provider_wallets.available_balance + ROUND(v_gross * (100 - v_commission_percent) / 100, 2),
+        updated_at = now();
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_auto_provider_earning
+BEFORE UPDATE ON public.appointments
+FOR EACH ROW
+EXECUTE FUNCTION public.auto_create_provider_earning();
+
+-- =============================================
+-- 10. Auto-commission for pharmacy orders on delivery
+-- =============================================
+CREATE OR REPLACE FUNCTION public.auto_create_pharmacy_earning()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_commission_percent NUMERIC := 8;
+  v_gross NUMERIC;
+  v_user_id UUID;
+BEGIN
+  IF NEW.status = 'delivered' AND (OLD.status IS DISTINCT FROM 'delivered') THEN
+    v_gross := NEW.subtotal;
+
+    SELECT commission_percent INTO v_commission_percent
+    FROM platform_commission_config
+    WHERE provider_type = 'pharmacy' AND service_type = 'order' AND is_active = true
+    LIMIT 1;
+    v_commission_percent := COALESCE(v_commission_percent, 8);
+
+    SELECT user_id INTO v_user_id FROM pharmacies WHERE id = NEW.pharmacy_id;
+
+    INSERT INTO provider_earnings (provider_type, provider_id, reference_type, reference_id, gross_amount, commission_percent, commission_amount, net_amount, description)
+    VALUES ('pharmacy', NEW.pharmacy_id, 'order', NEW.id, v_gross, v_commission_percent, ROUND(v_gross * v_commission_percent / 100, 2), ROUND(v_gross * (100 - v_commission_percent) / 100, 2), 'Order delivery')
+    ON CONFLICT (reference_type, reference_id) DO NOTHING;
+
+    INSERT INTO provider_wallets (provider_type, provider_id, user_id, total_earned, available_balance)
+    VALUES ('pharmacy', NEW.pharmacy_id, v_user_id, ROUND(v_gross * (100 - v_commission_percent) / 100, 2), ROUND(v_gross * (100 - v_commission_percent) / 100, 2))
+    ON CONFLICT (provider_type, provider_id) DO UPDATE SET
+      total_earned = provider_wallets.total_earned + ROUND(v_gross * (100 - v_commission_percent) / 100, 2),
+      available_balance = provider_wallets.available_balance + ROUND(v_gross * (100 - v_commission_percent) / 100, 2),
+      updated_at = now();
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_auto_pharmacy_earning
+BEFORE UPDATE ON public.orders
+FOR EACH ROW
+EXECUTE FUNCTION public.auto_create_pharmacy_earning();
+
+-- =============================================
+-- 11. Auto-commission for ambulance trips
+-- =============================================
+CREATE OR REPLACE FUNCTION public.auto_create_ambulance_earning()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_commission_percent NUMERIC := 5;
+  v_gross NUMERIC;
+BEGIN
+  IF NEW.status = 'completed' AND (OLD.status IS DISTINCT FROM 'completed') AND NOT COALESCE(NEW.is_free, false) THEN
+    v_gross := COALESCE(NEW.total_fare, 0);
+    IF v_gross <= 0 THEN RETURN NEW; END IF;
+
+    SELECT commission_percent INTO v_commission_percent
+    FROM platform_commission_config
+    WHERE provider_type = 'hospital' AND service_type = 'ambulance' AND is_active = true
+    LIMIT 1;
+    v_commission_percent := COALESCE(v_commission_percent, 5);
+
+    -- Insert into hospital_earnings (existing table)
+    INSERT INTO hospital_earnings (hospital_id, type, amount, platform_commission, net_earning, appointment_id, description)
+    VALUES (NEW.hospital_id, 'ambulance', v_gross, ROUND(v_gross * v_commission_percent / 100, 2), ROUND(v_gross * (100 - v_commission_percent) / 100, 2), NULL, 'Ambulance trip #' || LEFT(NEW.id::text, 8));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_auto_ambulance_earning
+BEFORE UPDATE ON public.ambulance_trips
+FOR EACH ROW
+EXECUTE FUNCTION public.auto_create_ambulance_earning();
+
+-- =============================================
+-- 12. LAB TEST PACKAGES
+-- =============================================
+CREATE TABLE public.lab_test_packages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lab_id UUID NOT NULL REFERENCES labs(id),
+  name TEXT NOT NULL,
+  description TEXT,
+  tests JSONB NOT NULL DEFAULT '[]'::jsonb, -- array of {test_id, test_name}
+  package_price NUMERIC NOT NULL DEFAULT 0,
+  discount_percent NUMERIC DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.lab_test_packages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Everyone can view active packages"
+ON public.lab_test_packages FOR SELECT USING (true);
+
+CREATE POLICY "Lab admins can manage own packages"
+ON public.lab_test_packages FOR ALL
+USING (lab_id IN (SELECT id FROM labs WHERE user_id = auth.uid()))
+WITH CHECK (lab_id IN (SELECT id FROM labs WHERE user_id = auth.uid()));
+
+CREATE POLICY "Admins can manage all packages"
+ON public.lab_test_packages FOR ALL
+USING (public.has_role(auth.uid(), 'admin'))
+WITH CHECK (public.has_role(auth.uid(), 'admin'));
+
+-- =============================================
+-- 13. Enable realtime for key tables
+-- =============================================
+ALTER PUBLICATION supabase_realtime ADD TABLE public.support_tickets;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.payout_requests;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.suspicious_activity_logs;
+
+-- Updated_at triggers
+CREATE TRIGGER update_commission_config_ts BEFORE UPDATE ON public.platform_commission_config FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_sample_collections_ts BEFORE UPDATE ON public.lab_sample_collections FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_support_tickets_ts BEFORE UPDATE ON public.support_tickets FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- ===== 20260302141301_fdf903de-f37e-44ad-830e-b148359e7cfb.sql =====
+
+-- Dashboard Quick Actions (configurable from admin)
+CREATE TABLE public.dashboard_quick_actions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  label text NOT NULL,
+  icon_name text NOT NULL DEFAULT 'Calendar',
+  emoji text,
+  gradient text DEFAULT 'from-primary to-[hsl(190,70%,45%)]',
+  path text NOT NULL DEFAULT '/',
+  sort_order integer DEFAULT 0,
+  active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.dashboard_quick_actions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read quick actions" ON public.dashboard_quick_actions FOR SELECT USING (true);
+CREATE POLICY "Admins manage quick actions" ON public.dashboard_quick_actions FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+
+-- Dashboard Services (Browse Services section)
+CREATE TABLE public.dashboard_services (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text,
+  icon_name text NOT NULL DEFAULT 'Stethoscope',
+  path text NOT NULL DEFAULT '/',
+  color text DEFAULT 'text-primary',
+  bg_color text DEFAULT 'bg-primary/10',
+  sort_order integer DEFAULT 0,
+  active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.dashboard_services ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read services" ON public.dashboard_services FOR SELECT USING (true);
+CREATE POLICY "Admins manage services" ON public.dashboard_services FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+
+-- Dashboard Health Tips
+CREATE TABLE public.dashboard_health_tips (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text NOT NULL,
+  icon_name text NOT NULL DEFAULT 'Heart',
+  color text DEFAULT 'text-primary',
+  bg_color text DEFAULT 'bg-primary/10',
+  sort_order integer DEFAULT 0,
+  active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.dashboard_health_tips ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read health tips" ON public.dashboard_health_tips FOR SELECT USING (true);
+CREATE POLICY "Admins manage health tips" ON public.dashboard_health_tips FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+
+-- Add featured flags to doctors and medicines
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS is_featured boolean DEFAULT false;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS featured_sort_order integer DEFAULT 0;
+
+ALTER TABLE public.medicines ADD COLUMN IF NOT EXISTS is_featured boolean DEFAULT false;
+ALTER TABLE public.medicines ADD COLUMN IF NOT EXISTS featured_sort_order integer DEFAULT 0;
+
+-- Seed default quick actions
+INSERT INTO public.dashboard_quick_actions (label, icon_name, emoji, gradient, path, sort_order) VALUES
+  ('Book\nAppointment', 'Calendar', '📅', 'from-primary to-[hsl(190,70%,45%)]', '/doctors', 1),
+  ('Emergency\nSOS', 'AlertTriangle', '🚨', 'from-emergency to-[hsl(15,80%,50%)]', '/emergency', 2),
+  ('Order\nMedicines', 'Pill', '💊', 'from-success to-[hsl(160,55%,48%)]', '/pharmacies', 3),
+  ('Favorites', 'Heart', '❤️', 'from-warning to-[hsl(25,90%,55%)]', '/favorites', 4);
+
+-- Seed default services
+INSERT INTO public.dashboard_services (title, description, icon_name, path, color, bg_color, sort_order) VALUES
+  ('Doctors', 'Find specialists', 'Stethoscope', '/doctors', 'text-primary', 'bg-primary/10', 1),
+  ('Hospitals', 'Nearby facilities', 'Building2', '/hospitals', 'text-emergency', 'bg-emergency/10', 2),
+  ('Labs', 'Book tests', 'FlaskConical', '/labs', 'text-success', 'bg-success/10', 3),
+  ('Pharmacies', 'Order medicines', 'Store', '/pharmacies', 'text-warning', 'bg-warning/10', 4);
+
+-- Seed default health tips
+INSERT INTO public.dashboard_health_tips (title, description, icon_name, color, bg_color, sort_order) VALUES
+  ('Stay Hydrated', 'Drink 8+ glasses of water daily for optimal organ function.', 'Droplets', 'text-blue-500', 'bg-blue-500/10', 1),
+  ('Quality Sleep', '7-9 hours of sleep improves immunity and cognitive function.', 'Moon', 'text-violet-500', 'bg-violet-500/10', 2),
+  ('Balanced Diet', 'Include fruits, vegetables, and whole grains in every meal.', 'Apple', 'text-success', 'bg-success/10', 3),
+  ('Stay Active', '30 minutes of daily exercise reduces heart disease risk by 35%.', 'Dumbbell', 'text-warning', 'bg-warning/10', 4),
+  ('Mental Health', 'Practice mindfulness or meditation for 10 minutes daily.', 'Brain', 'text-primary', 'bg-primary/10', 5),
+  ('Vitamin D', '15 minutes of morning sunlight boosts bone health and mood.', 'Sun', 'text-amber-500', 'bg-amber-500/10', 6),
+  ('Heart Health', 'Regular checkups help detect cardiovascular issues early.', 'Heart', 'text-emergency', 'bg-emergency/10', 7),
+  ('Deep Breathing', 'Practice 4-7-8 breathing technique to reduce stress and anxiety.', 'Wind', 'text-teal-500', 'bg-teal-500/10', 8);
+
+-- ===== 20260302161311_27759afb-beb9-484d-93a0-d60fdb1ed6c8.sql =====
+
+-- Create a public storage bucket for slider images
+INSERT INTO storage.buckets (id, name, public) VALUES ('slider-images', 'slider-images', true);
+
+-- Allow anyone to view slider images
+CREATE POLICY "Slider images are publicly accessible"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'slider-images');
+
+-- Allow admins to upload slider images
+CREATE POLICY "Admins can upload slider images"
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id = 'slider-images' AND public.has_role(auth.uid(), 'admin'::public.app_role));
+
+-- Allow admins to update slider images
+CREATE POLICY "Admins can update slider images"
+ON storage.objects FOR UPDATE
+USING (bucket_id = 'slider-images' AND public.has_role(auth.uid(), 'admin'::public.app_role));
+
+-- Allow admins to delete slider images
+CREATE POLICY "Admins can delete slider images"
+ON storage.objects FOR DELETE
+USING (bucket_id = 'slider-images' AND public.has_role(auth.uid(), 'admin'::public.app_role));
+
+-- ===== 20260303024325_12d6ddc6-eeb9-4a49-af34-182b37817247.sql =====
+-- Create storage bucket for lab reports
+INSERT INTO storage.buckets (id, name, public) VALUES ('lab-reports', 'lab-reports', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- Lab admins can upload reports
+CREATE POLICY "Lab admins can upload reports"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'lab-reports'
+  AND EXISTS (
+    SELECT 1 FROM labs WHERE user_id = auth.uid()
+  )
+);
+
+-- Lab admins can update reports
+CREATE POLICY "Lab admins can update reports"
+ON storage.objects FOR UPDATE
+USING (
+  bucket_id = 'lab-reports'
+  AND EXISTS (
+    SELECT 1 FROM labs WHERE user_id = auth.uid()
+  )
+);
+
+-- Patients can download their own reports (path starts with their user_id)
+CREATE POLICY "Patients can view own lab reports"
+ON storage.objects FOR SELECT
+USING (
+  bucket_id = 'lab-reports'
+  AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+-- Admins can manage all lab reports
+CREATE POLICY "Admins can manage lab reports"
+ON storage.objects FOR ALL
+USING (
+  bucket_id = 'lab-reports'
+  AND has_role(auth.uid(), 'admin'::app_role)
+)
+WITH CHECK (
+  bucket_id = 'lab-reports'
+  AND has_role(auth.uid(), 'admin'::app_role)
+);

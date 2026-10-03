@@ -1,3 +1,4 @@
+-- chunk 1
 -- ===== 20260227173137_88fd199c-71e9-4375-9632-072f12d639af.sql =====
 
 -- Create profiles table
@@ -706,7 +707,7 @@ CREATE TRIGGER on_order_change
 -- ===== 20260228113935_61a7e039-577e-493c-a692-58efe2febbdc.sql =====
 
 -- Drop the overly permissive insert policy and replace with admin + service-role only
-DROP POLICY IF EXISTS "System can insert notifications" ON public.notifications;
+DROP POLICY "System can insert notifications" ON public.notifications;
 
 -- Only allow inserts via service role (triggers use SECURITY DEFINER which bypasses RLS)
 -- Users should not be able to insert notifications directly
@@ -1198,3 +1199,237 @@ BEGIN
       SELECT name INTO provider_name FROM hospitals WHERE id = NEW.hospital_id;
     ELSIF NEW.lab_id IS NOT NULL THEN
       SELECT name INTO provider_name FROM labs WHERE id = NEW.lab_id;
+    ELSIF NEW.pharmacy_id IS NOT NULL THEN
+      SELECT name INTO provider_name FROM pharmacies WHERE id = NEW.pharmacy_id;
+    END IF;
+    provider_name := COALESCE(provider_name, 'your provider');
+
+    notif_title := CASE NEW.status
+      WHEN 'confirmed' THEN 'Appointment Confirmed ✅'
+      WHEN 'cancelled' THEN 'Appointment Cancelled ❌'
+    END;
+    notif_message := 'Your ' || NEW.service_type || ' appointment with ' || provider_name || ' on ' || NEW.appointment_date || ' at ' || NEW.appointment_time || ' has been ' || NEW.status || '.';
+
+    PERFORM net.http_post(
+      url := 'https://zjlznbgcfzpcveqyjglf.supabase.co/functions/v1/send-push-notification',
+      body := jsonb_build_object(
+        'user_id', NEW.patient_id,
+        'title', notif_title,
+        'message', notif_message,
+        'path', '/appointments'
+      ),
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1aWNxcGZpam5zb3J0Y3N6cWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMDc4MjQsImV4cCI6MjA4Nzc4MzgyNH0.teNIccPIhtIoPmAHd9OtNHi0XyPOXsJcoiHygjuA1RQ'
+      )
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- ===== 20260228174411_b8943079-e2f0-45e3-80a4-95e5d719c7cb.sql =====
+
+CREATE OR REPLACE FUNCTION public.push_notify_appointment_confirmed()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  provider_name TEXT;
+  notif_title TEXT;
+  notif_message TEXT;
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM NEW.status AND NEW.status IN ('confirmed', 'cancelled', 'completed') THEN
+    IF NEW.doctor_id IS NOT NULL THEN
+      SELECT name INTO provider_name FROM doctors WHERE id = NEW.doctor_id;
+    ELSIF NEW.hospital_id IS NOT NULL THEN
+      SELECT name INTO provider_name FROM hospitals WHERE id = NEW.hospital_id;
+    ELSIF NEW.lab_id IS NOT NULL THEN
+      SELECT name INTO provider_name FROM labs WHERE id = NEW.lab_id;
+    ELSIF NEW.pharmacy_id IS NOT NULL THEN
+      SELECT name INTO provider_name FROM pharmacies WHERE id = NEW.pharmacy_id;
+    END IF;
+    provider_name := COALESCE(provider_name, 'your provider');
+
+    notif_title := CASE NEW.status
+      WHEN 'confirmed' THEN 'Appointment Confirmed ✅'
+      WHEN 'cancelled' THEN 'Appointment Cancelled ❌'
+      WHEN 'completed' THEN 'Appointment Completed 🎉'
+    END;
+    notif_message := 'Your ' || NEW.service_type || ' appointment with ' || provider_name || ' on ' || NEW.appointment_date || ' at ' || NEW.appointment_time || ' has been ' || NEW.status || '.';
+
+    PERFORM net.http_post(
+      url := 'https://zjlznbgcfzpcveqyjglf.supabase.co/functions/v1/send-push-notification',
+      body := jsonb_build_object(
+        'user_id', NEW.patient_id,
+        'title', notif_title,
+        'message', notif_message,
+        'path', '/appointments'
+      ),
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1aWNxcGZpam5zb3J0Y3N6cWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMDc4MjQsImV4cCI6MjA4Nzc4MzgyNH0.teNIccPIhtIoPmAHd9OtNHi0XyPOXsJcoiHygjuA1RQ'
+      )
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- ===== 20260228181734_2cbe7bf1-5a2d-4c1c-a2cb-4a711c892837.sql =====
+
+-- Add approval_status to provider tables
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'approved';
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'approved';
+ALTER TABLE public.labs ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'approved';
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'approved';
+
+-- Add status to profiles for user management
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
+
+-- Add indexes for filtering
+CREATE INDEX IF NOT EXISTS idx_doctors_approval ON public.doctors(approval_status);
+CREATE INDEX IF NOT EXISTS idx_hospitals_approval ON public.hospitals(approval_status);
+CREATE INDEX IF NOT EXISTS idx_labs_approval ON public.labs(approval_status);
+CREATE INDEX IF NOT EXISTS idx_pharmacies_approval ON public.pharmacies(approval_status);
+CREATE INDEX IF NOT EXISTS idx_profiles_status ON public.profiles(status);
+
+-- Allow admins to manage emergency_requests (update status, assign ambulance)
+CREATE POLICY "Admins can update emergency requests"
+ON public.emergency_requests
+FOR UPDATE
+USING (has_role(auth.uid(), 'admin'::app_role));
+
+-- Allow admins to manage ambulances
+CREATE POLICY "Admins can update ambulances"
+ON public.ambulances
+FOR UPDATE
+USING (has_role(auth.uid(), 'admin'::app_role));
+
+-- Allow admins to delete appointments
+CREATE POLICY "Admins can delete appointments"
+ON public.appointments
+FOR DELETE
+USING (has_role(auth.uid(), 'admin'::app_role));
+
+-- ===== 20260301005104_7908edf2-cfd9-4ca5-aaa2-caad771e25ee.sql =====
+
+-- Add new provider roles to the app_role enum
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'doctor';
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'hospital_admin';
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'lab_admin';
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'pharmacy_admin';
+
+-- Add user_id column to doctors table
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- Add user_id column to hospitals table
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- Add user_id column to labs table
+ALTER TABLE public.labs ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- Add user_id column to pharmacies table
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- Create indexes for user_id lookups
+CREATE INDEX IF NOT EXISTS idx_doctors_user_id ON public.doctors(user_id);
+CREATE INDEX IF NOT EXISTS idx_hospitals_user_id ON public.hospitals(user_id);
+CREATE INDEX IF NOT EXISTS idx_labs_user_id ON public.labs(user_id);
+CREATE INDEX IF NOT EXISTS idx_pharmacies_user_id ON public.pharmacies(user_id);
+
+-- RLS: Allow providers to view/update their own records
+CREATE POLICY "Doctors can view own record" ON public.doctors FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Doctors can update own record" ON public.doctors FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Hospital admins can view own record" ON public.hospitals FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Hospital admins can update own record" ON public.hospitals FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Lab admins can view own record" ON public.labs FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Lab admins can update own record" ON public.labs FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Pharmacy admins can view own record" ON public.pharmacies FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Pharmacy admins can update own record" ON public.pharmacies FOR UPDATE USING (auth.uid() = user_id);
+
+-- Allow providers to view their own appointments
+CREATE POLICY "Doctors can view their appointments" ON public.appointments FOR SELECT USING (
+  doctor_id IN (SELECT id FROM public.doctors WHERE user_id = auth.uid())
+);
+CREATE POLICY "Doctors can update their appointments" ON public.appointments FOR UPDATE USING (
+  doctor_id IN (SELECT id FROM public.doctors WHERE user_id = auth.uid())
+);
+
+CREATE POLICY "Hospital admins can view their appointments" ON public.appointments FOR SELECT USING (
+  hospital_id IN (SELECT id FROM public.hospitals WHERE user_id = auth.uid())
+);
+
+CREATE POLICY "Lab admins can view their appointments" ON public.appointments FOR SELECT USING (
+  lab_id IN (SELECT id FROM public.labs WHERE user_id = auth.uid())
+);
+
+CREATE POLICY "Pharmacy admins can view their appointments" ON public.appointments FOR SELECT USING (
+  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
+);
+
+-- Allow pharmacy admins to view orders for their pharmacy
+CREATE POLICY "Pharmacy admins can view their orders" ON public.orders FOR SELECT USING (
+  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
+);
+CREATE POLICY "Pharmacy admins can update their orders" ON public.orders FOR UPDATE USING (
+  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
+);
+
+-- Allow pharmacy admins to manage their medicines
+CREATE POLICY "Pharmacy admins can view their medicines" ON public.medicines FOR SELECT USING (
+  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
+);
+CREATE POLICY "Pharmacy admins can insert medicines" ON public.medicines FOR INSERT WITH CHECK (
+  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
+);
+CREATE POLICY "Pharmacy admins can update their medicines" ON public.medicines FOR UPDATE USING (
+  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
+);
+CREATE POLICY "Pharmacy admins can delete their medicines" ON public.medicines FOR DELETE USING (
+  pharmacy_id IN (SELECT id FROM public.pharmacies WHERE user_id = auth.uid())
+);
+
+-- ===== 20260301010615_09e53e49-55f7-4b0f-9503-6d9814380b98.sql =====
+
+-- Allow users to view their own roles
+CREATE POLICY "Users can view own roles"
+ON public.user_roles FOR SELECT
+TO authenticated
+USING (auth.uid() = user_id);
+
+-- Allow authenticated users to insert themselves as providers (pending approval)
+CREATE POLICY "Users can register as doctor"
+ON public.doctors FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = user_id AND approval_status = 'pending');
+
+CREATE POLICY "Users can register as hospital"
+ON public.hospitals FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = user_id AND approval_status = 'pending');
+
+CREATE POLICY "Users can register as lab"
+ON public.labs FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = user_id AND approval_status = 'pending');
+
+CREATE POLICY "Users can register as pharmacy"
+ON public.pharmacies FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = user_id AND approval_status = 'pending');
+
+-- Allow users to assign themselves a provider role (only provider roles, not admin)
+CREATE POLICY "Users can self-assign provider role"
+ON public.user_roles FOR INSERT
+TO authenticated
+WITH CHECK (
+  auth.uid() = user_id 
+  AND role IN ('doctor'::app_role, 'hospital_admin'::app_role, 'lab_admin'::app_role, 'pharmacy_admin'::app_role)
+);
+
