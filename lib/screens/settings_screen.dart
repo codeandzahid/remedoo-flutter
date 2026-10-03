@@ -205,7 +205,7 @@ class SettingsScreen extends StatelessWidget {
                         () => _infoDialog(
                             context,
                             'About Remedoo',
-                            'Remedoo v1.0.0\nYour Health, Our Priority.\n\nBook doctors, hospitals, labs and medicines in one app.'),
+                            'Remedoo v1.0.0 (build 2026-10-03)\nYour Health, Our Priority.\n\nBook doctors, hospitals, labs and medicines in one app.'),
                         last: true),
                   ]),
                   const SizedBox(height: 20),
@@ -213,7 +213,7 @@ class SettingsScreen extends StatelessWidget {
                   _logoutButton(context, state),
                   const SizedBox(height: 20),
                   Center(
-                    child: Text('Remedoo v1.0.0',
+                    child: Text('Remedoo v1.0.0 (build 2026-10-03)',
                         style: TextStyle(
                             color: scheme.onSurfaceVariant,
                             fontSize: 12)),
