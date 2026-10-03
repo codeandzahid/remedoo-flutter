@@ -306,7 +306,7 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
 
     return RHospitalCard(
       hospital: h,
-      isGuest: AppStateScope.of(context).isGuest,
+      hideBooking: !AppStateScope.of(context).isSignedIn,
       trailing: FavoriteButton(favKey: 'hospital:${h.id}'),
       onTap: openDetail,
       onView: openDetail,

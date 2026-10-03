@@ -119,7 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           const SizedBox(height: 10),
                           StaggerItem(
                               index: 2, child: _doctorCards(popularDoctors)),
-                          if (!state.isGuest) ...[
+                          if (state.isSignedIn) ...[
                             const SizedBox(height: 22),
                             StaggerItem(
                               index: 3,

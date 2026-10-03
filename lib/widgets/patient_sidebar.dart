@@ -106,7 +106,8 @@ class RQuickActionsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Guests never see the Book Appointment tile.
-    final actions = AppStateScope.of(context).isGuest
+    final signedIn = AppStateScope.of(context).isSignedIn;
+    final actions = !signedIn
         ? patientQuickActions()
             .where((a) => a.title != 'Book Appointment')
             .toList()

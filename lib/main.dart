@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_navigator.dart';
 
 import 'services/auth_service.dart';
 import 'state/app_state.dart';
@@ -13,7 +14,7 @@ import 'screens/admin/admin_shell.dart';
 
 /// Global navigator key: lets the auth listener route to the new-password
 /// screen when a password-recovery link is opened, from anywhere.
-final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 
 void main() {
   runApp(

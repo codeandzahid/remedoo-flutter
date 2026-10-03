@@ -25,6 +25,38 @@ void usePhoneSize(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets(
+      'guest redirect zombie state cannot bypass login gates', (tester) async {
+    // Reproduces the reported bypass: a guest taps a gated button, the
+    // toast shows, then the delayed logout fires while app pages are still
+    // on screen. Even in that logged-out limbo state, checkLogin must keep
+    // blocking — repeated tapping must never walk through an open gate.
+    final state = AppState();
+    state.loginAsGuest();
+    expect(state.isGuest, isTrue);
+    state.logout(); // what checkLogin's delayed redirect does
+    expect(state.isGuest, isFalse);
+    expect(state.isSignedIn, isFalse);
+    expect(state.isLoggedIn, isFalse);
+
+    var gateResult;
+    await tester.pumpWidget(_wrap(
+        Scaffold(
+            body: Builder(builder: (context) {
+          return ElevatedButton(
+              onPressed: () => gateResult = checkLogin(context),
+              child: const Text('Go'));
+        })),
+        state));
+    await tester.tap(find.text('Go'));
+    await tester.pump();
+    expect(gateResult, isFalse,
+        reason: 'checkLogin must block when not really signed in');
+    // Flush checkLogin's delayed redirect timer so the test ends clean.
+    await tester.pump(const Duration(milliseconds: 1500));
+  });
+
+
   SharedPreferences.setMockInitialValues({});
   testWidgets('drawer opens from the dashboard menu button on phones',
       (tester) async {
@@ -50,6 +82,7 @@ void main() {
       (tester) async {
     usePhoneSize(tester);
     final state = AppState();
+    state.login(name: 'Test User', email: 'test@example.com');
     final d = doctors.first;
     await tester.pumpWidget(_wrap(
         BookingScreen(

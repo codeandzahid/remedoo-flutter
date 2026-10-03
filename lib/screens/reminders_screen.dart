@@ -21,7 +21,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    if (state.isGuest) {
+    if (!state.isSignedIn) {
       return const GuestGate();
     }
     return Scaffold(

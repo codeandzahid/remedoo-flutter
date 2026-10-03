@@ -16,8 +16,12 @@ import 'package:remedoo_app/screens/admin/admin_shell.dart';
 import 'package:remedoo_app/data/mock_data.dart';
 
 Widget _wrap(Widget child) {
+  // Tests that pump inner screens simulate a signed-in (non-guest) user:
+  // login gates require a real account.
+  final state = AppState();
+  state.login(name: 'Test User', email: 'test@example.com');
   return AppStateScope(
-    state: AppState(),
+    state: state,
     child: MaterialApp(home: child),
   );
 }

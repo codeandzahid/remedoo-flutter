@@ -102,7 +102,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    if (state.isGuest) {
+    if (!state.isSignedIn) {
       return const GuestGate(message: 'Please login to view details');
     }
     final p = widget.pharmacy;

@@ -909,7 +909,10 @@ Future<bool> confirmDialog(
 bool checkLogin(BuildContext context,
     [String message = 'Please login to access this feature']) {
   final state = AppStateScope.of(context);
-  if (!state.isGuest) return true;
+  // Only a real signed-in account passes. Guests — and the logged-out
+  // state right after a guest is redirected — are blocked, so repeated
+  // tapping can never walk through an open gate.
+  if (state.isSignedIn) return true;
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text(message)),
   );
@@ -1317,7 +1320,7 @@ class RDoctorCard extends StatelessWidget {
 /// line, View/Book buttons. Government hospitals never show Book.
 class RHospitalCard extends StatelessWidget {
   final Hospital hospital;
-  final bool isGuest;
+  final bool hideBooking;
   final VoidCallback? onTap;
   final VoidCallback? onView;
   final VoidCallback? onBook;
@@ -1326,7 +1329,7 @@ class RHospitalCard extends StatelessWidget {
   const RHospitalCard({
     super.key,
     required this.hospital,
-    this.isGuest = false,
+    this.hideBooking = false,
     this.onTap,
     this.onView,
     this.onBook,
@@ -1428,7 +1431,7 @@ class RHospitalCard extends StatelessWidget {
                   onPressed: onView,
                 ),
               ),
-              if (!h.government && !isGuest) ...[
+              if (!h.government && !hideBooking) ...[
                 const SizedBox(width: 8),
                 Expanded(
                   child: RButton(

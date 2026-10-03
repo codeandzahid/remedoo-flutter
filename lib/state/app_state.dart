@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../app_navigator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -119,6 +120,10 @@ class AppState extends ChangeNotifier {
   /// True when a Supabase session, a mock login, OR a guest session is active.
   bool get isLoggedIn => _supaUser != null || _guest || _mockLoggedIn;
   bool get isGuest => _guest && _supaUser == null && !_mockLoggedIn;
+  /// True only for a real signed-in account (Supabase user or mock login).
+  /// Guests — and the logged-out state right after a guest is redirected —
+  /// return false, so login gates stay closed even if a pushed page lingers.
+  bool get isSignedIn => _supaUser != null || _mockLoggedIn;
   bool get seenOnboarding => _seenOnboarding;
 
   /// Display name: Supabase user metadata -> email fallback -> mock name.
@@ -394,6 +399,9 @@ class AppState extends ChangeNotifier {
     unawaited(AuthService.instance.signOut());
     _supaUser = null;
     _clearAuthLocal();
+    // Pop any pushed pages: after logout the RootGate shows LoginScreen,
+    // and inner screens must not linger on top with the gates down.
+    appNavigatorKey.currentState?.popUntil((r) => r.isFirst);
   }
 
   // ---------- Production data (Supabase) ----------

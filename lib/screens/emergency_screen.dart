@@ -309,7 +309,7 @@ class EmergencyScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (!AppStateScope.of(context).isGuest) ...[
+                if (AppStateScope.of(context).isSignedIn) ...[
                   const SizedBox(width: 8),
                   Expanded(
                     child: RButton(

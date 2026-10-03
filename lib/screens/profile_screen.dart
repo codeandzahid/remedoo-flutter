@@ -33,7 +33,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    if (state.isGuest) {
+    if (!state.isSignedIn) {
       return Scaffold(
         appBar: AppBar(title: const Text('My Profile')),
         body: MaxWidthBox(

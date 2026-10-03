@@ -55,7 +55,7 @@ class HospitalDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (AppStateScope.of(context).isGuest) {
+    if (!AppStateScope.of(context).isSignedIn) {
       return const GuestGate(message: 'Please login to view details');
     }
     final h = hospital;
