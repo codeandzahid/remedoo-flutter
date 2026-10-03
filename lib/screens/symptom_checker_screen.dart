@@ -132,7 +132,7 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
                         backgroundColor:
                             Theme.of(context).dividerColor,
                         valueColor:
-                            const AlwaysStoppedAnimation<Color>(
+                            AlwaysStoppedAnimation<Color>(
                                 RemedooTheme.primary),
                       ),
                     ),

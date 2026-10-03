@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remedoo_app/main.dart';
 import 'package:remedoo_app/state/app_state.dart';
+import 'package:remedoo_app/theme.dart';
 import 'package:remedoo_app/widgets/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:remedoo_app/services/auth_service.dart';
 import 'package:remedoo_app/screens/doctors_screen.dart';
 import 'package:remedoo_app/screens/settings_screen.dart';
@@ -21,6 +23,10 @@ Widget _wrap(Widget child) {
 }
 
 void main() {
+  // SharedPreferences has no platform channel in widget tests; mock it so
+  // AppState's persisted flags (onboarding, theme) load instantly instead
+  // of hitting the boot timeout.
+  SharedPreferences.setMockInitialValues({});
   // Supabase's token auto-refresh uses a periodic Timer that would keep
   // pumpAndSettle from ever settling; disable it in widget tests.
   AuthService.disableAutoRefresh = true;
@@ -229,6 +235,32 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1300));
     await tester.pump();
     expect(state.isLoggedIn, isFalse);
+  });
+
+  testWidgets('switching theme pack updates the theme', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final state = AppState();
+    expect(state.themePack.id, 'sky_pulse');
+    expect(RemedooTheme.primary, ThemePack.skyPulse.primary);
+    await state.setThemePack(ThemePack.oceanSand);
+    expect(state.themePack.id, 'ocean_sand');
+    expect(RemedooTheme.primary, ThemePack.oceanSand.primary);
+    expect(RemedooTheme.background, ThemePack.oceanSand.background);
+    // Switching back restores Sky Pulse.
+    await state.setThemePack(ThemePack.skyPulse);
+    expect(RemedooTheme.primary, ThemePack.skyPulse.primary);
+  });
+
+  testWidgets('all six theme packs are defined', (tester) async {
+    expect(ThemePack.all.length, 6);
+    expect(
+        ThemePack.all.map((p) => p.id).toSet(),
+        {'sky_pulse', 'ocean_sand', 'lavender_mist', 'blush_rose',
+         'honey_glow', 'emerald_heal'});
+    for (final pack in ThemePack.all) {
+      expect(ThemePack.byId(pack.id), pack);
+    }
+    expect(ThemePack.byId('nope'), isNull);
   });
 
 }

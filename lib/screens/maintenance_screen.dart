@@ -29,7 +29,7 @@ class MaintenanceScreen extends StatelessWidget {
                         .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(32),
                   ),
-                  child: const Icon(Icons.handyman_outlined,
+                  child: Icon(Icons.handyman_outlined,
                       size: 56, color: RemedooTheme.primary),
                 ),
                 const SizedBox(height: 24),

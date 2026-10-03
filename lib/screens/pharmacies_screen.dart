@@ -370,7 +370,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
                           ),
                           if (p.verified) ...[
                             const SizedBox(width: 4),
-                            const Icon(Icons.verified,
+                            Icon(Icons.verified,
                                 size: 16, color: RemedooTheme.primary),
                           ],
                         ],

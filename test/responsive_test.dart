@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:remedoo_app/responsive/responsive.dart';
 
 /// Builds a minimal two-destination ResponsiveScaffold for nav-type tests.
@@ -23,6 +24,7 @@ Widget _testScaffold() {
 }
 
 void main() {
+  SharedPreferences.setMockInitialValues({});
   testWidgets('compact width shows bottom NavigationBar', (tester) async {
     tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1.0;

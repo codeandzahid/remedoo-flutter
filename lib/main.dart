@@ -78,6 +78,7 @@ class _RootGateState extends State<RootGate> {
     // to the login/guest flow.
     Future(() async {
       await AuthService.instance.init();
+      await state.loadPersistedState();
       state.attachAuthListener();
       if (mounted) setState(() => _authReady = true);
     });

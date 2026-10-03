@@ -709,7 +709,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: RemedooTheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.medical_services,
+              child: Icon(Icons.medical_services,
                   color: RemedooTheme.primary, size: 24),
             ),
             const SizedBox(width: 12),
@@ -820,7 +820,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Text(inr(d.fee),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
                               color: RemedooTheme.primary)),
@@ -887,7 +887,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             child: Stack(
               children: [
-                const Center(
+                Center(
                   child: Icon(Icons.local_hospital,
                       size: 44, color: RemedooTheme.primary),
                 ),
@@ -984,7 +984,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Row(
                     children: [
                       Text(inr(state.priceOf(m)),
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: RemedooTheme.primary)),
                       const Spacer(),

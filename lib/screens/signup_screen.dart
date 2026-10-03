@@ -103,7 +103,7 @@ class _SignupScreenState extends State<SignupScreen> {
             // Curved orange header.
             Container(
               padding: const EdgeInsets.fromLTRB(24, 56, 24, 72),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: RemedooTheme.headerGradient,
                 borderRadius: BorderRadius.vertical(
                   bottom: Radius.circular(28),

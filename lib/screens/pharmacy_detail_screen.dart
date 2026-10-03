@@ -255,7 +255,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
                         fontSize: 17, fontWeight: FontWeight.w800)),
               ),
               if (p.verified)
-                const Icon(Icons.verified,
+                Icon(Icons.verified,
                     color: RemedooTheme.primary, size: 20),
             ],
           ),
@@ -369,7 +369,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
                     style: TextStyle(fontWeight: FontWeight.w800)),
               ),
               Text(inr(state.cartTotal),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.w800,
                       color: RemedooTheme.primary)),
             ],
@@ -546,7 +546,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
                   Row(
                     children: [
                       Text(inr(state.priceOf(m)),
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
                               color: RemedooTheme.primary)),

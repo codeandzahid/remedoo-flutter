@@ -512,7 +512,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                               ),
                               if (d.verified) ...[
                                 const SizedBox(width: 4),
-                                const Icon(Icons.verified,
+                                Icon(Icons.verified,
                                     size: 16,
                                     color: RemedooTheme.primary),
                               ],

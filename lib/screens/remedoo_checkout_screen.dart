@@ -490,7 +490,7 @@ class _RemedooCheckoutScreenState
                       fontSize: 15)),
               const Spacer(),
               Text(inr(total),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 18,
                       color: RemedooTheme.primary)),

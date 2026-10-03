@@ -83,7 +83,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
             // Orange header with rounded bottom.
             Container(
               padding: const EdgeInsets.fromLTRB(24, 56, 24, 52),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: RemedooTheme.headerGradient,
                 borderRadius: BorderRadius.vertical(
                   bottom: Radius.circular(28),

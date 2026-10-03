@@ -107,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen>
             // Orange curved header with decorative circles.
             Container(
               padding: const EdgeInsets.fromLTRB(24, 56, 24, 48),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: RemedooTheme.headerGradient,
                 borderRadius: BorderRadius.vertical(
                   bottom: Radius.circular(28),

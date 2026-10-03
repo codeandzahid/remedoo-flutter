@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models.dart';
 import '../data/mock_data.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_repository.dart';
+import '../theme.dart';
 
 /// Inherited access to the single AppState for the whole app.
 class AppStateScope extends InheritedNotifier<AppState> {
@@ -131,7 +133,67 @@ class AppState extends ChangeNotifier {
 
   void markOnboardingSeen() {
     _seenOnboarding = true;
+    unawaited(_persistSeenOnboarding());
     notifyListeners();
+  }
+
+  static const _kSeenOnboardingKey = 'remedoo_seen_onboarding';
+
+  /// Loads persisted flags. Called once at boot (see RootGate) before the
+  /// first frame that depends on them, so onboarding shows only once ever.
+  /// Never blocks boot for long: storage is local and fast, and the timeout
+  /// guards against a hung platform channel (e.g. in widget tests).
+  Future<void> loadPersistedState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 3));
+      final seen = prefs.getBool(_kSeenOnboardingKey);
+      if (seen != null) {
+        _seenOnboarding = seen;
+      }
+      final themeId = prefs.getString(_kThemePackKey);
+      if (themeId != null) {
+        final pack = ThemePack.byId(themeId);
+        if (pack != null) {
+          _themePack = pack;
+          RemedooTheme.setPack(pack);
+        }
+      }
+    } catch (_) {
+      // Storage unavailable (e.g. private browsing): keep in-memory default.
+    }
+  }
+
+  Future<void> _persistSeenOnboarding() async {
+    try {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 3));
+      await prefs.setBool(_kSeenOnboardingKey, true);
+    } catch (_) {
+      // Best-effort only; in-memory flag still applies for this session.
+    }
+  }
+
+  static const _kThemePackKey = 'remedoo_theme_pack';
+
+  ThemePack _themePack = ThemePack.skyPulse;
+
+  /// The active UI theme pack. Defaults to Sky Pulse.
+  ThemePack get themePack => _themePack;
+
+  /// Switches the app theme. Persists the choice and rebuilds the UI.
+  Future<void> setThemePack(ThemePack pack) async {
+    if (pack.id == _themePack.id) return;
+    _themePack = pack;
+    RemedooTheme.setPack(pack);
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 3));
+      await prefs.setString(_kThemePackKey, pack.id);
+    } catch (_) {
+      // Best-effort persistence only.
+    }
   }
 
   void loginAsGuest() {

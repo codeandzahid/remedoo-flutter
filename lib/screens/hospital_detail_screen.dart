@@ -153,7 +153,7 @@ class HospitalDetailScreen extends StatelessWidget {
                             ),
                             if (h.verified) ...[
                               const SizedBox(width: 5),
-                              const Icon(Icons.verified,
+                              Icon(Icons.verified,
                                   size: 18,
                                   color: RemedooTheme.primary),
                             ],
@@ -551,7 +551,7 @@ class HospitalDetailScreen extends StatelessWidget {
             children: [
               const Expanded(child: Text('General Consultation')),
               Text(inr(300),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.w800,
                       color: RemedooTheme.primary)),
             ],

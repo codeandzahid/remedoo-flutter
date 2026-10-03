@@ -379,7 +379,7 @@ class _LabsScreenState extends State<LabsScreen> {
                           ),
                           if (l.verified) ...[
                             const SizedBox(width: 4),
-                            const Icon(Icons.verified,
+                            Icon(Icons.verified,
                                 size: 16, color: RemedooTheme.primary),
                           ],
                         ],

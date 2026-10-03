@@ -1,42 +1,219 @@
 import 'package:flutter/material.dart';
 
-/// Remedoo design system — rebuilt 1:1 from the React reference app
-/// (`remedoo-reskin/DESIGN_SPEC.md`, tokens from `src/index.css`).
+/// A named UI theme pack: the full set of brand tokens for one visual theme.
 ///
-/// Light theme: warm off-white `#F9F7F5` background, white cards, orange
-/// `#EC6A13` primary. Dark theme: warm charcoal surfaces, `#DC6A18` primary.
+/// The app ships six user-facing themes (the user's hand-picked favorites):
+/// Sky Pulse, Ocean Sand, Lavender Mist, Blush Rose, Honey Glow, Emerald Heal.
+/// The active pack is held by [RemedooTheme] and switched at runtime; every
+/// `RemedooTheme.<token>` getter below reads from it, so all call sites
+/// follow the selected theme with no per-screen changes.
+class ThemePack {
+  final String id;
+  final String name;
+  final Color primary;
+  final Color primaryDark;
+  final Color background;
+  final Color card;
+  final Color ink;
+  final Color mutedText;
+  final Color border;
+  final Color secondary;
+  final Color mutedSurface;
+  final Color accent;
+  final Color accentForeground;
+  final Color shadowTint;
+
+  const ThemePack({
+    required this.id,
+    required this.name,
+    required this.primary,
+    required this.primaryDark,
+    required this.background,
+    required this.card,
+    required this.ink,
+    required this.mutedText,
+    required this.border,
+    required this.secondary,
+    required this.mutedSurface,
+    required this.accent,
+    required this.accentForeground,
+    required this.shadowTint,
+  });
+
+  /// Airy sky-blue on near-white. Breezy, optimistic, fresh.
+  static const skyPulse = ThemePack(
+    id: 'sky_pulse',
+    name: 'Sky Pulse',
+    primary: Color(0xFF0284C7),
+    primaryDark: Color(0xFF0369A1),
+    background: Color(0xFFF0F9FF),
+    card: Color(0xFFFFFFFF),
+    ink: Color(0xFF0C2D48),
+    mutedText: Color(0xFF5B7A93),
+    border: Color(0xFFDCEBF5),
+    secondary: Color(0xFFE8F4FC),
+    mutedSurface: Color(0xFFE4F1FA),
+    accent: Color(0xFFDFF1FB),
+    accentForeground: Color(0xFF075985),
+    shadowTint: Color(0xFF0284C7),
+  );
+
+  /// Warm sand background, ocean-teal brand. Coastal calm.
+  static const oceanSand = ThemePack(
+    id: 'ocean_sand',
+    name: 'Ocean Sand',
+    primary: Color(0xFF0E9AA7),
+    primaryDark: Color(0xFF0B7E88),
+    background: Color(0xFFFAF6EE),
+    card: Color(0xFFFFFFFF),
+    ink: Color(0xFF1F2E33),
+    mutedText: Color(0xFF7A8A8C),
+    border: Color(0xFFE8E0D0),
+    secondary: Color(0xFFF0EBDD),
+    mutedSurface: Color(0xFFECE5D3),
+    accent: Color(0xFFDFF5F6),
+    accentForeground: Color(0xFF0B6E78),
+    shadowTint: Color(0xFF0E9AA7),
+  );
+
+  /// Lavender-cream background, lilac brand. Dreamy serenity.
+  static const lavenderMist = ThemePack(
+    id: 'lavender_mist',
+    name: 'Lavender Mist',
+    primary: Color(0xFF8B5CF6),
+    primaryDark: Color(0xFF7C3AED),
+    background: Color(0xFFF5F1FA),
+    card: Color(0xFFFFFFFF),
+    ink: Color(0xFF2E2440),
+    mutedText: Color(0xFF8A7FA3),
+    border: Color(0xFFE4DCF2),
+    secondary: Color(0xFFECE6F7),
+    mutedSurface: Color(0xFFE2D9F3),
+    accent: Color(0xFFE9E2FA),
+    accentForeground: Color(0xFF6D28D9),
+    shadowTint: Color(0xFF8B5CF6),
+  );
+
+  /// Blush-pink cream, rose brand. Soft and caring.
+  static const blushRose = ThemePack(
+    id: 'blush_rose',
+    name: 'Blush Rose',
+    primary: Color(0xFFE84A6F),
+    primaryDark: Color(0xFFD13A5E),
+    background: Color(0xFFFDF2F4),
+    card: Color(0xFFFFFFFF),
+    ink: Color(0xFF3D1F26),
+    mutedText: Color(0xFFA07E88),
+    border: Color(0xFFF3DDE3),
+    secondary: Color(0xFFF9E8EC),
+    mutedSurface: Color(0xFFF5DDE4),
+    accent: Color(0xFFFADCE4),
+    accentForeground: Color(0xFFB91C4A),
+    shadowTint: Color(0xFFE84A6F),
+  );
+
+  /// Warm cream background, honey-amber brand. Cozy glow.
+  static const honeyGlow = ThemePack(
+    id: 'honey_glow',
+    name: 'Honey Glow',
+    primary: Color(0xFFD97706),
+    primaryDark: Color(0xFFB45309),
+    background: Color(0xFFFDF6EC),
+    card: Color(0xFFFFFFFF),
+    ink: Color(0xFF3B2A18),
+    mutedText: Color(0xFFA08A6D),
+    border: Color(0xFFF0E4CE),
+    secondary: Color(0xFFF8EFDD),
+    mutedSurface: Color(0xFFF3E7CF),
+    accent: Color(0xFFFBEFD8),
+    accentForeground: Color(0xFF92400E),
+    shadowTint: Color(0xFFD97706),
+  );
+
+  /// Mint-white background, emerald brand. Fresh healing.
+  static const emeraldHeal = ThemePack(
+    id: 'emerald_heal',
+    name: 'Emerald Heal',
+    primary: Color(0xFF059669),
+    primaryDark: Color(0xFF047857),
+    background: Color(0xFFF2FBF6),
+    card: Color(0xFFFFFFFF),
+    ink: Color(0xFF0C2E23),
+    mutedText: Color(0xFF6B8A7D),
+    border: Color(0xFFD9EDE2),
+    secondary: Color(0xFFE6F5EC),
+    mutedSurface: Color(0xFFD9EFE2),
+    accent: Color(0xFFD7F2E2),
+    accentForeground: Color(0xFF065F46),
+    shadowTint: Color(0xFF059669),
+  );
+
+  static const List<ThemePack> all = [
+    skyPulse,
+    oceanSand,
+    lavenderMist,
+    blushRose,
+    honeyGlow,
+    emeraldHeal,
+  ];
+
+  static ThemePack? byId(String id) {
+    for (final p in all) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+}
+
+/// Remedoo design system — theme tokens now come from the active [ThemePack]
+/// (see above); pick from Sky Pulse, Ocean Sand, Lavender Mist, Blush Rose,
+/// Honey Glow, Emerald Heal in Settings > Appearance.
+///
 /// Everything renders in Plus Jakarta Sans (bundled in assets/fonts).
 class RemedooTheme {
   // ------------------------------------------------------------------
-  // Light-theme tokens (exact, from the design spec)
+  // Active theme pack (switched at runtime via [setPack]).
   // ------------------------------------------------------------------
-  static const Color primary = Color(0xFFEC6A13);
-  static const Color primaryDark = Color(0xFFDC6A18);
-  static const Color background = Color(0xFFF9F7F5);
-  static const Color cardWhite = Color(0xFFFFFFFF);
-  static const Color ink = Color(0xFF201410);
-  static const Color mutedText = Color(0xFF8C7F76);
-  static const Color cardBorder = Color(0xFFE9E2DB);
+  static ThemePack _pack = ThemePack.skyPulse;
+
+  /// The currently active theme pack.
+  static ThemePack get pack => _pack;
+
+  /// Switches the active theme pack. Call sites reading the getters below
+  /// pick up the new tokens on the next rebuild.
+  static void setPack(ThemePack p) {
+    _pack = p;
+  }
+
+  // ------------------------------------------------------------------
+  // Light-theme tokens (from the active pack).
+  // ------------------------------------------------------------------
+  static Color get primary => _pack.primary;
+  static Color get primaryDark => _pack.primaryDark;
+  static Color get background => _pack.background;
+  static Color get cardWhite => _pack.card;
+  static Color get ink => _pack.ink;
+  static Color get mutedText => _pack.mutedText;
+  static Color get cardBorder => _pack.border;
+  static Color get secondary => _pack.secondary;
+  static Color get mutedSurface => _pack.mutedSurface;
+  static Color get accent => _pack.accent;
+  static Color get accentForeground => _pack.accentForeground;
   static const Color success = Color(0xFF2BAD6E);
   static const Color warning = Color(0xFFF5A623);
   static const Color destructive = Color(0xFFDE3F3F);
   static const Color emergency = Color(0xFFEE2B2B);
-  static const Color secondary = Color(0xFFF5F0EC);
-  static const Color mutedSurface = Color(0xFFF7F4F1);
-  static const Color accent = Color(0xFFF4E7DA);
-  static const Color accentForeground = Color(0xFF93490F);
 
   /// Dark-mode sidebar accents (from the design spec's dark tokens):
   /// --accent 24 30% 18%, --accent-foreground 24 50% 80%.
   static const Color darkAccent = Color(0xFF3C2B20);
   static const Color darkAccentForeground = Color(0xFFE6C7B3);
 
-  /// Sidebar surface: near-white in light mode (React `--sidebar-background`
-  /// 0 0% 98%), warm charcoal card in dark mode.
-  static const Color sidebarLight = Color(0xFFFAFAFA);
+  /// Sidebar surface: near-white in light mode, tinted from the active pack.
+  static Color get sidebarLight => _pack.background;
 
   /// Legacy aliases kept for screens written before the reskin.
-  static const Color pageBg = background;
+  static Color get pageBg => background;
   static const Color ratingGreen = success;
   static const Color purple = Color(0xFF6B4FA0);
   static const Color teal = Color(0xFF2E9E6B);
@@ -58,12 +235,13 @@ class RemedooTheme {
 
   static const String fontFamily = 'PlusJakartaSans';
 
-  /// Soft card shadow (light mode): thin warm-gray, very subtle.
+  /// Soft card shadow (light mode): tinted from the active pack's brand color,
+  /// very subtle — the "cloud card" feel.
   static List<BoxShadow> get softShadow => [
         BoxShadow(
-          color: const Color(0xFF3A2410).withValues(alpha: 0.06),
-          blurRadius: 16,
-          offset: const Offset(0, 6),
+          color: _pack.shadowTint.withValues(alpha: 0.08),
+          blurRadius: 18,
+          offset: const Offset(0, 8),
         ),
       ];
 
@@ -125,9 +303,9 @@ class RemedooTheme {
 
   static ThemeData light([Color? brand]) {
     final p = brand ?? primary;
-    const text = ink;
-    const muted = mutedText;
-    const border = cardBorder;
+    final text = ink;
+    final muted = mutedText;
+    final border = cardBorder;
     final scheme = ColorScheme(
       brightness: Brightness.light,
       primary: p,
@@ -152,7 +330,7 @@ class RemedooTheme {
       scaffoldBackgroundColor: background,
       textTheme: _textTheme(text, muted),
       pageTransitionsTheme: RemedooTheme.pageTransitions,
-      dividerTheme: const DividerThemeData(
+      dividerTheme: DividerThemeData(
         color: border,
         thickness: 1,
         space: 1,
@@ -163,7 +341,7 @@ class RemedooTheme {
           borderRadius: BorderRadius.circular(24),
         ),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: cardWhite,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -177,7 +355,7 @@ class RemedooTheme {
           borderRadius: BorderRadius.circular(14),
         ),
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         foregroundColor: ink,
         elevation: 0,
@@ -196,13 +374,13 @@ class RemedooTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: border),
+          side: BorderSide(color: border),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: cardWhite,
-        hintStyle: const TextStyle(
+        hintStyle: TextStyle(
           fontFamily: fontFamily,
           color: muted,
           fontSize: 14,
@@ -213,7 +391,7 @@ class RemedooTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: border),
+          borderSide: BorderSide(color: border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -249,11 +427,11 @@ class RemedooTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: cardWhite,
-        side: const BorderSide(color: border),
+        side: BorderSide(color: border),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        labelStyle: const TextStyle(
+        labelStyle: TextStyle(
           fontFamily: fontFamily,
           fontSize: 13,
           fontWeight: FontWeight.w500,
@@ -271,7 +449,7 @@ class RemedooTheme {
           ),
         ),
       ),
-      iconTheme: const IconThemeData(color: ink),
+      iconTheme: IconThemeData(color: ink),
     );
   }
 
@@ -304,7 +482,7 @@ class RemedooTheme {
       scaffoldBackgroundColor: darkBg,
       textTheme: _textTheme(text, muted),
       pageTransitionsTheme: RemedooTheme.pageTransitions,
-      dividerTheme: const DividerThemeData(
+      dividerTheme: DividerThemeData(
         color: border,
         thickness: 1,
         space: 1,
@@ -348,13 +526,13 @@ class RemedooTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: border),
+          side: BorderSide(color: border),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: darkMutedSurface,
-        hintStyle: const TextStyle(
+        hintStyle: TextStyle(
           fontFamily: fontFamily,
           color: muted,
           fontSize: 14,
@@ -401,7 +579,7 @@ class RemedooTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: darkCard,
-        side: const BorderSide(color: border),
+        side: BorderSide(color: border),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
@@ -427,12 +605,20 @@ class RemedooTheme {
     );
   }
 
-  /// Orange gradient used for headers (matches the React app's hero/header).
-  static const LinearGradient headerGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFFF2790F), Color(0xFFEC6A13), Color(0xFFD95F10)],
-  );
+  /// Brand gradient used for headers — derived from the active pack's primary.
+  static LinearGradient get headerGradient {
+    final p = _pack.primary;
+    final d = _pack.primaryDark;
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        Color.lerp(p, Colors.white, 0.15)!,
+        p,
+        d,
+      ],
+    );
+  }
 
   /// Teal-green gradient for health promo banners.
   static const LinearGradient promoTealGradient = LinearGradient(

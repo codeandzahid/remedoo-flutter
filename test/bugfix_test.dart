@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:remedoo_app/data/mock_data.dart';
 import 'package:remedoo_app/screens/appointments_screen.dart';
 import 'package:remedoo_app/screens/booking_screen.dart';
@@ -24,6 +25,7 @@ void usePhoneSize(WidgetTester tester) {
 }
 
 void main() {
+  SharedPreferences.setMockInitialValues({});
   testWidgets('drawer opens from the dashboard menu button on phones',
       (tester) async {
     usePhoneSize(tester);

@@ -188,6 +188,53 @@ class SettingsScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  const Text('Appearance',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 10),
+                  RCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Theme',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.onSurface)),
+                        const SizedBox(height: 12),
+                        for (var row = 0;
+                            row < ThemePack.all.length / 3;
+                            row++)
+                          Padding(
+                            padding: EdgeInsets.only(
+                                bottom: row == 1 ? 0 : 10),
+                            child: Row(
+                              children: [
+                                for (var col = 0; col < 3; col++)
+                                  if (row * 3 + col <
+                                      ThemePack.all.length)
+                                    Expanded(
+                                      child: Padding(
+                                        padding: EdgeInsets.only(
+                                          right: col == 2 ? 0 : 10,
+                                        ),
+                                        child: _themeTile(
+                                            context,
+                                            state,
+                                            ThemePack.all[
+                                                row * 3 + col],
+                                            scheme),
+                                      ),
+                                    ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   _groupCard(context, [
                     _linkData(
@@ -299,6 +346,51 @@ class SettingsScreen extends StatelessWidget {
                   color: Theme.of(context).dividerColor),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _themeTile(BuildContext context, AppState state, ThemePack pack,
+      ColorScheme scheme) {
+    final selected = state.themePack.id == pack.id;
+    return GestureDetector(
+      onTap: () => state.setThemePack(pack),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: pack.background,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? pack.primary : scheme.outline,
+            width: selected ? 2.5 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [pack.primary, pack.primaryDark],
+                ),
+              ),
+              child: selected
+                  ? const Icon(Icons.check,
+                      size: 16, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(height: 6),
+            Text(pack.name,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: pack.ink)),
+          ],
+        ),
       ),
     );
   }
@@ -423,7 +515,7 @@ class SettingsScreen extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis),
               trailing: state.role == e.key
-                  ? const Icon(Icons.check,
+                  ? Icon(Icons.check,
                       color: RemedooTheme.primary)
                   : null,
               onTap: () {

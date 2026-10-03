@@ -205,7 +205,7 @@ class OrderTrackingScreen extends StatelessWidget {
                           )),
                       if (isCurrent &&
                           order.status != 'delivered')
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.only(top: 2),
                           child: Text('In progress…',
                               style: TextStyle(

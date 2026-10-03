@@ -37,7 +37,7 @@ class _SplashViewState extends State<SplashView>
     return Scaffold(
       body: Container(
         decoration:
-            const BoxDecoration(gradient: RemedooTheme.headerGradient),
+            BoxDecoration(gradient: RemedooTheme.headerGradient),
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,

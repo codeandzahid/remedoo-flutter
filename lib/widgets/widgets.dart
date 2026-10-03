@@ -80,7 +80,7 @@ class GradientHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: RemedooTheme.headerGradient,
         borderRadius: BorderRadius.vertical(
           bottom: Radius.circular(RemedooRadius.xxl),
@@ -1630,12 +1630,12 @@ class RGradientHeader extends StatelessWidget {
   final Gradient gradient;
   final EdgeInsetsGeometry padding;
 
-  const RGradientHeader({
+  RGradientHeader({
     super.key,
     required this.child,
-    this.gradient = RemedooTheme.headerGradient,
+    Gradient? gradient,
     this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 28),
-  });
+  }) : gradient = gradient ?? RemedooTheme.headerGradient;
 
   @override
   Widget build(BuildContext context) {
