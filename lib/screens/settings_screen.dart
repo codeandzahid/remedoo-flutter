@@ -7,6 +7,8 @@ import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'profile_screen.dart';
 import 'appointments_screen.dart';
+import 'family_screen.dart';
+import 'reminders_screen.dart';
 import 'orders_screen.dart';
 import 'medical_history_screen.dart';
 import 'favorites_screen.dart';
@@ -52,8 +54,10 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   // User info card.
                   RCard(
-                    onTap: () =>
-                        pushPage(context, const ProfileScreen()),
+                    onTap: () {
+                      if (!checkLogin(context)) return;
+                      pushPage(context, const ProfileScreen());
+                    },
                     child: Row(
                       children: [
                         InitialsAvatar(
@@ -224,6 +228,13 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _go(BuildContext context, Widget page) {
+    if (page is ProfileScreen ||
+        page is AppointmentsScreen ||
+        page is OrdersScreen ||
+        page is FamilyScreen ||
+        page is RemindersScreen) {
+      if (!checkLogin(context)) return;
+    }
     pushPage(context, page);
   }
 

@@ -349,11 +349,14 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
           pct: urgent ? 96 : 92,
           reason:
               'Matches your symptoms and stays within your budget and distance.',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => DoctorDetailScreen(doctor: d)),
-          ),
+          onTap: () {
+            if (!checkLogin(context, 'Please login to view details')) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => DoctorDetailScreen(doctor: d)),
+            );
+          },
         )));
       }
     }
@@ -373,12 +376,15 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
           pct: urgent ? 94 : 88,
           reason:
               'Well-rated hospital close to you with emergency support.',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) =>
-                    HospitalDetailScreen(hospital: h)),
-          ),
+          onTap: () {
+            if (!checkLogin(context, 'Please login to view details')) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) =>
+                      HospitalDetailScreen(hospital: h)),
+            );
+          },
         )));
       }
     }
@@ -398,11 +404,14 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
           pct: 85,
           reason:
               'Recommended lab for the tests your symptoms suggest.',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => LabDetailScreen(lab: l)),
-          ),
+          onTap: () {
+            if (!checkLogin(context, 'Please login to view details')) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => LabDetailScreen(lab: l)),
+            );
+          },
         )));
       }
     }
