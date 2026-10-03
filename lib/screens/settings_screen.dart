@@ -205,33 +205,43 @@ class SettingsScreen extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 color: scheme.onSurface)),
                         const SizedBox(height: 12),
-                        for (var row = 0;
-                            row < ThemePack.all.length / 3;
-                            row++)
-                          Padding(
-                            padding: EdgeInsets.only(
-                                bottom: row == 1 ? 0 : 10),
-                            child: Row(
-                              children: [
-                                for (var col = 0; col < 3; col++)
-                                  if (row * 3 + col <
-                                      ThemePack.all.length)
-                                    Expanded(
-                                      child: Padding(
-                                        padding: EdgeInsets.only(
-                                          right: col == 2 ? 0 : 10,
-                                        ),
-                                        child: _themeTile(
-                                            context,
-                                            state,
-                                            ThemePack.all[
-                                                row * 3 + col],
-                                            scheme),
-                                      ),
-                                    ),
-                              ],
-                            ),
-                          ),
+                        Builder(builder: (c) {
+                          final packs = state.availablePacks;
+                          final rows = (packs.length / 3).ceil();
+                          return Column(
+                            children: [
+                              for (var row = 0; row < rows; row++)
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                      bottom:
+                                          row == rows - 1 ? 0 : 10),
+                                  child: Row(
+                                    children: [
+                                      for (var col = 0; col < 3; col++)
+                                        if (row * 3 + col <
+                                            packs.length)
+                                          Expanded(
+                                            child: Padding(
+                                              padding: EdgeInsets.only(
+                                                right:
+                                                    col == 2 ? 0 : 10,
+                                              ),
+                                              child: _themeTile(
+                                                  context,
+                                                  state,
+                                                  packs[row * 3 + col],
+                                                  scheme),
+                                            ),
+                                          )
+                                        else
+                                          const Expanded(
+                                              child: SizedBox.shrink()),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          );
+                        }),
                       ],
                     ),
                   ),

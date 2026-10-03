@@ -499,4 +499,60 @@ class SupabaseRepository {
       return false;
     }
   }
+
+  // ------------------------------------------------------------------ themes
+
+  /// Fetches theme pack availability (admin-controlled). Rows carry
+  /// id, name, enabled, is_primary, ordered for display. Empty on failure
+  /// (the caller falls back to all built-in packs).
+  Future<List<Map<String, dynamic>>> fetchThemePacks() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('theme_packs')
+          .select('id, name, enabled, is_primary')
+          .order('sort_order');
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchThemePacks failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin: enable or disable a theme pack project-wide.
+  /// The primary theme cannot be disabled (enforced by the database).
+  Future<bool> setThemePackEnabled(String id, bool enabled) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('theme_packs').update({'enabled': enabled}).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('setThemePackEnabled failed: $e');
+      return false;
+    }
+  }
+
+  /// Saves the user's theme choice to their profile (syncs web <-> app).
+  Future<bool> saveUserTheme(String packId) {
+    return saveProfile({'theme_pack': packId});
+  }
+
+  /// Realtime stream of the user's theme_pack. When the user changes the
+  /// theme on the website, the app picks it up live (and vice versa).
+  Stream<String?> watchUserTheme() {
+    final uid = _uid;
+    if (!_ready || uid == null) return const Stream.empty();
+    try {
+      return _db
+          .from('profiles')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', uid)
+          .limit(1)
+          .map((rows) =>
+              rows.isEmpty ? null : rows.first['theme_pack'] as String?);
+    } catch (e) {
+      debugPrint('watchUserTheme failed: $e');
+      return const Stream.empty();
+    }
+  }
 }

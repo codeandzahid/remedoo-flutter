@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/mock_data.dart';
+import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
@@ -450,8 +451,183 @@ class _BrandingScreenState extends State<BrandingScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 20),
+          const RSectionHeader(
+              title: 'App Themes',
+              subtitle:
+                  'Turn themes on or off project-wide — website and app'),
+          const SizedBox(height: 12),
+          _ThemePackAdminCard(),
         ],
       ),
+    );
+  }
+}
+
+/// Admin control for theme pack availability. Sky Pulse is the primary
+/// theme and cannot be turned off.
+class _ThemePackAdminCard extends StatefulWidget {
+  @override
+  State<_ThemePackAdminCard> createState() => _ThemePackAdminCardState();
+}
+
+class _ThemePackAdminCardState extends State<_ThemePackAdminCard> {
+  bool _loading = true;
+  List<Map<String, dynamic>> _packs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final rows = await SupabaseRepository.instance.fetchThemePacks();
+    if (!mounted) return;
+    setState(() {
+      // Fall back to built-in packs when the table isn't reachable.
+      _packs = rows.isEmpty
+          ? [
+              for (final p in ThemePack.all)
+                {
+                  'id': p.id,
+                  'name': p.name,
+                  'enabled': true,
+                  'is_primary': p.id == 'sky_pulse',
+                }
+            ]
+          : rows;
+      _loading = false;
+    });
+    // Keep AppState's availability map in sync.
+    if (rows.isNotEmpty && mounted) {
+      await AppStateScope.of(context).loadThemeAvailability();
+    }
+  }
+
+  Future<void> _toggle(String id, bool enabled) async {
+    final ok = await AppStateScope.of(context)
+        .setThemePackEnabled(id, enabled);
+    if (!mounted) return;
+    if (ok) {
+      setState(() {
+        final i = _packs.indexWhere((p) => p['id'] == id);
+        if (i >= 0) _packs[i]['enabled'] = enabled;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(enabled
+                ? 'Theme enabled project-wide'
+                : 'Theme disabled project-wide')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Could not update theme (admin only)')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (_loading) {
+      return const RCard(
+        padding: EdgeInsets.all(20),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return RCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Column(
+        children: [
+          for (var i = 0; i < _packs.length; i++) ...[
+            _themeRow(scheme, _packs[i], i == _packs.length - 1),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _themeRow(
+      ColorScheme scheme, Map<String, dynamic> pack, bool last) {
+    final id = '${pack['id']}';
+    final builtin = ThemePack.byId(id);
+    final enabled = pack['enabled'] == true;
+    final isPrimary = pack['is_primary'] == true;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: builtin == null
+                      ? null
+                      : LinearGradient(colors: [
+                          builtin.primary,
+                          builtin.primaryDark,
+                        ]),
+                  color: builtin == null ? scheme.secondary : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('${pack['name']}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14)),
+                        if (isPrimary) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: scheme.primary
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text('PRIMARY',
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: scheme.primary)),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      isPrimary
+                          ? 'Default theme · always on'
+                          : (enabled ? 'Available to users' : 'Hidden from users'),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: enabled,
+                activeThumbColor: scheme.primary,
+                onChanged: isPrimary
+                    ? null
+                    : (v) => _toggle(id, v),
+              ),
+            ],
+          ),
+        ),
+        if (!last) const Divider(height: 1),
+      ],
     );
   }
 }

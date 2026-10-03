@@ -63,6 +63,8 @@ class AppState extends ChangeNotifier {
     // Production catalog for everyone (guests browse it too); user data
     // loads inside _syncUserFromSession when a session exists.
     unawaited(loadProductionCatalog());
+    // Admin-controlled theme availability (also for guests).
+    unawaited(loadThemeAvailability());
     // AppState lives for the whole app lifetime, so the subscription is
     // intentionally never cancelled.
     AuthService.instance.authStateChanges.listen((data) {
@@ -70,6 +72,7 @@ class AppState extends ChangeNotifier {
       if (event == AuthChangeEvent.signedOut) {
         _supaUser = null;
         _resetProductionFlags();
+        _stopThemeWatch();
         _clearAuthLocal(notify: false);
         notifyListeners();
       } else if (event == AuthChangeEvent.signedIn ||
@@ -178,15 +181,53 @@ class AppState extends ChangeNotifier {
 
   ThemePack _themePack = ThemePack.skyPulse;
 
-  /// The active UI theme pack. Defaults to Sky Pulse.
+  /// Admin-controlled availability: pack id -> enabled. Fetched from
+  /// Supabase at boot; defaults to all-enabled when offline.
+  final Map<String, bool> _packEnabled = {
+    for (final p in ThemePack.all) p.id: true,
+  };
+
+  StreamSubscription<String?>? _themeSub;
+
+  /// The active UI theme pack. Sky Pulse is the primary (default) theme.
   ThemePack get themePack => _themePack;
 
-  /// Switches the app theme. Persists the choice and rebuilds the UI.
-  Future<void> setThemePack(ThemePack pack) async {
-    if (pack.id == _themePack.id) return;
+  /// Themes the user may pick from (admin-enabled only). Falls back to all
+  /// built-in packs when the availability fetch hasn't completed.
+  List<ThemePack> get availablePacks {
+    final enabled =
+        ThemePack.all.where((p) => _packEnabled[p.id] != false).toList();
+    return enabled.isEmpty ? ThemePack.all : enabled;
+  }
+
+  /// Fetches admin-controlled theme availability. Called at boot for
+  /// everyone (guests included). If the current pack got disabled, falls
+  /// back to the primary theme.
+  Future<void> loadThemeAvailability() async {
+    try {
+      final rows = await _repo.fetchThemePacks();
+      if (rows.isEmpty) return;
+      for (final r in rows) {
+        final id = '${r['id']}';
+        _packEnabled[id] = r['enabled'] == true;
+      }
+      // Primary theme can never be off.
+      _packEnabled['sky_pulse'] = true;
+      if (_packEnabled[_themePack.id] == false) {
+        unawaited(_applyPack(ThemePack.skyPulse, persist: true));
+      }
+      notifyListeners();
+    } catch (_) {
+      // Offline: keep all packs available.
+    }
+  }
+
+  /// Applies a pack locally + persists to device storage.
+  Future<void> _applyPack(ThemePack pack, {bool persist = true}) async {
     _themePack = pack;
     RemedooTheme.setPack(pack);
     notifyListeners();
+    if (!persist) return;
     try {
       final prefs = await SharedPreferences.getInstance()
           .timeout(const Duration(seconds: 3));
@@ -194,6 +235,69 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       // Best-effort persistence only.
     }
+  }
+
+  /// Switches the app theme. Persists on-device and, when signed in, to
+  /// Supabase so the website and the app stay in sync.
+  Future<void> setThemePack(ThemePack pack) async {
+    if (pack.id == _themePack.id) return;
+    await _applyPack(pack);
+    if (_supaUser != null) {
+      unawaited(_repo.saveUserTheme(pack.id));
+    }
+  }
+
+  /// Loads the signed-in user's theme from Supabase and starts the realtime
+  /// subscription: a theme change on the website applies live in the app
+  /// (and vice versa).
+  Future<void> syncUserTheme() async {
+    if (_supaUser == null) return;
+    try {
+      final profile = await _repo.fetchProfile();
+      final id = profile?['theme_pack'] as String?;
+      final pack = id == null ? null : ThemePack.byId(id);
+      if (pack != null &&
+          pack.id != _themePack.id &&
+          _packEnabled[pack.id] != false) {
+        await _applyPack(pack);
+      }
+    } catch (_) {}
+    _startThemeWatch();
+  }
+
+  void _startThemeWatch() {
+    _themeSub?.cancel();
+    _themeSub = _repo.watchUserTheme().listen((id) async {
+      if (id == null) return;
+      final pack = ThemePack.byId(id);
+      if (pack == null ||
+          pack.id == _themePack.id ||
+          _packEnabled[pack.id] == false) {
+        return;
+      }
+      await _applyPack(pack);
+    });
+  }
+
+  /// Stops the realtime theme subscription (on sign-out).
+  void _stopThemeWatch() {
+    _themeSub?.cancel();
+    _themeSub = null;
+  }
+
+  /// Admin: enable/disable a theme pack project-wide. The primary theme
+  /// (Sky Pulse) cannot be disabled.
+  Future<bool> setThemePackEnabled(String id, bool enabled) async {
+    if (id == 'sky_pulse' && !enabled) return false;
+    final ok = await _repo.setThemePackEnabled(id, enabled);
+    if (ok) {
+      _packEnabled[id] = enabled;
+      if (!enabled && _themePack.id == id) {
+        unawaited(_applyPack(ThemePack.skyPulse, persist: true));
+      }
+      notifyListeners();
+    }
+    return ok;
   }
 
   void loginAsGuest() {
@@ -376,6 +480,8 @@ class AppState extends ChangeNotifier {
   Future<void> loadUserProductionData() async {
     if (_supaUser == null || _userDataLoaded) return;
     _userDataLoaded = true;
+    // Cross-device theme sync (website <-> app).
+    unawaited(syncUserTheme());
     final arows = await _repo.fetchAppointments();
     if (arows.isNotEmpty) {
       appointments
