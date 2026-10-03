@@ -81,18 +81,20 @@ class HospitalDetailScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        color: scheme.surface,
-        child: SafeArea(
-          child: RButton(
-            label: 'Book Appointment',
-            icon: Icons.calendar_month_outlined,
-            fullWidth: true,
-            onPressed: () => _book(context, h),
-          ),
-        ),
-      ),
+      bottomNavigationBar: h.government
+          ? null
+          : Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              color: scheme.surface,
+              child: SafeArea(
+                child: RButton(
+                  label: 'Book Appointment',
+                  icon: Icons.calendar_month_outlined,
+                  fullWidth: true,
+                  onPressed: () => _book(context, h),
+                ),
+              ),
+            ),
     );
   }
 
