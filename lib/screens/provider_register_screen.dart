@@ -65,6 +65,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
       phone: _phone.text.trim(),
       role: _role,
       license: _license.text.trim(),
+      upiId: _upiId.text.trim(),
     );
     Navigator.pushReplacement(
       context,

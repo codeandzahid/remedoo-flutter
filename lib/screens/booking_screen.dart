@@ -84,6 +84,21 @@ class _BookingScreenState extends State<BookingScreen> {
     super.dispose();
   }
 
+  /// Returns the provider object for toggle checks.
+  dynamic _provider(AppState state) {
+    if (widget.kind == 'doctor') {
+      final d = state.activeDoctors.where((d) => d.id == widget.refId);
+      if (d.isNotEmpty) return d.first;
+    } else if (widget.kind == 'lab') {
+      final l = state.activeLabs.where((l) => l.id == widget.refId);
+      if (l.isNotEmpty) return l.first;
+    } else if (widget.kind == 'hospital') {
+      final h = state.activeHospitals.where((h) => h.id == widget.refId);
+      if (h.isNotEmpty) return h.first;
+    }
+    return null;
+  }
+
   /// Returns the provider's UPI ID if they have one set, null otherwise.
   String? _providerUpiId(AppState state) {
     if (widget.kind == 'doctor') {
@@ -163,6 +178,13 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget build(BuildContext context) {
     final slots = AppStateScope.of(context).slotsFor(_date);
     final isReschedule = widget.prefill != null;
+    final st = AppStateScope.of(context);
+    final upiId = _providerUpiId(st);
+    final prov = _provider(st);
+    final payInClinic = prov?.payInClinicEnabled ?? true;
+    final upiOn = (prov?.upiEnabled ?? true) &&
+        upiId != null &&
+        upiId.isNotEmpty;
 
     final sections = <Widget>[
       _providerCard(),
@@ -188,21 +210,16 @@ class _BookingScreenState extends State<BookingScreen> {
       const SizedBox(height: 14),
       _sectionTitle(Icons.credit_card, 'Payment Method'),
       const SizedBox(height: 10),
-      _payCard('At Clinic', 'Pay when you visit', Icons.payments_outlined),
-      const SizedBox(height: 10),
-      _payCard('Pay Online', 'Auto-confirm your slot', Icons.credit_card),
-      Builder(builder: (context) {
-        final upiId =
-            _providerUpiId(AppStateScope.of(context));
-        if (upiId == null || upiId.isEmpty) return const SizedBox.shrink();
-        return Column(
-          children: [
-            const SizedBox(height: 10),
-            _payCard('UPI', 'Pay directly to provider via UPI',
-                Icons.qr_code_2),
-          ],
-        );
-      }),
+      if (payInClinic)
+        _payCard('At Clinic', 'Pay when you visit',
+            Icons.payments_outlined),
+      if (payInClinic) const SizedBox(height: 10),
+      _payCard('Pay Online', 'Auto-confirm your slot',
+          Icons.credit_card),
+      if (upiOn) const SizedBox(height: 10),
+      if (upiOn)
+        _payCard('UPI', 'Pay directly to provider via UPI',
+            Icons.qr_code_2),
     ];
 
     final summary = _summaryCard();

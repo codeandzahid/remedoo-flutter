@@ -61,6 +61,8 @@ class SupabaseRepository {
       verified: r['approval_status'] == _approved,
       about: '${r['bio'] ?? ''}',
       upiId: r['upi_id']?.toString(),
+      payInClinicEnabled: r['pay_in_clinic_enabled'] != false,
+      upiEnabled: r['upi_enabled'] != false,
     );
   }
 
@@ -97,6 +99,8 @@ class SupabaseRepository {
       distanceKm: 0,
       verified: r['approval_status'] == _approved,
       upiId: r['upi_id']?.toString(),
+      payInClinicEnabled: r['pay_in_clinic_enabled'] != false,
+      upiEnabled: r['upi_enabled'] != false,
     );
   }
 
@@ -132,6 +136,8 @@ class SupabaseRepository {
       verified: r['approval_status'] == _approved,
       distanceKm: 0,
       upiId: r['upi_id']?.toString(),
+      payInClinicEnabled: r['pay_in_clinic_enabled'] != false,
+      upiEnabled: r['upi_enabled'] != false,
     );
   }
 
@@ -166,6 +172,8 @@ class SupabaseRepository {
       verified: r['approval_status'] == _approved,
       distanceKm: 0,
       upiId: r['upi_id']?.toString(),
+      payInClinicEnabled: r['pay_in_clinic_enabled'] != false,
+      upiEnabled: r['upi_enabled'] != false,
     );
   }
 

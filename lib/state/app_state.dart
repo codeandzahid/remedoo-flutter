@@ -1562,6 +1562,7 @@ class AppState extends ChangeNotifier {
     required String phone,
     required String role,
     required String license,
+    String? upiId,
   }) {
     final app = ProviderApplication(
       id: 'PA${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
@@ -1819,6 +1820,8 @@ class AppState extends ChangeNotifier {
           FieldSpec(key: 'exp', label: 'Experience (yrs)', type: 'number'),
           FieldSpec(key: 'verified', label: 'Verified', type: 'toggle'),
           FieldSpec(key: 'upi_id', label: 'UPI ID'),
+          FieldSpec(key: 'pay_in_clinic', label: 'Pay in Clinic', type: 'toggle'),
+          FieldSpec(key: 'upi_on', label: 'UPI Payments', type: 'toggle'),
         ],
         read: () => doctors
             .map((d) => {

@@ -19,6 +19,8 @@ class Doctor {
   final String about;
   final bool active;
   final String? upiId;
+  final bool payInClinicEnabled;
+  final bool upiEnabled;
 
   const Doctor({
     required this.id,
@@ -35,6 +37,8 @@ class Doctor {
     required this.about,
     this.active = true,
     this.upiId,
+    this.payInClinicEnabled = true,
+    this.upiEnabled = true,
   });
 }
 
@@ -52,6 +56,8 @@ class Hospital {
   final bool verified;
   final bool active;
   final String? upiId;
+  final bool payInClinicEnabled;
+  final bool upiEnabled;
 
   const Hospital({
     required this.id,
@@ -67,6 +73,8 @@ class Hospital {
     required this.verified,
     this.active = true,
     this.upiId,
+    this.payInClinicEnabled = true,
+    this.upiEnabled = true,
   });
 }
 
@@ -84,6 +92,8 @@ class Lab {
   final double distanceKm;
   final bool active;
   final String? upiId;
+  final bool payInClinicEnabled;
+  final bool upiEnabled;
 
   const Lab({
     required this.id,
@@ -99,6 +109,8 @@ class Lab {
     required this.distanceKm,
     this.active = true,
     this.upiId,
+    this.payInClinicEnabled = true,
+    this.upiEnabled = true,
   });
 }
 
@@ -115,6 +127,8 @@ class Pharmacy {
   final double distanceKm;
   final bool active;
   final String? upiId;
+  final bool payInClinicEnabled;
+  final bool upiEnabled;
 
   const Pharmacy({
     required this.id,
@@ -129,6 +143,8 @@ class Pharmacy {
     required this.distanceKm,
     this.active = true,
     this.upiId,
+    this.payInClinicEnabled = true,
+    this.upiEnabled = true,
   });
 }
 

@@ -418,11 +418,20 @@ class _RemedooCheckoutScreenState
 
   Widget _paymentCard() {
     final scheme = Theme.of(context).colorScheme;
-    const methods = [
-      'Cash on Delivery',
+    final state = AppStateScope.of(context);
+    final pharmacies = state.activePharmacies
+        .where((p) => p.id == state.cartPharmacyId);
+    final pharmacy =
+        pharmacies.isNotEmpty ? pharmacies.first : null;
+    final codOn = pharmacy?.payInClinicEnabled ?? true;
+    final upiOn = (pharmacy?.upiEnabled ?? true) &&
+        (pharmacy?.upiId?.isNotEmpty ?? false);
+    final methods = [
+      if (codOn) 'Cash on Delivery',
       'Pay Online',
-      'UPI',
+      if (upiOn) 'UPI',
     ];
+
     return RCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
