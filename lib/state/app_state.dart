@@ -932,7 +932,14 @@ class AppState extends ChangeNotifier {
     required String pharmacyId,
     required String pharmacyName,
   }) {
-    if (cartPharmacyId != null && cartPharmacyId != pharmacyId) return false;
+    // Same pharmacy if IDs match, or names match (handles ID format
+    // inconsistencies across screens).
+    final samePharmacy = cartPharmacyId == null ||
+        cartPharmacyId == pharmacyId ||
+        (cartPharmacyName != null &&
+            cartPharmacyName!.toLowerCase() ==
+                pharmacyName.toLowerCase());
+    if (!samePharmacy) return false;
     cartPharmacyId = pharmacyId;
     cartPharmacyName = pharmacyName;
     final existing = cart.where((l) => l.medicine.id == m.id);

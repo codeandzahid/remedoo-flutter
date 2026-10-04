@@ -1763,8 +1763,10 @@ class RSectionHeader extends StatelessWidget {
             children: [
               Text(
                 title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w800),
+                    fontSize: 16, fontWeight: FontWeight.w800),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),

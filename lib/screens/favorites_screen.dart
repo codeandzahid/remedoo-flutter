@@ -223,22 +223,21 @@ class FavoritesScreen extends StatelessWidget {
             ),
             Column(
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: RemedooTheme.destructive
-                        .withValues(alpha: 0.1),
-                  ),
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => state.toggleFavorite(key),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: RemedooTheme.destructive
+                          .withValues(alpha: 0.1),
+                    ),
+                    child: const Icon(
                         Icons.delete_outline,
                         size: 16,
                         color: RemedooTheme.destructive),
-                    onPressed: () =>
-                        state.toggleFavorite(key),
                   ),
                 ),
                 Icon(Icons.chevron_right,

@@ -142,8 +142,6 @@ class DoctorDetailScreen extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.currency_rupee,
-                      size: 18, color: scheme.primary),
                   Text(
                     inr(d.fee),
                     style: TextStyle(

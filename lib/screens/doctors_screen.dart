@@ -113,7 +113,15 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
           .toList();
     }
     if (_specialty != 'All') {
-      list = list.where((d) => d.specialty == _specialty).toList();
+      // Match by word stem: chip labels ('Cardiologist') vs data values
+      // ('Cardiology') share a prefix.
+      final fs = _specialty.toLowerCase().replaceAll(' specialist', '');
+      list = list.where((d) {
+        final ds = d.specialty.toLowerCase();
+        final n = ds.length < fs.length ? ds.length : fs.length;
+        final m = n > 6 ? 6 : n;
+        return ds.substring(0, m) == fs.substring(0, m);
+      }).toList();
     }
     if (_rating4) list = list.where((d) => d.rating >= 4.0).toList();
     switch (_sort) {
