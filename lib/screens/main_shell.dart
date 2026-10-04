@@ -148,12 +148,30 @@ class _MainShellState extends State<MainShell> {
             children: _pages,
           ),
         ),
-        bottomNavigationBar: state.drawerOpen
-            ? null
-            : RBottomNav(
-                currentIndex: _navIndexFor(_index),
-                onTap: (i) => _switchTab(_navToPage[i]),
+        bottomNavigationBar: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 350),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).animate(animation),
+              child: FadeTransition(
+                opacity: animation,
+                child: child,
               ),
+            );
+          },
+          child: state.drawerOpen
+              ? const SizedBox.shrink(key: ValueKey('nav-hidden'))
+              : RBottomNav(
+                  key: const ValueKey('nav-visible'),
+                  currentIndex: _navIndexFor(_index),
+                  onTap: (i) => _switchTab(_navToPage[i]),
+                ),
+        ),
         floatingActionButton: _supportFab(context),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       );
