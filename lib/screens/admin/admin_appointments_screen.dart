@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
-import '../../models.dart';
 import '../../state/app_state.dart';
 import '../../widgets/widgets.dart';
 
-/// Admin appointments: filterable list with status-change actions.
+String _fmtDate(String? iso) {
+  if (iso == null || iso.isEmpty) return '';
+  try {
+    final d = DateTime.parse(iso).toLocal();
+    return '${d.day}/${d.month}/${d.year}';
+  } catch (_) {
+    return iso;
+  }
+}
+
+/// Admin appointments: real Supabase appointments, filterable.
 class AdminAppointmentsScreen extends StatefulWidget {
   const AdminAppointmentsScreen({super.key});
 
@@ -16,14 +25,30 @@ class AdminAppointmentsScreen extends StatefulWidget {
 class _AdminAppointmentsScreenState
     extends State<AdminAppointmentsScreen> {
   String _filter = 'All';
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    await AppStateScope.of(context).loadAdminAppointments();
+    if (mounted) setState(() => _loading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final statuses = ['All', 'upcoming', 'cancelled'];
-    var list = state.appointments.toList();
+    final statuses = ['All', 'upcoming', 'cancelled', 'completed'];
+    var list = state.adminAppointments.toList();
     if (_filter != 'All') {
-      list = list.where((a) => a.status == _filter).toList();
+      list = list
+          .where((a) => '${a['status']}' == _filter)
+          .toList();
     }
     return Column(
       children: [
@@ -40,34 +65,48 @@ class _AdminAppointmentsScreenState
               final s = statuses[i];
               return Center(
                 child: RFilterChip(
-                  label: s == 'All' ? 'All' : s,
+                  label: s,
                   selected: s == _filter,
-                  onTap: () => setState(() => _filter = s),
+                  onTap: () =>
+                      setState(() => _filter = s),
                 ),
               );
             },
           ),
         ),
         Expanded(
-          child: list.isEmpty
-              ? const REmptyState(
-                  icon: Icons.calendar_month_outlined,
-                  title: 'No appointments',
-                  subtitle: 'Bookings will appear here.',
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(
-                      16, 4, 16, 16),
-                  itemCount: list.length,
-                  itemBuilder: (_, i) =>
-                      _card(state, list[i]),
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator())
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: list.isEmpty
+                      ? const REmptyState(
+                          icon:
+                              Icons.calendar_month_outlined,
+                          title: 'No appointments',
+                          subtitle:
+                              'Bookings will appear here.',
+                        )
+                      : ListView.builder(
+                          padding:
+                              const EdgeInsets.fromLTRB(
+                                  16, 4, 16, 16),
+                          itemCount: list.length,
+                          itemBuilder: (_, i) =>
+                              _card(list[i]),
+                        ),
                 ),
         ),
       ],
     );
   }
 
-  Widget _card(AppState state, Appointment a) {
+  Widget _card(Map<String, dynamic> a) {
+    final scheme = Theme.of(context).colorScheme;
+    final when =
+        '${_fmtDate(a['appointment_date']?.toString())} ${a['appointment_time'] ?? ''}'
+            .trim();
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: RCard(
@@ -75,30 +114,21 @@ class _AdminAppointmentsScreenState
             horizontal: 8, vertical: 6),
         child: ListTile(
           leading: InitialsAvatar(
-              name: a.doctorName, radius: 22),
-          title: Text(a.doctorName,
+              name: '${a['service_type'] ?? 'Visit'}',
+              radius: 22),
+          title: Text('${a['service_type'] ?? 'Appointment'}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style:
                   const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text(
-              '${a.specialty} • ${a.dateLabel} ${a.timeLabel}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              StatusChip(status: a.status),
-              if (a.status == 'upcoming')
-                IconButton(
-                  icon: const Icon(Icons.cancel_outlined,
-                      color: Colors.red),
-                  tooltip: 'Cancel',
-                  onPressed: () =>
-                      state.cancelAppointment(a.id),
-                ),
-            ],
-          ),
+              '${when.isEmpty ? '—' : when}${a['notes'] != null && '${a['notes']}'.isNotEmpty ? ' • ${a['notes']}' : ''}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: scheme.onSurfaceVariant)),
+          trailing: StatusChip(status: '${a['status'] ?? ''}'),
         ),
       ),
     );

@@ -66,6 +66,9 @@ class AppState extends ChangeNotifier {
     unawaited(loadProductionCatalog());
     // Admin-controlled theme availability (also for guests).
     unawaited(loadThemeAvailability());
+    // Admin-controlled app config: branding, fees, emergency numbers,
+    // maintenance mode (also for guests).
+    unawaited(loadAppConfig());
     // AppState lives for the whole app lifetime, so the subscription is
     // intentionally never cancelled.
     AuthService.instance.authStateChanges.listen((data) {
@@ -375,6 +378,28 @@ class AppState extends ChangeNotifier {
 
   Future<AuthResult> resendConfirmationEmail(String email) {
     return AuthService.instance.resendConfirmation(email);
+  }
+
+  /// Completes registration after the email OTP was verified (the user is
+  /// already signed in at this point): sets the password and the profile
+  /// name. Returns failure if the email already belongs to a finished
+  /// account (profile has a name) so the caller can sign the user in.
+  Future<AuthResult> completeOtpSignup({
+    required String name,
+    required String password,
+  }) async {
+    final existing = await _repo.fetchProfile();
+    final existingName =
+        '${existing?['full_name'] ?? ''}'.trim();
+    if (existingName.isNotEmpty) {
+      return const AuthResult.failure(
+          'An account with this email already exists. Signed you in instead.');
+    }
+    final pw = await AuthService.instance.updatePassword(password);
+    if (!pw.ok) return pw;
+    await _repo.saveProfile({'full_name': name});
+    _syncUserFromSession();
+    return const AuthResult.success();
   }
 
   Future<AuthResult> sendMagicLink(String email) {
@@ -1522,14 +1547,338 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ================= ADMIN =================
+  // Supabase-backed admin controls. Writes require the signed-in user to
+  // hold the 'admin' role (enforced by RLS policies); reads degrade
+  // gracefully when offline or not admin.
+
+  bool _isAdmin = false;
+
+  /// Whether the signed-in user holds the admin role.
+  bool get isAdmin => _isAdmin;
+
+  Future<void> checkAdminRole() async {
+    _isAdmin = await _repo.isCurrentUserAdmin();
+    notifyListeners();
+  }
+
+  // ---------- App config ----------
+
+  final Map<String, Map<String, dynamic>> _appConfig = {};
+
+  /// One app_config entry (branding, fees, emergency, maintenance...).
+  Map<String, dynamic> appConfigValue(String key) => _appConfig[key] ?? {};
+
+  Future<void> loadAppConfig() async {
+    final cfg = await _repo.fetchAppConfig();
+    _appConfig
+      ..clear()
+      ..addAll(cfg);
+    notifyListeners();
+  }
+
+  Future<bool> saveAppConfigValue(
+      String key, Map<String, dynamic> value) async {
+    final ok = await _repo.saveAppConfig(key, value);
+    if (ok) {
+      _appConfig[key] = value;
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  // ---------- Generic catalog tables ----------
+
+  final Map<String, List<Map<String, dynamic>>> _adminTables = {};
+
+  /// Raw rows of a catalog table as last loaded by [loadAdminTable].
+  List<Map<String, dynamic>> adminTable(String t) =>
+      _adminTables[t] ?? const [];
+
+  Future<void> loadAdminTable(String t) async {
+    _adminTables[t] = await _repo.adminFetchAll(t);
+    notifyListeners();
+  }
+
+  Future<bool> adminSaveRow(
+      String t, Map<String, dynamic> row) async {
+    final id = await _repo.adminUpsert(t, row);
+    if (id != null) {
+      await loadAdminTable(t);
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> adminDeleteRow(String t, String id) async {
+    final ok = await _repo.adminDelete(t, id);
+    if (ok) {
+      _adminTables[t]?.removeWhere((r) => '${r['id']}' == id);
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  // ---------- Provider applications (DB-backed) ----------
+
+  final List<Map<String, dynamic>> _adminProviderApplications = [];
+
+  List<Map<String, dynamic>> get adminProviderApplications =>
+      _adminProviderApplications;
+
+  Future<void> loadAdminProviderApplications() async {
+    _adminProviderApplications
+      ..clear()
+      ..addAll(await _repo.fetchProviderApplications());
+    notifyListeners();
+  }
+
+  /// Submits a provider application to the database.
+  Future<bool> submitProviderApplicationDb(
+      Map<String, dynamic> app) async {
+    final row = Map<String, dynamic>.from(app);
+    final uid = _supaUser?.id;
+    if (uid != null) row['user_id'] = uid;
+    final id = await _repo.submitProviderApplication(row);
+    return id != null;
+  }
+
+  static const _appTypeToTable = <String, String>{
+    'doctor': 'doctors',
+    'hospital': 'hospitals',
+    'lab': 'labs',
+    'pharmacy': 'pharmacies',
+  };
+
+  /// Approves/rejects a provider application. On approval a provider
+  /// record is created in the matching catalog table and linked to the
+  /// applicant's user id. Returns true only if everything succeeded.
+  Future<bool> decideProviderApplication(String id, String status,
+      Map<String, dynamic> app) async {
+    final ok = await _repo.decideProviderApplication(id, status);
+    if (!ok) return false;
+    if (status == 'approved') {
+      final table = _appTypeToTable['${app['provider_type'] ?? ''}'];
+      if (table == null) return false;
+      final row = <String, dynamic>{
+        'name': app['name'],
+        'phone': app['phone'],
+        'user_id': app['user_id'],
+        'approval_status': 'approved',
+        'admin_note':
+            'License: ${app['license_no'] ?? ''} (via application $id)',
+      };
+      if (table == 'doctors') {
+        row['bio'] = app['address'];
+      } else {
+        row['location'] = app['address'];
+      }
+      final newId = await _repo.adminUpsert(table, row);
+      if (newId == null) return false;
+    }
+    await loadAdminProviderApplications();
+    return true;
+  }
+
+  // ---------- Announcements ----------
+
+  final List<Map<String, dynamic>> _announcements = [];
+
+  List<Map<String, dynamic>> get announcements => _announcements;
+
+  Future<void> loadAnnouncements() async {
+    _announcements
+      ..clear()
+      ..addAll(await _repo.fetchAnnouncements());
+    notifyListeners();
+  }
+
+  Future<bool> createAnnouncement(
+      String title, String message, String audience) async {
+    final ok = await _repo.createAnnouncement(title, message, audience);
+    if (ok) await loadAnnouncements();
+    return ok;
+  }
+
+  Future<bool> deleteAnnouncement(String id) async {
+    final ok = await _repo.deleteAnnouncement(id);
+    if (ok) {
+      _announcements.removeWhere((a) => '${a['id']}' == id);
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  // ---------- Users ----------
+
+  final List<Map<String, dynamic>> _allProfiles = [];
+
+  List<Map<String, dynamic>> get allProfiles => _allProfiles;
+
+  Future<void> loadAllProfiles() async {
+    _allProfiles
+      ..clear()
+      ..addAll(await _repo.fetchAllProfiles());
+    notifyListeners();
+  }
+
+  // ---------- Operations ----------
+
+  final List<Map<String, dynamic>> _adminOrders = [];
+
+  List<Map<String, dynamic>> get adminOrders => _adminOrders;
+
+  Future<void> loadAdminOrders() async {
+    _adminOrders
+      ..clear()
+      ..addAll(await _repo.adminFetchOrders());
+    notifyListeners();
+  }
+
+  Future<bool> updateAdminOrder(
+      String id, Map<String, dynamic> fields) async {
+    final ok = await _repo.adminUpdateOrder(id, fields);
+    if (ok) {
+      for (final o in _adminOrders) {
+        if ('${o['id']}' == id) o.addAll(fields);
+      }
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  final List<Map<String, dynamic>> _adminAppointments = [];
+
+  List<Map<String, dynamic>> get adminAppointments => _adminAppointments;
+
+  Future<void> loadAdminAppointments() async {
+    _adminAppointments
+      ..clear()
+      ..addAll(await _repo.adminFetchAppointments());
+    notifyListeners();
+  }
+
+  final List<Map<String, dynamic>> _supportTickets = [];
+
+  List<Map<String, dynamic>> get supportTickets => _supportTickets;
+
+  Future<void> loadSupportTickets() async {
+    _supportTickets
+      ..clear()
+      ..addAll(await _repo.fetchSupportTickets());
+    notifyListeners();
+  }
+
+  Future<bool> updateSupportTicket(
+      String id, Map<String, dynamic> fields) async {
+    final ok = await _repo.updateSupportTicket(id, fields);
+    if (ok) {
+      for (final t in _supportTickets) {
+        if ('${t['id']}' == id) t.addAll(fields);
+      }
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  final List<Map<String, dynamic>> _refunds = [];
+
+  List<Map<String, dynamic>> get refunds => _refunds;
+
+  Future<void> loadRefunds() async {
+    _refunds
+      ..clear()
+      ..addAll(await _repo.fetchRefunds());
+    notifyListeners();
+  }
+
+  Future<bool> updateRefund(String id, String status) async {
+    final ok = await _repo.updateRefund(id, status);
+    if (ok) {
+      for (final r in _refunds) {
+        if ('${r['id']}' == id) r['status'] = status;
+      }
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  final List<Map<String, dynamic>> _emergencyRequests = [];
+
+  List<Map<String, dynamic>> get emergencyRequests => _emergencyRequests;
+
+  Future<void> loadEmergencyRequests() async {
+    _emergencyRequests
+      ..clear()
+      ..addAll(await _repo.fetchEmergencyRequests());
+    notifyListeners();
+  }
+
+  Future<bool> updateEmergencyRequest(
+      String id, Map<String, dynamic> fields) async {
+    final ok = await _repo.updateEmergencyRequest(id, fields);
+    if (ok) {
+      for (final r in _emergencyRequests) {
+        if ('${r['id']}' == id) r.addAll(fields);
+      }
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  final List<Map<String, dynamic>> _ambulances = [];
+
+  List<Map<String, dynamic>> get ambulances => _ambulances;
+
+  Future<void> loadAmbulances() async {
+    _ambulances
+      ..clear()
+      ..addAll(await _repo.fetchAmbulances());
+    notifyListeners();
+  }
+
+  Future<bool> updateAmbulance(
+      String id, Map<String, dynamic> fields) async {
+    final ok = await _repo.updateAmbulance(id, fields);
+    if (ok) {
+      for (final a in _ambulances) {
+        if ('${a['id']}' == id) a.addAll(fields);
+      }
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  // ---------- Provider payments ----------
+
+  /// Updates a provider's payment settings in the catalog table, then
+  /// refreshes that table's admin rows.
+  Future<bool> updateProviderPayment(String table, String id,
+      {String? upiId, bool? upiEnabled, bool? payInClinicEnabled}) async {
+    final ok = await _repo.updateProviderPayment(table, id,
+        upiId: upiId,
+        upiEnabled: upiEnabled,
+        payInClinicEnabled: payInClinicEnabled);
+    if (ok) await loadAdminTable(table);
+    return ok;
+  }
+
   /// Saves the provider's UPI ID. Returns true on success.
-  /// The UPI ID is stored in the user's profile and linked to their
-  /// provider record when approved.
+  /// The UPI ID is stored in the user's profile and on the provider's own
+  /// catalog record (so patients paying that provider use the right ID).
   Future<bool> saveProviderUpiId(String upiId) async {
     // Save to profiles table
     final saved = await _repo.saveProfile({'upi_id': upiId});
     if (saved) {
       _providerUpiId = upiId;
+      // Also write the UPI ID onto the provider's own catalog record so
+      // patients paying that provider are shown the correct ID.
+      final uid = _supaUser?.id;
+      if (uid != null) {
+        for (final table in _appTypeToTable.values) {
+          await _repo.setProviderUpiOnRecord(table, uid, upiId);
+        }
+      }
       notifyListeners();
     }
     return saved;

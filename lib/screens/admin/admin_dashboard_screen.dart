@@ -6,38 +6,71 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
 
-/// Admin overview: stat cards, revenue bar chart, orders donut, activity.
-class AdminDashboardScreen extends StatelessWidget {
+/// Admin overview with real data: stats, order pipeline, recent activity.
+class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
-  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-  static const _revenue = [42.0, 58.0, 51.0, 70.0, 66.0, 84.0];
+  @override
+  State<AdminDashboardScreen> createState() =>
+      _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    final state = AppStateScope.of(context);
+    await Future.wait([
+      state.loadAllProfiles(),
+      state.loadAdminTable('doctors'),
+      state.loadAdminAppointments(),
+      state.loadAdminOrders(),
+      state.loadAdminProviderApplications(),
+      state.loadEmergencyRequests(),
+    ]);
+    if (mounted) setState(() => _loading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final revenue =
-        state.orders.fold<double>(0, (s, o) => s + o.total);
-    final byStatus = <String, int>{};
-    for (final o in state.orders) {
-      byStatus[o.status] = (byStatus[o.status] ?? 0) + 1;
+    final scheme = Theme.of(context).colorScheme;
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
     }
-    final pendingApprovals = state.providerApplications
-        .where((a) => a.status == 'pending')
+
+    final revenue = state.adminOrders.fold<double>(
+        0, (s, o) => s + ((o['total'] as num?)?.toDouble() ?? 0));
+    final byStatus = <String, int>{};
+    for (final o in state.adminOrders) {
+      final st = '${o['status'] ?? 'placed'}';
+      byStatus[st] = (byStatus[st] ?? 0) + 1;
+    }
+    final pendingApprovals = state.adminProviderApplications
+        .where((a) => '${a['status']}' == 'pending')
         .length;
-    final activeEmergencies = state.sosAlerts
-        .where((a) => a.status != 'dispatched')
+    final activeEmergencies = state.emergencyRequests
+        .where((a) =>
+            '${a['status']}' != 'resolved' &&
+            '${a['status']}' != 'dispatched')
         .length;
 
-    final scheme = Theme.of(context).colorScheme;
     final stats = [
-      _stat(context, 'Total Users', '${state.adminUsers.length}',
+      _stat(context, 'Total Users', '${state.allProfiles.length}',
           Icons.people, scheme.primary),
-      _stat(context, 'Doctors', '${state.activeDoctors.length}',
-          Icons.person_search, RemedooTheme.teal),
-      _stat(context, 'Appointments', '${state.appointments.length}',
-          Icons.calendar_month, RemedooTheme.purple),
-      _stat(context, 'Total Orders', '${state.orders.length}',
+      _stat(context, 'Doctors',
+          '${state.adminTable('doctors').length}', Icons.person_search,
+          RemedooTheme.teal),
+      _stat(context, 'Appointments',
+          '${state.adminAppointments.length}', Icons.calendar_month,
+          RemedooTheme.purple),
+      _stat(context, 'Total Orders', '${state.adminOrders.length}',
           Icons.shopping_bag, RemedooTheme.warning),
       _stat(context, 'Pending Approvals', '$pendingApprovals',
           Icons.approval, scheme.primary),
@@ -47,63 +80,77 @@ class AdminDashboardScreen extends StatelessWidget {
           RemedooTheme.success),
     ];
 
-    final revenueCard = RCard(
-      child: SizedBox(
-        height: 200,
-        child: CustomPaint(
-          painter: _BarPainter(_months, _revenue, scheme.primary),
-        ),
-      ),
+    final donutCard = RCard(
+      child: byStatus.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('No orders yet.',
+                  style: TextStyle(
+                      color: scheme.onSurfaceVariant, fontSize: 13)),
+            )
+          : Row(
+              children: [
+                SizedBox(
+                  width: 150,
+                  height: 150,
+                  child: CustomPaint(
+                    painter: _DonutPainter(byStatus),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: byStatus.entries.map((e) {
+                      return Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: _DonutPainter.colorFor(e.key),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Text(
+                              e.key.replaceAll('_', ' '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            )),
+                            Text('${e.value}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
     );
 
-    final donutCard = RCard(
-      child: Row(
-        children: [
-          SizedBox(
-            width: 150,
-            height: 150,
-            child: CustomPaint(
-              painter: _DonutPainter(byStatus),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: byStatus.entries.map((e) {
-                return Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color:
-                              _DonutPainter.colorFor(e.key),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                          child: Text(
-                        e.key.replaceAll('_', ' '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      )),
-                      Text('${e.value}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
+    // Recent activity from real orders + appointments.
+    final recent = [
+      for (final o in state.adminOrders.take(4))
+        _Activity(
+          icon: Icons.shopping_bag,
+          title: 'Order ${('${o['id'] ?? ''}').length > 8 ? ('${o['id']}').substring(0, 8) : o['id']}',
+          body:
+              '${inr((o['total'] as num?)?.toDouble() ?? 0)} · ${o['status'] ?? 'placed'}',
+        ),
+      for (final a in state.adminAppointments.take(4))
+        _Activity(
+          icon: Icons.calendar_month,
+          title: 'Appointment ${a['service_type'] ?? ''}',
+          body: '${a['appointment_date'] ?? ''} · ${a['status'] ?? ''}',
+        ),
+    ];
 
     return MaxWidthBox(
       child: ListView(
@@ -124,83 +171,59 @@ class AdminDashboardScreen extends StatelessWidget {
                 StaggerItem(index: i % 6, child: stats[i]),
           ),
           const SizedBox(height: 24),
-          if (context.isDesktop)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: StaggerItem(
-                      index: 0,
-                      child: _section('Monthly Revenue',
-                          'Last 6 months of platform revenue',
-                          revenueCard)),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: StaggerItem(
-                      index: 1,
-                      child: _section('Orders by Status',
-                          'Current order pipeline', donutCard)),
-                ),
-              ],
-            )
-          else ...[
-            StaggerItem(
-                index: 0,
-                child: _section('Monthly Revenue',
-                    'Last 6 months of platform revenue',
-                    revenueCard)),
-            const SizedBox(height: 24),
-            StaggerItem(
-                index: 1,
-                child: _section('Orders by Status',
-                    'Current order pipeline', donutCard)),
-          ],
+          StaggerItem(
+              index: 0,
+              child: _section('Orders by Status',
+                  'Live order pipeline', donutCard)),
           const SizedBox(height: 24),
           const RSectionHeader(
               title: 'Recent Activity',
               subtitle: 'Latest platform events'),
           const SizedBox(height: 12),
-          ...state.notifications.take(8).map((n) => StaggerItem(
-                index: 0,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: RCard(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      children: [
-                        _tile(context, n.icon, scheme.primary),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(n.title,
-                                  maxLines: 1,
-                                  overflow:
-                                      TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontWeight:
-                                          FontWeight.w600)),
-                              Text(n.body,
-                                  maxLines: 1,
-                                  overflow:
-                                      TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: scheme
-                                          .onSurfaceVariant)),
-                            ],
+          if (recent.isEmpty)
+            const REmptyState(
+                icon: Icons.timeline,
+                title: 'No activity yet',
+                subtitle: 'Orders and appointments will appear here.',
+                compact: true)
+          else
+            ...recent.map((n) => StaggerItem(
+                  index: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: RCard(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          _tile(context, n.icon, scheme.primary),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(n.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight:
+                                            FontWeight.w600)),
+                                Text(n.body,
+                                    maxLines: 1,
+                                    overflow:
+                                        TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: scheme
+                                            .onSurfaceVariant)),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              )),
+                )),
         ],
       ),
     );
@@ -263,46 +286,12 @@ class AdminDashboardScreen extends StatelessWidget {
   }
 }
 
-class _BarPainter extends CustomPainter {
-  final List<String> labels;
-  final List<double> values;
-  final Color color;
+class _Activity {
+  final IconData icon;
+  final String title;
+  final String body;
 
-  _BarPainter(this.labels, this.values, this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final maxV = values.reduce((a, b) => a > b ? a : b);
-    final slot = size.width / values.length;
-    final barW = slot * 0.5;
-    final paint = Paint()..color = color;
-    for (var i = 0; i < values.length; i++) {
-      final h = (size.height - 40) * values[i] / maxV;
-      final x = slot * i + (slot - barW) / 2;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, size.height - 24 - h, barW, h),
-          const Radius.circular(6),
-        ),
-        paint,
-      );
-      final tp = TextPainter(
-        text: TextSpan(
-            text: labels[i],
-            style: const TextStyle(
-                fontSize: 11, color: Colors.grey)),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(
-          canvas,
-          Offset(slot * i + (slot - tp.width) / 2,
-              size.height - 18));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) =>
-      false;
+  _Activity({required this.icon, required this.title, required this.body});
 }
 
 class _DonutPainter extends CustomPainter {
@@ -325,8 +314,7 @@ class _DonutPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final total =
-        data.values.fold<int>(0, (a, b) => a + b);
+    final total = data.values.fold<int>(0, (a, b) => a + b);
     if (total == 0) {
       canvas.drawCircle(
         Offset(size.width / 2, size.height / 2),

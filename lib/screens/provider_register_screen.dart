@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../widgets/email_otp_field.dart';
 import '../widgets/widgets.dart';
 import 'pending_approval_screen.dart';
 
@@ -74,6 +75,7 @@ class _ProviderRegisterScreenState
   final _address = TextEditingController();
   bool _busy = false;
   String? _error;
+  bool _emailVerified = false;
 
   late final List<_DocSlot> _docs;
 
@@ -140,7 +142,7 @@ class _ProviderRegisterScreenState
     return '${(bytes / 1024).toStringAsFixed(1)} KB';
   }
 
-  void _submit() {
+  void _submit() async {
     // Validate all compulsory fields.
     if (_name.text.trim().isEmpty) {
       setState(
@@ -152,6 +154,11 @@ class _ProviderRegisterScreenState
             .hasMatch(_email.text.trim())) {
       setState(
           () => _error = 'A valid email is required.');
+      return;
+    }
+    if (!_emailVerified) {
+      setState(() => _error =
+          'Please verify your email with the OTP first.');
       return;
     }
     if (_phone.text.trim().isEmpty) {
@@ -179,13 +186,30 @@ class _ProviderRegisterScreenState
       _busy = true;
       _error = null;
     });
-    AppStateScope.of(context).submitProviderApplication(
-      name: _name.text.trim(),
-      email: _email.text.trim(),
-      phone: _phone.text.trim(),
-      role: _roleTitle(widget.providerType),
-      license: _license.text.trim(),
-    );
+    // Submit to the real backend so the admin panel can review it.
+    final ok = await AppStateScope.of(context)
+        .submitProviderApplicationDb({
+      'provider_type': widget.providerType,
+      'name': _name.text.trim(),
+      'email': _email.text.trim(),
+      'phone': _phone.text.trim(),
+      'license_no': _license.text.trim(),
+      'address': _address.text.trim(),
+      'documents': _docs
+          .map((d) => {
+                'kind': d.label.replaceAll(' *', ''),
+                'name': d.file?.name ?? '',
+                'size': d.file?.size ?? 0,
+              })
+          .toList(),
+    });
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!ok) {
+      setState(() => _error =
+          'Could not submit your application. Please try again.');
+      return;
+    }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -293,13 +317,43 @@ class _ProviderRegisterScreenState
                           icon: Icons.person_outline,
                         ),
                         const SizedBox(height: 12),
-                        _RequiredField(
-                          label: 'Email',
-                          hint: 'you@example.com',
-                          controller: _email,
-                          keyboardType:
-                              TextInputType.emailAddress,
-                          icon: Icons.email_outlined,
+                        Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            RichText(
+                              text: TextSpan(
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight:
+                                      FontWeight.w600,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface,
+                                ),
+                                children: const [
+                                  TextSpan(
+                                      text: 'Email'),
+                                  TextSpan(
+                                    text: ' *',
+                                    style: TextStyle(
+                                        color: Colors.red),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            EmailOtpField(
+                              controller: _email,
+                              label: null,
+                              hint: 'you@example.com',
+                              onVerifiedChanged: (v) =>
+                                  setState(() {
+                                _emailVerified = v;
+                                if (v) _error = null;
+                              }),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         _RequiredField(

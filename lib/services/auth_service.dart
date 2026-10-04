@@ -160,6 +160,43 @@ class AuthService {
     }
   }
 
+  /// Send a 6-digit email OTP for registration verification.
+  /// Unlike [sendMagicLink], this omits the redirect so Supabase sends a
+  /// code the user types back into the form.
+  Future<AuthResult> sendEmailOtp(String email) async {
+    try {
+      await _client.auth.signInWithOtp(email: email);
+      return const AuthResult.success();
+    } on AuthException catch (e) {
+      return AuthResult.failure(_friendlyMessage(e));
+    } catch (e) {
+      return AuthResult.failure(_friendlyMessage(e));
+    }
+  }
+
+  /// Verify the 6-digit email OTP. On success the user is signed in.
+  Future<AuthResult> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    try {
+      final res = await _client.auth.verifyOTP(
+        type: OtpType.email,
+        token: token.trim(),
+        email: email,
+      );
+      if (res.session == null) {
+        return const AuthResult.failure(
+            'Wrong OTP. Please check the code and try again.');
+      }
+      return const AuthResult.success();
+    } on AuthException catch (e) {
+      return AuthResult.failure(_friendlyMessage(e));
+    } catch (e) {
+      return AuthResult.failure(_friendlyMessage(e));
+    }
+  }
+
   /// Passwordless magic-link sign-in email.
   Future<AuthResult> sendMagicLink(String email) async {
     try {
@@ -217,6 +254,25 @@ class AuthService {
     }
   }
 
+  /// True when the signed-in user has the `admin` role in `user_roles`.
+  Future<bool> isCurrentUserAdmin() async {
+    if (!_initialized) return false;
+    try {
+      final uid = _client.auth.currentUser?.id;
+      if (uid == null) return false;
+      final rows = await _client
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', uid)
+          .eq('role', 'admin')
+          .limit(1);
+      return rows.isNotEmpty;
+    } catch (e) {
+      debugPrint('isCurrentUserAdmin failed: $e');
+      return false;
+    }
+  }
+
   /// Maps Supabase/auth errors to short, user-friendly messages.
   /// Never includes raw tokens or sensitive data.
   String _friendlyMessage(Object e) {
@@ -225,6 +281,12 @@ class AuthService {
     if (m.contains('invalid login credentials') ||
         m.contains('invalid email or password')) {
       return 'Incorrect email or password. Please try again.';
+    }
+    if (m.contains('token has expired') ||
+        m.contains('invalid token') ||
+        m.contains('otp expired') ||
+        m.contains('code is invalid')) {
+      return 'Wrong OTP. Please check the code and try again.';
     }
     if (m.contains('email not confirmed') ||
         m.contains('email not verified')) {

@@ -5,6 +5,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'signup_screen.dart';
+import 'admin/admin_login_screen.dart';
 import 'forgot_password_screen.dart';
 import 'provider_type_screen.dart';
 
@@ -302,6 +303,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     const SizedBox(height: 32),
+                    // Discreet admin access
+                    Center(
+                      child: TextButton(
+                        onPressed: () => _push(context,
+                            const AdminLoginScreen()),
+                        child: Text(
+                          'Admin Login',
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant
+                                .withValues(alpha: 0.6),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../services/auth_service.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
 
-/// Admin sign-in (demo credentials).
+/// Admin sign-in backed by Supabase Auth + the `user_roles` table.
+/// Only accounts with the `admin` role can enter the admin panel.
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
 
@@ -13,9 +15,10 @@ class AdminLoginScreen extends StatefulWidget {
 }
 
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
-  final _email = TextEditingController(text: 'admin@remedoo.app');
-  final _password = TextEditingController(text: 'admin123');
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   bool _obscure = true;
+  bool _busy = false;
   String? _error;
 
   @override
@@ -25,18 +28,49 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     super.dispose();
   }
 
-  void _signIn() {
-    if (_email.text.trim() == 'admin@remedoo.app' &&
-        _password.text == 'admin123') {
-      final state = AppStateScope.of(context);
-      state.login(name: 'Admin', email: 'admin@remedoo.app');
-      state.switchRole('admin');
-      // Pop back to RootGate, which shows the AdminShell for role=admin.
-      Navigator.of(context).pop();
-    } else {
-      setState(() => _error =
-          'Invalid credentials. Try admin@remedoo.app / admin123');
+  Future<void> _signIn() async {
+    final email = _email.text.trim();
+    if (email.isEmpty || _password.text.isEmpty) {
+      setState(() => _error = 'Please enter your email and password.');
+      return;
     }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final result = await AuthService.instance.signIn(
+      email: email,
+      password: _password.text,
+    );
+    if (!mounted) return;
+    if (!result.ok) {
+      setState(() {
+        _busy = false;
+        _error = result.error ?? 'Sign-in failed.';
+      });
+      return;
+    }
+    // Signed in — now verify the admin role.
+    final state = AppStateScope.of(context);
+    final isAdmin =
+        await AuthService.instance.isCurrentUserAdmin();
+    if (!mounted) return;
+    if (!isAdmin) {
+      await AuthService.instance.signOut();
+      state.checkAdminRole();
+      setState(() {
+        _busy = false;
+        _error =
+            'This account does not have admin access. Contact the app owner to grant the admin role.';
+      });
+      return;
+    }
+    await state.checkAdminRole();
+    state.switchRole('admin');
+    if (!mounted) return;
+    setState(() => _busy = false);
+    // Pop back to RootGate, which shows the AdminShell for role=admin.
+    Navigator.of(context).pop();
   }
 
   @override
@@ -140,15 +174,20 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                           ],
                           const SizedBox(height: 20),
                           RButton(
-                            label: 'Sign In as Admin',
+                            label: _busy
+                                ? 'Signing in…'
+                                : 'Sign In as Admin',
                             fullWidth: true,
-                            onPressed: _signIn,
+                            onPressed:
+                                _busy ? null : _signIn,
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text('Demo: admin@remedoo.app / admin123',
+                    Text(
+                        'Only accounts with the admin role can sign in here.',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                             fontSize: 12,
                             color: scheme.onSurfaceVariant)),

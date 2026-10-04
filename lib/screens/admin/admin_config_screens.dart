@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../data/mock_data.dart';
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
-import 'admin_crud_screen.dart';
 
-// Configuration screens — each saves into the AdminConfig state in AppState.
+// Configuration screens — every setting persists in the Supabase
+// `app_config` table and applies across the website and app.
 
 class _Scaffold extends StatelessWidget {
   final Widget child;
@@ -26,86 +25,134 @@ class _Scaffold extends StatelessWidget {
   }
 }
 
-/// OTP length + expiry.
-class OtpSettingsScreen extends StatelessWidget {
-  const OtpSettingsScreen({super.key});
+/// Notice shown by screens that were removed during the admin cleanup.
+/// Kept as stubs so admin_shell.dart still compiles until the nav is rewired.
+class _RemovedNotice extends StatelessWidget {
+  final String title;
+  final String reason;
+
+  const _RemovedNotice({required this.title, required this.reason});
 
   @override
   Widget build(BuildContext context) {
-    final state = AppStateScope.of(context);
-    return _Scaffold(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const RSectionHeader(
-              title: 'OTP Settings',
-              subtitle: 'Verification code policy'),
-          const SizedBox(height: 12),
-          RCard(
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                        child: Text('OTP length (digits)',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w600))),
-                    QtyStepper(
-                      qty: state.otpLength,
-                      onMinus: () {
-                        state.otpLength =
-                            (state.otpLength - 1).clamp(4, 8);
-                        state.refresh();
-                      },
-                      onPlus: () {
-                        state.otpLength =
-                            (state.otpLength + 1).clamp(4, 8);
-                        state.refresh();
-                      },
-                    ),
-                  ],
-                ),
-                const Divider(height: 24),
-                Row(
-                  children: [
-                    const Expanded(
-                        child: Text('Expiry (minutes)',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w600))),
-                    QtyStepper(
-                      qty: state.otpExpiryMinutes,
-                      onMinus: () {
-                        state.otpExpiryMinutes =
-                            (state.otpExpiryMinutes - 1)
-                                .clamp(1, 30);
-                        state.refresh();
-                      },
-                      onPlus: () {
-                        state.otpExpiryMinutes =
-                            (state.otpExpiryMinutes + 1)
-                                .clamp(1, 30);
-                        state.refresh();
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: REmptyState(
+          icon: Icons.info_outline,
+          title: '$title removed',
+          subtitle: reason,
+        ),
       ),
     );
   }
 }
 
-/// Per-category commission percentages.
-class CommissionScreen extends StatelessWidget {
+/// OTP length + expiry — removed: auth is Supabase-managed.
+class OtpSettingsScreen extends StatelessWidget {
+  const OtpSettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _RemovedNotice(
+        title: 'OTP Settings',
+        reason:
+            'Verification codes are managed by Supabase Auth. This screen is no longer needed.',
+      );
+}
+
+/// API keys — removed: the generator produced fake keys.
+class ApiKeysScreen extends StatelessWidget {
+  const ApiKeysScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _RemovedNotice(
+        title: 'API Keys',
+        reason: 'The key generator was a demo. Real keys live in your '
+            'Supabase / Cloudflare dashboards.',
+      );
+}
+
+/// Quick actions toggles — removed: no app screen reads these.
+class QuickActionsScreen extends StatelessWidget {
+  const QuickActionsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _RemovedNotice(
+        title: 'Quick Actions',
+        reason: 'No screen in the app reads these shortcuts. Removed.',
+      );
+}
+
+/// Category actions toggles — removed: no app screen reads these.
+class CategoryActionsScreen extends StatelessWidget {
+  const CategoryActionsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _RemovedNotice(
+        title: 'Category Actions',
+        reason: 'No screen in the app reads these shortcuts. Removed.',
+      );
+}
+
+/// Per-category commission percentages, stored in app_config.
+class CommissionScreen extends StatefulWidget {
   const CommissionScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<CommissionScreen> createState() => _CommissionScreenState();
+}
+
+class _CommissionScreenState extends State<CommissionScreen> {
+  bool _loading = true;
+  bool _saving = false;
+  Map<String, double> _values = {
+    'Doctor': 15,
+    'Hospital': 8,
+    'Lab': 12,
+    'Pharmacy': 10,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
     final state = AppStateScope.of(context);
+    await state.loadAppConfig();
+    if (!mounted) return;
+    final saved = state.appConfigValue('commission');
+    setState(() {
+      if (saved.isNotEmpty) {
+        _values = {
+          for (final e in saved.entries)
+            e.key: (e.value as num).toDouble()
+        };
+      }
+      _loading = false;
+    });
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final ok = await AppStateScope.of(context)
+        .saveAppConfigValue('commission', _values);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content:
+              Text(ok ? 'Commission saved' : 'Could not save (admin only)')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return _Scaffold(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -117,38 +164,30 @@ class CommissionScreen extends StatelessWidget {
           RCard(
             child: Column(
               children: [
-                ...state.commission.keys.map((k) {
-                  final v = state.commission[k]!;
+                ..._values.keys.map((k) {
+                  final v = _values[k]!;
                   return Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
                             Expanded(
                                 child: Text(k,
                                     style: const TextStyle(
-                                        fontWeight:
-                                            FontWeight.w600))),
+                                        fontWeight: FontWeight.w600))),
                             Container(
-                              padding:
-                                  const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 5),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 5),
                               decoration: BoxDecoration(
                                 color: scheme.primary
                                     .withValues(alpha: 0.1),
-                                borderRadius:
-                                    BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Text(
-                                  '${v.toStringAsFixed(0)}%',
+                              child: Text('${v.toStringAsFixed(0)}%',
                                   style: TextStyle(
-                                      fontWeight:
-                                          FontWeight.w700,
+                                      fontWeight: FontWeight.w700,
                                       color: scheme.primary)),
                             ),
                           ],
@@ -159,15 +198,18 @@ class CommissionScreen extends StatelessWidget {
                           max: 30,
                           divisions: 30,
                           activeColor: scheme.primary,
-                          onChanged: (nv) {
-                            state.commission[k] = nv;
-                            state.refresh();
-                          },
+                          onChanged: (nv) =>
+                              setState(() => _values[k] = nv),
                         ),
                       ],
                     ),
                   );
                 }),
+                const SizedBox(height: 8),
+                RButton(
+                    label: 'Save',
+                    small: true,
+                    onPressed: _saving ? null : _save),
               ],
             ),
           ),
@@ -177,172 +219,209 @@ class CommissionScreen extends StatelessWidget {
   }
 }
 
-/// Subscription plans CRUD.
-class SubscriptionsScreen extends StatelessWidget {
-  const SubscriptionsScreen({super.key});
+/// Generic name+price plan list editor backed by app_config.
+class _PlanListScreen extends StatefulWidget {
+  final String configKey;
+  final String title;
+  final String subtitle;
+  final String itemLabel;
+
+  const _PlanListScreen({
+    required this.configKey,
+    required this.title,
+    required this.subtitle,
+    required this.itemLabel,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final state = AppStateScope.of(context);
-    return AdminCrudScreen(
-        spec: state.mapSpec('Subscription Plans', 'Plan', const [
-      FieldSpec(key: 'name', label: 'Name', required: true),
-      FieldSpec(key: 'price', label: 'Price (₹)', type: 'number'),
-    ], state.subscriptionPlans));
-  }
+  State<_PlanListScreen> createState() => _PlanListScreenState();
 }
 
-/// Corporate plans CRUD.
-class CorporatePlansScreen extends StatelessWidget {
-  const CorporatePlansScreen({super.key});
+class _PlanListScreenState extends State<_PlanListScreen> {
+  bool _loading = true;
+  bool _saving = false;
+  List<Map<String, dynamic>> _plans = [];
 
   @override
-  Widget build(BuildContext context) {
-    final state = AppStateScope.of(context);
-    return AdminCrudScreen(
-        spec: state.mapSpec('Corporate Plans', 'Plan', const [
-      FieldSpec(key: 'name', label: 'Name', required: true),
-      FieldSpec(key: 'price', label: 'Price (₹)', type: 'number'),
-    ], state.corporatePlans));
-  }
-}
-
-/// Healthcare packages CRUD.
-class HealthcarePackagesScreen extends StatelessWidget {
-  const HealthcarePackagesScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final state = AppStateScope.of(context);
-    return AdminCrudScreen(
-        spec: state.mapSpec(
-            'Healthcare Packages', 'Package', const [
-      FieldSpec(key: 'name', label: 'Name', required: true),
-      FieldSpec(key: 'price', label: 'Price (₹)', type: 'number'),
-    ], state.healthcarePackages));
-  }
-}
-
-/// API keys list + regenerate.
-class ApiKeysScreen extends StatelessWidget {
-  const ApiKeysScreen({super.key});
-
-  String _newKey() {
-    final h = DateTime.now()
-        .millisecondsSinceEpoch
-        .toRadixString(16);
-    return 'rk_live_${h.substring(0, 4)}…${h.substring(h.length - 4)}';
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Future<void> _load() async {
     final state = AppStateScope.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Row(
-            children: [
-              const Expanded(
-                child: RSectionHeader(
-                    title: 'API Keys',
-                    subtitle: 'Regenerate keys anytime'),
-              ),
-              RButton(
-                label: 'Add Key',
-                icon: Icons.add,
-                small: true,
-                onPressed: () {
-                  state.collectionAdd(state.apiKeys, {
-                    'name': 'New key',
-                    'key': _newKey(),
-                  });
-                },
-              ),
-            ],
-          ),
+    await state.loadAppConfig();
+    if (!mounted) return;
+    final saved = state.appConfigValue(widget.configKey);
+    setState(() {
+      _plans = [
+        for (final p in (saved['plans'] as List? ?? []))
+          Map<String, dynamic>.from(p as Map)
+      ];
+      _loading = false;
+    });
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final ok = await AppStateScope.of(context)
+        .saveAppConfigValue(widget.configKey, {'plans': _plans});
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content:
+              Text(ok ? 'Saved' : 'Could not save (admin only)')),
+    );
+  }
+
+  void _addDialog() {
+    final name = TextEditingController();
+    final price = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Add ${widget.itemLabel}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RTextField(label: 'Name', controller: name),
+            const SizedBox(height: 10),
+            RTextField(
+                label: 'Price (₹)',
+                controller: price,
+                keyboardType: TextInputType.number),
+          ],
         ),
-        const SizedBox(height: 12),
-        Expanded(
-          child: ListView.builder(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: state.apiKeys.length,
-            itemBuilder: (_, i) {
-              final k = state.apiKeys[i];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: RCard(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 6),
-                  child: ListTile(
-                    leading: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.1),
-                        borderRadius:
-                            BorderRadius.circular(13),
-                      ),
-                      child: Icon(Icons.key,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary),
-                    ),
-                    title: Text(k['name'] ?? 'Key',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700)),
-                    subtitle: Text(k['key'] ?? '',
-                        style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 12)),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                              Icons.refresh, size: 20),
-                          tooltip: 'Regenerate',
-                          onPressed: () {
-                            k['key'] = _newKey();
-                            state.refresh();
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      'Key regenerated (demo)')),
-                            );
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                              Icons.delete_outline,
-                              size: 20,
-                              color:
-                                  RemedooTheme.emergency),
-                          onPressed: () => state
-                              .collectionRemove(
-                                  state.apiKeys,
-                                  k['id']!),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          RButton(
+            label: 'Add',
+            small: true,
+            onPressed: () {
+              if (name.text.trim().isEmpty) return;
+              setState(() => _plans.add({
+                    'name': name.text.trim(),
+                    'price': num.tryParse(price.text) ?? 0,
+                  }));
+              Navigator.pop(context);
             },
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return _Scaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: RSectionHeader(
+                    title: widget.title, subtitle: widget.subtitle),
+              ),
+              RButton(
+                  label: 'Add',
+                  icon: Icons.add,
+                  small: true,
+                  onPressed: _addDialog),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_plans.isEmpty)
+            const REmptyState(
+                icon: Icons.card_membership,
+                title: 'No plans yet',
+                subtitle: 'Add your first plan above.',
+                compact: true)
+          else
+            RCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (var i = 0; i < _plans.length; i++)
+                    ListTile(
+                      title: Text('${_plans[i]['name']}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(inr((_plans[i]['price'] as num?) ?? 0),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700)),
+                          IconButton(
+                            icon: Icon(Icons.delete_outline,
+                                color: RemedooTheme.emergency),
+                            onPressed: () =>
+                                setState(() => _plans.removeAt(i)),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+          RButton(
+              label: 'Save changes',
+              fullWidth: true,
+              onPressed: _saving ? null : _save),
+        ],
+      ),
     );
   }
 }
 
-/// Branding: app name, tagline, primary color swatches (re-themes the app).
+/// Subscription plans.
+class SubscriptionsScreen extends StatelessWidget {
+  const SubscriptionsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _PlanListScreen(
+        configKey: 'subscriptions',
+        title: 'Subscription Plans',
+        subtitle: 'Recurring care plans',
+        itemLabel: 'Plan',
+      );
+}
+
+/// Corporate plans.
+class CorporatePlansScreen extends StatelessWidget {
+  const CorporatePlansScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _PlanListScreen(
+        configKey: 'corporate_plans',
+        title: 'Corporate Plans',
+        subtitle: 'Plans for companies',
+        itemLabel: 'Plan',
+      );
+}
+
+/// Healthcare packages.
+class HealthcarePackagesScreen extends StatelessWidget {
+  const HealthcarePackagesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _PlanListScreen(
+        configKey: 'healthcare_packages',
+        title: 'Healthcare Packages',
+        subtitle: 'Bundled checkup packages',
+        itemLabel: 'Package',
+      );
+}
+
+/// Branding: app name + tagline in app_config, plus the real theme controls.
 class BrandingScreen extends StatefulWidget {
   const BrandingScreen({super.key});
 
@@ -354,15 +433,19 @@ class _BrandingScreenState extends State<BrandingScreen> {
   late final TextEditingController _name;
   late final TextEditingController _tagline;
   bool _init = false;
+  bool _saving = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_init) {
       final s = AppStateScope.of(context);
-      _name = TextEditingController(text: s.brandName);
-      _tagline = TextEditingController(text: s.brandTagline);
+      final b = s.appConfigValue('branding');
+      _name = TextEditingController(text: '${b['app_name'] ?? 'Remedoo'}');
+      _tagline = TextEditingController(
+          text: '${b['tagline'] ?? 'Healthcare, simplified'}');
       _init = true;
+      s.loadAppConfig();
     }
   }
 
@@ -373,81 +456,46 @@ class _BrandingScreenState extends State<BrandingScreen> {
     super.dispose();
   }
 
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final ok = await AppStateScope.of(context).saveAppConfigValue(
+        'branding', {
+      'app_name': _name.text.trim(),
+      'tagline': _tagline.text.trim(),
+    });
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(ok
+              ? 'Branding saved — live across website and app'
+              : 'Could not save (admin only)')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final state = AppStateScope.of(context);
-    final scheme = Theme.of(context).colorScheme;
     return _Scaffold(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const RSectionHeader(
               title: 'Branding',
-              subtitle: 'Applies instantly across the app'),
+              subtitle: 'Saved to the database, applies everywhere'),
           const SizedBox(height: 12),
           RCard(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                RTextField(
-                  label: 'App name',
-                  controller: _name,
-                  onChanged: (v) => state.brandName = v,
-                ),
+                RTextField(label: 'App name', controller: _name),
                 const SizedBox(height: 12),
-                RTextField(
-                  label: 'Tagline',
-                  controller: _tagline,
-                  onChanged: (v) => state.brandTagline = v,
-                ),
-                const SizedBox(height: 20),
-                const Text('Primary color',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: List.generate(
-                      AppState.brandSwatches.length, (i) {
-                    final c = AppState.brandSwatches[i];
-                    final sel = state.brandColorIndex == i;
-                    return GestureDetector(
-                      onTap: () {
-                        state.brandColorIndex = i;
-                        state.refresh();
-                      },
-                      child: Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: c,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: sel
-                                ? scheme.primary
-                                : Colors.transparent,
-                            width: 3,
-                          ),
-                          boxShadow:
-                              RemedooTheme.softShadow,
-                        ),
-                        child: sel
-                            ? const Icon(Icons.check,
-                                color: Colors.white, size: 20)
-                            : null,
-                      ),
-                    );
-                  }),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Applies instantly across the whole app.',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: scheme.onSurfaceVariant),
-                ),
+                RTextField(label: 'Tagline', controller: _tagline),
+                const SizedBox(height: 16),
+                RButton(
+                    label: 'Save branding',
+                    small: true,
+                    onPressed: _saving ? null : _save),
               ],
             ),
           ),
@@ -478,7 +526,7 @@ class _ThemePackAdminCardState extends State<_ThemePackAdminCard> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   Future<void> _load() async {
@@ -632,254 +680,255 @@ class _ThemePackAdminCardState extends State<_ThemePackAdminCard> {
   }
 }
 
-/// Service areas CRUD.
-class ServiceAreasScreen extends StatelessWidget {
+/// Service areas, stored in app_config.
+class ServiceAreasScreen extends StatefulWidget {
   const ServiceAreasScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final state = AppStateScope.of(context);
-    return AdminCrudScreen(
-        spec: state.mapSpec('Service Areas', 'Area', const [
-      FieldSpec(key: 'name', label: 'Area name', required: true),
-    ], state.serviceAreas));
-  }
+  State<ServiceAreasScreen> createState() => _ServiceAreasScreenState();
 }
 
-/// Quick actions toggles.
-class QuickActionsScreen extends StatelessWidget {
-  const QuickActionsScreen({super.key});
+class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
+  bool _loading = true;
+  bool _saving = false;
+  List<String> _areas = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    final state = AppStateScope.of(context);
+    await state.loadAppConfig();
+    if (!mounted) return;
+    setState(() {
+      _areas = [
+        for (final a in (state.appConfigValue('service_areas')['areas'] as List? ?? []))
+          '$a'
+      ];
+      _loading = false;
+    });
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final ok = await AppStateScope.of(context)
+        .saveAppConfigValue('service_areas', {'areas': _areas});
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content:
+              Text(ok ? 'Service areas saved' : 'Could not save (admin only)')),
+    );
+  }
+
+  void _addDialog() {
+    final c = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Add service area'),
+        content: RTextField(label: 'Area name', controller: c),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          RButton(
+            label: 'Add',
+            small: true,
+            onPressed: () {
+              if (c.text.trim().isEmpty) return;
+              setState(() => _areas.add(c.text.trim()));
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final state = AppStateScope.of(context);
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return _Scaffold(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const RSectionHeader(
-              title: 'Quick Actions',
-              subtitle: 'Home screen shortcuts'),
-          const SizedBox(height: 12),
-          RCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: state.quickActions.keys.map((k) {
-                return SwitchListTile(
-                  value: state.quickActions[k]!,
-                  activeThumbColor: RemedooTheme.success,
-                  onChanged: (v) {
-                    state.quickActions[k] = v;
-                    state.refresh();
-                  },
-                  title: Text(k),
-                );
-              }).toList(),
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: RSectionHeader(
+                    title: 'Service Areas',
+                    subtitle: 'Where Remedoo operates'),
+              ),
+              RButton(
+                  label: 'Add',
+                  icon: Icons.add,
+                  small: true,
+                  onPressed: _addDialog),
+            ],
           ),
+          const SizedBox(height: 12),
+          if (_areas.isEmpty)
+            const REmptyState(
+                icon: Icons.map,
+                title: 'No areas yet',
+                subtitle: 'Add the first service area.',
+                compact: true)
+          else
+            RCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (var i = 0; i < _areas.length; i++)
+                    ListTile(
+                      leading: const Icon(Icons.location_on_outlined),
+                      title: Text(_areas[i],
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w600)),
+                      trailing: IconButton(
+                        icon: Icon(Icons.delete_outline,
+                            color: RemedooTheme.emergency),
+                        onPressed: () =>
+                            setState(() => _areas.removeAt(i)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+          RButton(
+              label: 'Save changes',
+              fullWidth: true,
+              onPressed: _saving ? null : _save),
         ],
       ),
     );
   }
 }
 
-/// Category actions toggles.
-class CategoryActionsScreen extends StatelessWidget {
-  const CategoryActionsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final state = AppStateScope.of(context);
-    return _Scaffold(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const RSectionHeader(
-              title: 'Category Actions',
-              subtitle: 'Category row shortcuts'),
-          const SizedBox(height: 12),
-          RCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: state.categoryActions.keys.map((k) {
-                return SwitchListTile(
-                  value: state.categoryActions[k]!,
-                  activeThumbColor: RemedooTheme.success,
-                  onChanged: (v) {
-                    state.categoryActions[k] = v;
-                    state.refresh();
-                  },
-                  title: Text(k),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Featured doctors / medicines / providers pickers.
-class FeaturedScreen extends StatelessWidget {
+/// Featured doctors / medicines — toggles the real `is_featured` column.
+class FeaturedScreen extends StatefulWidget {
   const FeaturedScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<FeaturedScreen> createState() => _FeaturedScreenState();
+}
+
+class _FeaturedScreenState extends State<FeaturedScreen>
+    with SingleTickerProviderStateMixin {
+  bool _loading = true;
+  late final TabController _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
     final state = AppStateScope.of(context);
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    await Future.wait([
+      state.loadAdminTable('doctors'),
+      state.loadAdminTable('medicines'),
+    ]);
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _toggle(String table, Map<String, dynamic> row) async {
+    final state = AppStateScope.of(context);
+    final updated = Map<String, dynamic>.from(row)
+      ..['is_featured'] = !(row['is_featured'] == true);
+    final ok = await state.adminSaveRow(table, updated);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(ok
+              ? (updated['is_featured'] == true
+                  ? 'Marked as featured'
+                  : 'Removed from featured')
+              : 'Could not save (admin only)')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Column(
       children: [
-        _picker(
-          context,
-          state,
-          'Featured Doctors',
-          state.featuredDoctors,
-          doctors
-              .map((d) => (d.id, d.name))
-              .toList(),
-        ),
-        const SizedBox(height: 12),
-        _picker(
-          context,
-          state,
-          'Featured Medicines',
-          state.featuredMedicines,
-          medicines
-              .map((m) => (m.id, m.name))
-              .toList(),
-        ),
-        const SizedBox(height: 12),
-        _picker(
-          context,
-          state,
-          'Featured Providers',
-          state.featuredProviders,
-          [
-            ...hospitals.map((h) => (h.id, h.name)),
-            ...labs.map((l) => (l.id, l.name)),
-            ...pharmacies.map((p) => (p.id, p.name)),
+        TabBar(
+          controller: _tabs,
+          labelColor: scheme.primary,
+          unselectedLabelColor: scheme.onSurfaceVariant,
+          indicatorColor: scheme.primary,
+          tabs: const [
+            Tab(text: 'Doctors'),
+            Tab(text: 'Medicines'),
           ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabs,
+            children: [
+              _list('doctors'),
+              _list('medicines'),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _picker(
-    BuildContext context,
-    AppState state,
-    String title,
-    List<String> selected,
-    List<(String, String)> options,
-  ) {
-    final scheme = Theme.of(context).colorScheme;
-    String nameOf(String id) {
-      final hit = options.where((o) => o.$1 == id);
-      return hit.isEmpty ? id : hit.first.$2;
-    }
-
-    return RCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(title,
-                    style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800)),
+  Widget _list(String table) {
+    final state = AppStateScope.of(context);
+    final rows = state.adminTable(table);
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: rows.length,
+      itemBuilder: (_, i) {
+        final r = rows[i];
+        final featured = r['is_featured'] == true;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: RCard(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: ListTile(
+              title: Text('${r['name']}',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: table == 'doctors'
+                  ? Text('${r['specialization'] ?? ''}')
+                  : Text('${r['category'] ?? ''}'),
+              trailing: IconButton(
+                icon: Icon(
+                  featured ? Icons.star : Icons.star_border,
+                  color: featured
+                      ? RemedooTheme.warning
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                tooltip:
+                    featured ? 'Remove from featured' : 'Mark as featured',
+                onPressed: () => _toggle(table, r),
               ),
-              RButton(
-                label: 'Pick',
-                icon: Icons.add,
-                small: true,
-                variant: RButtonVariant.outline,
-                onPressed: () => _pickDialog(
-                    context, state, title, selected, options),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (selected.isEmpty)
-            Text('None selected.',
-                style: TextStyle(
-                    fontSize: 13,
-                    color: scheme.onSurfaceVariant))
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: selected
-                  .map((id) => Chip(
-                        label: Text(nameOf(id)),
-                        deleteIcon:
-                            const Icon(Icons.close, size: 16),
-                        onDeleted: () {
-                          selected.remove(id);
-                          state.refresh();
-                        },
-                      ))
-                  .toList(),
-            ),
-        ],
-      ),
-    );
-  }
-
-  void _pickDialog(
-    BuildContext context,
-    AppState state,
-    String title,
-    List<String> selected,
-    List<(String, String)> options,
-  ) {
-    final temp = Set<String>.of(selected);
-    showDialog(
-      context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          title: Text(title,
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w800)),
-          content: SizedBox(
-            width: 400,
-            height: 400,
-            child: ListView.builder(
-              itemCount: options.length,
-              itemBuilder: (_, i) {
-                final (id, name) = options[i];
-                final sel = temp.contains(id);
-                return CheckboxListTile(
-                  value: sel,
-                  onChanged: (v) => setD(() => v!
-                      ? temp.add(id)
-                      : temp.remove(id)),
-                  title: Text(name),
-                  dense: true,
-                );
-              },
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            RButton(
-              label: 'Save',
-              small: true,
-              onPressed: () {
-                selected
-                  ..clear()
-                  ..addAll(temp);
-                state.refresh();
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 }

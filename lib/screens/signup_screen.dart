@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../widgets/email_otp_field.dart';
 import '../widgets/widgets.dart';
 
 /// Modern signup screen matching the login redesign.
@@ -20,9 +21,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscure = true;
   bool _busy = false;
   String? _error;
-  bool _confirmationSent = false;
-
-  static final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+  bool _emailVerified = false;
 
   @override
   void dispose() {
@@ -46,14 +45,14 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _signUp() async {
     final name = _name.text.trim();
-    final email = _email.text.trim();
     final password = _password.text;
-    if (name.isEmpty) {
-      setState(() => _error = 'Please enter your full name.');
+    if (!_emailVerified) {
+      setState(() =>
+          _error = 'Please verify your email with the OTP first.');
       return;
     }
-    if (!_emailRegex.hasMatch(email)) {
-      setState(() => _error = 'Please enter a valid email address.');
+    if (name.isEmpty) {
+      setState(() => _error = 'Please enter your full name.');
       return;
     }
     if (password.length < 8) {
@@ -65,19 +64,24 @@ class _SignupScreenState extends State<SignupScreen> {
       _busy = true;
       _error = null;
     });
+    // The email OTP already verified this address and signed the user in;
+    // just set the password and profile name.
     final result =
-        await AppStateScope.of(context).signUpWithPassword(
+        await AppStateScope.of(context).completeOtpSignup(
       name: name,
-      email: email,
       password: password,
     );
     if (!mounted) return;
     setState(() => _busy = false);
     if (!result.ok) {
+      if ((result.error ?? '').contains('already exists')) {
+        // Existing account: the OTP sign-in is valid, go to the app.
+        Navigator.popUntil(context, (r) => r.isFirst);
+        return;
+      }
       setState(() => _error = result.error);
-    } else {
-      setState(() => _confirmationSent = true);
     }
+    // Success: RootGate picks up the session and shows the dashboard.
   }
 
   @override
@@ -164,68 +168,27 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    if (_confirmationSent)
-                      RCard(
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.mark_email_read_outlined,
-                              size: 48,
-                              color: scheme.primary,
-                            ),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'Check your email',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'We sent a confirmation link to ${_email.text.trim()}. Tap it to activate your account.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color:
-                                    scheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            RButton(
-                              label: 'Back to Sign In',
-                              fullWidth: true,
-                              variant:
-                                  RButtonVariant.outline,
-                              onPressed: () =>
-                                  Navigator.pop(context),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      RCard(
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.stretch,
-                          children: [
+                    RCard(
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.stretch,
+                        children: [
+                          EmailOtpField(
+                            controller: _email,
+                            onVerifiedChanged: (v) =>
+                                setState(() {
+                              _emailVerified = v;
+                              if (v) _error = null;
+                            }),
+                          ),
+                          if (_emailVerified) ...[
+                            const SizedBox(height: 14),
                             RTextField(
                               label: 'Full Name',
                               hint: 'Your full name',
                               controller: _name,
                               prefixIcon: const Icon(
                                   Icons.person_outline,
-                                  size: 18),
-                            ),
-                            const SizedBox(height: 14),
-                            RTextField(
-                              label: 'Email',
-                              hint: 'you@example.com',
-                              controller: _email,
-                              keyboardType:
-                                  TextInputType.emailAddress,
-                              prefixIcon: const Icon(
-                                  Icons.email_outlined,
                                   size: 18),
                             ),
                             const SizedBox(height: 14),
@@ -279,43 +242,58 @@ class _SignupScreenState extends State<SignupScreen> {
                                 ),
                               ),
                             ],
-                            if (_error != null) ...[
-                              const SizedBox(height: 12),
-                              Container(
-                                padding:
-                                    const EdgeInsets.all(
+                          ],
+                          if (_error != null) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding:
+                                  const EdgeInsets.all(
+                                      10),
+                              decoration: BoxDecoration(
+                                color: RemedooTheme
+                                    .emergency
+                                    .withValues(
+                                        alpha: 0.1),
+                                borderRadius:
+                                    BorderRadius.circular(
                                         10),
-                                decoration: BoxDecoration(
+                              ),
+                              child: Text(
+                                _error!,
+                                style: TextStyle(
+                                  fontSize: 13,
                                   color: RemedooTheme
-                                      .emergency
-                                      .withValues(
-                                          alpha: 0.1),
-                                  borderRadius:
-                                      BorderRadius.circular(
-                                          10),
-                                ),
-                                child: Text(
-                                  _error!,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: RemedooTheme
-                                        .emergency,
-                                  ),
+                                      .emergency,
                                 ),
                               ),
-                            ],
-                            const SizedBox(height: 20),
-                            RButton(
-                              label: _busy
-                                  ? 'Creating…'
-                                  : 'Create Account',
-                              fullWidth: true,
-                              onPressed:
-                                  _busy ? null : _signUp,
                             ),
                           ],
-                        ),
+                          const SizedBox(height: 20),
+                          RButton(
+                            label: _busy
+                                ? 'Creating…'
+                                : 'Create Account',
+                            fullWidth: true,
+                            onPressed: (_busy ||
+                                    !_emailVerified)
+                                ? null
+                                : _signUp,
+                          ),
+                          if (!_emailVerified) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Verify your email with the OTP to continue.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color:
+                                    scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
+                    ),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment:

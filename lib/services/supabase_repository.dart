@@ -567,4 +567,425 @@ class SupabaseRepository {
       return const Stream.empty();
     }
   }
+
+  // ================= ADMIN BACKEND =================
+  // Supabase-backed methods for the admin panel. All writes require the
+  // signed-in user to hold the 'admin' role (enforced by RLS policies using
+  // has_role(auth.uid(), 'admin')). Best-effort: safe defaults on error.
+
+  /// Whether the signed-in user holds the admin role.
+  Future<bool> isCurrentUserAdmin() async {
+    if (!_ready) return false;
+    try {
+      final uid = _uid;
+      if (uid == null) return false;
+      final rows = await _db
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', uid)
+          .eq('role', 'admin')
+          .limit(1);
+      return rows.isNotEmpty;
+    } catch (e) {
+      debugPrint('isCurrentUserAdmin failed: $e');
+      return false;
+    }
+  }
+
+  /// App-wide config key/value store (branding, fees, emergency numbers,
+  /// maintenance mode...). Returns {key: valueMap}.
+  Future<Map<String, Map<String, dynamic>>> fetchAppConfig() async {
+    if (!_ready) return const {};
+    try {
+      final rows = await _db.from('app_config').select('key, value');
+      final out = <String, Map<String, dynamic>>{};
+      for (final r in rows) {
+        final v = r['value'];
+        out['${r['key']}'] =
+            v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
+      }
+      return out;
+    } catch (e) {
+      debugPrint('fetchAppConfig failed: $e');
+      return const {};
+    }
+  }
+
+  /// Saves one app_config entry (admin only via RLS).
+  Future<bool> saveAppConfig(String key, Map<String, dynamic> value) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('app_config').upsert({
+        'key': key,
+        'value': value,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('saveAppConfig failed: $e');
+      return false;
+    }
+  }
+
+  /// Admin read of any catalog table (all rows, incl. non-approved).
+  Future<List<Map<String, dynamic>>> adminFetchAll(String table) async {
+    if (!_ready) return const [];
+    try {
+      final rows =
+          await _db.from(table).select('*').order('name').limit(500);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('adminFetchAll($table) failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin insert/update of a catalog row. Returns the row id.
+  Future<String?> adminUpsert(
+      String table, Map<String, dynamic> row) async {
+    if (!_ready) return null;
+    try {
+      final res = await _db
+          .from(table)
+          .upsert(row)
+          .select('id')
+          .maybeSingle();
+      return res == null ? null : '${res['id']}';
+    } catch (e) {
+      debugPrint('adminUpsert($table) failed: $e');
+      return null;
+    }
+  }
+
+  /// Admin delete of a catalog row.
+  Future<bool> adminDelete(String table, String id) async {
+    if (!_ready) return false;
+    try {
+      await _db.from(table).delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('adminDelete($table) failed: $e');
+      return false;
+    }
+  }
+
+  /// Submits a provider application (onboarding). Returns the application id.
+  Future<String?> submitProviderApplication(
+      Map<String, dynamic> app) async {
+    if (!_ready) return null;
+    try {
+      final res = await _db
+          .from('provider_applications')
+          .insert(app)
+          .select('id')
+          .maybeSingle();
+      return res == null ? null : '${res['id']}';
+    } catch (e) {
+      debugPrint('submitProviderApplication failed: $e');
+      return null;
+    }
+  }
+
+  /// Admin list of provider applications, newest first.
+  Future<List<Map<String, dynamic>>> fetchProviderApplications() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('provider_applications')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(200);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchProviderApplications failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin approve/reject of a provider application.
+  Future<bool> decideProviderApplication(String id, String status) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('provider_applications').update({
+        'status': status,
+        'decided_at': DateTime.now().toIso8601String(),
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('decideProviderApplication failed: $e');
+      return false;
+    }
+  }
+
+  /// Admin list of announcements (broadcasts), newest first.
+  Future<List<Map<String, dynamic>>> fetchAnnouncements() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('announcements')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(50);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchAnnouncements failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin creates an announcement (broadcast).
+  Future<bool> createAnnouncement(
+      String title, String message, String audience) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('announcements').insert({
+        'title': title,
+        'message': message,
+        'audience': audience,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('createAnnouncement failed: $e');
+      return false;
+    }
+  }
+
+  /// Admin deletes an announcement.
+  Future<bool> deleteAnnouncement(String id) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('announcements').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('deleteAnnouncement failed: $e');
+      return false;
+    }
+  }
+
+  /// Latest announcements for display in the app (public read).
+  Future<List<Map<String, dynamic>>> fetchLatestAnnouncements() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('announcements')
+          .select('title, message, created_at')
+          .order('created_at', ascending: false)
+          .limit(5);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchLatestAnnouncements failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin list of all user profiles.
+  Future<List<Map<String, dynamic>>> fetchAllProfiles() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('profiles')
+          .select('user_id, full_name, email, phone, created_at')
+          .order('created_at', ascending: false)
+          .limit(500);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchAllProfiles failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin list of all orders with items, newest first.
+  Future<List<Map<String, dynamic>>> adminFetchOrders() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('orders')
+          .select('*, order_items(*)')
+          .order('created_at', ascending: false)
+          .limit(200);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('adminFetchOrders failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin update of an order (e.g. status).
+  Future<bool> adminUpdateOrder(
+      String id, Map<String, dynamic> fields) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('orders').update(fields).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('adminUpdateOrder failed: $e');
+      return false;
+    }
+  }
+
+  /// Admin list of all appointments, newest first.
+  Future<List<Map<String, dynamic>>> adminFetchAppointments() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('appointments')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(200);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('adminFetchAppointments failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin list of support tickets, newest first.
+  Future<List<Map<String, dynamic>>> fetchSupportTickets() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('support_tickets')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(200);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchSupportTickets failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin update of a support ticket (status, reply...).
+  Future<bool> updateSupportTicket(
+      String id, Map<String, dynamic> fields) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('support_tickets').update(fields).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateSupportTicket failed: $e');
+      return false;
+    }
+  }
+
+  /// Admin list of refunds, newest first.
+  Future<List<Map<String, dynamic>>> fetchRefunds() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('refunds')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(200);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchRefunds failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin update of a refund status.
+  Future<bool> updateRefund(String id, String status) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('refunds').update({'status': status}).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateRefund failed: $e');
+      return false;
+    }
+  }
+
+  /// Admin list of emergency requests, newest first.
+  Future<List<Map<String, dynamic>>> fetchEmergencyRequests() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('emergency_requests')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(100);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchEmergencyRequests failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin update of an emergency request (status, assigned ambulance...).
+  Future<bool> updateEmergencyRequest(
+      String id, Map<String, dynamic> fields) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('emergency_requests').update(fields).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateEmergencyRequest failed: $e');
+      return false;
+    }
+  }
+
+  /// Admin list of ambulances.
+  Future<List<Map<String, dynamic>>> fetchAmbulances() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('ambulances')
+          .select('*')
+          .order('vehicle_number')
+          .limit(100);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchAmbulances failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin update of an ambulance (status, driver...).
+  Future<bool> updateAmbulance(
+      String id, Map<String, dynamic> fields) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('ambulances').update(fields).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateAmbulance failed: $e');
+      return false;
+    }
+  }
+
+  /// Admin update of a provider's payment settings (UPI ID, toggles).
+  /// [table] is one of doctors/hospitals/labs/pharmacies.
+  Future<bool> updateProviderPayment(String table, String id,
+      {String? upiId, bool? upiEnabled, bool? payInClinicEnabled}) async {
+    if (!_ready) return false;
+    try {
+      final fields = <String, dynamic>{};
+      if (upiId != null) fields['upi_id'] = upiId;
+      if (upiEnabled != null) fields['upi_enabled'] = upiEnabled;
+      if (payInClinicEnabled != null) {
+        fields['pay_in_clinic_enabled'] = payInClinicEnabled;
+      }
+      if (fields.isEmpty) return true;
+      await _db.from(table).update(fields).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateProviderPayment failed: $e');
+      return false;
+    }
+  }
+
+  /// Sets the UPI ID on the provider record(s) linked to [userId].
+  /// The caller loops the provider tables; returns true if no exception.
+  Future<bool> setProviderUpiOnRecord(
+      String table, String userId, String upiId) async {
+    if (!_ready) return false;
+    try {
+      await _db.from(table).update({'upi_id': upiId}).eq('user_id', userId);
+      return true;
+    } catch (e) {
+      debugPrint('setProviderUpiOnRecord($table) failed: $e');
+      return false;
+    }
+  }
 }

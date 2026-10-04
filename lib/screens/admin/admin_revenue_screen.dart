@@ -1,26 +1,50 @@
 import 'package:flutter/material.dart';
 
-import '../../models.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
 
-/// Revenue: cards, chart, transactions table.
-class AdminRevenueScreen extends StatelessWidget {
+/// Revenue from real Supabase orders: totals, averages, transactions.
+class AdminRevenueScreen extends StatefulWidget {
   const AdminRevenueScreen({super.key});
 
-  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-  static const _vals = [42.0, 58.0, 51.0, 70.0, 66.0, 84.0];
+  @override
+  State<AdminRevenueScreen> createState() => _AdminRevenueScreenState();
+}
+
+class _AdminRevenueScreenState extends State<AdminRevenueScreen> {
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    await AppStateScope.of(context).loadAdminOrders();
+    if (mounted) setState(() => _loading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final total =
-        state.orders.fold<double>(0, (s, o) => s + o.total);
-    final avg = state.orders.isEmpty
-        ? 0.0
-        : total / state.orders.length;
     final scheme = Theme.of(context).colorScheme;
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final orders = state.adminOrders;
+    final total = orders.fold<double>(
+        0, (s, o) => s + ((o['total'] as num?)?.toDouble() ?? 0));
+    final avg = orders.isEmpty ? 0.0 : total / orders.length;
+
+    // Orders grouped by status for the pipeline summary.
+    final byStatus = <String, int>{};
+    for (final o in orders) {
+      final st = '${o['status'] ?? 'placed'}';
+      byStatus[st] = (byStatus[st] ?? 0) + 1;
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -29,61 +53,79 @@ class AdminRevenueScreen extends StatelessWidget {
             _card(context, 'Total Revenue', inr(total),
                 Icons.trending_up, RemedooTheme.success),
             const SizedBox(width: 10),
-            _card(context, 'Avg. Order', inr(avg),
-                Icons.receipt, scheme.primary),
+            _card(context, 'Avg. Order', inr(avg), Icons.receipt,
+                scheme.primary),
             const SizedBox(width: 10),
-            _card(context, 'Transactions',
-                '${state.orders.length}', Icons.list_alt,
-                RemedooTheme.purple),
+            _card(context, 'Transactions', '${orders.length}',
+                Icons.list_alt, RemedooTheme.purple),
           ],
         ),
         const SizedBox(height: 24),
         const RSectionHeader(
-            title: 'Revenue Trend',
-            subtitle: 'Last 6 months (demo data)'),
+            title: 'Order Pipeline',
+            subtitle: 'Live counts by status'),
         const SizedBox(height: 12),
         RCard(
-          child: SizedBox(
-            height: 180,
-            child: CustomPaint(
-              painter: _RevPainter(
-                  _months, _vals, RemedooTheme.success),
-            ),
-          ),
+          child: byStatus.isEmpty
+              ? Text('No orders yet.',
+                  style: TextStyle(
+                      color: scheme.onSurfaceVariant, fontSize: 13))
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: byStatus.entries
+                      .map((e) => Chip(
+                            label: Text(
+                                '${e.key.replaceAll('_', ' ')} · ${e.value}'),
+                          ))
+                      .toList(),
+                ),
         ),
         const SizedBox(height: 24),
         const RSectionHeader(
-            title: 'Transactions',
-            subtitle: 'All medicine orders'),
+            title: 'Transactions', subtitle: 'All medicine orders'),
         const SizedBox(height: 12),
-        RCard(
-          padding: const EdgeInsets.all(8),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingTextStyle: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 0.4,
-                color: scheme.onSurfaceVariant,
+        if (orders.isEmpty)
+          const REmptyState(
+              icon: Icons.receipt_long,
+              title: 'No transactions yet',
+              subtitle: 'Orders will appear here.',
+              compact: true)
+        else
+          RCard(
+            padding: const EdgeInsets.all(8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingTextStyle: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 0.4,
+                  color: scheme.onSurfaceVariant,
+                ),
+                columns: const [
+                  DataColumn(label: Text('ORDER')),
+                  DataColumn(label: Text('AMOUNT')),
+                  DataColumn(label: Text('PAYMENT')),
+                  DataColumn(label: Text('STATUS')),
+                ],
+                rows: orders.take(100).map((o) {
+                  final id = '${o['id'] ?? ''}';
+                  return DataRow(cells: [
+                    DataCell(Text(
+                        id.length > 8 ? id.substring(0, 8) : id,
+                        style: const TextStyle(fontFamily: 'monospace'))),
+                    DataCell(Text(
+                        inr((o['total'] as num?)?.toDouble() ?? 0))),
+                    DataCell(
+                        Text('${o['payment_method'] ?? 'cod'}')),
+                    DataCell(
+                        StatusChip(status: '${o['status'] ?? 'placed'}')),
+                  ]);
+                }).toList(),
               ),
-              columns: const [
-                DataColumn(label: Text('ORDER')),
-                DataColumn(label: Text('PHARMACY')),
-                DataColumn(label: Text('AMOUNT')),
-                DataColumn(label: Text('STATUS')),
-              ],
-              rows: state.orders.map((MedOrder o) {
-                return DataRow(cells: [
-                  DataCell(Text(o.id)),
-                  DataCell(Text(o.pharmacyName)),
-                  DataCell(Text(inr(o.total))),
-                  DataCell(StatusChip(status: o.status)),
-                ]);
-              }).toList(),
             ),
           ),
-        ),
       ],
     );
   }
@@ -114,60 +156,16 @@ class AdminRevenueScreen extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 17)),
+                    fontWeight: FontWeight.w800, fontSize: 17)),
             const SizedBox(height: 2),
             Text(label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    fontSize: 11,
-                    color: scheme.onSurfaceVariant)),
+                    fontSize: 11, color: scheme.onSurfaceVariant)),
           ],
         ),
       ),
     );
   }
-}
-
-class _RevPainter extends CustomPainter {
-  final List<String> labels;
-  final List<double> values;
-  final Color color;
-
-  _RevPainter(this.labels, this.values, this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final maxV = values.reduce((a, b) => a > b ? a : b);
-    final slot = size.width / values.length;
-    final barW = slot * 0.5;
-    final paint = Paint()..color = color;
-    for (var i = 0; i < values.length; i++) {
-      final h = (size.height - 40) * values[i] / maxV;
-      final x = slot * i + (slot - barW) / 2;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, size.height - 24 - h, barW, h),
-          const Radius.circular(6),
-        ),
-        paint,
-      );
-      final tp = TextPainter(
-        text: TextSpan(
-            text: labels[i],
-            style: const TextStyle(
-                fontSize: 11, color: Colors.grey)),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(
-          canvas,
-          Offset(slot * i + (slot - tp.width) / 2,
-              size.height - 18));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) =>
-      false;
 }

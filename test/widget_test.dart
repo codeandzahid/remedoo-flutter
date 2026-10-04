@@ -116,7 +116,7 @@ void main() {
         findsOneWidget);
   });
 
-  testWidgets('admin login sets admin role', (tester) async {
+  testWidgets('admin login requires credentials', (tester) async {
     final state = AppState();
     await tester.pumpWidget(AppStateScope(
         state: state,
@@ -125,8 +125,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sign In as Admin'));
     await tester.pumpAndSettle();
-    expect(state.isLoggedIn, isTrue);
-    expect(state.role, 'admin');
+    // Empty fields -> validation error, no admin role granted.
+    expect(find.text('Please enter your email and password.'),
+        findsOneWidget);
+    expect(state.role, isNot('admin'));
   });
 
   testWidgets('root gate shows admin console for admin role',

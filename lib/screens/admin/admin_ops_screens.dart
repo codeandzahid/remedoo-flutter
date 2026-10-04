@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../models.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
 
-// Operations screens: payouts, refunds, ambulance, drivers,
-// inventory, sessions, logs, suspicious activity.
+// Operations screens backed by Supabase:
+// refunds, ambulance fleet, pharmacy inventory.
 
 /// Pastel icon tile that adapts to light/dark.
 Widget _tile(BuildContext context, IconData icon, Color color,
@@ -25,77 +24,78 @@ Widget _tile(BuildContext context, IconData icon, Color color,
   );
 }
 
-/// Payouts to providers (demo data).
-class AdminPayoutsScreen extends StatelessWidget {
-  const AdminPayoutsScreen({super.key});
+void _snack(BuildContext context, String msg) {
+  ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(msg)));
+}
 
-  @override
-  Widget build(BuildContext context) {
-    final payouts = [
-      ('Dr. Aabid Shah', 'Doctor', 12400.0, 'Pending'),
-      ('CityCare Labs', 'Lab', 8300.0, 'Processed'),
-      ('MediPlus Pharmacy', 'Pharmacy', 15200.0, 'Pending'),
-      ('Irfan Dar (Driver)', 'Driver', 1450.0, 'Processed'),
-    ];
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: payouts.length,
-      itemBuilder: (_, i) {
-        final (name, role, amount, status) = payouts[i];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: RCard(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 8, vertical: 6),
-            child: ListTile(
-              leading: _tile(
-                  context, Icons.payments, RemedooTheme.success),
-              title: Text(name,
-                  style:
-                      const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(role),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(inr(amount),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 4),
-                  StatusChip(status: status),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+String _fmtDate(String? iso) {
+  if (iso == null || iso.isEmpty) return '';
+  try {
+    final d = DateTime.parse(iso).toLocal();
+    return '${d.day}/${d.month}/${d.year}';
+  } catch (_) {
+    return iso;
   }
 }
 
-/// Refund requests with Approve / Reject → updates RefundTracking.
-class AdminRefundsScreen extends StatelessWidget {
+/// Refund requests from Supabase with Approve / Reject / Complete.
+class AdminRefundsScreen extends StatefulWidget {
   const AdminRefundsScreen({super.key});
+
+  @override
+  State<AdminRefundsScreen> createState() =>
+      _AdminRefundsScreenState();
+}
+
+class _AdminRefundsScreenState
+    extends State<AdminRefundsScreen> {
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    await AppStateScope.of(context).loadRefunds();
+    if (mounted) setState(() => _loading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final list = state.refundRequests;
-    if (list.isEmpty) {
+    if (_loading) {
+      return const Center(
+          child: CircularProgressIndicator());
+    }
+    if (state.refunds.isEmpty) {
       return const REmptyState(
         icon: Icons.replay,
         title: 'No refund requests',
         subtitle: 'Refund requests will appear here.',
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      itemBuilder: (_, i) => _card(state, list[i]),
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: state.refunds.length,
+        itemBuilder: (_, i) =>
+            _card(context, state, state.refunds[i]),
+      ),
     );
   }
 
-  Widget _card(AppState state, RefundRequest r) {
+  Widget _card(BuildContext context, AppState state,
+      Map<String, dynamic> r) {
+    final scheme = Theme.of(context).colorScheme;
+    final id = '${r['id']}';
+    final status = '${r['status'] ?? 'requested'}';
+    final amount = (r['amount'] as num?)?.toDouble() ?? 0;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: RCard(
@@ -105,17 +105,22 @@ class AdminRefundsScreen extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text('Refund ${r.id}',
+                  child: Text(
+                      'Refund ${id.length > 8 ? id.substring(0, 8) : id}',
                       style: const TextStyle(
                           fontWeight: FontWeight.w800)),
                 ),
-                StatusChip(status: r.status),
+                StatusChip(status: status),
               ],
             ),
             const SizedBox(height: 6),
+            Text('${inr(amount)} • ${r['reason'] ?? '—'}'),
             Text(
-                'Order ${r.orderId} • ${inr(r.amount)} • ${r.reason}'),
-            if (r.status == 'requested') ...[
+                '${r['order_id'] != null ? 'Order ${(r['order_id'] as String).substring(0, 8)} • ' : ''}${_fmtDate(r['created_at']?.toString())}',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant)),
+            if (status == 'requested') ...[
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -124,8 +129,9 @@ class AdminRefundsScreen extends StatelessWidget {
                       label: 'Reject',
                       small: true,
                       variant: RButtonVariant.danger,
-                      onPressed: () => state.setRefundStatus(
-                          r.id, 'rejected'),
+                      onPressed: () =>
+                          _decide(context, state, id,
+                              'rejected'),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -133,20 +139,22 @@ class AdminRefundsScreen extends StatelessWidget {
                     child: RButton(
                       label: 'Approve',
                       small: true,
-                      onPressed: () => state.setRefundStatus(
-                          r.id, 'approved'),
+                      onPressed: () =>
+                          _decide(context, state, id,
+                              'approved'),
                     ),
                   ),
                 ],
               ),
-            ] else if (r.status == 'approved') ...[
+            ] else if (status == 'approved') ...[
               const SizedBox(height: 12),
               RButton(
                 label: 'Mark Completed',
                 fullWidth: true,
                 small: true,
-                onPressed: () => state.setRefundStatus(
-                    r.id, 'completed'),
+                onPressed: () =>
+                    _decide(context, state, id,
+                        'completed'),
               ),
             ],
           ],
@@ -154,9 +162,17 @@ class AdminRefundsScreen extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _decide(BuildContext context, AppState state,
+      String id, String status) async {
+    final ok = await state.updateRefund(id, status);
+    if (context.mounted && !ok) {
+      _snack(context, 'Update failed. Try again.');
+    }
+  }
 }
 
-/// Ambulance fleet with status.
+/// Ambulance fleet from Supabase with status management.
 class AdminAmbulanceScreen extends StatefulWidget {
   const AdminAmbulanceScreen({super.key});
 
@@ -167,324 +183,233 @@ class AdminAmbulanceScreen extends StatefulWidget {
 
 class _AdminAmbulanceScreenState
     extends State<AdminAmbulanceScreen> {
-  final _fleet = [
-    ('AMB-101', 'Dalgate, Srinagar', 'Available'),
-    ('AMB-102', 'Lal Chowk, Srinagar', 'On Trip'),
-    ('AMB-201', 'Gandhi Nagar, Jammu', 'Available'),
-    ('AMB-202', 'Trikuta Nagar, Jammu', 'Maintenance'),
+  bool _loading = true;
+
+  static const _statuses = [
+    'available',
+    'on_trip',
+    'maintenance',
+    'offline',
   ];
 
   @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _fleet.length,
-      itemBuilder: (_, i) {
-        final (id, base, status) = _fleet[i];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: RCard(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 8, vertical: 6),
-            child: ListTile(
-              leading: _tile(context, Icons.emergency,
-                  RemedooTheme.emergency),
-              title: Text(id,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700)),
-              subtitle: Text('Base: $base'),
-              trailing: DropdownButton<String>(
-                value: status,
-                underline: const SizedBox.shrink(),
-                items: const [
-                  'Available',
-                  'On Trip',
-                  'Maintenance'
-                ]
-                    .map((s) => DropdownMenuItem(
-                        value: s, child: Text(s)))
-                    .toList(),
-                onChanged: (v) => setState(() =>
-                    _fleet[i] = (id, base, v ?? status)),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _load());
   }
-}
 
-/// Delivery drivers + assign.
-class AdminDeliveryDriversScreen extends StatelessWidget {
-  const AdminDeliveryDriversScreen({super.key});
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    await AppStateScope.of(context).loadAmbulances();
+    if (mounted) setState(() => _loading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final drivers = [
-      ('Irfan Dar', '9906123456', 'Online'),
-      ('Sahil Bhat', '9419012345', 'Online'),
-      ('Danish Lone', '9906987654', 'Offline'),
-    ];
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: drivers.length,
-      itemBuilder: (_, i) {
-        final (name, phone, status) = drivers[i];
-        final assigned = state.deliveries
-            .where((d) => d.status != 'delivered')
-            .length;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: RCard(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 8, vertical: 6),
-            child: ListTile(
-              leading:
-                  InitialsAvatar(name: name, radius: 22),
-              title: Text(name,
-                  style:
-                      const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('$phone • $assigned active'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  StatusChip(status: status),
-                  IconButton(
-                    icon: const Icon(Icons.assignment_ind),
-                    tooltip: 'Assign delivery',
-                    onPressed: () {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(
-                        SnackBar(
-                            content: Text(
-                                'Delivery assigned to $name (demo)')),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
+    if (_loading) {
+      return const Center(
+          child: CircularProgressIndicator());
+    }
+    if (state.ambulances.isEmpty) {
+      return const REmptyState(
+        icon: Icons.emergency_outlined,
+        title: 'No ambulances',
+        subtitle:
+            'Fleet vehicles will appear here once added.',
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: state.ambulances.length,
+        itemBuilder: (_, i) =>
+            _card(context, state, state.ambulances[i]),
+      ),
+    );
+  }
+
+  Widget _card(BuildContext context, AppState state,
+      Map<String, dynamic> a) {
+    final id = '${a['id']}';
+    final status = '${a['status'] ?? 'available'}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: RCard(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: ListTile(
+          leading: _tile(context, Icons.emergency,
+              RemedooTheme.emergency),
+          title: Text('${a['vehicle_number'] ?? '—'}',
+              style:
+                  const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(
+              '${a['driver_name'] ?? '—'} • ${a['driver_phone'] ?? '—'}'),
+          trailing: DropdownButton<String>(
+            value:
+                _statuses.contains(status) ? status : null,
+            underline: const SizedBox.shrink(),
+            items: _statuses
+                .map((s) => DropdownMenuItem(
+                    value: s,
+                    child: Text(s.replaceAll('_', ' '))))
+                .toList(),
+            onChanged: (v) async {
+              if (v == null) return;
+              final ok = await state.updateAmbulance(
+                  id, {'status': v});
+              if (context.mounted && !ok) {
+                _snack(
+                    context, 'Update failed. Try again.');
+              }
+            },
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
-/// Remedoo Pharmacy stock editor.
-class AdminInventoryScreen extends StatelessWidget {
+/// Pharmacy stock editor backed by the Supabase `medicines` table.
+class AdminInventoryScreen extends StatefulWidget {
   const AdminInventoryScreen({super.key});
 
   @override
+  State<AdminInventoryScreen> createState() =>
+      _AdminInventoryScreenState();
+}
+
+class _AdminInventoryScreenState
+    extends State<AdminInventoryScreen> {
+  bool _loading = true;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    await AppStateScope.of(context)
+        .loadAdminTable('medicines');
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final list = state.activeMedicines.take(20).toList();
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      itemBuilder: (_, i) {
-        final m = list[i];
-        final stock = state.stockOf(m.id);
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: RCard(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                _tile(context, Icons.medication,
-                    RemedooTheme.teal,
-                    size: 42),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      Text(m.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700)),
-                      Text(
-                          '${m.pack} • ${inr(state.priceOf(m))}',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color:
-                                  scheme.onSurfaceVariant)),
-                    ],
-                  ),
-                ),
-                QtyStepper(
-                  qty: stock,
-                  onMinus: () =>
-                      state.setStock(m.id, stock - 1),
-                  onPlus: () =>
-                      state.setStock(m.id, stock + 1),
-                ),
-              ],
-            ),
+    var rows = state.adminTable('medicines');
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      rows = rows
+          .where((m) =>
+              '${m['name'] ?? ''}'.toLowerCase().contains(q))
+          .toList();
+    }
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: RTextField(
+            hint: 'Search medicines…',
+            prefixIcon: const Icon(Icons.search),
+            onChanged: (v) =>
+                setState(() => _query = v.trim()),
           ),
-        );
-      },
-    );
-  }
-}
-
-/// Active sessions (demo).
-class AdminSessionsScreen extends StatelessWidget {
-  const AdminSessionsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final sessions = [
-      ('Zahid Manzoor', 'Android • Srinagar', 'Active now'),
-      ('Aisha Khan', 'iPhone • Jammu', '12 min ago'),
-      ('Rohan Gupta', 'Web • Delhi', '1 hr ago'),
-    ];
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: sessions.length,
-      itemBuilder: (_, i) {
-        final (name, device, last) = sessions[i];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: RCard(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 8, vertical: 6),
-            child: ListTile(
-              leading:
-                  _tile(context, Icons.devices, scheme.primary),
-              title: Text(name,
-                  style:
-                      const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(device),
-              trailing: Text(last,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: scheme.onSurfaceVariant)),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Login logs (demo).
-class AdminLogsScreen extends StatelessWidget {
-  const AdminLogsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final logs = [
-      ('admin@remedoo.app', 'Success', 'Today, 09:42'),
-      ('zahid391105@gmail.com', 'Success', 'Today, 08:15'),
-      ('unknown@example.com', 'Failed', 'Yesterday, 22:03'),
-      ('aisha.k@example.com', 'Success', 'Yesterday, 18:31'),
-    ];
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: logs.length,
-      itemBuilder: (_, i) {
-        final (email, result, at) = logs[i];
-        final ok = result == 'Success';
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: RCard(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 8, vertical: 6),
-            child: ListTile(
-              leading: _tile(
-                context,
-                ok ? Icons.check_circle : Icons.error,
-                ok
-                    ? RemedooTheme.success
-                    : RemedooTheme.emergency,
-              ),
-              title: Text(email,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600)),
-              subtitle: Text(at),
-              trailing: StatusChip(status: result),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Flagged suspicious activity (demo).
-class AdminSuspiciousActivityScreen extends StatelessWidget {
-  const AdminSuspiciousActivityScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final flags = [
-      ('Multiple failed logins', 'unknown@example.com',
-          '5 attempts in 2 minutes'),
-      ('Unusual refund pattern', 'Order R049B060',
-          '3 refunds in 24 hours'),
-      ('Bulk appointment booking', '94190XXXXX',
-          '12 slots booked at once'),
-    ];
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: flags.length,
-      itemBuilder: (_, i) {
-        final (title, subject, detail) = flags[i];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: RCard(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _tile(context, Icons.warning,
-                    RemedooTheme.warning),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      Text(title,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      Text('$subject\n$detail',
-                          style: TextStyle(
-                              fontSize: 13,
-                              color:
-                                  scheme.onSurfaceVariant)),
-                      const SizedBox(height: 8),
-                      RButton(
-                        label: 'Review',
-                        small: true,
-                        variant: RButtonVariant.outline,
-                        onPressed: () {
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    'Flagged for review (demo)')),
-                          );
-                        },
+        ),
+        Expanded(
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator())
+              : rows.isEmpty
+                  ? const REmptyState(
+                      icon: Icons.inventory_2_outlined,
+                      title: 'No medicines',
+                      subtitle:
+                          'Stock appears here once medicines are added.',
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(
+                            16, 0, 16, 16),
+                        itemCount: rows.length,
+                        itemBuilder: (_, i) => _row(
+                            context, state, scheme, rows[i]),
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+                    ),
+        ),
+      ],
     );
+  }
+
+  Widget _row(BuildContext context, AppState state,
+      ColorScheme scheme, Map<String, dynamic> m) {
+    final id = '${m['id']}';
+    final stock =
+        (m['stock_quantity'] as num?)?.toInt() ?? 0;
+    final inStock = m['in_stock'] != false;
+    final price = (m['price'] as num?)?.toDouble() ?? 0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: RCard(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            _tile(context, Icons.medication,
+                RemedooTheme.teal,
+                size: 42),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Text('${m['name'] ?? '—'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700)),
+                  Text(
+                      '${m['unit'] ?? 'strip'} • ${inr(price)}${inStock ? '' : ' • OUT OF STOCK'}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: inStock
+                              ? scheme.onSurfaceVariant
+                              : RemedooTheme.emergency)),
+                ],
+              ),
+            ),
+            QtyStepper(
+              qty: stock,
+              onMinus: () => _setStock(
+                  context, state, id, stock - 1),
+              onPlus: () => _setStock(
+                  context, state, id, stock + 1),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setStock(BuildContext context, AppState state,
+      String id, int qty) async {
+    if (qty < 0) return;
+    final ok = await state.adminSaveRow('medicines', {
+      'id': id,
+      'stock_quantity': qty,
+      'in_stock': qty > 0,
+    });
+    if (context.mounted && !ok) {
+      _snack(context, 'Stock update failed. Try again.');
+    }
   }
 }
