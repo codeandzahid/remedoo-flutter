@@ -43,6 +43,58 @@ class _SignupScreenState extends State<SignupScreen> {
     return s.clamp(0.0, 1.0);
   }
 
+  /// Small "Step X of 2" header for the two-step signup flow.
+  Widget _stepHeader(ColorScheme scheme,
+      {required String step,
+      required String title,
+      required bool done}) {
+    return Row(
+      children: [
+        Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: done
+                ? RemedooTheme.success.withValues(alpha: 0.12)
+                : scheme.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (done)
+                Icon(Icons.check,
+                    size: 14, color: RemedooTheme.success)
+              else
+                Text(
+                  step,
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.primary),
+                ),
+              if (done) const SizedBox(width: 4),
+              if (done)
+                Text(
+                  step,
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: RemedooTheme.success),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: const TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+  }
+
   Future<void> _signUp() async {
     final name = _name.text.trim();
     final password = _password.text;
@@ -173,16 +225,37 @@ class _SignupScreenState extends State<SignupScreen> {
                         crossAxisAlignment:
                             CrossAxisAlignment.stretch,
                         children: [
-                          EmailOtpField(
-                            controller: _email,
-                            onVerifiedChanged: (v) =>
-                                setState(() {
-                              _emailVerified = v;
-                              if (v) _error = null;
-                            }),
+                          // Step 1: verify the email address.
+                          _stepHeader(
+                            scheme,
+                            step: 'Step 1 of 2',
+                            title: 'Verify your email',
+                            done: _emailVerified,
                           ),
+                          const SizedBox(height: 12),
+                          if (!_emailVerified)
+                            EmailOtpField(
+                              controller: _email,
+                              onVerifiedChanged: (v) =>
+                                  setState(() {
+                                _emailVerified = v;
+                                if (v) _error = null;
+                              }),
+                            )
+                          else
+                            VerifiedEmailCard(
+                                email:
+                                    _email.text.trim()),
+                          // Step 2: complete the profile (unlocked after OTP).
                           if (_emailVerified) ...[
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 20),
+                            _stepHeader(
+                              scheme,
+                              step: 'Step 2 of 2',
+                              title: 'Create your profile',
+                              done: false,
+                            ),
+                            const SizedBox(height: 12),
                             RTextField(
                               label: 'Full Name',
                               hint: 'Your full name',
@@ -279,18 +352,6 @@ class _SignupScreenState extends State<SignupScreen> {
                                 ? null
                                 : _signUp,
                           ),
-                          if (!_emailVerified) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              'Verify your email with the OTP to continue.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color:
-                                    scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),

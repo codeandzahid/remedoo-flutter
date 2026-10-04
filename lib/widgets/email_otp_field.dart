@@ -6,6 +6,53 @@ import '../services/auth_service.dart';
 import '../theme.dart';
 import 'widgets.dart';
 
+/// Locked card showing a verified email address (not editable).
+class VerifiedEmailCard extends StatelessWidget {  final String email;
+
+  const VerifiedEmailCard({super.key, required this.email});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: RemedooTheme.success.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: RemedooTheme.success.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.verified,
+              color: RemedooTheme.success, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  email,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                Text(
+                  'Verified — cannot be changed',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.lock_outline,
+              size: 16, color: scheme.onSurfaceVariant),
+        ],
+      ),
+    );
+  }
+}
 /// Email field with built-in OTP verification.
 ///
 /// Flow: user types a complete email -> "Send OTP" button appears -> tapping
@@ -76,9 +123,6 @@ class _EmailOtpFieldState extends State<EmailOtpField> {
       });
     }
   }
-
-  bool get _emailValid =>
-      _emailRegex.hasMatch(widget.controller.text.trim());
 
   void _startCooldown() {
     _timer?.cancel();
@@ -189,14 +233,12 @@ class _EmailOtpFieldState extends State<EmailOtpField> {
             ],
           ),
         ] else if (!_otpSent) ...[
-          if (_emailValid) ...[
-            const SizedBox(height: 10),
-            RButton(
-              label: 'Send OTP',
-              icon: Icons.mark_email_read_outlined,
-              onPressed: _busy ? null : _sendOtp,
-            ),
-          ],
+          const SizedBox(height: 10),
+          RButton(
+            label: 'Send OTP',
+            icon: Icons.mark_email_read_outlined,
+            onPressed: _busy ? null : _sendOtp,
+          ),
         ] else ...[
           const SizedBox(height: 10),
           RTextField(

@@ -305,6 +305,27 @@ class _ProviderRegisterScreenState
                       ),
                     ),
                     const SizedBox(height: 16),
+                    if (!_emailVerified)
+                      _SectionCard(
+                        title: 'Step 1 of 2: Verify Your Email',
+                        icon: Icons.email_outlined,
+                        children: [
+                          EmailOtpField(
+                            controller: _email,
+                            label: null,
+                            hint: 'you@example.com',
+                            onVerifiedChanged: (v) =>
+                                setState(() {
+                              _emailVerified = v;
+                              if (v) _error = null;
+                            }),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      VerifiedEmailCard(
+                          email: _email.text.trim()),
+                      const SizedBox(height: 14),
                     // Personal details
                     _SectionCard(
                       title: 'Personal Details',
@@ -317,44 +338,7 @@ class _ProviderRegisterScreenState
                           icon: Icons.person_outline,
                         ),
                         const SizedBox(height: 12),
-                        Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                          children: [
-                            RichText(
-                              text: TextSpan(
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight:
-                                      FontWeight.w600,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface,
-                                ),
-                                children: const [
-                                  TextSpan(
-                                      text: 'Email'),
-                                  TextSpan(
-                                    text: ' *',
-                                    style: TextStyle(
-                                        color: Colors.red),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            EmailOtpField(
-                              controller: _email,
-                              label: null,
-                              hint: 'you@example.com',
-                              onVerifiedChanged: (v) =>
-                                  setState(() {
-                                _emailVerified = v;
-                                if (v) _error = null;
-                              }),
-                            ),
-                          ],
-                        ),
+
                         const SizedBox(height: 12),
                         _RequiredField(
                           label: 'Phone',
@@ -454,6 +438,7 @@ class _ProviderRegisterScreenState
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
+                    ],
                     const SizedBox(height: 24),
                   ],
                 ),
