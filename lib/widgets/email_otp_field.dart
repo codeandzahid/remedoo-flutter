@@ -56,7 +56,7 @@ class VerifiedEmailCard extends StatelessWidget {  final String email;
 /// Email field with built-in OTP verification.
 ///
 /// Flow: user types a complete email -> "Send OTP" button appears -> tapping
-/// it emails a 6-digit code -> an OTP input appears -> "Verify OTP" checks the
+/// it emails a one-time code -> an OTP input appears -> "Verify OTP" checks the
 /// code. Wrong codes show a "Wrong OTP" error; a correct code locks the field
 /// with a verified badge and notifies [onVerifiedChanged].
 class EmailOtpField extends StatefulWidget {
@@ -169,7 +169,7 @@ class _EmailOtpFieldState extends State<EmailOtpField> {
   Future<void> _verifyOtp() async {
     final code = _otp.text.trim();
     if (code.length < 6) {
-      setState(() => _error = 'Please enter the 6-digit code.');
+      setState(() => _error = 'Please enter the full code from the email.');
       return;
     }
     setState(() {
@@ -243,7 +243,7 @@ class _EmailOtpFieldState extends State<EmailOtpField> {
           const SizedBox(height: 10),
           RTextField(
             label: 'Enter OTP',
-            hint: '6-digit code',
+            hint: 'Enter the code',
             controller: _otp,
             keyboardType: TextInputType.number,
             enabled: !_busy,

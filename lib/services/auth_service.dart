@@ -160,7 +160,7 @@ class AuthService {
     }
   }
 
-  /// Send a 6-digit email OTP for registration verification.
+  /// Send an email OTP for registration verification.
   /// Unlike [sendMagicLink], this omits the redirect so Supabase sends a
   /// code the user types back into the form.
   Future<AuthResult> sendEmailOtp(String email) async {
@@ -174,7 +174,7 @@ class AuthService {
     }
   }
 
-  /// Verify the 6-digit email OTP. On success the user is signed in.
+  /// Verify the email OTP. On success the user is signed in.
   Future<AuthResult> verifyEmailOtp({
     required String email,
     required String token,
@@ -219,6 +219,20 @@ class AuthService {
       await _client.auth.resetPasswordForEmail(
         email,
         redirectTo: Uri.base.origin,
+      );
+      return const AuthResult.success();
+    } on AuthException catch (e) {
+      return AuthResult.failure(_friendlyMessage(e));
+    } catch (e) {
+      return AuthResult.failure(_friendlyMessage(e));
+    }
+  }
+
+  /// Set custom metadata (e.g. display_name) on the auth user.
+  Future<AuthResult> updateUserMetadata(Map<String, dynamic> data) async {
+    try {
+      await _client.auth.updateUser(
+        UserAttributes(data: data),
       );
       return const AuthResult.success();
     } on AuthException catch (e) {

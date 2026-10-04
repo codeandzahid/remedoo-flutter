@@ -17,16 +17,20 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
+  final _phone = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;
   bool _busy = false;
   String? _error;
   bool _emailVerified = false;
+  String _gender = 'Male';
+  DateTime? _dob;
 
   @override
   void dispose() {
     _name.dispose();
     _email.dispose();
+    _phone.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -41,6 +45,104 @@ class _SignupScreenState extends State<SignupScreen> {
     if (RegExp(r'[0-9]').hasMatch(p)) s += 0.15;
     if (RegExp(r'[^A-Za-z0-9]').hasMatch(p)) s += 0.15;
     return s.clamp(0.0, 1.0);
+  }
+
+  Widget _genderDropdown(ColorScheme scheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Gender',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface)),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: scheme.outline.withValues(alpha: 0.3)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _gender,
+              isExpanded: true,
+              items: const ['Male', 'Female', 'Other']
+                  .map((g) =>
+                      DropdownMenuItem(value: g, child: Text(g)))
+                  .toList(),
+              onChanged: (v) =>
+                  setState(() => _gender = v ?? 'Male'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _dobField(ColorScheme scheme) {
+    final label = _dob == null
+        ? 'Date of birth (optional)'
+        : 'DOB: ${_dob!.day}/${_dob!.month}/${_dob!.year}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Date of Birth',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface)),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: () async {
+            final now = DateTime.now();
+            final picked = await showDatePicker(
+              context: context,
+              initialDate:
+                  DateTime(now.year - 25, now.month, now.day),
+              firstDate: DateTime(1900),
+              lastDate: now,
+            );
+            if (picked != null) setState(() => _dob = picked);
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest
+                  .withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: scheme.outline.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.cake_outlined,
+                    size: 18, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 10),
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: _dob == null
+                            ? scheme.onSurfaceVariant
+                            : scheme.onSurface)),
+                const Spacer(),
+                if (_dob != null)
+                  InkWell(
+                    onTap: () => setState(() => _dob = null),
+                    child: Icon(Icons.clear,
+                        size: 18,
+                        color: scheme.onSurfaceVariant),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   /// Small "Step X of 2" header for the two-step signup flow.
@@ -117,11 +219,18 @@ class _SignupScreenState extends State<SignupScreen> {
       _error = null;
     });
     // The email OTP already verified this address and signed the user in;
-    // just set the password and profile name.
+    // just set the password and profile details.
     final result =
         await AppStateScope.of(context).completeOtpSignup(
       name: name,
       password: password,
+      phone: _phone.text.trim(),
+      gender: _gender,
+      dateOfBirth: _dob == null
+          ? null
+          : '${_dob!.year.toString().padLeft(4, '0')}-'
+              '${_dob!.month.toString().padLeft(2, '0')}-'
+              '${_dob!.day.toString().padLeft(2, '0')}',
     );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -264,6 +373,20 @@ class _SignupScreenState extends State<SignupScreen> {
                                   Icons.person_outline,
                                   size: 18),
                             ),
+                            const SizedBox(height: 14),
+                            RTextField(
+                              label: 'Mobile Number',
+                              hint: '+91 XXXXX XXXXX',
+                              controller: _phone,
+                              keyboardType: TextInputType.phone,
+                              prefixIcon: const Icon(
+                                  Icons.phone_outlined,
+                                  size: 18),
+                            ),
+                            const SizedBox(height: 14),
+                            _genderDropdown(scheme),
+                            const SizedBox(height: 14),
+                            _dobField(scheme),
                             const SizedBox(height: 14),
                             RTextField(
                               label: 'Password',

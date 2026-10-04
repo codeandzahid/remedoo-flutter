@@ -389,6 +389,9 @@ class AppState extends ChangeNotifier {
   Future<AuthResult> completeOtpSignup({
     required String name,
     required String password,
+    String? phone,
+    String? gender,
+    String? dateOfBirth,
   }) async {
     final existing = await _repo.fetchProfile();
     final existingName =
@@ -399,7 +402,23 @@ class AppState extends ChangeNotifier {
     }
     final pw = await AuthService.instance.updatePassword(password);
     if (!pw.ok) return pw;
-    await _repo.saveProfile({'full_name': name});
+    // Store the typed name in the auth user's metadata too, so the app
+    // never falls back to showing the email prefix as the display name.
+    await AuthService.instance.updateUserMetadata({
+      'display_name': name,
+      'full_name': name,
+    });
+    final profile = <String, dynamic>{'full_name': name};
+    if (phone != null && phone.isNotEmpty) profile['phone'] = phone;
+    if (gender != null && gender.isNotEmpty) profile['gender'] = gender;
+    if (dateOfBirth != null && dateOfBirth.isNotEmpty) {
+      profile['date_of_birth'] = dateOfBirth;
+    }
+    await _repo.saveProfile(profile);
+    // Set local fields immediately (no waiting on a profile re-fetch).
+    _name = name;
+    if (phone != null && phone.isNotEmpty) _phone = phone;
+    if (gender != null && gender.isNotEmpty) _gender = gender;
     _syncUserFromSession();
     return const AuthResult.success();
   }
@@ -1234,110 +1253,6 @@ class AppState extends ChangeNotifier {
   // ---------- Seed ----------
 
   void _seed() {
-    final ph = pharmacies[0];
-    final meds = medicinesForPharmacy(ph.id).take(2).toList();
-    final lines = meds.map((m) => CartLine(medicine: m)).toList();
-    final subtotal =
-        lines.fold(0.0, (s, l) => s + l.medicine.price * l.qty);
-    orders.add(MedOrder(
-      id: 'R049B076',
-      pharmacyName: ph.name,
-      items: lines,
-      subtotal: subtotal,
-      deliveryFee: 30,
-      total: subtotal + 30,
-      address: _address,
-      payment: 'Online Payment',
-      placedAt: DateTime.now().subtract(const Duration(hours: 5)),
-      status: 'placed',
-    ));
-    notifications.addAll([
-      AppNotification(
-        id: 'N1',
-        title: 'Order Update',
-        message: '${ph.name} • R049B076 confirmed and being packed',
-        time: DateTime.now().subtract(const Duration(hours: 4)),
-        category: 'orders',
-      ),
-      AppNotification(
-        id: 'N2',
-        title: 'Welcome to Remedoo',
-        message: 'Your health companion is ready. Book your first appointment.',
-        time: DateTime.now().subtract(const Duration(days: 1)),
-        category: 'system',
-        read: true,
-      ),
-    ]);
-    tickets.add(SupportTicket(
-      id: 'T1001',
-      subject: 'How do I upload a prescription?',
-      category: 'Order',
-      description: 'I want to order medicines that need a prescription.',
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      status: 'resolved',
-    ));
-    providerApplications.addAll([
-      ProviderApplication(
-        id: 'PA881100',
-        name: 'Dr. Sameer Koul',
-        email: 'sameer.koul@example.com',
-        phone: '9876543210',
-        role: 'Doctor',
-        license: 'JKMC-45210',
-        date: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      ProviderApplication(
-        id: 'PA881101',
-        name: 'CityCare Diagnostics',
-        email: 'hello@citycare.example.com',
-        phone: '9876543211',
-        role: 'Lab',
-        license: 'LAB-JK-8831',
-        date: DateTime.now().subtract(const Duration(hours: 6)),
-      ),
-    ]);
-    sosAlerts.addAll([
-      SosAlert(
-        id: 'S1',
-        name: 'Rafiq Ahmad',
-        phone: '9906123456',
-        location: 'Dalgate, Srinagar',
-        time: DateTime.now().subtract(const Duration(minutes: 25)),
-      ),
-      SosAlert(
-        id: 'S2',
-        name: 'Priya Sharma',
-        phone: '9419012345',
-        location: 'Gandhi Nagar, Jammu',
-        time: DateTime.now().subtract(const Duration(hours: 2)),
-        status: 'acknowledged',
-      ),
-      SosAlert(
-        id: 'S3',
-        name: 'Mohd Yousuf',
-        phone: '9906987654',
-        location: 'Anantnag',
-        time: DateTime.now().subtract(const Duration(days: 1)),
-        status: 'dispatched',
-      ),
-    ]);
-    refundRequests.addAll([
-      RefundRequest(
-        id: 'RF7001',
-        orderId: 'R049B071',
-        amount: 245,
-        reason: 'Medicines not delivered on time',
-        date: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      RefundRequest(
-        id: 'RF7002',
-        orderId: 'R049B060',
-        amount: 120,
-        reason: 'Wrong item received',
-        date: DateTime.now().subtract(const Duration(days: 3)),
-        status: 'approved',
-      ),
-    ]);
     adminUsers.addAll([
       {'id': 'U1', 'name': 'Zahid Manzoor', 'email': 'zahid391105@gmail.com', 'phone': '9876543210', 'active': '1'},
       {'id': 'U2', 'name': 'Aisha Khan', 'email': 'aisha.k@example.com', 'phone': '9876543211', 'active': '1'},
@@ -1390,79 +1305,6 @@ class AppState extends ChangeNotifier {
       {'id': 'Q1', 'title': 'Book Appointment', 'icon': 'calendar', 'active': '1'},
       {'id': 'Q2', 'title': 'Order Medicines', 'icon': 'pill', 'active': '1'},
     ]);
-    reports.addAll([
-      LabReport(
-        id: 'LR1',
-        patientName: _name,
-        labName: labs[0].name,
-        date: DateTime.now().subtract(const Duration(days: 6)),
-        status: 'Completed',
-        tests: const [
-          {
-            'name': 'Complete Blood Count',
-            'result': '5.1',
-            'unit': '10^9/L',
-            'range': '4.0 - 11.0',
-            'flag': 'Normal'
-          },
-          {
-            'name': 'HbA1c',
-            'result': '6.8',
-            'unit': '%',
-            'range': '4.0 - 5.6',
-            'flag': 'High'
-          },
-          {
-            'name': 'Lipid Profile',
-            'result': '185',
-            'unit': 'mg/dL',
-            'range': '< 200',
-            'flag': 'Normal'
-          },
-        ],
-      ),
-      LabReport(
-        id: 'LR2',
-        patientName: _name,
-        labName: labs[2].name,
-        date: DateTime.now().subtract(const Duration(days: 1)),
-        status: 'In Progress',
-        tests: const [
-          {
-            'name': 'Thyroid Panel (T3/T4/TSH)',
-            'result': '—',
-            'unit': '',
-            'range': '—',
-            'flag': 'Pending'
-          },
-        ],
-      ),
-    ]);
-    deliveries.addAll([
-      DriverDelivery(
-        id: 'D1',
-        orderId: 'R049B076',
-        pharmacy: ph.name,
-        address: _address,
-        amount: subtotal + 30,
-      ),
-      DriverDelivery(
-        id: 'D2',
-        orderId: 'R049B071',
-        pharmacy: pharmacies[3].name,
-        address: 'Rajbagh, Srinagar, J&K 190008',
-        amount: 245,
-        status: 'accepted',
-      ),
-      DriverDelivery(
-        id: 'D3',
-        orderId: 'R049B066',
-        pharmacy: pharmacies[7].name,
-        address: 'Gandhi Nagar, Jammu, J&K 180004',
-        amount: 180,
-        status: 'delivered',
-      ),
-    ]);
   }
 
   // ---------- Roles ----------
@@ -1487,10 +1329,7 @@ class AppState extends ChangeNotifier {
   List<Medicine> get activeMedicines =>
       medicines.where((m) => m.active).toList();
 
-  final List<String> prescriptionsSeed = const [
-    'Rx-2026-0912',
-    'Rx-2026-0820'
-  ];
+  final List<String> prescriptionsSeed = const [];
 
   List<String> get prescriptions => prescriptionsSeed;
 

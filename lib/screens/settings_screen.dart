@@ -13,11 +13,6 @@ import 'orders_screen.dart';
 import 'medical_history_screen.dart';
 import 'favorites_screen.dart';
 import 'refund_tracking_screen.dart';
-import 'roles/doctor_portal_screen.dart';
-import 'roles/driver_portal_screen.dart';
-import 'roles/pharmacy_portal_screen.dart';
-import 'roles/lab_portal_screen.dart';
-import 'roles/hospital_portal_screen.dart';
 
 /// Settings: profile card, quick links, preferences, about, logout.
 class SettingsScreen extends StatelessWidget {
@@ -114,9 +109,6 @@ class SettingsScreen extends StatelessWidget {
                         'Refund Status',
                         () => _go(context,
                             const RefundTrackingScreen())),
-                    _linkData(context, Icons.swap_horiz,
-                        'Switch role (demo)',
-                        () => _roleDialog(context, state)),
                   ]),
                   const SizedBox(height: 20),
                   const Text('Preferences',
@@ -504,60 +496,6 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _roleDialog(BuildContext context, AppState state) {
-    final roles = {
-      'patient': 'Patient',
-      'doctor': 'Doctor Portal',
-      'driver': 'Driver Portal',
-      'pharmacy': 'Pharmacy Portal',
-      'lab': 'Lab Portal',
-      'hospital': 'Hospital Portal',
-    };
-    showResponsiveDialog(
-      context,
-      (_) => AlertDialog(
-        title: const Text('Switch role (demo)'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: roles.entries.map((e) {
-            return ListTile(
-              title: Text(e.value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-              trailing: state.role == e.key
-                  ? Icon(Icons.check,
-                      color: RemedooTheme.primary)
-                  : null,
-              onTap: () {
-                Navigator.pop(context);
-                state.switchRole(e.key);
-                _openPortal(context, e.key);
-              },
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  void _openPortal(BuildContext context, String role) {
-    Widget? page;
-    switch (role) {
-      case 'doctor':
-        page = const DoctorPortalScreen();
-      case 'driver':
-        page = const DriverPortalScreen();
-      case 'pharmacy':
-        page = const PharmacyPortalScreen();
-      case 'lab':
-        page = const LabPortalScreen();
-      case 'hospital':
-        page = const HospitalPortalScreen();
-    }
-    if (page != null) {
-      pushPage(context, page);
-    }
-  }
 }
 
 class _LinkData {
