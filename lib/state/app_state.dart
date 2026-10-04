@@ -1498,25 +1498,35 @@ class AppState extends ChangeNotifier {
     return line.isEmpty ? 0 : line.first.qty;
   }
 
-  void removeFromCart(String medicineId) => changeQty(medicineId, -1);
+  void removeFromCart(String medicineId) {
+    cart.removeWhere((l) => l.medicine.id == medicineId);
+    if (cart.isEmpty) {
+      cartPharmacyId = null;
+      cartPharmacyName = null;
+    }
+    notifyListeners();
+  }
 
   void setDriverOnline(bool v) {
     driverOnline = v;
     notifyListeners();
   }
 
-  void updateProfile({String? name, String? phone, String? address}) {
+  Future<bool> updateProfile(
+      {String? name, String? phone, String? address}) async {
     if (name != null) _name = name;
     if (phone != null) _phone = phone;
     if (address != null) _address = address;
     // Persist to Supabase so the name/phone survive reloads.
+    bool saved = true;
     final fields = <String, dynamic>{};
     if (name != null) fields['full_name'] = name;
     if (phone != null) fields['phone'] = phone;
     if (fields.isNotEmpty) {
-      _repo.saveProfile(fields).then((_) {});
+      saved = await _repo.saveProfile(fields);
     }
     notifyListeners();
+    return saved;
   }
 
   List<String> slotsFor(DateTime day) => timeSlotsFor('', day);

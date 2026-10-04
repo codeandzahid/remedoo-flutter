@@ -218,6 +218,16 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 ],
               ),
             ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => state.deleteReminder(r.id),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.delete_outline,
+                    size: 20, color: Colors.grey),
+              ),
+            ),
           ],
         ),
       ),

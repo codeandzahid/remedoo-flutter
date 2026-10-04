@@ -284,16 +284,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       label: 'Save Changes',
                       icon: Icons.save_outlined,
                       fullWidth: true,
-                      onPressed: () {
-                        state.updateProfile(
+                      onPressed: () async {
+                        final messenger =
+                            ScaffoldMessenger.of(context);
+                        final ok = await state.updateProfile(
                           name: _name.text.trim(),
                           phone: _phone.text.trim(),
                           address: _address.text.trim(),
                         );
+                        if (!mounted) return;
                         setState(() {});
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Profile saved!')),
+                        messenger.showSnackBar(
+                          SnackBar(
+                              content: Text(ok
+                                  ? 'Profile saved!'
+                                  : 'Saved locally; cloud sync failed.')),
                         );
                       },
                     ),
