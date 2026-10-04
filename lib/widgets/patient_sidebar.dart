@@ -4,157 +4,12 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import 'widgets.dart';
 import '../screens/appointments_screen.dart';
-import '../screens/doctors_screen.dart';
 import '../screens/emergency_screen.dart';
 import '../screens/family_screen.dart';
-import '../screens/favorites_screen.dart';
-import '../screens/orders_screen.dart';
-import '../screens/pharmacies_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/login_screen.dart';
 import '../screens/reminders_screen.dart';
-import '../screens/care_match_screen.dart';
 import '../screens/settings_screen.dart';
-
-/// A quick-action tile definition: gradient tile with emoji + label that
-/// pushes a page. Mirrors the React AppSidebar `quickActions` list.
-class QuickActionDef {
-  final String title;
-  final String emoji;
-  final List<Color> gradient;
-  final Widget Function() page;
-
-  /// When true, guests see the tile but tapping it asks them to sign in
-  /// instead of opening the page.
-  final bool requiresLogin;
-
-  const QuickActionDef({
-    required this.title,
-    required this.emoji,
-    required this.gradient,
-    required this.page,
-    this.requiresLogin = false,
-  });
-}
-
-/// The React sidebar's 5 quick actions (gradient color per action).
-List<QuickActionDef> patientQuickActions() => [
-      QuickActionDef(
-        title: 'Book Appointment',
-        emoji: '📅',
-        gradient: [
-          RemedooTheme.primary,
-          RemedooTheme.primary.withValues(alpha: 0.8),
-        ],
-        page: () => const DoctorsScreen(),
-      ),
-      QuickActionDef(
-        title: 'Emergency SOS',
-        emoji: '🚨',
-        gradient: [
-          RemedooTheme.emergency,
-          RemedooTheme.emergency.withValues(alpha: 0.8),
-        ],
-        page: () => const EmergencyScreen(),
-      ),
-      QuickActionDef(
-        title: 'Order Medicines',
-        emoji: '💊',
-        gradient: [
-          RemedooTheme.success,
-          RemedooTheme.success.withValues(alpha: 0.8),
-        ],
-        page: () => const PharmaciesScreen(),
-      ),
-      QuickActionDef(
-        title: 'Favorites',
-        emoji: '❤️',
-        gradient: [
-          RemedooTheme.warning,
-          RemedooTheme.warning.withValues(alpha: 0.8),
-        ],
-        page: () => const FavoritesScreen(),
-        requiresLogin: true,
-      ),
-      QuickActionDef(
-        title: 'My Orders',
-        emoji: '🛍️',
-        gradient: [
-          RemedooTheme.primary,
-          RemedooTheme.success.withValues(alpha: 0.8),
-        ],
-        page: () => const OrdersScreen(),
-        requiresLogin: true,
-      ),
-      QuickActionDef(
-        title: 'Smart Care',
-        emoji: '✨',
-        gradient: [
-          RemedooTheme.primary,
-          RemedooTheme.primaryDark,
-        ],
-        page: () => const CareMatchScreen(),
-      ),
-    ];
-
-/// "⚡ QUICK ACTIONS" label + 2-column gradient tile grid, as in the React
-/// sidebar. Used both in the phone drawer and the desktop permanent drawer.
-class RQuickActionsGrid extends StatelessWidget {
-  final void Function(Widget page) onPush;
-
-  const RQuickActionsGrid({super.key, required this.onPush});
-
-  @override
-  Widget build(BuildContext context) {
-    // Guests never see the Book Appointment tile.
-    final signedIn = AppStateScope.of(context).isSignedIn;
-    final actions = !signedIn
-        ? patientQuickActions()
-            .where((a) => a.title != 'Book Appointment')
-            .toList()
-        : patientQuickActions();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const RSidebarGroupLabel('⚡ QUICK ACTIONS'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              // Taller than wide: the emoji + two-line label must fit
-              // without overflowing at phone drawer widths.
-              childAspectRatio: 1.25,
-            ),
-            itemCount: actions.length,
-            itemBuilder: (c, i) {
-              final a = actions[i];
-              return RSidebarQuickTile(
-                emoji: a.emoji,
-                label: a.title,
-                gradient: a.gradient,
-                onTap: () {
-                  if (a.requiresLogin &&
-                      !checkLogin(c,
-                          'Please login to access ${a.title.toLowerCase()}')) {
-                    return;
-                  }
-                  onPush(a.page());
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _NavDef {
   final String title;
   final IconData icon;
@@ -193,8 +48,102 @@ List<_NavDef> _patientNav() => const [
           requiresLogin: true),
     ];
 
-/// Complete patient sidebar: gradient Close button, Quick Actions gradient
-/// tile grid, and the Navigate section — 1:1 with the React AppSidebar.
+/// Patient profile header: avatar + name at the top of the sidebar.
+/// Tapping opens the Profile screen (or login for guests).
+class RSidebarProfileHeader extends StatelessWidget {
+  final VoidCallback onClose;
+  final void Function(Widget page) onPush;
+
+  const RSidebarProfileHeader({
+    super.key,
+    required this.onClose,
+    required this.onPush,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppStateScope.of(context);
+    final signedIn = state.isSignedIn;
+    final name = signedIn ? state.userName : 'Guest';
+    final scheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        onClose();
+        if (signedIn) {
+          onPush(const ProfileScreen());
+        } else {
+          onPush(const LoginScreen());
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scheme.primary.withValues(alpha: 0.15),
+              scheme.primary.withValues(alpha: 0.05),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: scheme.primary.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            RAvatarCircle(name: name, size: 52),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    signedIn ? 'Welcome back,' : 'Welcome,',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (!signedIn)
+                    Text(
+                      'Tap to sign in',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: scheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Complete patient sidebar: gradient Close button, patient profile header
+/// (avatar + name), and the Navigate section.
 /// [onClose] dismisses the drawer; [onPush] pushes a page (called after the
 /// drawer is closed, matching the React close-then-navigate behavior).
 class RPatientSidebar extends StatelessWidget {
@@ -229,10 +178,10 @@ class RPatientSidebar extends StatelessWidget {
               RSidebarCloseButton(onPressed: onClose),
               const SizedBox(height: 24),
             ],
-            RQuickActionsGrid(onPush: (page) {
-              onClose();
-              onPush(page);
-            }),
+            RSidebarProfileHeader(
+              onClose: onClose,
+              onPush: onPush,
+            ),
             const SizedBox(height: 24),
             const RSidebarGroupLabel('🧭 NAVIGATE'),
             Padding(
