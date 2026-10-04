@@ -810,6 +810,19 @@ class SupabaseRepository {
     }
   }
 
+  /// Admin update of an appointment (e.g. status).
+  Future<bool> adminUpdateAppointment(
+      String id, Map<String, dynamic> fields) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('appointments').update(fields).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('adminUpdateAppointment failed: $e');
+      return false;
+    }
+  }
+
   /// Admin update of an order (e.g. status).
   Future<bool> adminUpdateOrder(
       String id, Map<String, dynamic> fields) async {

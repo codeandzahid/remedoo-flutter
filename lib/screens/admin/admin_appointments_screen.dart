@@ -128,9 +128,44 @@ class _AdminAppointmentsScreenState
               style: TextStyle(
                   fontSize: 12,
                   color: scheme.onSurfaceVariant)),
-          trailing: StatusChip(status: '${a['status'] ?? ''}'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              StatusChip(status: '${a['status'] ?? ''}'),
+              if ('${a['status'] ?? ''}' != 'cancelled' &&
+                  '${a['status'] ?? ''}' != 'completed') ...[
+                IconButton(
+                  icon: Icon(Icons.cancel_outlined,
+                      color: Theme.of(context).colorScheme.error,
+                      size: 20),
+                  tooltip: 'Cancel appointment',
+                  onPressed: () => _confirmCancel(a),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Future<void> _confirmCancel(Map<String, dynamic> a) async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Cancel appointment?',
+      message:
+          'This will mark the appointment as cancelled for the patient.',
+      confirmLabel: 'Cancel appointment',
+    );
+    if (!ok || !mounted) return;
+    final done = await AppStateScope.of(context)
+        .updateAdminAppointment('${a['id']}', {'status': 'cancelled'});
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(done
+              ? 'Appointment cancelled.'
+              : 'Could not cancel. Try again.')),
     );
   }
 }

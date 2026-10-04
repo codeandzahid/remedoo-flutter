@@ -1826,6 +1826,18 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> updateAdminAppointment(
+      String id, Map<String, dynamic> fields) async {
+    final ok = await _repo.adminUpdateAppointment(id, fields);
+    if (ok) {
+      for (final a in _adminAppointments) {
+        if ('${a['id']}' == id) a.addAll(fields);
+      }
+      notifyListeners();
+    }
+    return ok;
+  }
+
   final List<Map<String, dynamic>> _supportTickets = [];
 
   List<Map<String, dynamic>> get supportTickets => _supportTickets;
