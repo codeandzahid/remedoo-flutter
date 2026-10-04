@@ -317,7 +317,7 @@ class _DonutPainter extends CustomPainter {
       case 'out_for_delivery':
         return RemedooTheme.primary;
       case 'packed':
-        return Colors.orange;
+        return RemedooTheme.warning;
       default:
         return RemedooTheme.purple;
     }

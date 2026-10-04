@@ -123,14 +123,7 @@ class InitialsAvatar extends StatelessWidget {
 
   const InitialsAvatar({super.key, required this.name, this.radius = 28});
 
-  static const _palette = [
-    Color(0xFFEC6A13),
-    Color(0xFF3B82F6),
-    Color(0xFF8B5CF6),
-    Color(0xFF2E9E6B),
-    Color(0xFFDE3F3F),
-    Color(0xFF0E9F8A),
-  ];
+
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +131,7 @@ class InitialsAvatar extends StatelessWidget {
     final initials = parts.length >= 2
         ? '${parts[0][0]}${parts[1][0]}'
         : name.substring(0, 1);
-    final color = _palette[name.hashCode.abs() % _palette.length];
+    final color = RemedooTheme.primary;
     return CircleAvatar(
       radius: radius,
       backgroundColor: color.withValues(alpha: 0.14),
@@ -707,7 +700,7 @@ class _ReviewDialogState extends State<ReviewDialog> {
               return IconButton(
                 icon: Icon(
                   i < _stars ? Icons.star : Icons.star_border,
-                  color: Colors.amber.shade700,
+                  color: RemedooTheme.primary,
                   size: 32,
                 ),
                 onPressed: () => setState(() => _stars = i + 1),
@@ -1450,6 +1443,129 @@ class RHospitalCard extends StatelessWidget {
   }
 }
 
+/// Dense list row for the compact UI: leading avatar, title, subtitle,
+/// meta line, optional trailing action. Rows are grouped in [RDenseGroup].
+class RDenseRow extends StatelessWidget {
+  final VoidCallback? onTap;
+  final Widget leading;
+  final String title;
+  final String? subtitle;
+  final Widget? meta;
+  final Widget? trailing;
+
+  const RDenseRow({
+    super.key,
+    this.onTap,
+    required this.leading,
+    required this.title,
+    this.subtitle,
+    this.meta,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            leading,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: RemedooTheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  if (meta != null) ...[
+                    const SizedBox(height: 2),
+                    meta!,
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 8),
+              trailing!,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact "star rating · detail · detail" meta line for dense rows.
+class RDenseMeta extends StatelessWidget {
+  final double rating;
+  final List<String> parts;
+
+  const RDenseMeta(
+      {super.key, required this.rating, this.parts = const []});
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Row(
+      children: [
+        RStarRating(rating: rating, size: 12),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            parts.join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: muted),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One card holding dense rows separated by dividers — the compact UI's
+/// replacement for grids of big cards.
+class RDenseGroup extends StatelessWidget {
+  final List<Widget> rows;
+
+  const RDenseGroup({super.key, required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    return RCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (int i = 0; i < rows.length; i++) ...[
+            rows[i],
+            if (i < rows.length - 1)
+              const Divider(height: 1, indent: 70),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// White card: 18px radius, thin warm-gray border, soft subtle shadow.
 class RCard extends StatelessWidget {
   final Widget child;
@@ -1756,8 +1872,8 @@ class RPromoBanner extends StatelessWidget {
   }
 }
 
-/// Orange ribbon badge overlaid at the bottom of a listing image header
-/// (e.g. "ICU Available 24/7", "Government Hospital").
+/// Theme-tinted ribbon badge overlaid at the bottom of a listing image
+/// header (e.g. "ICU Available 24/7", "Government Hospital").
 class RRibbon extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -1773,11 +1889,11 @@ class RRibbon extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
-          colors: [Color(0xFFF2790F), Color(0xFFEC6A13)],
+          colors: [RemedooTheme.primary, RemedooTheme.primaryDark],
         ),
       ),
       child: Row(

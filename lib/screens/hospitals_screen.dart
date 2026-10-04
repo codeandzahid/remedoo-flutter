@@ -9,7 +9,6 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'hospital_detail_screen.dart';
-import 'booking_screen.dart';
 
 const _filters = [
   'Relevance',
@@ -116,17 +115,6 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
     return list;
   }
 
-  double _aspectFor(double maxWidth, BuildContext context) {
-    final cols = const ResponsiveValue<int>(
-      compact: 1,
-      medium: 2,
-      expanded: 3,
-      wide: 4,
-    ).of(context);
-    final cellW = (maxWidth - 32 - 12 * (cols - 1)) / cols;
-    // Card: 130px image header + ~152px content.
-    return (cellW / 282).clamp(0.6, 3.0);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -252,30 +240,26 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
   }
 
   Widget _resultsBody(List<Hospital> list) {
-    Widget grid({
+    Widget denseList({
       required int itemCount,
       required Widget Function(BuildContext, int) itemBuilder,
     }) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          return ResponsiveGrid(
-            compactCols: 1,
-            mediumCols: 2,
-            expandedCols: 3,
-            wideCols: 4,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            childAspectRatio: _aspectFor(constraints.maxWidth, context),
-            itemCount: itemCount,
-            itemBuilder: itemBuilder,
-          );
-        },
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          RDenseGroup(
+            rows: [
+              for (int i = 0; i < itemCount; i++) itemBuilder(context, i),
+            ],
+          ),
+        ],
       );
     }
 
     if (_loading) {
-      return grid(
+      return denseList(
         itemCount: 6,
-        itemBuilder: (_, _) => const SkeletonCard(height: 150),
+        itemBuilder: (_, _) => const SkeletonCard(height: 64),
       );
     }
     if (list.isEmpty) {
@@ -290,7 +274,7 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
         await Future.delayed(const Duration(milliseconds: 600));
         if (mounted) setState(() {});
       },
-      child: grid(
+      child: denseList(
         itemCount: list.length,
         itemBuilder: (_, i) =>
             StaggerItem(index: i % 6, child: _card(list[i])),
@@ -299,34 +283,33 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
   }
 
   Widget _card(Hospital h) {
-    void openDetail() {
-      if (!checkLogin(context, 'Please login to view details')) return;
-      pushPage(context, HospitalDetailScreen(hospital: h));
-    }
-
-    return RHospitalCard(
-      hospital: h,
-      hideBooking: !AppStateScope.of(context).isSignedIn,
-      trailing: FavoriteButton(favKey: 'hospital:${h.id}'),
-      onTap: openDetail,
-      onView: openDetail,
-      onBook: () {
-        if (!checkLogin(context, 'Please login to book appointments')) return;
-        pushPage(
-          context,
-          BookingScreen(
-            kind: 'hospital',
-            refId: h.id,
-            title: h.name,
-            subtitle: 'General Consultation',
-            place: h.location,
-            fee: 300,
-          ),
-        );
+    final scheme = Theme.of(context).colorScheme;
+    return RDenseRow(
+      leading: RAvatarCircle(
+          name: h.name, size: 46, icon: Icons.local_hospital),
+      title: h.name,
+      subtitle: h.location,
+      meta: RDenseMeta(
+        rating: h.rating,
+        parts: [
+          '${h.beds} beds',
+          h.government ? 'Government' : 'Private',
+        ],
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FavoriteButton(favKey: 'hospital:${h.id}'),
+          Icon(Icons.chevron_right,
+              color: scheme.onSurfaceVariant),
+        ],
+      ),
+      onTap: () {
+        if (!checkLogin(context, 'Please login to view details')) return;
+        pushPage(context, HospitalDetailScreen(hospital: h));
       },
     );
   }
-
 }
 
 /// Circular back button on a muted circle, like the React listing headers.

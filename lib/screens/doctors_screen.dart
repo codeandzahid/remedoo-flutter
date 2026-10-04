@@ -45,26 +45,15 @@ class _BannerData {
   const _BannerData(this.emoji, this.title, this.subtitle, this.gradient);
 }
 
-const _violetGradient = LinearGradient(
-  begin: Alignment.centerLeft,
-  end: Alignment.centerRight,
-  colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
-);
-
-const _amberGradient = LinearGradient(
-  begin: Alignment.centerLeft,
-  end: Alignment.centerRight,
-  colors: [Color(0xFFF97316), Color(0xFFD97706)],
-);
-
-const _banners = [
-  _BannerData('🩺', 'Flat 30% OFF', 'On first doctor consultation',
-      RemedooTheme.promoTealGradient),
-  _BannerData('⚡', 'Instant Booking', 'No waiting, confirm in seconds',
-      _violetGradient),
-  _BannerData('📞', 'Free Follow-up', 'Within 7 days of consultation',
-      _amberGradient),
-];
+/// Promo banners tinted by the active theme.
+List<_BannerData> get _banners => [
+      _BannerData('🩺', 'Flat 30% OFF', 'On first doctor consultation',
+          RemedooTheme.bannerGradientA),
+      _BannerData('⚡', 'Instant Booking', 'No waiting, confirm in seconds',
+          RemedooTheme.bannerGradientB),
+      _BannerData('📞', 'Free Follow-up', 'Within 7 days of consultation',
+          RemedooTheme.bannerGradientC),
+    ];
 
 /// Doctor directory with search, filters and sorting.
 class DoctorsScreen extends StatefulWidget {
@@ -194,34 +183,23 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                                   ),
                                 ],
                               )
-                            : context.isCompact
-                                ? ListView.separated(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        16, 0, 16, 16),
-                                    itemCount: list.length,
-                                    separatorBuilder: (_, _) =>
-                                        const SizedBox(height: 12),
-                                    itemBuilder: (_, i) => StaggerItem(
-                                      index: i % 6,
-                                      child: _doctorCard(list[i], state),
-                                    ),
-                                  )
-                                : ResponsiveGrid(
-                                    compactCols: 1,
-                                    mediumCols: 2,
-                                    expandedCols: 2,
-                                    wideCols: 3,
-                                    padding: const EdgeInsets.fromLTRB(
-                                        16, 0, 16, 16),
-                                    // Taller cells: the new cards carry a 120px
-                                    // photo header + content + CTA (~300px).
-                                    childAspectRatio: 0.9,
-                                    itemCount: list.length,
-                                    itemBuilder: (_, i) => StaggerItem(
-                                      index: i % 6,
-                                      child: _doctorCard(list[i], state),
+                            : ListView(
+                                padding: const EdgeInsets.fromLTRB(
+                                    16, 0, 16, 16),
+                                children: [
+                                  StaggerItem(
+                                    index: 0,
+                                    child: RDenseGroup(
+                                      rows: [
+                                        for (int i = 0;
+                                            i < list.length;
+                                            i++)
+                                          _doctorRow(list[i], state),
+                                      ],
                                     ),
                                   ),
+                                ],
+                              ),
                       ),
               ),
             ],
@@ -443,17 +421,27 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     );
   }
 
-  Widget _doctorCard(Doctor d, AppState state) {
-    void openDetail() {
-      if (!checkLogin(context, 'Please login to view details')) return;
-      pushPage(context, DoctorDetailScreen(doctor: d));
-    }
-
-    return RDoctorCard(
-      doctor: d,
-      trailing: _favButton(state, d),
-      onTap: openDetail,
-      onVisit: openDetail,
+  Widget _doctorRow(Doctor d, AppState state) {
+    final scheme = Theme.of(context).colorScheme;
+    return RDenseRow(
+      leading: RAvatarCircle(name: d.name, size: 46),
+      title: d.name,
+      subtitle: d.specialty,
+      meta: RDenseMeta(
+        rating: d.rating,
+        parts: ['${d.expYears} yrs exp', inr(d.fee)],
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _favButton(state, d),
+          Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+        ],
+      ),
+      onTap: () {
+        if (!checkLogin(context, 'Please login to view details')) return;
+        pushPage(context, DoctorDetailScreen(doctor: d));
+      },
     );
   }
 

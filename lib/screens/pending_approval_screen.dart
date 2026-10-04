@@ -34,7 +34,7 @@ class PendingApprovalScreen extends StatelessWidget {
                         color: RemedooTheme.warning
                             .withValues(alpha: 0.12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.access_time_rounded,
                         size: 32,
                         color: RemedooTheme.warning,

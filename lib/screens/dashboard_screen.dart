@@ -675,83 +675,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Dense "Doctors near you": one card with compact divided rows so
   /// more doctors fit on screen.
   Widget _doctorRows(List<Doctor> list) {
-    final docs = list.take(4).toList();
-    return RCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          for (int i = 0; i < docs.length; i++) ...[
-            _doctorRow(docs[i]),
-            if (i < docs.length - 1)
-              const Divider(height: 1, indent: 70),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _doctorRow(Doctor d) {
     final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: () =>
-          _goGated(DoctorDetailScreen(doctor: d), 'Please login to view details'),
-      child: Padding(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            RAvatarCircle(name: d.name, size: 46),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    d.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 14),
-                  ),
-                  Text(
-                    d.specialty,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: RemedooTheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      RStarRating(rating: d.rating, size: 12),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${d.expYears} yrs exp',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: scheme.onSurfaceVariant),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        inr(d.fee),
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: scheme.onSurface),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+    return RDenseGroup(
+      rows: [
+        for (final d in list.take(4))
+          RDenseRow(
+            leading: RAvatarCircle(name: d.name, size: 46),
+            title: d.name,
+            subtitle: d.specialty,
+            meta: RDenseMeta(
+              rating: d.rating,
+              parts: ['${d.expYears} yrs exp', inr(d.fee)],
             ),
-            Icon(Icons.chevron_right,
+            trailing: Icon(Icons.chevron_right,
                 color: scheme.onSurfaceVariant),
-          ],
-        ),
-      ),
+            onTap: () => _goGated(DoctorDetailScreen(doctor: d),
+                'Please login to view details'),
+          ),
+      ],
     );
   }
 

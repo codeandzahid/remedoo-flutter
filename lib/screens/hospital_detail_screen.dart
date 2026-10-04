@@ -203,8 +203,9 @@ class HospitalDetailScreen extends StatelessWidget {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const Icon(Icons.star,
-                                size: 15, color: RemedooTheme.warning),
+                            Icon(Icons.star,
+                                size: 15,
+                                color: RemedooTheme.warning),
                             const SizedBox(width: 4),
                             Text(h.rating.toStringAsFixed(1),
                                 style: const TextStyle(
@@ -370,10 +371,9 @@ class HospitalDetailScreen extends StatelessWidget {
                                       const SizedBox(height: 3),
                                       Row(
                                         children: [
-                                          const Icon(Icons.star,
+                                          Icon(Icons.star,
                                               size: 12,
-                                              color:
-                                                  RemedooTheme.warning),
+                                              color: RemedooTheme.warning),
                                           const SizedBox(width: 3),
                                           Text(
                                               d.rating.toStringAsFixed(1),

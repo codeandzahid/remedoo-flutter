@@ -111,17 +111,6 @@ class _LabsScreenState extends State<LabsScreen> {
     return list;
   }
 
-  double _aspectFor(double maxWidth, BuildContext context) {
-    final cols = const ResponsiveValue<int>(
-      compact: 1,
-      medium: 2,
-      expanded: 3,
-      wide: 4,
-    ).of(context);
-    final cellW = (maxWidth - 32 - 12 * (cols - 1)) / cols;
-    // Card: 130px image header + ~104px content.
-    return (cellW / 234).clamp(0.6, 3.0);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -247,30 +236,26 @@ class _LabsScreenState extends State<LabsScreen> {
   }
 
   Widget _resultsBody(List<Lab> list) {
-    Widget grid({
+    Widget denseList({
       required int itemCount,
       required Widget Function(BuildContext, int) itemBuilder,
     }) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          return ResponsiveGrid(
-            compactCols: 1,
-            mediumCols: 2,
-            expandedCols: 3,
-            wideCols: 4,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            childAspectRatio: _aspectFor(constraints.maxWidth, context),
-            itemCount: itemCount,
-            itemBuilder: itemBuilder,
-          );
-        },
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          RDenseGroup(
+            rows: [
+              for (int i = 0; i < itemCount; i++) itemBuilder(context, i),
+            ],
+          ),
+        ],
       );
     }
 
     if (_loading) {
-      return grid(
+      return denseList(
         itemCount: 6,
-        itemBuilder: (_, _) => const SkeletonCard(height: 150),
+        itemBuilder: (_, _) => const SkeletonCard(height: 64),
       );
     }
     if (list.isEmpty) {
@@ -285,7 +270,7 @@ class _LabsScreenState extends State<LabsScreen> {
         await Future.delayed(const Duration(milliseconds: 600));
         if (mounted) setState(() {});
       },
-      child: grid(
+      child: denseList(
         itemCount: list.length,
         itemBuilder: (_, i) =>
             StaggerItem(index: i % 6, child: _card(list[i])),
@@ -294,163 +279,53 @@ class _LabsScreenState extends State<LabsScreen> {
   }
 
   Widget _card(Lab l) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     final comparing = _compareA != null;
-    return RCard(
-      padding: EdgeInsets.zero,
+    final selected = _compareA?.id == l.id;
+    return RDenseRow(
+      leading: RAvatarCircle(
+          name: l.name, size: 46, icon: Icons.science_outlined),
+      title: l.name,
+      subtitle: l.location,
+      meta: RDenseMeta(
+        rating: l.rating,
+        parts: [
+          '${l.testCount} tests',
+          'Report in ${l.turnaround}',
+          if (l.offers > 0) '${l.offers} offers',
+        ],
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FavoriteButton(favKey: 'lab:${l.id}'),
+          IconButton(
+            tooltip: selected ? 'Cancel compare' : 'Compare',
+            icon: Icon(
+              Icons.compare_arrows,
+              color: selected
+                  ? RemedooTheme.primary
+                  : scheme.onSurfaceVariant,
+              size: 20,
+            ),
+            onPressed: () => setState(
+                () => _compareA = selected ? null : l),
+          ),
+          Icon(Icons.chevron_right,
+              color: scheme.onSurfaceVariant),
+        ],
+      ),
       onTap: () {
-        if (comparing && _compareA!.id != l.id) {
+        if (comparing && !selected) {
           LabCompareSheet.show(context, _compareA!, l);
           setState(() => _compareA = null);
         } else {
-          if (!checkLogin(context, 'Please login to view details')) return;
+          if (!checkLogin(context, 'Please login to view details')) {
+            return;
+          }
           pushPage(context, LabDetailScreen(lab: l));
         }
       },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: 130,
-            child: Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: dark
-                        ? RemedooTheme.darkSecondary
-                        : const Color(0xFFEAF6F4),
-                    borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(RemedooRadius.card)),
-                  ),
-                  child: const Center(
-                    child: Text('🔬', style: TextStyle(fontSize: 60)),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x1A000000),
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: FavoriteButton(favKey: 'lab:${l.id}'),
-                    ),
-                  ),
-                ),
-                if (l.offers > 0)
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: RRibbon(
-                        label: '${l.offers} offers on tests',
-                        icon: Icons.percent),
-                  ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Text(l.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14)),
-                          ),
-                          if (l.verified) ...[
-                            const SizedBox(width: 4),
-                            Icon(Icons.verified,
-                                size: 16, color: RemedooTheme.primary),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    RRatingPill(rating: l.rating),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(l.location,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 12.5,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant)),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.only(top: 8),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: BorderSide(
-                          color: Theme.of(context).dividerColor),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      RStat(
-                          icon: Icons.access_time,
-                          text: 'Report in ${l.turnaround}'),
-                      _dot(),
-                      RStat(
-                          icon: Icons.science_outlined,
-                          text: '${l.testCount} tests'),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () => setState(() => _compareA =
-                            _compareA?.id == l.id ? null : l),
-                        child: Text(
-                          _compareA?.id == l.id
-                              ? 'Cancel'
-                              : 'Compare',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _dot() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Text('•',
-          style: TextStyle(
-              color:
-                  Theme.of(context).colorScheme.onSurfaceVariant)),
     );
   }
 }

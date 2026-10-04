@@ -250,7 +250,9 @@ class RemedooTheme {
   static Color get accent => _pack.accent;
   static Color get accentForeground => _pack.accentForeground;
   static const Color success = Color(0xFF2BAD6E);
-  static const Color warning = Color(0xFFF5A623);
+  /// Warning/pending accent — follows the active theme instead of a
+  /// hardcoded amber, so no orange survives a theme switch.
+  static Color get warning => primary;
   static const Color destructive = Color(0xFFDE3F3F);
   static const Color emergency = Color(0xFFEE2B2B);
 
