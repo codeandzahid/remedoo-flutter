@@ -1,22 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../responsive/responsive.dart';
-import '../responsive/animations.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
-import '../widgets/patient_sidebar.dart';
 import 'dashboard_screen.dart';
 import 'doctors_screen.dart';
 import 'hospitals_screen.dart';
 import 'labs_screen.dart';
 import 'orders_screen.dart';
 import 'pharmacies_screen.dart';
-import 'favorites_screen.dart';
-import 'appointments_screen.dart';
-import 'family_screen.dart';
-import 'reminders_screen.dart';
-import 'profile_screen.dart';
 
 /// Adaptive shell: floating white bottom bar on phones (the React 5-tab set:
 /// Home / Hospitals / Labs / Pharmacy / Orders), rail on tablets, permanent
@@ -71,17 +64,6 @@ class _MainShellState extends State<MainShell> {
 
   /// Drawer navigation with the reference-style guest gate: toast + redirect
   /// to login for Favorites, Orders, Appointments, Family, Reminders, Profile.
-  void _pushDrawer(BuildContext context, Widget page) {
-    if (page is FavoritesScreen ||
-        page is OrdersScreen ||
-        page is AppointmentsScreen ||
-        page is FamilyScreen ||
-        page is RemindersScreen ||
-        page is ProfileScreen) {
-      if (!checkLogin(context)) return;
-    }
-    pushPage(context, page);
-  }
 
   List<NavDestinationItem> _destinations(AppState state) => [
         const NavDestinationItem(
@@ -185,9 +167,6 @@ class _MainShellState extends State<MainShell> {
       sections: [NavSection('', _destinations(state))],
       pages: _pages,
       drawerHeader: _drawerHeader(context),
-      drawerLeading: RQuickActionsGrid(
-        onPush: (page) => _pushDrawer(context, page),
-      ),
       floatingActionButton: _supportFab(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
