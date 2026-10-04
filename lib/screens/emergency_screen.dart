@@ -29,9 +29,26 @@ const _emergencyGradient = LinearGradient(
 class EmergencyScreen extends StatelessWidget {
   const EmergencyScreen({super.key});
 
+  IconData _iconFor(String label) {
+    final l = label.toLowerCase();
+    if (l.contains('ambulance')) return Icons.emergency;
+    if (l.contains('women')) return Icons.woman;
+    if (l.contains('police')) return Icons.local_police;
+    if (l.contains('fire')) return Icons.local_fire_department;
+    if (l.contains('child')) return Icons.child_care;
+    if (l.contains('disaster')) return Icons.warning;
+    return Icons.phone;
+  }
+
   @override
   Widget build(BuildContext context) {
     final nearby = hospitals.take(4).toList();
+    // Quick contacts are admin-controlled (Settings > App Settings >
+    // Emergency Numbers); fall back to the built-in list.
+    final state = AppStateScope.of(context);
+    final contacts = state.emergencyNumbers.isNotEmpty
+        ? state.emergencyNumbers
+        : _quickContacts.map((c) => (c.$1, c.$2)).toList();
     return Scaffold(
       body: Column(
         children: [
@@ -121,7 +138,7 @@ class EmergencyScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   Center(
                     child: Text(
-                      'Calls 112 · Your location will be shared if available',
+                      'Calls ${contacts.isNotEmpty ? contacts.first.$2 : '112'} · Your location will be shared if available',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 12,
@@ -146,11 +163,11 @@ class EmergencyScreen extends StatelessWidget {
                       crossAxisSpacing: 10,
                       childAspectRatio: 1.6,
                     ),
-                    itemCount: _quickContacts.length,
+                    itemCount: contacts.length,
                     itemBuilder: (_, i) {
-                      final name = _quickContacts[i].$1;
-                      final number = _quickContacts[i].$2;
-                      final icon = _quickContacts[i].$3;
+                      final name = contacts[i].$1;
+                      final number = contacts[i].$2;
+                      final icon = _iconFor(name);
                       return StaggerItem(
                         index: i % 6,
                         child: RCard(
@@ -320,19 +337,22 @@ class EmergencyScreen extends StatelessWidget {
 
 
   void _sosConfirm(BuildContext context) {
+    final state = AppStateScope.of(context);
+    final numbers = state.emergencyNumbers;
+    final primary = numbers.isNotEmpty ? numbers.first.$2 : '112';
     showResponsiveDialog(
       context,
       (_) => AlertDialog(
         title: const Text('Call emergency services?'),
-        content: const Text(
-            'This will dial 112 and share your location with responders. (demo — no actual call is made)'),
+        content: Text(
+            'This will dial $primary and share your location with responders. ${state.sosMessage} (demo — no actual call is made)'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           RButton(
-            label: 'Call 112',
+            label: 'Call $primary',
             variant: RButtonVariant.danger,
             small: true,
             onPressed: () {

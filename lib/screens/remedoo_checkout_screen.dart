@@ -36,8 +36,11 @@ class _RemedooCheckoutScreenState
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final subtotal = state.cartTotal;
-    // Matches React RemedooCheckout: free delivery above ₹499.
-    final delivery = subtotal >= 499 ? 0.0 : 30.0;
+    // Delivery fee + free-delivery threshold are admin-controlled
+    // (Settings > App Settings).
+    final delivery = subtotal >= state.freeDeliveryThreshold
+        ? 0.0
+        : state.deliveryFee;
     final total = subtotal + delivery;
     final hasRx =
         state.cartLines.any((l) => l.medicine.rxRequired);
@@ -143,7 +146,7 @@ class _RemedooCheckoutScreenState
         );
         return;
       }
-      final total = state.cartTotal + 30.0; // + delivery
+      final total = state.cartTotal + state.deliveryFee; // + delivery
       final orderId = 'ORD${DateTime.now().millisecondsSinceEpoch}';
       showUpiPaymentSheet(
         context,
@@ -265,7 +268,7 @@ class _RemedooCheckoutScreenState
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                'Add ${inr(499 - subtotal)} more for free delivery',
+                'Add ${inr(state.freeDeliveryThreshold - subtotal)} more for free delivery',
                 style: TextStyle(
                     fontSize: 10.5,
                     color: scheme.onSurfaceVariant),

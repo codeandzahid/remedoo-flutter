@@ -69,6 +69,8 @@ class AppState extends ChangeNotifier {
     // Admin-controlled app config: branding, fees, emergency numbers,
     // maintenance mode (also for guests).
     unawaited(loadAppConfig());
+    // Admin announcements shown in-app.
+    unawaited(loadLatestAnnouncements());
     // AppState lives for the whole app lifetime, so the subscription is
     // intentionally never cancelled.
     AuthService.instance.authStateChanges.listen((data) {
@@ -1574,7 +1576,73 @@ class AppState extends ChangeNotifier {
     _appConfig
       ..clear()
       ..addAll(cfg);
+    // Apply maintenance mode immediately (RootGate gates on it).
+    final maint = cfg['maintenance'];
+    if (maint is Map<String, dynamic>) {
+      _maintenanceMode = maint['enabled'] == true;
+    }
     notifyListeners();
+  }
+
+  /// Delivery fee from admin Settings (fees.delivery_fee), default ₹30.
+  double get deliveryFee =>
+      ((appConfigValue('fees')['delivery_fee'] as num?)?.toDouble() ??
+          30);
+
+  /// Free-delivery threshold from admin Settings, default ₹499.
+  double get freeDeliveryThreshold =>
+      ((appConfigValue('fees')['free_delivery_threshold'] as num?)
+              ?.toDouble() ??
+          499);
+
+  /// Emergency numbers from admin Settings (emergency.numbers).
+  List<(String, String)> get emergencyNumbers {
+    final raw = appConfigValue('emergency')['numbers'];
+    if (raw is List && raw.isNotEmpty) {
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map((m) => (
+                '${m['label'] ?? 'Emergency'}',
+                '${m['number'] ?? ''}'
+              ))
+          .where((e) => e.$2.isNotEmpty)
+          .toList();
+    }
+    return const [
+      ('Ambulance', '108'),
+      ('Emergency', '112'),
+    ];
+  }
+
+  /// SOS message from admin Settings.
+  String get sosMessage =>
+      '${appConfigValue('emergency')['sos_message'] ?? 'Emergency! I need help.'}';
+
+  /// Support contact from admin Settings.
+  String get supportPhone =>
+      '${appConfigValue('support')['phone'] ?? ''}';
+  String get supportEmail =>
+      '${appConfigValue('support')['email'] ?? 'support@remedoo.app'}';
+
+  // ---------- Announcements (admin broadcast -> in-app) ----------
+
+  List<Map<String, dynamic>> _latestAnnouncements = [];
+
+  List<Map<String, dynamic>> get latestAnnouncements =>
+      _latestAnnouncements;
+
+  Future<void> loadLatestAnnouncements() async {
+    _latestAnnouncements =
+        await _repo.fetchLatestAnnouncements();
+    notifyListeners();
+  }
+
+  /// Dismisses an announcement for this session.
+  void dismissAnnouncement(int index) {
+    if (index >= 0 && index < _latestAnnouncements.length) {
+      _latestAnnouncements.removeAt(index);
+      notifyListeners();
+    }
   }
 
   Future<bool> saveAppConfigValue(

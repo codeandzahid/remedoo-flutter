@@ -121,6 +121,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Admin announcements (Content > Announcements).
+                          if (state.latestAnnouncements.isNotEmpty)
+                            StaggerItem(
+                              index: 0,
+                              child:
+                                  _announcementBanner(state),
+                            ),
+                          if (state.latestAnnouncements.isNotEmpty)
+                            const SizedBox(height: 14),
                           StaggerItem(index: 0, child: _categories()),
                           const SizedBox(height: 14),
                           StaggerItem(index: 1, child: _illustratedBanner()),
@@ -459,6 +468,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   /// Compact illustrated promo banner carousel: theme-tinted gradient,
   /// soft decorative circles, emoji artwork, dot indicators.
+  /// Dismissible banner showing the latest admin announcement.
+  Widget _announcementBanner(AppState state) {
+    final a = state.latestAnnouncements.first;
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.campaign_outlined,
+                color: scheme.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${a['title'] ?? 'Announcement'}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                if ('${a['message'] ?? ''}'.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '${a['message']}',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            onPressed: () => state.dismissAnnouncement(0),
+            tooltip: 'Dismiss',
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _illustratedBanner() {
     return SizedBox(
       height: 112,
