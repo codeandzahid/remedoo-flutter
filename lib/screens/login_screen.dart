@@ -62,6 +62,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _busy = false);
     if (!result.ok) {
       setState(() => _error = result.error);
+    } else if (Navigator.of(context).canPop()) {
+      // Opened on top of the app (gated action): reveal the signed-in app.
+      Navigator.of(context).popUntil((r) => r.isFirst);
     }
   }
 
@@ -287,9 +290,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                   scheme.onSurfaceVariant),
                         ),
                         TextButton(
-                          onPressed: () =>
-                              AppStateScope.of(context)
-                                  .loginAsGuest(),
+                          onPressed: () {
+                            AppStateScope.of(context)
+                                .loginAsGuest();
+                            if (Navigator.of(context)
+                                .canPop()) {
+                              Navigator.of(context).popUntil(
+                                  (r) => r.isFirst);
+                            }
+                          },
                           child: Text(
                             'Continue as Guest',
                             style: TextStyle(

@@ -4,6 +4,8 @@ import '../theme.dart';
 import '../models.dart';
 import '../data/mock_data.dart';
 import '../state/app_state.dart';
+import '../app_navigator.dart';
+import '../screens/login_screen.dart';
 import 'theme_backdrop.dart';
 
 // Shared building blocks for the Remedoo app.
@@ -934,6 +936,10 @@ Future<bool> confirmDialog(
   return res ?? false;
 }
 
+/// Set while a delayed login redirect is scheduled, so repeated taps on a
+/// gated feature can't stack multiple login pages.
+bool _loginRedirectPending = false;
+
 /// Reference-style guest gate (matches remedoo.inboxxahid.workers.dev):
 /// no modal dialogs — a toast is shown and the guest is redirected to the
 /// login page, which always offers "Skip, continue as guest".
@@ -944,23 +950,29 @@ Future<bool> confirmDialog(
 bool checkLogin(BuildContext context,
     [String message = 'Please login to access this feature']) {
   final state = AppStateScope.of(context);
-  // Only a real signed-in account passes. Guests — and the logged-out
-  // state right after a guest is redirected — are blocked, so repeated
+  // Only a real signed-in account passes. Guests are blocked, so repeated
   // tapping can never walk through an open gate.
   if (state.isSignedIn) return true;
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text(message)),
   );
-  // Let the toast show, then exit guest mode → RootGate → LoginScreen.
+  // Let the toast show, then open the login page on top. Guard against
+  // stacking multiple login pages from repeated taps.
+  if (_loginRedirectPending) return false;
+  _loginRedirectPending = true;
   Future.delayed(const Duration(milliseconds: 1200), () {
-    if (state.isGuest) state.logout();
+    _loginRedirectPending = false;
+    final nav = appNavigatorKey.currentState;
+    if (nav == null) return;
+    nav.popUntil((r) => r.isFirst);
+    nav.push(MaterialPageRoute(builder: (_) => const LoginScreen()));
   });
   return false;
 }
 
 /// Passive full-screen guest gate (backstop for screens that require a
-/// signed-in account). Shows the message with a Sign In action that exits
-/// guest mode to the login page. Intentionally passive (no auto-redirect):
+/// signed-in account). Shows the message with a Sign In action that opens
+/// the login page. Intentionally passive (no auto-redirect):
 /// it must be safe to build eagerly inside an IndexedStack. The
 /// reference-style toast + redirect happens at navigation time via
 /// [checkLogin].
@@ -974,7 +986,6 @@ class GuestGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = AppStateScope.of(context);
     return Scaffold(
       body: Center(
         child: Padding(
@@ -991,8 +1002,11 @@ class GuestGate extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               FilledButton(
-                // Exit guest mode; RootGate rebuilds straight to LoginScreen.
-                onPressed: () => state.logout(),
+                // Open the login page on top; back returns to guest browsing.
+                onPressed: () => appNavigatorKey.currentState?.push(
+                  MaterialPageRoute(
+                      builder: (_) => const LoginScreen()),
+                ),
                 child: const Text('Sign In'),
               ),
             ],

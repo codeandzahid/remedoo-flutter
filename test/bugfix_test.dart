@@ -8,12 +8,14 @@ import 'package:remedoo_app/screens/main_shell.dart';
 import 'package:remedoo_app/screens/profile_screen.dart';
 import 'package:remedoo_app/screens/remedoo_pharmacy_screen.dart';
 import 'package:remedoo_app/state/app_state.dart';
+import 'package:remedoo_app/app_navigator.dart';
+import 'package:remedoo_app/screens/login_screen.dart';
 import 'package:remedoo_app/widgets/widgets.dart';
 
 Widget _wrap(Widget child, AppState state) {
   return AppStateScope(
     state: state,
-    child: MaterialApp(home: child),
+    child: MaterialApp(navigatorKey: appNavigatorKey, home: child),
   );
 }
 
@@ -192,7 +194,7 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Add to Cart'), findsNothing);
   });
 
-  testWidgets('guest profile Sign In logs out to the login screen',
+  testWidgets('guest profile Sign In opens the login screen',
       (tester) async {
     usePhoneSize(tester);
     final state = AppState();
@@ -205,8 +207,8 @@ void main() {
     await tester.tap(find.text('Sign In'));
     await tester.pumpAndSettle();
 
-    // Guest session ends; RootGate rebuilds straight to LoginScreen.
-    expect(state.isLoggedIn, isFalse);
-    expect(state.isGuest, isFalse);
+    // Login page opens on top; the guest session stays intact.
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(state.isGuest, isTrue);
   });
 }

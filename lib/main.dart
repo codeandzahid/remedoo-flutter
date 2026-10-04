@@ -6,7 +6,6 @@ import 'state/app_state.dart';
 import 'theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/onboarding_screen.dart';
-import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/maintenance_screen.dart';
 import 'screens/reset_password_screen.dart';
@@ -81,6 +80,10 @@ class _RootGateState extends State<RootGate> {
       await AuthService.instance.init();
       await state.loadPersistedState();
       state.attachAuthListener();
+      // No forced login screen: anyone without a session enters as a guest
+      // and lands straight on the dashboard. The login screen only appears
+      // when a gated action requires it.
+      if (!state.isLoggedIn) state.loginAsGuest();
       if (mounted) setState(() => _authReady = true);
     });
   }
@@ -105,7 +108,6 @@ class _RootGateState extends State<RootGate> {
     if (state.maintenanceMode) return const MaintenanceScreen();
     if (!_splashDone || !_authReady) return const SplashView();
     if (!state.seenOnboarding) return const OnboardingScreen();
-    if (!state.isLoggedIn) return const LoginScreen();
     if (state.role == 'admin') return const AdminShell();
     return const MainShell();
   }

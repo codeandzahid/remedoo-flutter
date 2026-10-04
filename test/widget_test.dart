@@ -14,6 +14,8 @@ import 'package:remedoo_app/screens/appointments_screen.dart';
 import 'package:remedoo_app/screens/admin/admin_login_screen.dart';
 import 'package:remedoo_app/screens/admin/admin_shell.dart';
 import 'package:remedoo_app/data/mock_data.dart';
+import 'package:remedoo_app/app_navigator.dart';
+import 'package:remedoo_app/screens/login_screen.dart';
 
 Widget _wrap(Widget child) {
   // Tests that pump inner screens simulate a signed-in (non-guest) user:
@@ -55,10 +57,8 @@ void main() {
     expect(find.text('Book Appointments'), findsOneWidget);
     await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();
-    expect(find.text('Welcome Back'), findsOneWidget);
-    // Sign in as guest
-    await tester.tap(find.text('Continue as Guest'));
-    await tester.pumpAndSettle();
+    // Skipping onboarding lands straight on the dashboard as a guest
+    // (no forced login screen).
     expect(find.textContaining('Good '), findsOneWidget);
     expect(find.text('Smart Care'), findsOneWidget);
   });
@@ -173,13 +173,18 @@ void main() {
     final state = AppState();
     state.loginAsGuest();
     await tester.pumpWidget(AppStateScope(
-        state: state, child: const MaterialApp(home: AppointmentsScreen())));
+        state: state,
+        child: MaterialApp(
+            navigatorKey: appNavigatorKey,
+            home: const AppointmentsScreen())));
     await tester.pumpAndSettle();
     // Passive gate (no auto-redirect): message + Sign In button.
     expect(find.text('Please login to access this feature'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Sign In'));
     await tester.pumpAndSettle();
-    expect(state.isLoggedIn, isFalse);
+    // Login page opens on top; the guest session stays intact.
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(state.isGuest, isTrue);
   });
 
   testWidgets('guest booking shows login toast and blocks booking',
@@ -188,15 +193,16 @@ void main() {
     state.loginAsGuest();
     await tester.pumpWidget(AppStateScope(
         state: state,
-        child: const MaterialApp(
-            home: BookingScreen(
-          kind: 'doctor',
-          refId: 'd1',
-          title: 'Dr. Test',
-          subtitle: 'Cardiologist',
-          place: 'Test Clinic',
-          fee: 500,
-        ))));
+        child: MaterialApp(
+            navigatorKey: appNavigatorKey,
+            home: const BookingScreen(
+              kind: 'doctor',
+              refId: 'd1',
+              title: 'Dr. Test',
+              subtitle: 'Cardiologist',
+              place: 'Test Clinic',
+              fee: 500,
+            ))));
     await tester.pumpAndSettle();
     final confirm = find.textContaining('Confirm Booking');
     expect(confirm, findsOneWidget);
@@ -206,10 +212,11 @@ void main() {
     // Reference-style toast appears; no appointment is booked.
     expect(find.text('Please login to book appointments'), findsOneWidget);
     expect(state.appointments, isEmpty);
-    // After the redirect delay the guest lands on the login screen.
+    // After the redirect delay the login page opens on top.
     await tester.pump(const Duration(milliseconds: 1300));
-    await tester.pump();
-    expect(state.isLoggedIn, isFalse);
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(state.isGuest, isTrue);
     expect(state.appointments, isEmpty);
   });
 
@@ -229,7 +236,10 @@ void main() {
     final state = AppState();
     state.loginAsGuest();
     await tester.pumpWidget(AppStateScope(
-        state: state, child: const MaterialApp(home: DoctorsScreen())));
+        state: state,
+        child: MaterialApp(
+            navigatorKey: appNavigatorKey,
+            home: const DoctorsScreen())));
     await tester.pumpAndSettle();
     // Tap the first doctor card (not the Book button).
     final card = find.text('Dr. Aarav Malhotra');
@@ -239,8 +249,9 @@ void main() {
     await tester.pump();
     expect(find.text('Please login to view details'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 1300));
-    await tester.pump();
-    expect(state.isLoggedIn, isFalse);
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(state.isGuest, isTrue);
   });
 
   testWidgets('switching theme pack updates the theme', (tester) async {

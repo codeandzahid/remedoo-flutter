@@ -440,8 +440,9 @@ class AppState extends ChangeNotifier {
     unawaited(AuthService.instance.signOut());
     _supaUser = null;
     _clearAuthLocal();
-    // Pop any pushed pages: after logout the RootGate shows LoginScreen,
-    // and inner screens must not linger on top with the gates down.
+    // Pop any pushed pages: after logout the RootGate shows the dashboard
+    // in guest-browsing state, and inner screens must not linger on top
+    // with the gates down.
     appNavigatorKey.currentState?.popUntil((r) => r.isFirst);
   }
 

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
+import '../app_navigator.dart';
 import '../widgets/widgets.dart';
+import 'login_screen.dart';
 
 /// My Profile: avatar, name/email, phone, gender, address, password section.
 class ProfileScreen extends StatefulWidget {
@@ -42,8 +44,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: 'You are browsing as a guest',
             subtitle: 'Sign in to manage your profile.',
             actionLabel: 'Sign In',
-            // Log out of guest mode; RootGate rebuilds straight to LoginScreen.
-            onAction: () => state.logout(),
+            // Open the login page; back returns to guest browsing.
+            onAction: () => appNavigatorKey.currentState?.push(
+              MaterialPageRoute(
+                  builder: (_) => const LoginScreen()),
+            ),
           ),
         ),
       );
