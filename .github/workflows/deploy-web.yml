@@ -30,7 +30,7 @@ jobs:
           channel: stable
 
       - name: Build web release
-        run: flutter build web --release --no-web-resources-cdn
+        run: flutter build web --release --wasm --no-web-resources-cdn
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
