@@ -137,9 +137,13 @@ class AppState extends ChangeNotifier {
   bool get seenOnboarding => _seenOnboarding;
 
   /// Display name: Supabase user metadata -> email fallback -> mock name.
-  String get userName => _supaUser != null
-      ? AuthService.instance.displayNameOf(_supaUser!)
-      : _name;
+  String get userName {
+    // Prefer the explicitly saved name (profile edits) over auth metadata.
+    if (_name.isNotEmpty && _name != 'Patient') return _name;
+    return _supaUser != null
+        ? AuthService.instance.displayNameOf(_supaUser!)
+        : _name;
+  }
 
   /// Email: Supabase user email first, then the mock value.
   String get email =>
@@ -1505,6 +1509,13 @@ class AppState extends ChangeNotifier {
     if (name != null) _name = name;
     if (phone != null) _phone = phone;
     if (address != null) _address = address;
+    // Persist to Supabase so the name/phone survive reloads.
+    final fields = <String, dynamic>{};
+    if (name != null) fields['full_name'] = name;
+    if (phone != null) fields['phone'] = phone;
+    if (fields.isNotEmpty) {
+      _repo.saveProfile(fields).then((_) {});
+    }
     notifyListeners();
   }
 

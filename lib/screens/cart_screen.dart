@@ -265,22 +265,22 @@ class _CartScreenState extends State<CartScreen> {
   Widget _stepBtn(IconData icon, VoidCallback onTap,
       ColorScheme scheme,
       {bool destructive = false}) {
-    return Material(
-      color: scheme.surfaceContainerHighest
-          .withValues(alpha: 0.6),
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: SizedBox(
-          width: 28,
-          height: 28,
-          child: Icon(icon,
-              size: 15,
-              color: destructive
-                  ? RemedooTheme.destructive
-                  : scheme.onSurface),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest
+              .withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(8),
         ),
+        child: Icon(icon,
+            size: 15,
+            color: destructive
+                ? RemedooTheme.destructive
+                : scheme.onSurface),
       ),
     );
   }

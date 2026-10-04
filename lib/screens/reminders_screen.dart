@@ -295,10 +295,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
-            RButton(
-              label: 'Add',
-              small: true,
-              onPressed: () {
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
                 if (title.text.trim().isEmpty) return;
                 state.addReminder(
                   title: title.text.trim(),
@@ -308,6 +307,20 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 );
                 Navigator.pop(context);
               },
+              child: RButton(
+                label: 'Add',
+                small: true,
+                onPressed: () {
+                  if (title.text.trim().isEmpty) return;
+                  state.addReminder(
+                    title: title.text.trim(),
+                    date: DateTime.now(),
+                    timeLabel: time.text.trim(),
+                    notes: repeat,
+                  );
+                  Navigator.pop(context);
+                },
+              ),
             ),
           ],
         ),
