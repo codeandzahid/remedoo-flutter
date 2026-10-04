@@ -104,19 +104,14 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
           SliverToBoxAdapter(child: _hero(context)),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-              child: Transform.translate(
-                offset: const Offset(0, -52),
-                child: _infoCard(l),
-              ),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: _infoCard(l),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-              child: Transform.translate(
-                offset: const Offset(0, -52),
-                child: Column(
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (_showSearch) ...[
@@ -150,7 +145,6 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
                   ],
                 ),
               ),
-            ),
           ),
         ],
       ),
@@ -203,7 +197,7 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
             ),
             child: const Center(
               child: Text('🔬',
-                  style: TextStyle(fontSize: 52, color: Colors.white)),
+                  style: TextStyle(fontSize: 48)),
             ),
           ),
           Container(

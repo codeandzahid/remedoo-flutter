@@ -139,7 +139,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
               ),
             ),
             child: const Center(
-              child: Text('💊', style: TextStyle(fontSize: 52)),
+              child: Text('💊', style: TextStyle(fontSize: 48)),
             ),
           ),
           SafeArea(
@@ -171,19 +171,16 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
         SliverToBoxAdapter(child: _hero(p)),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-            child: Transform.translate(
-              offset: const Offset(0, -46),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _infoCard(p),
-                  const SizedBox(height: 12),
-                  _categoryChips(categories),
-                  const SizedBox(height: 8),
-                  _sortRow(list.length),
-                ],
-              ),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _infoCard(p),
+                const SizedBox(height: 12),
+                _categoryChips(categories),
+                const SizedBox(height: 8),
+                _sortRow(list.length),
+              ],
             ),
           ),
         ),
@@ -207,31 +204,28 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
         SliverToBoxAdapter(child: _hero(p)),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Transform.translate(
-              offset: const Offset(0, -46),
-              child: DetailSplit(
-                main: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _infoCard(p),
-                    const SizedBox(height: 12),
-                    _categoryChips(categories),
-                    const SizedBox(height: 8),
-                    _sortRow(list.length),
-                    const SizedBox(height: 8),
-                    for (var i = 0; i < list.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: StaggerItem(
-                            index: i % 6,
-                            child: _medCard(list[i], state)),
-                      ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-                side: _orderPanel(state, p),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: DetailSplit(
+              main: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _infoCard(p),
+                  const SizedBox(height: 12),
+                  _categoryChips(categories),
+                  const SizedBox(height: 8),
+                  _sortRow(list.length),
+                  const SizedBox(height: 8),
+                  for (var i = 0; i < list.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: StaggerItem(
+                          index: i % 6,
+                          child: _medCard(list[i], state)),
+                    ),
+                  const SizedBox(height: 16),
+                ],
               ),
+              side: _orderPanel(state, p),
             ),
           ),
         ),
