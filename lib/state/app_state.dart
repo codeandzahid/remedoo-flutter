@@ -1522,6 +1522,32 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Saves the provider's UPI ID. Returns true on success.
+  /// The UPI ID is stored in the user's profile and linked to their
+  /// provider record when approved.
+  Future<bool> saveProviderUpiId(String upiId) async {
+    // Save to profiles table
+    final saved = await _repo.saveProfile({'upi_id': upiId});
+    if (saved) {
+      _providerUpiId = upiId;
+      notifyListeners();
+    }
+    return saved;
+  }
+
+  String? _providerUpiId;
+  String? get providerUpiId => _providerUpiId;
+
+  /// Checks if the UPI setup popup should be shown:
+  /// user has an approved provider application but no UPI ID set.
+  bool get shouldShowUpiSetup {
+    if (!isSignedIn) return false;
+    if (_providerUpiId?.isNotEmpty ?? false) return false;
+    final email = this.email;
+    return providerApplications.any((a) =>
+        a.email == email && a.status == 'approved');
+  }
+
   Future<bool> updateProfile(
       {String? name, String? phone, String? address}) async {
     if (name != null) _name = name;

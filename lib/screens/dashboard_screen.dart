@@ -8,6 +8,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/upi_setup_dialog.dart';
 import '../widgets/patient_sidebar.dart';
 import 'doctors_screen.dart';
 import 'doctor_detail_screen.dart';
@@ -48,6 +49,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     Future.delayed(const Duration(milliseconds: 650), () {
       if (mounted) setState(() => _loading = false);
+    });
+    // Show UPI setup popup for verified providers who haven't set it up.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = AppStateScope.of(context);
+      if (state.shouldShowUpiSetup) {
+        showUpiSetupDialog(context);
+      }
     });
     // Auto-advance the promo carousel like the React app (every 3.5s).
     _promoTimer = Timer.periodic(const Duration(milliseconds: 3500), (_) {

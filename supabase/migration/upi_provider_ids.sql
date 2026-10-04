@@ -8,3 +8,6 @@ ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS upi_id TEXT;
 -- Allow providers to update their own UPI ID (they already have
 -- update policies on their own rows via the existing provider policies).
 -- Public read is already enabled via the existing SELECT policies.
+
+-- Provider's own UPI ID (stored in their profile until linked to provider record)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS upi_id TEXT;

@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../responsive/responsive.dart';
@@ -6,41 +7,101 @@ import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'pending_approval_screen.dart';
 
-const _roles = ['Doctor', 'Hospital', 'Lab', 'Pharmacy', 'Driver'];
-
 IconData _roleIcon(String role) {
-  switch (role) {
-    case 'Doctor':
+  switch (role.toLowerCase()) {
+    case 'doctor':
       return Icons.medical_services_outlined;
-    case 'Hospital':
+    case 'hospital':
       return Icons.local_hospital_outlined;
-    case 'Lab':
+    case 'lab':
       return Icons.science_outlined;
-    case 'Pharmacy':
+    case 'pharmacy':
       return Icons.local_pharmacy_outlined;
-    case 'Driver':
-      return Icons.directions_car_outlined;
     default:
       return Icons.business_outlined;
   }
 }
 
-/// "Provider Registration" application form (React ProviderRegister.tsx styling).
+String _roleTitle(String role) {
+  switch (role.toLowerCase()) {
+    case 'doctor':
+      return 'Doctor';
+    case 'hospital':
+      return 'Hospital';
+    case 'lab':
+      return 'Lab';
+    case 'pharmacy':
+      return 'Pharmacy';
+    default:
+      return role;
+  }
+}
+
+/// Maximum document size: 500 KB.
+const _maxDocBytes = 500 * 1024;
+
+/// A required document upload slot.
+class _DocSlot {
+  final String label;
+  final String hint;
+  PlatformFile? file;
+
+  _DocSlot({required this.label, required this.hint});
+}
+
+/// Provider registration form. Opened from [ProviderTypeScreen] after
+/// the user picks their provider type. All fields are compulsory.
+/// UPI setup happens separately after verification via the UPI popup.
 class ProviderRegisterScreen extends StatefulWidget {
-  const ProviderRegisterScreen({super.key});
+  final String providerType;
+
+  const ProviderRegisterScreen({
+    super.key,
+    this.providerType = 'doctor',
+  });
 
   @override
   State<ProviderRegisterScreen> createState() =>
       _ProviderRegisterScreenState();
 }
 
-class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
-  String _role = _roles.first;
+class _ProviderRegisterScreenState
+    extends State<ProviderRegisterScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _license = TextEditingController();
-  final _upiId = TextEditingController();
+  final _address = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  late final List<_DocSlot> _docs;
+
+  @override
+  void initState() {
+    super.initState();
+    final role = widget.providerType.toLowerCase();
+    _docs = [
+      _DocSlot(
+        label: 'License / Registration Certificate *',
+        hint: 'Upload your medical license or registration certificate',
+      ),
+      _DocSlot(
+        label: 'Government ID Proof *',
+        hint: 'Aadhaar, PAN, or Passport (front side)',
+      ),
+      if (role == 'hospital' || role == 'lab')
+        _DocSlot(
+          label: 'Facility Accreditation *',
+          hint: 'NABH, NABL, or equivalent accreditation certificate',
+        ),
+      if (role == 'pharmacy')
+        _DocSlot(
+          label: 'Drug License *',
+          hint: 'Valid drug retail license',
+        ),
+    ];
+  }
 
   @override
   void dispose() {
@@ -48,250 +109,508 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     _email.dispose();
     _phone.dispose();
     _license.dispose();
-    _upiId.dispose();
+    _address.dispose();
     super.dispose();
   }
 
-  void _submit() {
-    if (_name.text.trim().isEmpty || _email.text.trim().isEmpty) {
+  Future<void> _pickDoc(_DocSlot slot) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if ((file.size) > _maxDocBytes) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill name and email')),
+        SnackBar(
+          content: Text(
+            '${file.name} is ${(_fileSize(file.size))}. Documents must be under 500 KB.',
+          ),
+        ),
       );
       return;
     }
+    setState(() => slot.file = file);
+  }
+
+  String _fileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  }
+
+  void _submit() {
+    // Validate all compulsory fields.
+    if (_name.text.trim().isEmpty) {
+      setState(
+          () => _error = 'Full name is required.');
+      return;
+    }
+    if (_email.text.trim().isEmpty ||
+        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+            .hasMatch(_email.text.trim())) {
+      setState(
+          () => _error = 'A valid email is required.');
+      return;
+    }
+    if (_phone.text.trim().isEmpty) {
+      setState(() => _error = 'Phone number is required.');
+      return;
+    }
+    if (_license.text.trim().isEmpty) {
+      setState(() =>
+          _error = 'License / registration number is required.');
+      return;
+    }
+    if (_address.text.trim().isEmpty) {
+      setState(() => _error = 'Address is required.');
+      return;
+    }
+    // Validate all documents uploaded.
+    for (final d in _docs) {
+      if (d.file == null) {
+        setState(() =>
+            _error = 'Please upload: ${d.label.replaceAll(' *', '')}');
+        return;
+      }
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     AppStateScope.of(context).submitProviderApplication(
       name: _name.text.trim(),
       email: _email.text.trim(),
       phone: _phone.text.trim(),
-      role: _role,
+      role: _roleTitle(widget.providerType),
       license: _license.text.trim(),
-      upiId: _upiId.text.trim(),
     );
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const PendingApprovalScreen()),
+      MaterialPageRoute(
+          builder: (_) =>
+              const PendingApprovalScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final roleTitle = _roleTitle(widget.providerType);
+    final roleIcon = _roleIcon(widget.providerType);
     return Scaffold(
-      body: MaxWidthBox(
-        maxWidth: 720,
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            // Orange header with rounded bottom.
-            Container(
-              padding: const EdgeInsets.fromLTRB(24, 56, 24, 52),
-              decoration: BoxDecoration(
-                gradient: RemedooTheme.headerGradient,
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(28),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.3),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: const BackButton(),
+        title: Text(
+          '$roleTitle Registration',
+          style:
+              const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        centerTitle: true,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              scheme.primary.withValues(alpha: 0.08),
+              scheme.surface,
+            ],
+            stops: const [0.0, 0.4],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24),
+              child: MaxWidthBox(
+                maxWidth: 520,
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Container(
+                        padding:
+                            const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10),
+                        decoration: BoxDecoration(
+                          color: scheme.primary
+                              .withValues(alpha: 0.12),
+                          borderRadius:
+                              BorderRadius.circular(999),
+                          border: Border.all(
+                            color: scheme.primary
+                                .withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(roleIcon,
+                                size: 18,
+                                color: scheme.primary),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Registering as $roleTitle',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    child: const Icon(
-                      Icons.favorite,
-                      color: Colors.white,
-                      size: 28,
+                    const SizedBox(height: 8),
+                    Text(
+                      'All fields marked * are compulsory',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
+                    const SizedBox(height: 16),
+                    // Personal details
+                    _SectionCard(
+                      title: 'Personal Details',
+                      icon: Icons.person_outline,
+                      children: [
+                        _RequiredField(
+                          label: 'Full Name / Business Name',
+                          hint: 'Enter name',
+                          controller: _name,
+                          icon: Icons.person_outline,
+                        ),
+                        const SizedBox(height: 12),
+                        _RequiredField(
+                          label: 'Email',
+                          hint: 'you@example.com',
+                          controller: _email,
+                          keyboardType:
+                              TextInputType.emailAddress,
+                          icon: Icons.email_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        _RequiredField(
+                          label: 'Phone',
+                          hint: '+91 XXXXX XXXXX',
+                          controller: _phone,
+                          keyboardType: TextInputType.phone,
+                          icon: Icons.phone_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        _RequiredField(
+                          label:
+                              'License / Registration Number',
+                          hint: 'Enter license number',
+                          controller: _license,
+                          icon: Icons.badge_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        _RequiredField(
+                          label: 'Address',
+                          hint:
+                              'Clinic / facility address',
+                          controller: _address,
+                          icon:
+                              Icons.location_on_outlined,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    // Documents
+                    _SectionCard(
+                      title: 'Required Documents',
+                      icon: Icons.upload_file_outlined,
+                      subtitle:
+                          'PDF, JPG, or PNG — each under 500 KB',
+                      children: [
+                        for (var i = 0;
+                            i < _docs.length;
+                            i++) ...[
+                          _DocUploadTile(
+                            slot: _docs[i],
+                            onPick: () =>
+                                _pickDoc(_docs[i]),
+                          ),
+                          if (i < _docs.length - 1)
+                            const SizedBox(height: 10),
+                        ],
+                      ],
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding:
+                            const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: RemedooTheme.emergency
+                              .withValues(alpha: 0.1),
+                          borderRadius:
+                              BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 18,
+                              color:
+                                  RemedooTheme.emergency,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: RemedooTheme
+                                      .emergency,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    RButton(
+                      label: _busy
+                          ? 'Submitting…'
+                          : 'Submit for Verification',
+                      fullWidth: true,
+                      onPressed: _busy ? null : _submit,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Our team verifies your details and documents within 24–48 hours. Once approved, you\'ll be guided to set up UPI payments.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final String? subtitle;
+  final List<Widget> children;
+
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    this.subtitle,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon,
+                  size: 18, color: scheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle!,
+              style: TextStyle(
+                fontSize: 12,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _RequiredField extends StatelessWidget {
+  final String label;
+  final String hint;
+  final TextEditingController controller;
+  final IconData icon;
+  final TextInputType? keyboardType;
+
+  const _RequiredField({
+    required this.label,
+    required this.hint,
+    required this.controller,
+    required this.icon,
+    this.keyboardType,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        RichText(
+          text: TextSpan(
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface,
+            ),
+            children: [
+              TextSpan(text: label),
+              const TextSpan(
+                text: ' *',
+                style: TextStyle(color: Colors.red),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        RTextField(
+          hint: hint,
+          controller: controller,
+          keyboardType: keyboardType,
+          prefixIcon: Icon(icon, size: 18),
+        ),
+      ],
+    );
+  }
+}
+
+class _DocUploadTile extends StatelessWidget {
+  final _DocSlot slot;
+  final VoidCallback onPick;
+
+  const _DocUploadTile({
+    required this.slot,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final hasFile = slot.file != null;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onPick,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: hasFile
+              ? RemedooTheme.success
+                  .withValues(alpha: 0.08)
+              : scheme.surfaceContainerHighest
+                  .withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasFile
+                ? RemedooTheme.success
+                    .withValues(alpha: 0.4)
+                : scheme.outline
+                    .withValues(alpha: 0.3),
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: hasFile
+                    ? RemedooTheme.success
+                        .withValues(alpha: 0.15)
+                    : scheme.primary
+                        .withValues(alpha: 0.1),
+                borderRadius:
+                    BorderRadius.circular(10),
+              ),
+              child: Icon(
+                hasFile
+                    ? Icons.check_circle
+                    : Icons.upload_file_outlined,
+                color: hasFile
+                    ? RemedooTheme.success
+                    : scheme.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
                   Text(
-                    'Provider Registration',
-                    style: textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                    slot.label,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Join the Remedoo network and reach thousands of patients.',
-                    textAlign: TextAlign.center,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.7),
+                    hasFile
+                        ? '${slot.file!.name} (${(slot.file!.size / 1024).toStringAsFixed(1)} KB)'
+                        : slot.hint,
+                    maxLines: 1,
+                    overflow:
+                        TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: hasFile
+                          ? RemedooTheme.success
+                          : scheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
-            // Form card overlapping the header.
-            Transform.translate(
-              offset: const Offset(0, -20),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: RCard(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'I want to register as a:',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Provider-type tiles (2-column grid).
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 2.2,
-                        ),
-                        itemCount: _roles.length,
-                        itemBuilder: (_, i) {
-                          final r = _roles[i];
-                          final sel = r == _role;
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () => setState(() => _role = r),
-                            child: AnimatedContainer(
-                              duration:
-                                  const Duration(milliseconds: 180),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: sel
-                                    ? scheme.primary.withValues(alpha: 0.08)
-                                    : scheme.surfaceContainerHighest
-                                        .withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: sel
-                                      ? scheme.primary
-                                      : scheme.outlineVariant,
-                                  width: sel ? 2 : 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    _roleIcon(r),
-                                    color: scheme.primary,
-                                    size: 28,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      r,
-                                      style: textTheme.labelLarge?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Account Information',
-                        style: textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      RTextField(
-                        label: 'Full Name',
-                        hint: 'Your full name',
-                        controller: _name,
-                        prefixIcon:
-                            const Icon(Icons.person_outline, size: 18),
-                      ),
-                      const SizedBox(height: 12),
-                      RTextField(
-                        label: 'Email',
-                        hint: 'your@email.com',
-                        controller: _email,
-                        keyboardType: TextInputType.emailAddress,
-                        prefixIcon:
-                            const Icon(Icons.mail_outline, size: 18),
-                      ),
-                      const SizedBox(height: 12),
-                      RTextField(
-                        label: 'Phone',
-                        hint: '+91 9876543210',
-                        controller: _phone,
-                        keyboardType: TextInputType.phone,
-                        prefixIcon:
-                            const Icon(Icons.phone_outlined, size: 18),
-                      ),
-                      const SizedBox(height: 12),
-                      RTextField(
-                        label: 'License / Registration Number',
-                        hint: 'Enter your license number',
-                        controller: _license,
-                        prefixIcon:
-                            const Icon(Icons.badge_outlined, size: 18),
-                      ),
-                      const SizedBox(height: 12),
-                      RTextField(
-                        label: 'UPI ID (for receiving payments)',
-                        hint: 'yourname@upi',
-                        controller: _upiId,
-                        prefixIcon:
-                            const Icon(Icons.qr_code_2, size: 18),
-                      ),
-                      const SizedBox(height: 20),
-                      RButton(
-                        label: 'Submit Registration',
-                        fullWidth: true,
-                        onPressed: _submit,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Back to sign-in.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Already have an account? ',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(
-                      'Sign In',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
+            Text(
+              hasFile ? 'Change' : 'Upload',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: scheme.primary,
               ),
             ),
           ],

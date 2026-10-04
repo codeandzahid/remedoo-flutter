@@ -57,7 +57,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Welcome Back'), findsOneWidget);
     // Sign in as guest
-    await tester.tap(find.text('Skip, continue as guest'));
+    await tester.tap(find.text('Continue as Guest'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Good '), findsOneWidget);
     expect(find.text('Smart Care'), findsOneWidget);
