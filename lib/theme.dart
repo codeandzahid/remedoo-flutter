@@ -736,6 +736,12 @@ class RemedooTheme {
     [Color(0xFFFEF9C3), Color(0xFFCA8A04)], // yellow
     [Color(0xFFCCFBF1), Color(0xFF0D9488)], // teal
     [Color(0xFFEDE9FE), Color(0xFF7C3AED)], // violet
+    [Color(0xFFE0E7FF), Color(0xFF4F46E5)], // indigo
+    [Color(0xFFCFFAFE), Color(0xFF0891B2)], // cyan
+    [Color(0xFFECFCCB), Color(0xFF65A30D)], // lime
+    [Color(0xFFFFE4E6), Color(0xFFE11D48)], // rose
+    [Color(0xFFFEF3C7), Color(0xFFD97706)], // amber
+    [Color(0xFFF1F5F9), Color(0xFF64748B)], // slate
   ];
 }
 

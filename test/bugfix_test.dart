@@ -39,7 +39,7 @@ void main() {
     expect(state.isSignedIn, isFalse);
     expect(state.isLoggedIn, isFalse);
 
-    var gateResult;
+    bool? gateResult;
     await tester.pumpWidget(_wrap(
         Scaffold(
             body: Builder(builder: (context) {

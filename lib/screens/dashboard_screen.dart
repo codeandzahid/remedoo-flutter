@@ -22,9 +22,13 @@ import 'lab_reports_screen.dart';
 import 'family_screen.dart';
 import 'notifications_screen.dart';
 import 'care_match_screen.dart';
+import 'remedoo_pharmacy_screen.dart';
+import 'medical_history_screen.dart';
+import 'support_tickets_screen.dart';
+import 'reminders_screen.dart';
 
 /// Home tab: orange hero header (menu / Remedoo / bell, greeting, translucent
-/// search), service grid, promo carousel, feature trio,
+/// search), dense service grid, compact promo carousel,
 /// stats, and listing rails — matching the React dashboard.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -107,40 +111,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          StaggerItem(index: 0, child: _illustratedBanner()),
-                          const SizedBox(height: 22),
+                          StaggerItem(index: 0, child: _categories()),
+                          const SizedBox(height: 18),
+                          StaggerItem(index: 1, child: _illustratedBanner()),
+                          const SizedBox(height: 18),
                           StaggerItem(
-                            index: 1,
+                            index: 2,
                             child: RSectionHeader(
                               title: 'Doctors near you',
                               onSeeAll: () => _go(const DoctorsScreen()),
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 8),
                           StaggerItem(
-                              index: 2, child: _doctorCards(popularDoctors)),
+                              index: 3, child: _doctorRows(popularDoctors)),
                           if (state.isSignedIn) ...[
-                            const SizedBox(height: 22),
+                            const SizedBox(height: 18),
                             StaggerItem(
-                              index: 3,
+                              index: 4,
                               child: RSectionHeader(
                                 title: 'Family Health',
                                 onSeeAll: () =>
                                     _goGated(const FamilyScreen()),
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            StaggerItem(index: 4, child: _familyRow(state)),
+                            const SizedBox(height: 8),
+                            StaggerItem(index: 5, child: _familyRow(state)),
                           ],
-                          const SizedBox(height: 22),
-                          const StaggerItem(
-                              index: 5,
-                              child: RSectionHeader(title: 'Services')),
-                          const SizedBox(height: 10),
-                          StaggerItem(index: 6, child: _categories()),
-                          const SizedBox(height: 22),
+                          const SizedBox(height: 18),
                           StaggerItem(
-                            index: 7,
+                            index: 6,
                             child: RSectionHeader(
                               title: 'Upcoming Appointments',
                               onSeeAll: upcoming.isNotEmpty
@@ -148,9 +148,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   : null,
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 8),
                           StaggerItem(
-                            index: 8,
+                            index: 7,
                             child: upcoming.isEmpty
                                 ? _emptyAppointments()
                                 : Column(
@@ -170,13 +170,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Orange hero header: menu / Remedoo / bell, greeting, translucent search,
-  /// Smart Care Finder. Rounded bottom via RGradientHeader.
+  /// Slim gradient header: menu, compact greeting + name, upcoming pill,
+  /// bell, then a compact search bar. Rounded bottom via RGradientHeader.
   Widget _heroHeader(AppState state) {
     return RGradientHeader(
       child: MaxWidthBox(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
@@ -191,17 +190,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Scaffold.of(drawerContext).openDrawer(),
                   ),
                 ),
-                const Expanded(
-                  child: Text(
-                    'Remedoo',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _greeting(),
+                        style: TextStyle(
+                          color:
+                              Colors.white.withValues(alpha: 0.75),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        '${state.displayName} 👋',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                _upcomingPill(state),
                 IconButton(
                   icon: Badge(
                     isLabelVisible: state.unreadNotifications > 0,
@@ -214,31 +229,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              _greeting(),
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${state.displayName} 👋',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                _upcomingPill(state),
-              ],
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             _translucentSearch(),
           ],
         ),
@@ -251,7 +242,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return GestureDetector(
       onTap: () => _go(const DoctorsScreen()),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.18),
           borderRadius: BorderRadius.circular(30),
@@ -320,34 +311,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// 8 pastel service tiles (4 columns on phones).
+  /// Dense service grid: 15 compact tiles in 5 columns so many options
+  /// fit on one screen.
   Widget _categories() {
     final tiles = RemedooTheme.serviceTileColors;
     final items = [
       ('Doctors', Icons.medical_services, 0, () => _go(const DoctorsScreen())),
-      ('Hospitals', Icons.local_hospital, 1, () => _go(const HospitalsScreen())),
+      ('Hospitals', Icons.local_hospital, 1,
+          () => _go(const HospitalsScreen())),
       ('Labs', Icons.science, 2, () => _go(const LabsScreen())),
-      ('Pharmacy', Icons.storefront, 3, () => _go(const PharmaciesScreen())),
-      ('Emergency', Icons.sos, 4, () => _go(const EmergencyScreen())),
-      ('Favorites', Icons.favorite, 5, () => _goGated(const FavoritesScreen())),
-      ('Orders', Icons.shopping_bag, 6, () => _goGated(const OrdersScreen())),
-      ('Reports', Icons.description, 7, () => _goGated(const LabReportsScreen())),
-      ('Smart Care', Icons.auto_awesome, 8, () => _go(const CareMatchScreen())),
+      ('Pharmacy', Icons.storefront, 3,
+          () => _go(const PharmaciesScreen())),
+      ('Medicines', Icons.medication, 4,
+          () => _go(const RemedooPharmacyScreen())),
+      ('Emergency', Icons.sos, 5, () => _go(const EmergencyScreen())),
+      ('Smart Care', Icons.auto_awesome, 6,
+          () => _go(const CareMatchScreen())),
+      ('Appointments', Icons.calendar_month, 7,
+          () => _goGated(const AppointmentsScreen())),
+      ('Orders', Icons.shopping_bag, 8,
+          () => _goGated(const OrdersScreen())),
+      ('Family', Icons.people, 9, () => _goGated(const FamilyScreen())),
+      ('Reminders', Icons.notifications, 10,
+          () => _goGated(const RemindersScreen())),
+      ('Favorites', Icons.favorite, 11,
+          () => _goGated(const FavoritesScreen())),
+      ('Reports', Icons.description, 12,
+          () => _goGated(const LabReportsScreen())),
+      ('History', Icons.history, 13,
+          () => _goGated(const MedicalHistoryScreen())),
+      ('Support', Icons.headset_mic, 14,
+          () => _goGated(const SupportTicketsScreen(),
+              'Please login to access support')),
     ];
-    return ResponsiveGrid(
-      compactCols: 4,
-      mediumCols: 6,
-      expandedCols: 8,
-      wideCols: 8,
+    return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 8,
-      childAspectRatio: 0.80,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 5,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 4,
+        childAspectRatio: 0.84,
+      ),
       itemCount: items.length,
       itemBuilder: (_, i) {
         final (label, icon, c, onTap) = items[i];
-        return RServiceTile(
+        return _denseTile(
           icon: icon,
           label: label,
           tileColor: tiles[c][0],
@@ -355,6 +364,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onTap: onTap,
         );
       },
+    );
+  }
+
+  /// Compact service tile for the dense grid.
+  Widget _denseTile({
+    required IconData icon,
+    required String label,
+    required Color tileColor,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: tileColor,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Icon(icon, size: 24, color: iconColor),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style:
+                const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     );
   }
 
@@ -393,11 +438,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ];
   }
 
-  /// Illustrated promo banner carousel (mockup style): theme-tinted
-  /// gradient, soft decorative circles, big emoji artwork, dot indicators.
+  /// Compact illustrated promo banner carousel: theme-tinted gradient,
+  /// soft decorative circles, emoji artwork, dot indicators.
   Widget _illustratedBanner() {
     return SizedBox(
-      height: 168,
+      height: 112,
       child: PageView.builder(
         controller: _promoCtrl,
         itemCount: _promos.length,
@@ -438,7 +483,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
                   child: Row(
                     children: [
                       Expanded(
@@ -450,24 +495,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               p.title,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 22,
+                                fontSize: 17,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 2),
                             Text(
                               p.subtitle,
                               style: TextStyle(
                                 color:
                                     Colors.white.withValues(alpha: 0.85),
-                                fontSize: 13,
+                                fontSize: 12,
                               ),
                             ),
                           ],
                         ),
                       ),
                       Text(p.emoji,
-                          style: const TextStyle(fontSize: 64)),
+                          style: const TextStyle(fontSize: 42)),
                     ],
                   ),
                 ),
@@ -618,21 +663,84 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   /// "Doctors near you" — mockup-style horizontal cards: circular
   /// initial avatar, name, specialty, star rating, Visit pill button.
-  Widget _doctorCards(List<Doctor> list) {
-    return SizedBox(
-      height: 212,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: list.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => SizedBox(
-          width: 158,
-          child: RDoctorCard(
-            compact: true,
-            doctor: list[i],
-            onTap: () => _goGated(DoctorDetailScreen(doctor: list[i])),
-            onVisit: () => _goGated(DoctorDetailScreen(doctor: list[i])),
-          ),
+  /// Dense "Doctors near you": one card with compact divided rows so
+  /// more doctors fit on screen.
+  Widget _doctorRows(List<Doctor> list) {
+    final docs = list.take(4).toList();
+    return RCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (int i = 0; i < docs.length; i++) ...[
+            _doctorRow(docs[i]),
+            if (i < docs.length - 1)
+              const Divider(height: 1, indent: 70),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _doctorRow(Doctor d) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () =>
+          _goGated(DoctorDetailScreen(doctor: d), 'Please login to view details'),
+      child: Padding(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            RAvatarCircle(name: d.name, size: 46),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    d.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                  Text(
+                    d.specialty,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: RemedooTheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      RStarRating(rating: d.rating, size: 12),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${d.expYears} yrs exp',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: scheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        inr(d.fee),
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurface),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right,
+                color: scheme.onSurfaceVariant),
+          ],
         ),
       ),
     );
