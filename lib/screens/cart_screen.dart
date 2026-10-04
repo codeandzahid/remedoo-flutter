@@ -240,7 +240,7 @@ class _CartScreenState extends State<CartScreen> {
       children: [
         _stepBtn(
           l.qty == 1 ? Icons.delete_outline : Icons.remove,
-          () => state.removeFromCart(l.medicine.id),
+          () => state.removeCartLine(l),
           scheme,
           destructive: l.qty == 1,
         ),

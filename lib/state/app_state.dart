@@ -1507,6 +1507,16 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Removes a cart line by object identity - cannot fail on ID mismatch.
+  void removeCartLine(CartLine line) {
+    cart.remove(line);
+    if (cart.isEmpty) {
+      cartPharmacyId = null;
+      cartPharmacyName = null;
+    }
+    notifyListeners();
+  }
+
   void setDriverOnline(bool v) {
     driverOnline = v;
     notifyListeners();
@@ -1524,11 +1534,6 @@ class AppState extends ChangeNotifier {
     if (phone != null) fields['phone'] = phone;
     if (fields.isNotEmpty) {
       saved = await _repo.saveProfile(fields);
-    }
-    // Also update auth metadata so the display name is consistent.
-    if (name != null && name.isNotEmpty) {
-      final metaOk = await AuthService.instance.updateDisplayName(name);
-      saved = saved && metaOk;
     }
     notifyListeners();
     return saved;
