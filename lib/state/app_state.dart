@@ -1525,6 +1525,11 @@ class AppState extends ChangeNotifier {
     if (fields.isNotEmpty) {
       saved = await _repo.saveProfile(fields);
     }
+    // Also update auth metadata so the display name is consistent.
+    if (name != null && name.isNotEmpty) {
+      final metaOk = await AuthService.instance.updateDisplayName(name);
+      saved = saved && metaOk;
+    }
     notifyListeners();
     return saved;
   }

@@ -205,6 +205,20 @@ class AuthService {
     }
   }
 
+  /// Updates the auth user metadata display name. Returns true on success.
+  Future<bool> updateDisplayName(String name) async {
+    if (!_initialized) return false;
+    try {
+      await _client.auth.updateUser(
+        UserAttributes(data: {'display_name': name}),
+      );
+      return true;
+    } catch (e) {
+      debugPrint('updateDisplayName failed: $e');
+      return false;
+    }
+  }
+
   Future<void> signOut() async {
     if (!_initialized) return;
     try {
