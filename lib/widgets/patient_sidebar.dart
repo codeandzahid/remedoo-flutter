@@ -189,7 +189,8 @@ List<_NavDef> _patientNav() => const [
           ProfileScreen.new,
           requiresLogin: true),
       _NavDef('Settings', Icons.settings_outlined, 'settings',
-          SettingsScreen.new),
+          SettingsScreen.new,
+          requiresLogin: true),
     ];
 
 /// Complete patient sidebar: gradient Close button, Quick Actions gradient
