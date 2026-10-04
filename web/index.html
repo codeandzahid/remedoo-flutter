@@ -29,78 +29,10 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>Remedoo - Care, on demand</title>
+  <title>Remedoo</title>
   <link rel="manifest" href="manifest.json">
-  <style>
-    #loading {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #0EA5A0 0%, #0B7C78 100%);
-      z-index: 9999;
-      transition: opacity 0.4s ease;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
-    #loading.hidden { opacity: 0; pointer-events: none; }
-    .pulse-logo {
-      width: 84px;
-      height: 84px;
-      border-radius: 24px;
-      background: rgba(255,255,255,0.18);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 44px;
-      animation: pulse 1.6s ease-in-out infinite;
-      backdrop-filter: blur(8px);
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.08); opacity: 0.85; }
-    }
-    .loading-title {
-      margin-top: 20px;
-      color: #fff;
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-    }
-    .loading-sub {
-      margin-top: 6px;
-      color: rgba(255,255,255,0.75);
-      font-size: 14px;
-    }
-    .spinner {
-      margin-top: 28px;
-      width: 36px;
-      height: 36px;
-      border: 3px solid rgba(255,255,255,0.25);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.9s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
 </head>
 <body>
-  <div id="loading">
-    <div class="pulse-logo">⚕️</div>
-    <div class="loading-title">Remedoo</div>
-    <div class="loading-sub">Care, on demand</div>
-    <div class="spinner"></div>
-  </div>
-  <script>
-    window.addEventListener('flutter-first-frame', function () {
-      var el = document.getElementById('loading');
-      if (el) {
-        el.classList.add('hidden');
-        setTimeout(function () { el.remove(); }, 500);
-      }
-    });
-  </script>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
