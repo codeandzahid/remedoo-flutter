@@ -361,8 +361,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 (_) => AlertDialog(
                                   title:
                                       const Text('Change Password'),
-                                  content: const Text(
-                                      'A reset link will be sent to your email. (demo)'),
+                                  content: Text(
+                                      'A reset link will be sent to ${state.email}.'),
                                   actions: [
                                     TextButton(
                                       onPressed: () =>
@@ -372,13 +372,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     RButton(
                                       label: 'Send Link',
                                       small: true,
-                                      onPressed: () {
+                                      onPressed: () async {
                                         Navigator.pop(context);
-                                        ScaffoldMessenger.of(context)
+                                        final result =
+                                            await AppStateScope.of(
+                                                    context)
+                                                .sendPasswordReset(
+                                                    state.email);
+                                        if (!context.mounted) {
+                                          return;
+                                        }
+                                        ScaffoldMessenger.of(
+                                                context)
                                             .showSnackBar(
-                                          const SnackBar(
+                                          SnackBar(
                                               content: Text(
-                                                  'Reset link sent! (demo)')),
+                                            result.ok
+                                                ? 'Reset link sent! Check your email.'
+                                                : result.error ??
+                                                    'Could not send the reset link.',
+                                          )),
                                         );
                                       },
                                     ),

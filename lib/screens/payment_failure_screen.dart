@@ -79,12 +79,7 @@ class PaymentFailureScreen extends StatelessWidget {
                   label: 'Try Again',
                   fullWidth: true,
                   onPressed: () {
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(
-                      const SnackBar(
-                          content:
-                              Text('Retrying payment… (demo)')),
-                    );
+                    // Back to the payment step for a real retry.
                     Navigator.pop(context);
                   },
                 ),

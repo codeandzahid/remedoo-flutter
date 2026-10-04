@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../responsive/responsive.dart';
@@ -152,15 +153,29 @@ class LabReportDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     RButton(
-                      label: 'Download Report',
-                      icon: Icons.download_outlined,
+                      label: 'Copy Results',
+                      icon: Icons.copy_outlined,
                       fullWidth: true,
                       onPressed: () {
+                        final buf = StringBuffer()
+                          ..writeln(
+                              'Lab Report — ${r.labName}')
+                          ..writeln('Patient: ${r.patientName}')
+                          ..writeln(
+                              'Date: ${r.date.day}/${r.date.month}/${r.date.year}')
+                          ..writeln('Status: ${r.status}')
+                          ..writeln('');
+                        for (final t in r.tests) {
+                          buf.writeln(
+                              '${t['name']}: ${t['result']} ${t['unit'] ?? ''} (Range: ${t['range'] ?? '-'}, ${t['flag'] ?? ''})');
+                        }
+                        Clipboard.setData(
+                            ClipboardData(text: buf.toString()));
                         ScaffoldMessenger.of(context)
                             .showSnackBar(
                           const SnackBar(
                               content: Text(
-                                  'Downloading report… (demo)')),
+                                  'Report results copied to clipboard.')),
                         );
                       },
                     ),
