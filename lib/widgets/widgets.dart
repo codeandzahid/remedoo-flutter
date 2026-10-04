@@ -450,21 +450,23 @@ class QtyStepper extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: const Icon(Icons.remove, size: 18),
-            color: p,
-            onPressed: onMinus,
-            padding: const EdgeInsets.all(4),
-            constraints: const BoxConstraints(),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onMinus,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(Icons.remove, size: 18, color: p),
+            ),
           ),
           Text('$qty',
               style: const TextStyle(fontWeight: FontWeight.w700)),
-          IconButton(
-            icon: const Icon(Icons.add, size: 18),
-            color: p,
-            onPressed: onPlus,
-            padding: const EdgeInsets.all(4),
-            constraints: const BoxConstraints(),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onPlus,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(Icons.add, size: 18, color: p),
+            ),
           ),
         ],
       ),
