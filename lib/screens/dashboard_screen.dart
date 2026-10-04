@@ -344,24 +344,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
           () => _goGated(const SupportTicketsScreen(),
               'Please login to access support')),
     ];
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 5,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 4,
-        childAspectRatio: 0.84,
-      ),
-      itemCount: items.length,
-      itemBuilder: (_, i) {
-        final (label, icon, c, onTap) = items[i];
-        return _denseTile(
-          icon: icon,
-          label: label,
-          tileColor: tiles[c][0],
-          iconColor: tiles[c][1],
-          onTap: onTap,
+    // Responsive column count + fixed row height (mainAxisExtent): the
+    // tile content is 50px icon + label (~71px total), so rows stay tight
+    // on every screen width instead of stretching into giant tap targets.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final cols = w < 480 ? 5 : (w < 900 ? 7 : 8);
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 4,
+            mainAxisExtent: 78,
+          ),
+          itemCount: items.length,
+          itemBuilder: (_, i) {
+            final (label, icon, c, onTap) = items[i];
+            return _denseTile(
+              icon: icon,
+              label: label,
+              tileColor: tiles[c][0],
+              iconColor: tiles[c][1],
+              onTap: onTap,
+            );
+          },
         );
       },
     );
