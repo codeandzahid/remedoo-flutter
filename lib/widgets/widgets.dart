@@ -1813,7 +1813,7 @@ class RPromoBanner extends StatelessWidget {
         gradient: gradient,
         borderRadius: BorderRadius.circular(20),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
+      padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1827,27 +1827,27 @@ class RPromoBanner extends StatelessWidget {
                       title,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 20,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 13,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
               if (illustration != null)
-                SizedBox(width: 96, height: 96, child: illustration),
+                SizedBox(width: 64, height: 64, child: illustration),
             ],
           ),
           if (pageCount != null && pageCount! > 1) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(pageCount!, (i) {
