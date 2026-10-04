@@ -35,8 +35,8 @@ class RemedooApp extends StatelessWidget {
       title: 'Remedoo - Patient Health App',
       debugShowCheckedModeBanner: false,
       navigatorKey: appNavigatorKey,
-      theme: RemedooTheme.light(state.brandPrimary),
-      darkTheme: RemedooTheme.dark(state.brandPrimary),
+      theme: RemedooTheme.light(),
+      darkTheme: RemedooTheme.dark(),
       themeMode: state.darkMode ? ThemeMode.dark : ThemeMode.light,
       home: const RootGate(),
     );

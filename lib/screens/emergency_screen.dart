@@ -21,7 +21,7 @@ const _quickContacts = [
 const _emergencyGradient = LinearGradient(
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
-  colors: [Color(0xFFE5484D), Color(0xFFF76B1C)],
+  colors: [Color(0xFFE5484D), Color(0xFFC81E1E)],
 );
 
 /// Emergency SOS: gradient banner, big SOS dial, quick contacts,
