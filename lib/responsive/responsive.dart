@@ -275,10 +275,7 @@ class ResponsiveScaffold extends StatelessWidget {
             key: const ValueKey('nav-drawer'),
             width: 288,
             decoration: BoxDecoration(
-              color: sidebarBg,
-              border: Border(
-                right: BorderSide(color: scheme.outlineVariant),
-              ),
+              color: scheme.primary.withValues(alpha: 0.05),
             ),
             child: Column(
               children: [

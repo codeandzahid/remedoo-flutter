@@ -1073,29 +1073,52 @@ class RButton extends StatelessWidget {
         ),
       ],
     );
-    final button = Material(
-      color: bg,
-      shape: RemedooTheme.pillButtons
-          ? StadiumBorder(side: side ?? BorderSide.none)
-          : RoundedRectangleBorder(
-              side: side ?? BorderSide.none,
-              borderRadius:
-                  BorderRadius.circular(RemedooTheme.buttonRadius),
+    final shape = RemedooTheme.pillButtons
+        ? StadiumBorder(side: side ?? BorderSide.none)
+        : RoundedRectangleBorder(
+            side: side ?? BorderSide.none,
+            borderRadius:
+                BorderRadius.circular(RemedooTheme.buttonRadius),
+          );
+    final button = Container(
+      decoration: BoxDecoration(
+        gradient: variant == RButtonVariant.primary
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [scheme.primary, RemedooTheme.primaryDark],
+              )
+            : null,
+        color: variant == RButtonVariant.primary ? null : bg,
+        borderRadius: RemedooTheme.pillButtons
+            ? BorderRadius.circular(999)
+            : BorderRadius.circular(RemedooTheme.buttonRadius),
+        border: side != null
+            ? Border.fromBorderSide(side)
+            : null,
+        boxShadow: variant == RButtonVariant.primary
+            ? [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: 0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        shape: shape,
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: shape,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: small ? 18 : 24,
+              vertical: small ? 10 : 14,
             ),
-      child: InkWell(
-        onTap: onPressed,
-        customBorder: RemedooTheme.pillButtons
-            ? const StadiumBorder()
-            : RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(RemedooTheme.buttonRadius),
-              ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: small ? 18 : 24,
-            vertical: small ? 10 : 14,
+            child: content,
           ),
-          child: content,
         ),
       ),
     );
@@ -2522,14 +2545,12 @@ class RSidebarNavTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final accent = dark ? RemedooTheme.darkAccent : RemedooTheme.accent;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           onTap: onTap,
           splashColor: scheme.primary.withValues(alpha: 0.12),
           highlightColor: scheme.primary.withValues(alpha: 0.08),
@@ -2537,94 +2558,62 @@ class RSidebarNavTile extends StatelessWidget {
             padding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              gradient: active
-                  ? LinearGradient(
-                      colors: [accent, accent.withValues(alpha: 0.6)],
-                    )
-                  : null,
-              borderRadius: BorderRadius.circular(16),
-              border: active
-                  ? Border.all(
-                      color: scheme.primary.withValues(alpha: 0.2))
-                  : null,
+              color: active
+                  ? scheme.primary
+                  : scheme.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: active
                   ? [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
+                        color: scheme.primary.withValues(alpha: 0.35),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
                     ]
                   : null,
             ),
-            child: Stack(
-              clipBehavior: Clip.none,
+            child: Row(
               children: [
-                if (active)
-                  Positioned(
-                    left: -16,
-                    top: 0,
-                    bottom: 0,
-                    child: Center(
-                      child: Container(
-                        width: 4,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: scheme.primary,
-                          borderRadius: const BorderRadius.horizontal(
-                            right: Radius.circular(2),
-                          ),
-                        ),
+                Icon(
+                  icon,
+                  size: 20,
+                  color: active
+                      ? Colors.white
+                      : scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight:
+                          active ? FontWeight.w700 : FontWeight.w600,
+                      color: active ? Colors.white : scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                if (badgeLabel != null && badgeLabel!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? Colors.white.withValues(alpha: 0.25)
+                          : scheme.primary,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badgeLabel!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                Row(
-                  children: [
-                    Icon(
-                      icon,
-                      size: 20,
-                      color: active
-                          ? scheme.primary
-                          : scheme.onSurfaceVariant
-                              .withValues(alpha: 0.6),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: active
-                              ? scheme.primary
-                              : scheme.onSurfaceVariant
-                                  .withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ),
-                    if (badgeLabel != null &&
-                        badgeLabel!.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: scheme.primary,
-                          borderRadius:
-                              BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          badgeLabel!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
               ],
             ),
           ),
@@ -2633,3 +2622,4 @@ class RSidebarNavTile extends StatelessWidget {
     );
   }
 }
+
