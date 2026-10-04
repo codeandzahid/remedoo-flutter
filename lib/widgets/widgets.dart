@@ -235,6 +235,7 @@ class EmptyState extends StatelessWidget {
   final String subtitle;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final bool compact;
 
   const EmptyState({
     super.key,
@@ -243,10 +244,56 @@ class EmptyState extends StatelessWidget {
     required this.subtitle,
     this.actionLabel,
     this.onAction,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: RemedooTheme.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon,
+                    size: 26, color: RemedooTheme.primary),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              if (actionLabel != null) ...[
+                const SizedBox(height: 10),
+                RButton(
+                  label: actionLabel!,
+                  onPressed: onAction,
+                  small: true,
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -1957,6 +2004,7 @@ class REmptyState extends StatelessWidget {
   final String subtitle;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final bool compact;
 
   const REmptyState({
     super.key,
@@ -1965,6 +2013,7 @@ class REmptyState extends StatelessWidget {
     required this.subtitle,
     this.actionLabel,
     this.onAction,
+    this.compact = false,
   });
 
   @override
@@ -1974,6 +2023,7 @@ class REmptyState extends StatelessWidget {
         subtitle: subtitle,
         actionLabel: actionLabel,
         onAction: onAction,
+        compact: compact,
       );
 }
 
@@ -2140,7 +2190,7 @@ class RGradientHeader extends StatelessWidget {
     super.key,
     required this.child,
     Gradient? gradient,
-    this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 28),
+    this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 20),
   }) : gradient = gradient ?? RemedooTheme.headerGradient;
 
   @override

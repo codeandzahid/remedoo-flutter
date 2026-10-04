@@ -176,7 +176,7 @@ class _MainShellState extends State<MainShell> {
   Widget _drawerHeader(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       alignment: Alignment.centerLeft,
       child: Row(
         children: [

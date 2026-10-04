@@ -149,17 +149,6 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
           child: Column(
             children: [
               _header(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: _promoBanner(),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-                child: RSectionHeader(
-                  title: '${list.length} doctors available',
-                  subtitle: 'Book consultation with best doctors',
-                ),
-              ),
               Expanded(
                 child: _loading
                     ? ListView.builder(
@@ -187,6 +176,20 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                                 padding: const EdgeInsets.fromLTRB(
                                     16, 0, 16, 16),
                                 children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                        top: 16),
+                                    child: _promoBanner(),
+                                  ),
+                                  Padding(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(
+                                            0, 20, 0, 12),
+                                    child: RSectionHeader(
+                                      title:
+                                          '${list.length} doctors available',
+                                    ),
+                                  ),
                                   StaggerItem(
                                     index: 0,
                                     child: RDenseGroup(
@@ -279,37 +282,26 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
             ),
           ),
           SizedBox(
-            height: 52,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _specialties.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final s = _specialties[i];
-                return Center(
-                  child: RFilterChip(
-                    label: s,
-                    selected: s == _specialty,
-                    onTap: () => setState(() => _specialty = s),
-                  ),
-                );
-              },
-            ),
-          ),
-          SizedBox(
-            height: 52,
+            height: 44,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
+                for (final sp in _specialties) ...[
+                  Center(
+                    child: RFilterChip(
+                      label: sp,
+                      selected: sp == _specialty,
+                      onTap: () => setState(() => _specialty = sp),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 Center(
-                  // Decorative in the React app too (no action attached).
-                  child: RFilterChip(
-                    label: 'Filter',
-                    icon: Icons.tune,
-                    selected: false,
-                    onTap: () {},
+                  child: Container(
+                    width: 1,
+                    height: 20,
+                    color: Theme.of(context).dividerColor,
                   ),
                 ),
                 const SizedBox(width: 8),

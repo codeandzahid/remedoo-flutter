@@ -38,8 +38,6 @@ class DoctorDetailScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 _aboutCard(context, d),
                 const SizedBox(height: 12),
-                _hospitalCard(context, d),
-                const SizedBox(height: 12),
                 _hoursCard(context),
               ],
             ),
@@ -55,7 +53,7 @@ class DoctorDetailScreen extends StatelessWidget {
   Widget _profileCard(BuildContext context, Doctor d) {
     final scheme = Theme.of(context).colorScheme;
     return RCard(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           Row(
@@ -63,7 +61,7 @@ class DoctorDetailScreen extends StatelessWidget {
             children: [
               Hero(
                 tag: 'doctor-avatar-${d.id}',
-                child: InitialsAvatar(name: d.name, radius: 40),
+                child: InitialsAvatar(name: d.name, radius: 36),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -109,6 +107,25 @@ class DoctorDetailScreen extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 13,
                               color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.business_outlined,
+                            size: 15,
+                            color: scheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            d.hospital,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: scheme.onSurfaceVariant),
+                          ),
                         ),
                       ],
                     ),
@@ -172,64 +189,6 @@ class DoctorDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _hospitalCard(BuildContext context, Doctor d) {
-    final scheme = Theme.of(context).colorScheme;
-    return RCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.business, size: 16, color: scheme.primary),
-              const SizedBox(width: 8),
-              const Text('Hospital',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(d.hospital,
-              style:
-                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(Icons.location_on,
-                  size: 14, color: scheme.onSurfaceVariant),
-              const SizedBox(width: 4),
-              Text('Main Road, Srinagar',
-                  style: TextStyle(
-                      fontSize: 13, color: scheme.onSurfaceVariant)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          RButton(
-            label: 'Get Directions',
-            icon: Icons.directions,
-            variant: RButtonVariant.outline,
-            small: true,
-            fullWidth: true,
-            onPressed: () {
-              showResponsiveDialog(
-                context,
-                (_) => AlertDialog(
-                  title: const Text('Directions'),
-                  content: const Text(
-                      'Opening maps to the hospital… (demo)'),
-                  actions: [
-                    FilledButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('OK'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _hoursCard(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -281,7 +240,7 @@ class DoctorDetailScreen extends StatelessWidget {
   Widget _bookingPanel(BuildContext context, Doctor d) {
     final scheme = Theme.of(context).colorScheme;
     return RCard(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,

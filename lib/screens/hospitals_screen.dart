@@ -138,28 +138,7 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
               ),
               const SizedBox(height: 10),
               _filterRow(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: RPromoBanner(
-                  gradient: banner.$4,
-                  title: banner.$2,
-                  subtitle: banner.$3,
-                  illustration: Center(
-                    child: Text(banner.$1,
-                        style: const TextStyle(fontSize: 52)),
-                  ),
-                  pageCount: _banners.length,
-                  pageIndex: _bannerIdx,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-                child: RSectionHeader(
-                  title: '${list.length} hospitals near you',
-                  subtitle: 'Find the right hospital for your needs',
-                ),
-              ),
-              Expanded(child: _resultsBody(list)),
+              Expanded(child: _resultsBody(list, banner)),
             ],
           ),
         ),
@@ -239,7 +218,8 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
     );
   }
 
-  Widget _resultsBody(List<Hospital> list) {
+  Widget _resultsBody(List<Hospital> list,
+      (String, String, String, Gradient) banner) {
     Widget denseList({
       required int itemCount,
       required Widget Function(BuildContext, int) itemBuilder,
@@ -247,6 +227,26 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: RPromoBanner(
+              gradient: banner.$4,
+              title: banner.$2,
+              subtitle: banner.$3,
+              illustration: Center(
+                child: Text(banner.$1,
+                    style: const TextStyle(fontSize: 44)),
+              ),
+              pageCount: _banners.length,
+              pageIndex: _bannerIdx,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 16, 0, 10),
+            child: RSectionHeader(
+              title: '${list.length} hospitals near you',
+            ),
+          ),
           RDenseGroup(
             rows: [
               for (int i = 0; i < itemCount; i++) itemBuilder(context, i),

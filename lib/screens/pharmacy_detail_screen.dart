@@ -122,7 +122,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
   Widget _hero(Pharmacy p) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
-      height: 190,
+      height: 140,
       child: Stack(
         children: [
           Container(
@@ -139,7 +139,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
               ),
             ),
             child: const Center(
-              child: Text('💊', style: TextStyle(fontSize: 76)),
+              child: Text('💊', style: TextStyle(fontSize: 52)),
             ),
           ),
           SafeArea(

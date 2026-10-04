@@ -219,105 +219,77 @@ class EmergencyScreen extends StatelessWidget {
   Widget _hospitalCard(BuildContext context, Hospital h) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 8),
       child: RCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(12),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(h.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15)),
-                ),
-                if (h.hasIcu) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: RemedooTheme.success
-                          .withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text('ICU',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: RemedooTheme.success)),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-                '${h.location} • ${h.distanceKm.toStringAsFixed(1)} km',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: scheme.onSurfaceVariant)),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                RStat(
-                    icon: Icons.star,
-                    text: h.rating.toStringAsFixed(1)),
-                const SizedBox(width: 14),
-                RStat(icon: Icons.hotel, text: '${h.beds} beds'),
-                const SizedBox(width: 14),
-                RStat(
-                    icon: Icons.schedule,
-                    text: '${h.waitMin} min wait'),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: RButton(
-                    label: 'Call',
-                    icon: Icons.call,
-                    variant: RButtonVariant.danger,
-                    small: true,
-                    onPressed: () =>
-                        _callDialog(context, h.name, '0194-000000'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: RButton(
-                    label: 'Directions',
-                    icon: Icons.navigation,
-                    small: true,
-                    onPressed: () => showResponsiveDialog(
-                      context,
-                      (_) => AlertDialog(
-                        title: const Text('Directions'),
-                        content: Text(
-                            'Opening maps to ${h.name}… (demo)'),
-                        actions: [
-                          TextButton(
-                            onPressed: () =>
-                                Navigator.pop(context),
-                            child: const Text('OK'),
-                          ),
-                        ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(h.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14)),
                       ),
-                    ),
+                      if (h.hasIcu) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: RemedooTheme.success
+                                .withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text('ICU',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: RemedooTheme.success)),
+                        ),
+                      ],
+                    ],
                   ),
+                  const SizedBox(height: 3),
+                  Text(
+                      '${h.location} \u2022 ${h.distanceKm.toStringAsFixed(1)} km \u2022 '
+                      '\u2605 ${h.rating.toStringAsFixed(1)} \u2022 ${h.beds} beds \u2022 '
+                      '${h.waitMin} min wait',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RButton(
+                  label: 'Call',
+                  icon: Icons.call,
+                  variant: RButtonVariant.danger,
+                  small: true,
+                  onPressed: () =>
+                      _callDialog(context, h.name, '0194-000000'),
                 ),
                 if (AppStateScope.of(context).isSignedIn) ...[
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: RButton(
-                      label: 'Book',
-                      icon: Icons.calendar_month,
-                      variant: RButtonVariant.outline,
-                      small: true,
-                      onPressed: () {
+                  const SizedBox(height: 6),
+                  RButton(
+                    label: 'Book',
+                    icon: Icons.calendar_month,
+                    variant: RButtonVariant.outline,
+                    small: true,
+                    onPressed: () {
                       if (!checkLogin(
                           context, 'Please login to book appointments')) {
                         return;
@@ -337,7 +309,6 @@ class EmergencyScreen extends StatelessWidget {
                       );
                     },
                   ),
-                  ),
                 ],
               ],
             ),
@@ -346,6 +317,7 @@ class EmergencyScreen extends StatelessWidget {
       ),
     );
   }
+
 
   void _sosConfirm(BuildContext context) {
     showResponsiveDialog(

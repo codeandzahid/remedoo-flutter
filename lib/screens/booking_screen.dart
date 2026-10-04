@@ -131,22 +131,22 @@ class _BookingScreenState extends State<BookingScreen> {
         const SizedBox(height: 12),
         _testsCard(),
       ],
-      const SizedBox(height: 20),
+      const SizedBox(height: 14),
       _sectionTitle(Icons.calendar_month, 'Select Date'),
       const SizedBox(height: 10),
       _datePicker(),
-      const SizedBox(height: 20),
+      const SizedBox(height: 14),
       _sectionTitle(Icons.schedule, 'Select Time'),
       const SizedBox(height: 10),
       _timePicker(slots),
-      const SizedBox(height: 20),
+      const SizedBox(height: 14),
       RTextField(
         label: 'Notes (optional)',
         hint: 'Anything the doctor should know…',
         controller: _notes,
         maxLines: 2,
       ),
-      const SizedBox(height: 20),
+      const SizedBox(height: 14),
       _sectionTitle(Icons.credit_card, 'Payment Method'),
       const SizedBox(height: 10),
       _payCard('At Clinic', 'Pay when you visit', Icons.payments_outlined),
@@ -308,7 +308,7 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget _datePicker() {
     final scheme = Theme.of(context).colorScheme;
     return SizedBox(
-      height: 84,
+      height: 72,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _days.length,

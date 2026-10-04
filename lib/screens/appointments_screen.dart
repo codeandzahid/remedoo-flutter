@@ -73,7 +73,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
                         'Appointments (${state.appointments.length})',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -123,7 +123,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
         borderRadius: BorderRadius.circular(14),
         onTap: () => _tabs.animateTo(index),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(
             label,
             textAlign: TextAlign.center,
@@ -170,7 +170,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: RCard(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         onTap: () =>
             pushPage(context, AppointmentDetailScreen(appointment: a)),
         child: Column(
@@ -178,7 +178,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
           children: [
             Row(
               children: [
-                InitialsAvatar(name: a.doctorName, radius: 26),
+                InitialsAvatar(name: a.doctorName, radius: 22),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

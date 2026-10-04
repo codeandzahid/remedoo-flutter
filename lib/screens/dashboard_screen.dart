@@ -112,9 +112,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           StaggerItem(index: 0, child: _categories()),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
                           StaggerItem(index: 1, child: _illustratedBanner()),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
                           StaggerItem(
                             index: 2,
                             child: RSectionHeader(
@@ -126,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           StaggerItem(
                               index: 3, child: _doctorRows(popularDoctors)),
                           if (state.isSignedIn) ...[
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 14),
                             StaggerItem(
                               index: 4,
                               child: RSectionHeader(
@@ -138,7 +138,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(height: 8),
                             StaggerItem(index: 5, child: _familyRow(state)),
                           ],
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
                           StaggerItem(
                             index: 6,
                             child: RSectionHeader(
@@ -298,9 +298,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               SkeletonBox(width: 58, height: 58, radius: 18),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           const SkeletonBox(height: 148, radius: 20),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           const SkeletonCard(),
           const SizedBox(height: 12),
           const SkeletonCard(),
@@ -565,6 +565,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _upcomingPill(AppState state) {
     final n =
         state.appointments.where((a) => a.status == 'upcoming').length;
+    if (n == 0) return const SizedBox.shrink();
     return GestureDetector(
       onTap: () => _goGated(const AppointmentsScreen()),
       child: Container(
@@ -614,6 +615,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       subtitle: 'Book your visit today!',
       actionLabel: 'Book Now',
       onAction: () => _goGated(const DoctorsScreen()),
+      compact: true,
     );
   }
 

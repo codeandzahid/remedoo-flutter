@@ -215,26 +215,22 @@ class _RemedooPharmacyScreenState extends State<RemedooPharmacyScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
-                children: categories
-                    .map((c) => Padding(
-                          padding:
-                              const EdgeInsets.only(right: 8),
-                          child: RFilterChip(
-                            label: c,
-                            selected: _category == c,
-                            onTap: () =>
-                                setState(() => _category = c),
-                          ),
-                        ))
-                    .toList(),
+                children: [
+                  ...categories.map((c) => Padding(
+                        padding:
+                            const EdgeInsets.only(right: 8),
+                        child: RFilterChip(
+                          label: c,
+                          selected: _category == c,
+                          onTap: () =>
+                              setState(() => _category = c),
+                        ),
+                      )),
+                  _sortPill(),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: _sortPill(),
-            ),
+            const SizedBox(height: 12),
           ],
         ),
       ),

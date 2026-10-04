@@ -185,7 +185,7 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
   Widget _hero(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
-      height: 210,
+      height: 150,
       child: Stack(
         children: [
           Container(
@@ -203,7 +203,7 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
             ),
             child: const Center(
               child: Text('🔬',
-                  style: TextStyle(fontSize: 84, color: Colors.white)),
+                  style: TextStyle(fontSize: 52, color: Colors.white)),
             ),
           ),
           Container(
@@ -461,6 +461,24 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w800,
                                     fontSize: 14)),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              height: 30,
+                              child: sel
+                                  ? RButton(
+                                      label: 'ADDED',
+                                      small: true,
+                                      onPressed: () => setState(() =>
+                                          _selected.remove(t.id)),
+                                    )
+                                  : RButton(
+                                      label: 'ADD',
+                                      small: true,
+                                      variant: RButtonVariant.outline,
+                                      onPressed: () => setState(() =>
+                                          _selected.add(t.id)),
+                                    ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -519,47 +537,10 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
                       'After the Test',
                       'You can resume normal activities immediately. '
                       'Consult your doctor to interpret the results — do not self-diagnose.'),
-                  const SizedBox(height: 10),
-                  RButton(
-                    label: sel ? 'Added — tap to remove' : 'ADD',
-                    small: true,
-                    fullWidth: true,
-                    variant: sel
-                        ? RButtonVariant.primary
-                        : RButtonVariant.outline,
-                    onPressed: () => setState(() => sel
-                        ? _selected.remove(t.id)
-                        : _selected.add(t.id)),
-                  ),
                 ],
               ),
             )
-          else
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-              child: Row(
-                children: [
-                  const Spacer(),
-                  SizedBox(
-                    height: 32,
-                    child: sel
-                        ? RButton(
-                            label: 'ADDED',
-                            small: true,
-                            onPressed: () => setState(
-                                () => _selected.remove(t.id)),
-                          )
-                        : RButton(
-                            label: 'ADD',
-                            small: true,
-                            variant: RButtonVariant.outline,
-                            onPressed: () => setState(
-                                () => _selected.add(t.id)),
-                          ),
-                  ),
-                ],
-              ),
-            ),
+
         ],
       ),
     );

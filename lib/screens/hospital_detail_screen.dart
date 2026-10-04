@@ -258,10 +258,26 @@ class HospitalDetailScreen extends StatelessWidget {
                           fontWeight: FontWeight.w600)),
                 ],
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.location_on_outlined,
+                      size: 15, color: scheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(h.location,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: scheme.onSurfaceVariant)),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         RCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -299,7 +315,7 @@ class HospitalDetailScreen extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         RCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,7 +417,7 @@ class HospitalDetailScreen extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         RCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,50 +457,8 @@ class HospitalDetailScreen extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        RCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.navigation_outlined,
-                      size: 16, color: scheme.primary),
-                  const SizedBox(width: 8),
-                  const Text('Location',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 15)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(h.location,
-                  style: TextStyle(
-                      fontSize: 13, color: scheme.onSurfaceVariant)),
-              const SizedBox(height: 12),
-              RButton(
-                label: 'Get Directions',
-                icon: Icons.navigation_outlined,
-                variant: RButtonVariant.outline,
-                small: true,
-                fullWidth: true,
-                onPressed: () => showDialog(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: const Text('Directions'),
-                    content: const Text('Opening maps… (demo)'),
-                    actions: [
-                      FilledButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('OK'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
+
+        const SizedBox(height: 12),
         RCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -499,25 +473,26 @@ class HospitalDetailScreen extends StatelessWidget {
                           fontWeight: FontWeight.w700, fontSize: 15)),
                 ],
               ),
-              const SizedBox(height: 10),
-              ..._facilities.map((f) => Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 5),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle,
-                            size: 17, color: RemedooTheme.success),
-                        const SizedBox(width: 10),
-                        Expanded(
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _facilities
+                    .map((f) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: RemedooTheme.success
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                           child: Text(f,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style:
-                                  const TextStyle(fontSize: 13.5)),
-                        ),
-                      ],
-                    ),
-                  )),
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500)),
+                        ))
+                    .toList(),
+              ),
             ],
           ),
         ),
@@ -567,7 +542,7 @@ class HospitalDetailScreen extends StatelessWidget {
               style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           RButton(
             label: 'Book Appointment',
             fullWidth: true,
