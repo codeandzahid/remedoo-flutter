@@ -4,6 +4,7 @@ import '../models.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../widgets/upi_payment_sheet.dart';
+import 'online_payment_screen.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'appointments_screen.dart';
@@ -114,7 +115,7 @@ class _BookingScreenState extends State<BookingScreen> {
     return null;
   }
 
-  void _confirm(bool isReschedule) {
+  void _confirm(bool isReschedule) async {
     if (!checkLogin(context, 'Please login to book appointments')) return;
     final state = AppStateScope.of(context);
     if (isReschedule) {
@@ -127,6 +128,27 @@ class _BookingScreenState extends State<BookingScreen> {
         const SnackBar(content: Text('Appointment rescheduled!')),
       );
     } else {
+      // "Pay Online" opens the payment page first — the appointment is
+      // only booked after the user completes (or skips) payment there.
+      if (_payment == 'Pay Online') {
+        final upiId = _providerUpiId(state);
+        final orderId =
+            'APT${DateTime.now().millisecondsSinceEpoch}';
+        final paid = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OnlinePaymentScreen(
+              amount: widget.fee,
+              recipientName: widget.title,
+              recipientUpiId: upiId,
+              orderId: orderId,
+              orderLabel: 'Appointment Fee',
+            ),
+          ),
+        );
+        // Payment page dismissed or payment not completed: do not book.
+        if (paid != true || !mounted) return;
+      }
       // If UPI payment selected, show the UPI payment sheet first.
       if (_payment == 'UPI') {
         final upiId = _providerUpiId(state);

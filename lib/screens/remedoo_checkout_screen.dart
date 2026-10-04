@@ -5,6 +5,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import '../widgets/upi_payment_sheet.dart';
+import 'online_payment_screen.dart';
 
 /// Checkout for the Remedoo Pharmacy store — matches RemedooCheckout.tsx:
 /// plain sticky header, order summary with (Rx) tags + dashed divider,
@@ -123,7 +124,7 @@ class _RemedooCheckoutScreenState
     );
   }
 
-  void _placeOrder(AppState state) {
+  void _placeOrder(AppState state) async {
     if (!checkLogin(context)) return;
     if (_address.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -131,6 +132,30 @@ class _RemedooCheckoutScreenState
             content: Text('Please enter a delivery address')),
       );
       return;
+    }
+    // "Pay Online" opens the payment page first — the order is only
+    // placed after the user completes payment there.
+    if (_payment == 'Pay Online') {
+      final pharmacies = state.activePharmacies
+          .where((p) => p.id == state.cartPharmacyId);
+      final pharmacy =
+          pharmacies.isNotEmpty ? pharmacies.first : null;
+      final total = state.cartTotal + state.deliveryFee;
+      final orderId = 'ORD${DateTime.now().millisecondsSinceEpoch}';
+      final paid = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OnlinePaymentScreen(
+            amount: total,
+            recipientName: pharmacy?.name ?? 'Pharmacy',
+            recipientUpiId: pharmacy?.upiId,
+            orderId: orderId,
+            orderLabel: 'Order Total',
+          ),
+        ),
+      );
+      // Payment page dismissed or payment not completed: do not order.
+      if (paid != true || !mounted) return;
     }
     // If UPI selected, show the provider's UPI payment sheet first.
     if (_payment == 'UPI') {

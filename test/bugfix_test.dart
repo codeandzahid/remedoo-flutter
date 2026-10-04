@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:remedoo_app/data/mock_data.dart';
 import 'package:remedoo_app/screens/appointments_screen.dart';
 import 'package:remedoo_app/screens/booking_screen.dart';
+import 'package:remedoo_app/screens/online_payment_screen.dart';
 import 'package:remedoo_app/screens/main_shell.dart';
 import 'package:remedoo_app/screens/profile_screen.dart';
 import 'package:remedoo_app/screens/remedoo_pharmacy_screen.dart';
@@ -113,10 +114,8 @@ void main() {
       expect(target.evaluate().isNotEmpty, isTrue);
     }
 
-    // Payment cards live below the fold on phones — scroll them into view.
+    // "Pay Online" now opens the payment page instead of booking directly.
     await reveal(find.text('Pay Online'));
-
-    // Payment method radio toggles.
     final payOnlineCard = find.ancestor(
       of: find.text('Pay Online'),
       matching: find.byType(InkWell),
@@ -125,7 +124,6 @@ void main() {
     await tester.tap(payOnlineCard);
     await tester.pump();
 
-    // Scroll to the confirm button and complete the booking.
     await tester.drag(pageList, const Offset(0, -10000));
     await tester.pumpAndSettle();
     final confirmBtn = find.ancestor(
@@ -136,9 +134,66 @@ void main() {
     await tester.tap(confirmBtn);
     await tester.pumpAndSettle();
 
+    // Payment page opens; nothing is booked yet.
+    expect(find.byType(OnlinePaymentScreen), findsOneWidget);
+    expect(state.appointments, isEmpty);
+
+    // Cancelling the payment page leaves the booking unmade.
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(OnlinePaymentScreen), findsNothing);
+    expect(state.appointments, isEmpty);
+  });
+
+  testWidgets('booking with At Clinic payment books directly',
+      (tester) async {
+    usePhoneSize(tester);
+    final state = AppState();
+    state.login(name: 'Test User', email: 'test@example.com');
+    final d = doctors.first;
+    await tester.pumpWidget(_wrap(
+        BookingScreen(
+          kind: 'doctor',
+          refId: d.id,
+          title: d.name,
+          subtitle: d.specialty,
+          place: d.hospital,
+          fee: d.fee,
+        ),
+        state));
+    await tester.pumpAndSettle();
+
+    final pageList = find.byWidgetPredicate(
+      (w) => w is ListView && w.scrollDirection == Axis.vertical,
+    );
+    Future<void> reveal(Finder target) async {
+      for (var i = 0; i < 20 && target.evaluate().isEmpty; i++) {
+        await tester.drag(pageList, const Offset(0, -500));
+        await tester.pumpAndSettle();
+      }
+      expect(target.evaluate().isNotEmpty, isTrue);
+    }
+
+    await reveal(find.text('At Clinic'));
+    final atClinicCard = find.ancestor(
+      of: find.text('At Clinic'),
+      matching: find.byType(InkWell),
+    );
+    await tester.tap(atClinicCard);
+    await tester.pump();
+
+    await tester.drag(pageList, const Offset(0, -10000));
+    await tester.pumpAndSettle();
+    final confirmBtn = find.ancestor(
+      of: find.textContaining('Confirm Booking'),
+      matching: find.byType(FilledButton),
+    );
+    await tester.tap(confirmBtn);
+    await tester.pumpAndSettle();
+
     expect(state.appointments, hasLength(1));
     expect(state.appointments.first.doctorName, d.name);
-    expect(state.appointments.first.payment, 'Pay Online');
+    expect(state.appointments.first.payment, 'At Clinic');
     expect(find.byType(AppointmentsScreen), findsOneWidget);
   });
 
