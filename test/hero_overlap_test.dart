@@ -12,34 +12,7 @@ Widget _wrap(Widget child, AppState state) {
 }
 
 void main() {
-  testWidgets('lab hero illustration does not overlap info card',
-      (tester) async {
-    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
-    tester.view.devicePixelRatio = 3.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    final state = AppState();
-    state.login(name: 'Test', email: 'test@example.com');
-    await tester.pumpWidget(_wrap(LabDetailScreen(lab: labs.first), state));
-    await tester.pumpAndSettle();
-    // Ignore unrelated pre-existing row overflows; we only assert hero vs card.
-    while (tester.takeException() != null) {}
-
-    // Find the hero emoji and the info card (RCard containing lab name).
-    final emoji = find.text('🔬');
-    expect(emoji, findsOneWidget);
-    final emojiBox = tester.getRect(emoji);
-
-    final nameText = find.text(labs.first.name);
-    expect(nameText, findsOneWidget);
-    final nameBox = tester.getRect(nameText);
-
-    // The lab name (top of info card) must start below the hero emoji.
-    expect(nameBox.top, greaterThan(emojiBox.bottom),
-        reason:
-            'info card top (${nameBox.top}) should be below hero emoji bottom (${emojiBox.bottom})');
-  });
-
-  testWidgets('pharmacy hero illustration does not overlap info card',
+  testWidgets('pharmacy detail: clean top bar, name visible, no hero blocking',
       (tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3.0;
@@ -48,19 +21,92 @@ void main() {
     state.login(name: 'Test', email: 'test@example.com');
     await tester.pumpWidget(
         _wrap(PharmacyDetailScreen(pharmacy: pharmacies.first), state));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
     while (tester.takeException() != null) {}
 
-    final emoji = find.text('💊');
-    expect(emoji, findsOneWidget);
-    final emojiBox = tester.getRect(emoji);
+    // Top bar with title and working back button (no giant hero).
+    expect(find.text('Pharmacy Details'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    // No oversized hero illustration: the only pill emoji left is the
+    // small 40px info-card icon.
+    final bigEmoji = find.byWidgetPredicate(
+      (w) =>
+          w is Text &&
+          w.data == '💊' &&
+          (w.style?.fontSize ?? 0) >= 48,
+    );
+    expect(bigEmoji, findsNothing);
+    // Pharmacy name is visible near the top inside the info card.
+    expect(find.text(pharmacies.first.name), findsOneWidget);
+  });
 
-    final nameText = find.text(pharmacies.first.name);
-    expect(nameText, findsOneWidget);
-    final nameBox = tester.getRect(nameText);
+  testWidgets('lab detail: clean top bar, name visible, no hero blocking',
+      (tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    final state = AppState();
+    state.login(name: 'Test', email: 'test@example.com');
+    await tester.pumpWidget(
+        _wrap(LabDetailScreen(lab: labs.first), state));
+    await tester.pump(const Duration(seconds: 1));
+    while (tester.takeException() != null) {}
 
-    expect(nameBox.top, greaterThan(emojiBox.bottom),
-        reason:
-            'info card top (${nameBox.top}) should be below hero emoji bottom (${emojiBox.bottom})');
+    expect(find.text('Lab Details'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    // No oversized hero illustration: the only microscope emoji left is the
+    // small 40px info-card icon.
+    final bigEmoji = find.byWidgetPredicate(
+      (w) =>
+          w is Text &&
+          w.data == '🔬' &&
+          (w.style?.fontSize ?? 0) >= 48,
+    );
+    expect(bigEmoji, findsNothing);
+    // Lab name is visible near the top inside the info card.
+    expect(find.text(labs.first.name), findsOneWidget);
+  });
+
+  testWidgets('pharmacy back button pops the detail screen', (tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    final state = AppState();
+    state.login(name: 'Test', email: 'test@example.com');
+    await tester.pumpWidget(AppStateScope(
+      state: state,
+      child: MaterialApp(
+        home: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AppStateScope(
+                  state: state,
+                  child:
+                      PharmacyDetailScreen(pharmacy: pharmacies.first),
+                ),
+              ),
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('open'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    while (tester.takeException() != null) {}
+    expect(find.text('Pharmacy Details'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    // Popped back to the opener — detail screen is gone.
+    expect(find.text('Pharmacy Details'), findsNothing);
+    expect(find.text('open'), findsOneWidget);
   });
 }

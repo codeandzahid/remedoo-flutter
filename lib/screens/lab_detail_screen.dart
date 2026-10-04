@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../state/app_state.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
+import 'main_shell.dart';
 
 const _testSortOptions = [
   'Relevance',
@@ -99,15 +100,17 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
     ];
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _hero(context)),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: _infoCard(l),
+      body: SafeArea(
+        top: true,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: _topBar(context)),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: _infoCard(l),
+              ),
             ),
-          ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -145,8 +148,9 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
                   ],
                 ),
               ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
       bottomSheet: Container(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -176,62 +180,37 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
     );
   }
 
-  Widget _hero(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return SizedBox(
-      height: 150,
-      child: Stack(
+  /// Robust back: pops when possible, otherwise returns to the dashboard
+  /// (covers deep links where there is nothing to pop).
+  void _goBack() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainShell()),
+        (r) => false,
+      );
+    }
+  }
+
+  Widget _topBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Row(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: dark
-                    ? [RemedooTheme.darkSecondary, RemedooTheme.darkCard]
-                    : [
-                        const Color(0xFFD9EFE9),
-                        const Color(0xFFEFF8F4),
-                      ],
-              ),
-            ),
-            child: const Center(
-              child: Text('🔬',
-                  style: TextStyle(fontSize: 48)),
-            ),
+          _BackCircle(onTap: _goBack),
+          const SizedBox(width: 12),
+          const Text('Lab Details',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          const Spacer(),
+          _BackCircle(
+            icon: _showSearch ? Icons.close : Icons.search,
+            onTap: () =>
+                setState(() => _showSearch = !_showSearch),
           ),
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Color(0x99000000)],
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Row(
-                children: [
-                  _CircleBtn(
-                    icon: Icons.arrow_back,
-                    onTap: () => Navigator.maybePop(context),
-                  ),
-                  const Spacer(),
-                  _CircleBtn(
-                    icon: _showSearch ? Icons.close : Icons.search,
-                    onTap: () =>
-                        setState(() => _showSearch = !_showSearch),
-                  ),
-                  const SizedBox(width: 8),
-                  _CircleBtn(
-                    child: FavoriteButton(favKey: 'lab:${widget.lab.id}'),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          const SizedBox(width: 8),
+          _FavCircle(favKey: 'lab:${widget.lab.id}'),
         ],
       ),
     );
@@ -246,6 +225,18 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Center(
+                  child: Text('🔬', style: TextStyle(fontSize: 40)),
+                ),
+              ),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -586,41 +577,51 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
   }
 }
 
-class _CircleBtn extends StatelessWidget {
-  final IconData? icon;
-  final Widget? child;
-  final VoidCallback? onTap;
+class _BackCircle extends StatelessWidget {
+  final VoidCallback onTap;
+  final IconData icon;
 
-  const _CircleBtn({this.icon, this.child, this.onTap});
+  const _BackCircle(
+      {required this.onTap, this.icon = Icons.arrow_back});
 
   @override
   Widget build(BuildContext context) {
-    final btn = Container(
-      width: 38,
-      height: 38,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Center(
-        child: child ?? Icon(icon, size: 19, color: Colors.black87),
-      ),
-    );
-    if (onTap == null) return btn;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Colors.transparent,
+      color:
+          dark ? RemedooTheme.darkSecondary : RemedooTheme.mutedSurface,
+      shape: const CircleBorder(),
       child: InkWell(
         onTap: onTap,
         customBorder: const CircleBorder(),
-        child: btn,
+        child: SizedBox(
+          width: 38,
+          height: 38,
+          child: Icon(icon, size: 20),
+        ),
       ),
+    );
+  }
+}
+
+class _FavCircle extends StatelessWidget {
+  final String favKey;
+
+  const _FavCircle({required this.favKey});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: dark
+            ? RemedooTheme.darkSecondary
+            : RemedooTheme.mutedSurface,
+        shape: BoxShape.circle,
+      ),
+      child: Center(child: FavoriteButton(favKey: favKey)),
     );
   }
 }

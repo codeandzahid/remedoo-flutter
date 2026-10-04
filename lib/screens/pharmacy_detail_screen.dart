@@ -8,8 +8,9 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'cart_screen.dart';
+import 'main_shell.dart';
 
-/// Pharmacy detail: hero header, overlapping info card, category chips,
+/// Pharmacy detail: top bar, info card with icon, category chips,
 /// medicine list with ADD → stepper, sticky cart bar — matches PharmacyDetail.tsx.
 ///
 /// ADD→stepper and detail-sheet add-to-cart behavior kept exactly as before;
@@ -112,53 +113,41 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
       ...{for (final m in medicinesForPharmacy(p.id)) m.category}
     ];
     return Scaffold(
-      body: context.isCompact
-          ? _compactBody(state, p, list, categories)
-          : _wideBody(state, p, list, categories),
+      body: SafeArea(
+        top: true,
+        child: context.isCompact
+            ? _compactBody(state, p, list, categories)
+            : _wideBody(state, p, list, categories),
+      ),
       bottomSheet: state.cartCount > 0 ? _cartBar(state) : null,
     );
   }
 
-  Widget _hero(Pharmacy p) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return SizedBox(
-      height: 140,
-      child: Stack(
+  /// Robust back: pops when possible, otherwise returns to the dashboard
+  /// (covers deep links where there is nothing to pop).
+  void _goBack() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainShell()),
+        (r) => false,
+      );
+    }
+  }
+
+  Widget _topBar(Pharmacy p) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Row(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: dark
-                    ? [RemedooTheme.darkSecondary, RemedooTheme.darkCard]
-                    : [
-                        const Color(0xFFF0E8DC),
-                        const Color(0xFFF9F5EE),
-                      ],
-              ),
-            ),
-            child: const Center(
-              child: Text('💊', style: TextStyle(fontSize: 48)),
-            ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Row(
-                children: [
-                  _CircleBtn(
-                    icon: Icons.arrow_back,
-                    onTap: () => Navigator.maybePop(context),
-                  ),
-                  const Spacer(),
-                  _CircleBtn(
-                    child: FavoriteButton(favKey: 'pharmacy:${p.id}'),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _BackCircle(onTap: _goBack),
+          const SizedBox(width: 12),
+          const Text('Pharmacy Details',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          const Spacer(),
+          _FavCircle(favKey: 'pharmacy:${p.id}'),
         ],
       ),
     );
@@ -168,7 +157,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
       List<String> categories) {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(child: _hero(p)),
+        SliverToBoxAdapter(child: _topBar(p)),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -201,7 +190,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
       List<String> categories) {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(child: _hero(p)),
+        SliverToBoxAdapter(child: _topBar(p)),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -241,24 +230,49 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(p.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.w800)),
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Center(
+                  child: Text('💊', style: TextStyle(fontSize: 40)),
+                ),
               ),
-              if (p.verified)
-                Icon(Icons.verified,
-                    color: RemedooTheme.primary, size: 20),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(p.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 17, fontWeight: FontWeight.w800)),
+                        ),
+                        if (p.verified)
+                          Icon(Icons.verified,
+                              color: RemedooTheme.primary, size: 20),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                        '${p.deliveryTime} • ${p.itemCount} items • ${p.location}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text('${p.deliveryTime} • ${p.itemCount} items • ${p.location}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  fontSize: 12.5, color: scheme.onSurfaceVariant)),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -600,41 +614,49 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
   }
 }
 
-class _CircleBtn extends StatelessWidget {
-  final IconData? icon;
-  final Widget? child;
-  final VoidCallback? onTap;
+class _BackCircle extends StatelessWidget {
+  final VoidCallback onTap;
 
-  const _CircleBtn({this.icon, this.child, this.onTap});
+  const _BackCircle({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final btn = Container(
-      width: 38,
-      height: 38,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Center(
-        child: child ?? Icon(icon, size: 19, color: Colors.black87),
-      ),
-    );
-    if (onTap == null) return btn;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Colors.transparent,
+      color:
+          dark ? RemedooTheme.darkSecondary : RemedooTheme.mutedSurface,
+      shape: const CircleBorder(),
       child: InkWell(
         onTap: onTap,
         customBorder: const CircleBorder(),
-        child: btn,
+        child: const SizedBox(
+          width: 38,
+          height: 38,
+          child: Icon(Icons.arrow_back, size: 20),
+        ),
       ),
+    );
+  }
+}
+
+class _FavCircle extends StatelessWidget {
+  final String favKey;
+
+  const _FavCircle({required this.favKey});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: dark
+            ? RemedooTheme.darkSecondary
+            : RemedooTheme.mutedSurface,
+        shape: BoxShape.circle,
+      ),
+      child: Center(child: FavoriteButton(favKey: favKey)),
     );
   }
 }
