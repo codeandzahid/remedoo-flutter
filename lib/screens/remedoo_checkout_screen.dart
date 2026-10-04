@@ -4,6 +4,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/upi_payment_sheet.dart';
 
 /// Checkout for the Remedoo Pharmacy store — matches RemedooCheckout.tsx:
 /// plain sticky header, order summary with (Rx) tags + dashed divider,
@@ -127,6 +128,31 @@ class _RemedooCheckoutScreenState
             content: Text('Please enter a delivery address')),
       );
       return;
+    }
+    // If UPI selected, show the provider's UPI payment sheet first.
+    if (_payment == 'UPI') {
+      final pharmacies = state.activePharmacies
+          .where((p) => p.id == state.cartPharmacyId);
+      final upiId =
+          pharmacies.isNotEmpty ? pharmacies.first.upiId : null;
+      if (upiId == null || upiId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Pharmacy has not set up UPI yet. Please choose another payment method.')),
+        );
+        return;
+      }
+      final total = state.cartTotal + 30.0; // + delivery
+      final orderId = 'ORD${DateTime.now().millisecondsSinceEpoch}';
+      showUpiPaymentSheet(
+        context,
+        upiId: upiId,
+        providerName:
+            pharmacies.first.name,
+        amount: total,
+        orderId: orderId,
+      );
     }
     state.placeOrder(
       address: _address.text.trim(),

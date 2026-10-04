@@ -1818,6 +1818,7 @@ class AppState extends ChangeNotifier {
           FieldSpec(key: 'rating', label: 'Rating', type: 'number'),
           FieldSpec(key: 'exp', label: 'Experience (yrs)', type: 'number'),
           FieldSpec(key: 'verified', label: 'Verified', type: 'toggle'),
+          FieldSpec(key: 'upi_id', label: 'UPI ID'),
         ],
         read: () => doctors
             .map((d) => {
@@ -1828,6 +1829,7 @@ class AppState extends ChangeNotifier {
                   'fee': d.fee.toStringAsFixed(0),
                   'rating': d.rating.toString(),
                   'exp': d.expYears.toString(),
+                  'upi_id': d.upiId ?? '',
                   'verified': d.verified ? '1' : '0',
                 })
             .toList(),

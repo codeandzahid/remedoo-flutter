@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
+import '../widgets/upi_payment_sheet.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'appointments_screen.dart';
@@ -83,6 +84,21 @@ class _BookingScreenState extends State<BookingScreen> {
     super.dispose();
   }
 
+  /// Returns the provider's UPI ID if they have one set, null otherwise.
+  String? _providerUpiId(AppState state) {
+    if (widget.kind == 'doctor') {
+      final d = state.activeDoctors.where((d) => d.id == widget.refId);
+      if (d.isNotEmpty) return d.first.upiId;
+    } else if (widget.kind == 'lab') {
+      final l = state.activeLabs.where((l) => l.id == widget.refId);
+      if (l.isNotEmpty) return l.first.upiId;
+    } else if (widget.kind == 'hospital') {
+      final h = state.activeHospitals.where((h) => h.id == widget.refId);
+      if (h.isNotEmpty) return h.first.upiId;
+    }
+    return null;
+  }
+
   void _confirm(bool isReschedule) {
     if (!checkLogin(context, 'Please login to book appointments')) return;
     final state = AppStateScope.of(context);
@@ -96,6 +112,29 @@ class _BookingScreenState extends State<BookingScreen> {
         const SnackBar(content: Text('Appointment rescheduled!')),
       );
     } else {
+      // If UPI payment selected, show the UPI payment sheet first.
+      if (_payment == 'UPI') {
+        final upiId = _providerUpiId(state);
+        if (upiId == null || upiId.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Provider has not set up UPI yet. Please choose another payment method.')),
+          );
+          return;
+        }
+        final orderId =
+            'APT${DateTime.now().millisecondsSinceEpoch}';
+        showUpiPaymentSheet(
+          context,
+          upiId: upiId,
+          providerName: widget.title,
+          amount: widget.fee,
+          orderId: orderId,
+        );
+        // Book the appointment with UPI as payment method.
+        // The patient completes the UPI payment in their UPI app.
+      }
       state.bookAppointment(
         kind: widget.kind,
         refId: widget.refId,
@@ -152,6 +191,18 @@ class _BookingScreenState extends State<BookingScreen> {
       _payCard('At Clinic', 'Pay when you visit', Icons.payments_outlined),
       const SizedBox(height: 10),
       _payCard('Pay Online', 'Auto-confirm your slot', Icons.credit_card),
+      Builder(builder: (context) {
+        final upiId =
+            _providerUpiId(AppStateScope.of(context));
+        if (upiId == null || upiId.isEmpty) return const SizedBox.shrink();
+        return Column(
+          children: [
+            const SizedBox(height: 10),
+            _payCard('UPI', 'Pay directly to provider via UPI',
+                Icons.qr_code_2),
+          ],
+        );
+      }),
     ];
 
     final summary = _summaryCard();

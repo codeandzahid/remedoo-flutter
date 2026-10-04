@@ -40,6 +40,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _license = TextEditingController();
+  final _upiId = TextEditingController();
 
   @override
   void dispose() {
@@ -47,6 +48,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     _email.dispose();
     _phone.dispose();
     _license.dispose();
+    _upiId.dispose();
     super.dispose();
   }
 
@@ -241,6 +243,14 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
                         controller: _license,
                         prefixIcon:
                             const Icon(Icons.badge_outlined, size: 18),
+                      ),
+                      const SizedBox(height: 12),
+                      RTextField(
+                        label: 'UPI ID (for receiving payments)',
+                        hint: 'yourname@upi',
+                        controller: _upiId,
+                        prefixIcon:
+                            const Icon(Icons.qr_code_2, size: 18),
                       ),
                       const SizedBox(height: 20),
                       RButton(
