@@ -155,27 +155,20 @@ class RatingPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: RemedooTheme.success,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.star, size: 13, color: Colors.white),
-          const SizedBox(width: 3),
-          Text(
-            rating.toStringAsFixed(1),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.star_rounded, size: 15, color: Color(0xFFFFB300)),
+        const SizedBox(width: 3),
+        Text(
+          rating.toStringAsFixed(1),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -1628,13 +1621,22 @@ class RCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final radius = RemedooTheme.cardRadius + 4;
     final card = Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(RemedooTheme.cardRadius),
-        border: Border.all(color: Theme.of(context).dividerColor),
-        boxShadow: _isDark(context) ? null : RemedooTheme.softShadow,
+        color: scheme.primary.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: _isDark(context)
+            ? null
+            : [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
       ),
       child: Material(
         type: MaterialType.transparency,
@@ -1646,7 +1648,7 @@ class RCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(RemedooTheme.cardRadius),
+        borderRadius: BorderRadius.circular(radius),
         child: card,
       ),
     );
@@ -1682,16 +1684,19 @@ class RSearchBar extends StatelessWidget {
           fontFamily: RemedooTheme.fontFamily, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: Icon(Icons.search, color: scheme.onSurfaceVariant),
+        prefixIcon: Icon(Icons.search, color: scheme.primary),
         filled: true,
-        fillColor: scheme.surface,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
+        fillColor: scheme.primary.withValues(alpha: 0.08),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide(color: Theme.of(context).dividerColor),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: scheme.primary, width: 1.6),
         ),
         contentPadding:
@@ -1701,7 +1706,7 @@ class RSearchBar extends StatelessWidget {
   }
 }
 
-/// Bold dark title (+ optional gray subtitle) with an orange "See all" action.
+/// Title with a vertical theme-accent bar (+ optional subtitle) and "See all".
 class RSectionHeader extends StatelessWidget {
   final String title;
   final String? subtitle;
@@ -1720,6 +1725,15 @@ class RSectionHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Container(
+          width: 4,
+          height: 22,
+          margin: const EdgeInsets.only(right: 10, top: 1),
+          decoration: BoxDecoration(
+            color: scheme.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1727,7 +1741,7 @@ class RSectionHeader extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w700),
+                    fontSize: 17, fontWeight: FontWeight.w800),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
@@ -1762,7 +1776,7 @@ class RSectionHeader extends StatelessWidget {
   }
 }
 
-/// Small white pill with a border; selected = dark near-black pill, white text.
+/// Tinted rounded chip; selected = theme-primary filled, white text.
 class RFilterChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -1780,21 +1794,20 @@ class RFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final dark = _isDark(context);
-    final Color bg =
-        selected ? const Color(0xFF201410) : scheme.surface;
-    final Color fg =
-        selected ? Colors.white : (dark ? scheme.onSurface : RemedooTheme.ink);
+    final Color bg = selected
+        ? scheme.primary
+        : scheme.primary.withValues(alpha: 0.10);
+    final Color fg = selected ? Colors.white : scheme.primary;
     return Material(
       color: bg,
-      shape: StadiumBorder(
-        side: selected
-            ? BorderSide.none
-            : BorderSide(color: Theme.of(context).dividerColor),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
       child: InkWell(
         onTap: onTap,
-        customBorder: const StadiumBorder(),
+        customBorder: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           child: Row(
@@ -1811,7 +1824,7 @@ class RFilterChip extends StatelessWidget {
                   color: fg,
                   fontSize: 13,
                   fontWeight:
-                      selected ? FontWeight.w600 : FontWeight.w500,
+                      selected ? FontWeight.w700 : FontWeight.w600,
                 ),
               ),
             ],
@@ -1858,66 +1871,101 @@ class RPromoBanner extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         gradient: gradient,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Positioned(
+            right: -28,
+            top: -28,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            right: 52,
+            bottom: -40,
+            child: Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              color:
+                                  Colors.white.withValues(alpha: 0.85),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 12,
-                      ),
-                    ),
+                    if (illustration != null)
+                      SizedBox(
+                          width: 64, height: 64, child: illustration),
                   ],
                 ),
-              ),
-              if (illustration != null)
-                SizedBox(width: 64, height: 64, child: illustration),
-            ],
-          ),
-          if (pageCount != null && pageCount! > 1) ...[
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(pageCount!, (i) {
-                final active = i == pageIndex;
-                return Container(
-                  width: active ? 18 : 6,
-                  height: 6,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  decoration: BoxDecoration(
-                    color: active
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(4),
+                if (pageCount != null && pageCount! > 1) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(pageCount!, (i) {
+                      final active = i == pageIndex;
+                      return Container(
+                        width: active ? 18 : 6,
+                        height: 6,
+                        margin:
+                            const EdgeInsets.symmetric(horizontal: 3),
+                        decoration: BoxDecoration(
+                          color: active
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      );
+                    }),
                   ),
-                );
-              }),
+                ],
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 }
+
 
 /// Theme-tinted ribbon badge overlaid at the bottom of a listing image
 /// header (e.g. "ICU Available 24/7", "Government Hospital").
@@ -2050,50 +2098,65 @@ class RBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final bg = scheme.primary.withValues(alpha: 0.08);
     return SafeArea(
+      top: false,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Theme.of(context).dividerColor),
-          boxShadow: _isDark(context)
-              ? null
-              : [
-                  BoxShadow(
-                    color: const Color(0xFF3A2410).withValues(alpha: 0.10),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+          color: bg,
+          border: Border(
+            top: BorderSide(
+                color: scheme.primary.withValues(alpha: 0.18)),
+          ),
         ),
         child: Row(
           children: List.generate(_items.length, (i) {
             final active = i == currentIndex;
-            final color =
-                active ? scheme.primary : scheme.onSurfaceVariant;
             return Expanded(
               child: InkWell(
                 onTap: () => onTap(i),
-                borderRadius: BorderRadius.circular(24),
-                child: Padding(
+                borderRadius: BorderRadius.circular(16),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
                   padding:
-                      const EdgeInsets.symmetric(vertical: 10),
+                      const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? scheme.primary
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: active
+                        ? [
+                            BoxShadow(
+                              color: scheme.primary
+                                  .withValues(alpha: 0.35),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(active ? _items[i].$3 : _items[i].$2,
-                          size: 24, color: color),
-                      const SizedBox(height: 3),
+                          size: 22,
+                          color: active
+                              ? Colors.white
+                              : scheme.onSurfaceVariant),
+                      const SizedBox(height: 2),
                       Text(
                         _items[i].$1,
                         style: TextStyle(
                           fontFamily: RemedooTheme.fontFamily,
-                          fontSize: 11,
+                          fontSize: 10.5,
                           fontWeight: active
-                              ? FontWeight.w700
+                              ? FontWeight.w800
                               : FontWeight.w500,
-                          color: color,
+                          color: active
+                              ? Colors.white
+                              : scheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -2195,9 +2258,10 @@ class RGradientHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        gradient: gradient,
+        color: scheme.primary,
         borderRadius: const BorderRadius.vertical(
           bottom: Radius.circular(RemedooRadius.xxl),
         ),
@@ -2206,6 +2270,19 @@ class RGradientHeader extends StatelessWidget {
         children: [
           // Per-theme decorative artwork (clouds, waves, petals...).
           const HeaderArtwork(),
+          // Soft diagonal sheen for depth (solid, not a gradient wash).
+          Positioned(
+            left: -40,
+            top: -60,
+            child: Transform.rotate(
+              angle: -0.35,
+              child: Container(
+                width: 220,
+                height: 160,
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
           SafeArea(
             bottom: false,
             child: Padding(padding: padding, child: child),
