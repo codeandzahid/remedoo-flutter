@@ -148,10 +148,12 @@ class _MainShellState extends State<MainShell> {
             children: _pages,
           ),
         ),
-        bottomNavigationBar: RBottomNav(
-          currentIndex: _navIndexFor(_index),
-          onTap: (i) => _switchTab(_navToPage[i]),
-        ),
+        bottomNavigationBar: state.drawerOpen
+            ? null
+            : RBottomNav(
+                currentIndex: _navIndexFor(_index),
+                onTap: (i) => _switchTab(_navToPage[i]),
+              ),
         floatingActionButton: _supportFab(context),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       );

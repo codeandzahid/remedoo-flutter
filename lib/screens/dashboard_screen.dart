@@ -94,6 +94,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       drawer: _drawer(),
+      onDrawerChanged: (open) => state.drawerOpen = open,
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FocusTraversalGroup(

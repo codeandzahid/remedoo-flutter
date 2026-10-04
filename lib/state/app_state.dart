@@ -117,6 +117,16 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// True while the phone navigation drawer is open; the bottom nav
+  /// hides while the drawer is visible.
+  bool _drawerOpen = false;
+  bool get drawerOpen => _drawerOpen;
+  set drawerOpen(bool v) {
+    if (_drawerOpen == v) return;
+    _drawerOpen = v;
+    notifyListeners();
+  }
+
   /// True when a Supabase session, a mock login, OR a guest session is active.
   bool get isLoggedIn => _supaUser != null || _guest || _mockLoggedIn;
   bool get isGuest => _guest && _supaUser == null && !_mockLoggedIn;
