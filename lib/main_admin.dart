@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_navigator.dart';
+import 'services/auth_service.dart';
 import 'state/app_state.dart';
 import 'theme.dart';
 import 'screens/admin/admin_login_screen.dart';
@@ -56,6 +57,9 @@ class _AdminRootGateState extends State<AdminRootGate> {
 
   Future<void> _boot() async {
     final state = AppStateScope.of(context);
+    // Initialize Supabase first — the login screen needs the client.
+    await AuthService.instance.init();
+    await state.loadPersistedState();
     await state.checkAdminRole();
     if (mounted) setState(() => _ready = true);
   }
