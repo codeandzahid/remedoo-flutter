@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Remedoo — Email Verification</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(160deg, #0d9488 0%, #0a6e64 60%, #084f48 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: #fff;
+  }
+  .card {
+    background: #ffffff;
+    color: #1a2e2b;
+    border-radius: 24px;
+    padding: 48px 40px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+  }
+  .icon {
+    width: 84px; height: 84px;
+    border-radius: 50%;
+    margin: 0 auto 24px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px;
+  }
+  .icon.ok { background: #e6f7f3; }
+  .icon.fail { background: #fdecec; }
+  h1 { font-size: 22px; margin-bottom: 12px; }
+  p { font-size: 15px; color: #5b6f6c; line-height: 1.6; margin-bottom: 28px; }
+  .btn {
+    display: inline-block;
+    background: #0d9488;
+    color: #fff;
+    text-decoration: none;
+    padding: 14px 36px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .logo { font-weight: 800; font-size: 15px; color: #0d9488; letter-spacing: 2px; margin-bottom: 20px; }
+  #fail { display: none; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">REMEDOO</div>
+    <div id="ok">
+      <div class="icon ok">✅</div>
+      <h1>Your email has been verified</h1>
+      <p>Your account is ready. You can now sign in to the Remedoo app.</p>
+      <a class="btn" href="/">Open Remedoo</a>
+    </div>
+    <div id="fail">
+      <div class="icon fail">❌</div>
+      <h1>Verification failed</h1>
+      <p id="failmsg">This link is invalid or has expired. Please try again.</p>
+      <a class="btn" href="/">Back to Remedoo</a>
+    </div>
+  </div>
+<script>
+  (function () {
+    var q = window.location.search + window.location.hash;
+    var failed = /error/i.test(q);
+    if (failed) {
+      document.getElementById('ok').style.display = 'none';
+      document.getElementById('fail').style.display = 'block';
+      var m = q.match(/error_description=([^&]*)/);
+      if (m) {
+        try {
+          var d = decodeURIComponent(m[1].replace(/\+/g, ' '));
+          if (d) document.getElementById('failmsg').textContent = d + ' Please try again.';
+        } catch (e) {}
+      }
+    }
+    document.title = failed ? 'Remedoo — Verification failed' : 'Remedoo — Email verified';
+  })();
+</script>
+</body>
+</html>
