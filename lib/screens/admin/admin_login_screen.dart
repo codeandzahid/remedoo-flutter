@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../services/auth_service.dart';
@@ -24,6 +26,38 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   bool _obscure = true;
   bool _busy = false;
   String? _error;
+  String? _diag;
+
+  /// Tests basic connectivity to the Supabase backend and reports details.
+  Future<void> _testConnection() async {
+    setState(() {
+      _diag = 'Testing…';
+      _error = null;
+    });
+    final sb = StringBuffer();
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 10);
+      final req = await client.headUrl(
+          Uri.parse('https://zjlznbgcfzpcveqyjglf.supabase.co/rest/v1/'));
+      req.headers.set('apikey', 'test');
+      final resp =
+          await req.close().timeout(const Duration(seconds: 10));
+      sb.writeln('Internet: OK (server replied ${resp.statusCode})');
+      client.close();
+    } catch (e) {
+      sb.writeln('Internet: FAILED');
+      sb.writeln('$e'.split('\n').first);
+    }
+    try {
+      final inited = AuthService.instance.isInitialized;
+      sb.writeln(
+          'App backend: ${inited ? 'ready' : 'NOT ready — restart app'}');
+    } catch (e) {
+      sb.writeln('App backend: error');
+    }
+    if (mounted) setState(() => _diag = sb.toString().trim());
+  }
 
   @override
   void dispose() {
@@ -191,6 +225,30 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             onPressed:
                                 _busy ? null : _signIn,
                           ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: _busy ? null : _testConnection,
+                            child: const Text(
+                              'Test Connection',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          if (_diag != null) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: scheme.primary
+                                    .withValues(alpha: 0.08),
+                                borderRadius:
+                                    BorderRadius.circular(10),
+                              ),
+                              child: Text(_diag!,
+                                  style: TextStyle(
+                                      color: scheme.onSurface,
+                                      fontSize: 12)),
+                            ),
+                          ],
                         ],
                       ),
                     ),
