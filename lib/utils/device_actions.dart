@@ -83,7 +83,7 @@ Future<String?> fetchCurrentAddress() async {
           m.administrativeArea,
           m.postalCode,
           m.country,
-        ].where((s) => s != null && s!.trim().isNotEmpty).toList();
+        ].where((s) => s != null && s.trim().isNotEmpty).toList();
         if (parts.isNotEmpty) return parts.join(', ');
       }
     } catch (_) {
