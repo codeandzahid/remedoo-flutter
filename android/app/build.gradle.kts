@@ -23,6 +23,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        // Required for resValue() in product flavors (flavor app names).
+        resValues = true
+    }
+
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
