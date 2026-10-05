@@ -78,8 +78,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       // role change — nothing to pop.
       return;
     }
-    // Pop back to RootGate, which shows the AdminShell for role=admin.
-    Navigator.of(context).pop();
+    // Pop back to RootGate (through any intermediate login screens),
+    // which shows the AdminShell for role=admin.
+    Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
   @override

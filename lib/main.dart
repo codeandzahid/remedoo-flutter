@@ -83,7 +83,14 @@ class _RootGateState extends State<RootGate> {
       // No forced login screen: anyone without a session enters as a guest
       // and lands straight on the dashboard. The login screen only appears
       // when a gated action requires it.
-      if (!state.isLoggedIn) state.loginAsGuest();
+      if (!state.isLoggedIn) {
+        state.loginAsGuest();
+      } else {
+        // Returning admin session: restore the admin role so RootGate
+        // routes to the AdminShell instead of the patient view.
+        await state.checkAdminRole();
+        if (state.isAdmin) state.switchRole('admin');
+      }
       if (mounted) setState(() => _authReady = true);
     });
   }
