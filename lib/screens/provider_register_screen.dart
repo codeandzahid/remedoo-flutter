@@ -46,6 +46,7 @@ class _DocSlot {
   final String label;
   final String hint;
   PlatformFile? file;
+  int fileSize = 0;
 
   _DocSlot({required this.label, required this.hint});
 }
@@ -116,25 +117,28 @@ class _ProviderRegisterScreenState
   }
 
   Future<void> _pickDoc(_DocSlot slot) async {
-    final result = await FilePicker.platform.pickFiles(
+    final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-      withData: true,
     );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
-    if ((file.size) > _maxDocBytes) {
+    if (files.isEmpty) return;
+    final file = files.first;
+    final size = await file.xFile.length();
+    if (size > _maxDocBytes) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${file.name} is ${(_fileSize(file.size))}. Documents must be under 500 KB.',
+            '${file.name} is ${(_fileSize(size))}. Documents must be under 500 KB.',
           ),
         ),
       );
       return;
     }
-    setState(() => slot.file = file);
+    setState(() {
+      slot.file = file;
+      slot.fileSize = size;
+    });
   }
 
   String _fileSize(int bytes) {
@@ -195,13 +199,14 @@ class _ProviderRegisterScreenState
       'phone': _phone.text.trim(),
       'license_no': _license.text.trim(),
       'address': _address.text.trim(),
-      'documents': _docs
-          .map((d) => {
-                'kind': d.label.replaceAll(' *', ''),
-                'name': d.file?.name ?? '',
-                'size': d.file?.size ?? 0,
-              })
-          .toList(),
+      'documents': [
+        for (final d in _docs)
+          {
+            'kind': d.label.replaceAll(' *', ''),
+            'name': d.file?.name ?? '',
+            'size': d.fileSize,
+          },
+      ],
     });
     if (!mounted) return;
     setState(() => _busy = false);
@@ -629,7 +634,7 @@ class _DocUploadTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     hasFile
-                        ? '${slot.file!.name} (${(slot.file!.size / 1024).toStringAsFixed(1)} KB)'
+                        ? '${slot.file!.name} (${(slot.fileSize / 1024).toStringAsFixed(1)} KB)'
                         : slot.hint,
                     maxLines: 1,
                     overflow:

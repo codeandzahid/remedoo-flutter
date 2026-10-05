@@ -327,14 +327,12 @@ class _CartScreenState extends State<CartScreen> {
               onPressed: () async {
                 final messenger =
                     ScaffoldMessenger.of(context);
-                final result =
-                    await FilePicker.platform.pickFiles(
+                final files = await FilePicker.pickFiles(
                   type: FileType.custom,
                   allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-                  withData: true,
                 );
-                if (result == null || result.files.isEmpty) return;
-                final file = result.files.first;
+                if (files.isEmpty) return;
+                final file = files.first;
                 if (!context.mounted) return;
                 setState(() => _rxFileName = file.name);
                 messenger.showSnackBar(
