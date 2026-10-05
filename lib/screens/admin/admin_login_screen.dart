@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -76,10 +77,23 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       _busy = true;
       _error = null;
     });
-    final result = await AuthService.instance.signIn(
-      email: email,
-      password: _password.text,
-    );
+    AuthResult result;
+    try {
+      result = await AuthService.instance
+          .signIn(
+            email: email,
+            password: _password.text,
+          )
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error =
+            'Connection timed out. Check your internet and tap Test Connection below.';
+      });
+      return;
+    }
     if (!mounted) return;
     if (!result.ok) {
       setState(() {
