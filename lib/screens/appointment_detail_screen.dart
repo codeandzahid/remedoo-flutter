@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
+import '../app_navigator.dart';
 
 /// Appointment detail with cancel + reschedule.
 /// Mirrors the React AppointmentDetail page: orange gradient header with
@@ -36,7 +37,7 @@ class AppointmentDetailScreen extends StatelessWidget {
               children: [
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.maybePop(context),
+                  onPressed: () => goBack(context),
                 ),
                 Expanded(
                   child: Column(

@@ -4,10 +4,11 @@ import '../data/mock_data.dart';
 import '../models.dart';
 import '../responsive/animations.dart';
 import '../theme.dart';
+import '../utils/device_actions.dart';
 import '../state/app_state.dart';
+import '../app_navigator.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
-import 'main_shell.dart';
 
 const _testSortOptions = [
   'Relevance',
@@ -180,26 +181,12 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
     );
   }
 
-  /// Robust back: pops when possible, otherwise returns to the dashboard
-  /// (covers deep links where there is nothing to pop).
-  void _goBack() {
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    } else {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const MainShell()),
-        (r) => false,
-      );
-    }
-  }
-
   Widget _topBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Row(
         children: [
-          _BackCircle(onTap: _goBack),
+          _BackCircle(onTap: () => goBack(context)),
           const SizedBox(width: 12),
           const Text('Lab Details',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
@@ -312,14 +299,25 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
             ),
             child: Row(
               children: [
-                Icon(Icons.navigation_outlined,
-                    size: 14, color: scheme.primary),
-                const SizedBox(width: 6),
-                Text('Get Directions',
-                    style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: scheme.primary)),
+                GestureDetector(
+                  onTap: () => openDirections(
+                    context,
+                    name: l.name,
+                    address: l.location,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.navigation_outlined,
+                          size: 14, color: scheme.primary),
+                      const SizedBox(width: 6),
+                      Text('Get Directions',
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.primary)),
+                    ],
+                  ),
+                ),
                 const Spacer(),
                 if (l.nabl) const StatusChip(status: 'NABL Accredited'),
               ],

@@ -11,6 +11,7 @@ import 'hospital_detail_screen.dart';
 import 'lab_detail_screen.dart';
 import 'pharmacy_detail_screen.dart';
 import 'doctors_screen.dart';
+import '../app_navigator.dart';
 
 /// Saved favorites across doctors, hospitals, labs, pharmacies.
 class FavoritesScreen extends StatelessWidget {
@@ -32,7 +33,7 @@ class FavoritesScreen extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.arrow_back,
                       color: Colors.white),
-                  onPressed: () => Navigator.maybePop(context),
+                  onPressed: () => goBack(context),
                 ),
                 const SizedBox(width: 4),
                 const Text('Favorites',

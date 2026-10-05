@@ -8,6 +8,7 @@ import 'online_payment_screen.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'appointments_screen.dart';
+import '../app_navigator.dart';
 
 /// Book an appointment for a doctor, hospital or lab visit.
 /// Layout mirrors the React BookAppointment page: orange gradient header,
@@ -262,7 +263,7 @@ class _BookingScreenState extends State<BookingScreen> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.maybePop(context),
+                  onPressed: () => goBack(context),
                 ),
                 Expanded(
                   child: Text(

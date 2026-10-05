@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'remedoo_checkout_screen.dart';
+import '../app_navigator.dart';
 
 const _sortOptions = [
   'Relevance',
@@ -173,7 +174,7 @@ class _RemedooPharmacyScreenState extends State<RemedooPharmacyScreen> {
               child: Row(
                 children: [
                   _BackCircle(
-                      onTap: () => Navigator.maybePop(context)),
+                      onTap: () => goBack(context)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

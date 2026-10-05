@@ -6,6 +6,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../app_navigator.dart';
 
 /// Family members management.
 class FamilyScreen extends StatelessWidget {
@@ -27,7 +28,7 @@ class FamilyScreen extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.arrow_back,
                       color: Colors.white),
-                  onPressed: () => Navigator.maybePop(context),
+                  onPressed: () => goBack(context),
                 ),
                 const SizedBox(width: 4),
                 Expanded(

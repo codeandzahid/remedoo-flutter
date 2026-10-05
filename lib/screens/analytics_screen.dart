@@ -5,6 +5,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../app_navigator.dart';
 
 /// My Analytics: stat cards, monthly activity bar chart, top categories.
 class AnalyticsScreen extends StatelessWidget {
@@ -79,7 +80,7 @@ class AnalyticsScreen extends StatelessWidget {
                   icon: const Icon(Icons.arrow_back,
                       color: Colors.white),
                   onPressed: () =>
-                      Navigator.maybePop(context),
+                      goBack(context),
                 ),
                 const SizedBox(width: 4),
                 const Text('Analytics',

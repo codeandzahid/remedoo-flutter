@@ -6,8 +6,10 @@ import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
+import '../app_navigator.dart';
 
 const _quickContacts = [
   ('Ambulance', '108', Icons.emergency),
@@ -62,7 +64,7 @@ class EmergencyScreen extends StatelessWidget {
                   icon: const Icon(Icons.arrow_back,
                       color: Colors.white),
                   onPressed: () =>
-                      Navigator.maybePop(context),
+                      goBack(context),
                 ),
                 const SizedBox(width: 4),
                 Expanded(
@@ -345,7 +347,7 @@ class EmergencyScreen extends StatelessWidget {
       (_) => AlertDialog(
         title: const Text('Call emergency services?'),
         content: Text(
-            'This will dial $primary and share your location with responders. ${state.sosMessage} (demo — no actual call is made)'),
+            'This will dial $primary now. ${state.sosMessage}'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -357,10 +359,11 @@ class EmergencyScreen extends StatelessWidget {
             small: true,
             onPressed: () {
               Navigator.pop(context);
+              dialNumber(context, primary);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                     content: Text(
-                        'SOS sent to responders (demo).')),
+                        'Dialing $primary…')),
               );
             },
           ),
@@ -386,10 +389,7 @@ class EmergencyScreen extends StatelessWidget {
             small: true,
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text('Calling $number… (demo)')),
-              );
+              dialNumber(context, number);
             },
           ),
         ],

@@ -7,6 +7,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../app_navigator.dart';
 
 /// Support tickets ("My Queries"): search + ticket cards + new-ticket form.
 class SupportTicketsScreen extends StatefulWidget {
@@ -55,7 +56,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                       IconButton(
                         icon: const Icon(Icons.arrow_back),
                         onPressed: () =>
-                            Navigator.maybePop(context),
+                            goBack(context),
                       ),
                       Icon(Icons.forum_outlined,
                           color: scheme.primary, size: 20),

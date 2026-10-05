@@ -6,9 +6,11 @@ import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../theme.dart';
 import '../state/app_state.dart';
+import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
 import 'doctor_detail_screen.dart';
+import '../app_navigator.dart';
 
 const _departments = [
   'Emergency',
@@ -103,7 +105,7 @@ class HospitalDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Row(
         children: [
-          _BackCircle(onTap: () => Navigator.maybePop(context)),
+          _BackCircle(onTap: () => goBack(context)),
           const SizedBox(width: 12),
           const Text('Hospital Details',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
@@ -257,6 +259,26 @@ class HospitalDetailScreen extends StatelessWidget {
                           color: RemedooTheme.emergency,
                           fontWeight: FontWeight.w600)),
                 ],
+              ),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () => openDirections(
+                  context,
+                  name: h.name,
+                  address: h.location,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.navigation_outlined,
+                        size: 15, color: scheme.primary),
+                    const SizedBox(width: 6),
+                    Text('Get Directions',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
               ),
               const SizedBox(height: 8),
               Row(

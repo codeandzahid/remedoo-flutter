@@ -9,6 +9,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'hospital_detail_screen.dart';
+import '../app_navigator.dart';
 
 const _filters = [
   'Relevance',
@@ -151,7 +152,7 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Row(
         children: [
-          _BackCircle(onTap: () => Navigator.maybePop(context)),
+          _BackCircle(onTap: () => goBack(context)),
           const SizedBox(width: 12),
           const Text('Hospitals',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),

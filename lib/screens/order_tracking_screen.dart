@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../responsive/responsive.dart';
+import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
+import '../app_navigator.dart';
 
 /// Order tracking — matches OrderTracking.tsx: gradient header with ETA
 /// strip, orange step timeline, pharmacy + call card, address, items + bill,
@@ -52,7 +55,7 @@ class OrderTrackingScreen extends StatelessWidget {
                   children: [
                     _HeaderBack(
                         onTap: () =>
-                            Navigator.maybePop(context)),
+                            goBack(context)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -264,21 +267,19 @@ class OrderTrackingScreen extends StatelessWidget {
             color: scheme.primary.withValues(alpha: 0.1),
             shape: const CircleBorder(),
             child: InkWell(
-              onTap: () => showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('Call pharmacy'),
-                  content: const Text(
-                      'Calling the pharmacy… (demo)'),
-                  actions: [
-                    FilledButton(
-                      onPressed: () =>
-                          Navigator.pop(context),
-                      child: const Text('OK'),
-                    ),
-                  ],
-                ),
-              ),
+              onTap: () {
+                final phone =
+                    AppStateScope.of(context).supportPhone;
+                if (phone.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text(
+                            'Support number not configured.')),
+                  );
+                  return;
+                }
+                dialNumber(context, phone);
+              },
               customBorder: const CircleBorder(),
               child: SizedBox(
                 width: 40,

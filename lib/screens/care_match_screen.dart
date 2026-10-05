@@ -8,6 +8,7 @@ import '../widgets/widgets.dart';
 import 'doctor_detail_screen.dart';
 import 'hospital_detail_screen.dart';
 import 'lab_detail_screen.dart';
+import '../app_navigator.dart';
 
 const _quickSymptoms = [
   'Fever and body ache',
@@ -114,7 +115,7 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                       icon: const Icon(Icons.arrow_back,
                           size: 20),
                       onPressed: () =>
-                          Navigator.maybePop(context),
+                          goBack(context),
                     ),
                   ),
                   const SizedBox(width: 10),

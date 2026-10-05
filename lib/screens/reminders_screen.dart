@@ -6,6 +6,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../app_navigator.dart';
 
 /// Health reminders with Upcoming / Completed segmented filter.
 class RemindersScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       icon: const Icon(Icons.arrow_back,
                           color: Colors.white),
                       onPressed: () =>
-                          Navigator.maybePop(context),
+                          goBack(context),
                     ),
                     const SizedBox(width: 4),
                     const Icon(Icons.notifications_outlined,

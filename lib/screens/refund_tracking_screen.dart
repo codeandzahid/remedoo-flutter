@@ -6,6 +6,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../app_navigator.dart';
 
 /// Refund status: cards with per-refund timelines.
 class RefundTrackingScreen extends StatelessWidget {
@@ -63,7 +64,7 @@ class RefundTrackingScreen extends StatelessWidget {
                   icon: const Icon(Icons.arrow_back,
                       color: Colors.white),
                   onPressed: () =>
-                      Navigator.maybePop(context),
+                      goBack(context),
                 ),
                 const SizedBox(width: 4),
                 const Text('Refund Status',

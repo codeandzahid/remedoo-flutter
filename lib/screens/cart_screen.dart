@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../models.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
 import 'remedoo_pharmacy_screen.dart';
+import '../app_navigator.dart';
 
 /// Your Cart — matches Cart.tsx: gradient header, item rows with steppers,
 /// Rx prescription card, address + GPS, payment radio rows, bill summary,
@@ -22,7 +25,8 @@ class _CartScreenState extends State<CartScreen> {
   final _address = TextEditingController();
   final _instructions = TextEditingController();
   String _payment = 'Cash on Delivery';
-  bool _rxUploaded = false;
+  String? _rxFileName;
+  bool _locating = false;
 
   @override
   void dispose() {
@@ -41,7 +45,7 @@ class _CartScreenState extends State<CartScreen> {
             child: Row(
               children: [
                 _HeaderBack(
-                    onTap: () => Navigator.maybePop(context)),
+                    onTap: () => goBack(context)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -313,19 +317,30 @@ class _CartScreenState extends State<CartScreen> {
           SizedBox(
             width: double.infinity,
             child: RButton(
-              label: _rxUploaded
-                  ? 'Prescription Uploaded'
+              label: _rxFileName != null
+                  ? 'Prescription: $_rxFileName'
                   : 'Upload Prescription',
-              icon: _rxUploaded
+              icon: _rxFileName != null
                   ? Icons.check_circle
                   : Icons.upload_file,
               variant: RButtonVariant.outline,
-              onPressed: () {
-                setState(() => _rxUploaded = true);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
+              onPressed: () async {
+                final messenger =
+                    ScaffoldMessenger.of(context);
+                final result =
+                    await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+                  withData: true,
+                );
+                if (result == null || result.files.isEmpty) return;
+                final file = result.files.first;
+                if (!context.mounted) return;
+                setState(() => _rxFileName = file.name);
+                messenger.showSnackBar(
+                  SnackBar(
                       content: Text(
-                          'Prescription uploaded! (demo)')),
+                          'Prescription "${file.name}" attached.')),
                 );
               },
             ),
@@ -356,21 +371,36 @@ class _CartScreenState extends State<CartScreen> {
               ),
               const Spacer(),
               RButton(
-                label: 'Use GPS',
+                label: _locating ? 'Locating…' : 'Use GPS',
                 icon: Icons.my_location,
                 small: true,
                 variant: RButtonVariant.outline,
-                onPressed: () {
-                  _address.text =
-                      '12, Residency Road, Srinagar';
-                  setState(() {});
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(
-                    const SnackBar(
-                        content:
-                            Text('Location detected! (demo)')),
-                  );
-                },
+                onPressed: _locating
+                    ? null
+                    : () async {
+                        final messenger =
+                            ScaffoldMessenger.of(context);
+                        setState(() => _locating = true);
+                        final address =
+                            await fetchCurrentAddress();
+                        if (!context.mounted) return;
+                        setState(() => _locating = false);
+                        if (address == null) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Could not detect location. Please allow location access or enter your address manually.')),
+                          );
+                          return;
+                        }
+                        _address.text = address;
+                        setState(() {});
+                        messenger.showSnackBar(
+                          const SnackBar(
+                              content:
+                                  Text('Location detected!')),
+                        );
+                      },
               ),
             ],
           ),

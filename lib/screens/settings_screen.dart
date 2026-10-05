@@ -13,6 +13,7 @@ import 'orders_screen.dart';
 import 'medical_history_screen.dart';
 import 'favorites_screen.dart';
 import 'refund_tracking_screen.dart';
+import '../app_navigator.dart';
 
 /// Settings: profile card, quick links, preferences, about, logout.
 class SettingsScreen extends StatelessWidget {
@@ -30,7 +31,7 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.maybePop(context),
+                  onPressed: () => goBack(context),
                 ),
                 const SizedBox(width: 4),
                 const Text('Settings',

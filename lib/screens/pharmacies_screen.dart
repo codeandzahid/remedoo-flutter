@@ -9,6 +9,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'pharmacy_detail_screen.dart';
+import '../app_navigator.dart';
 
 const _filters = [
   'Relevance',
@@ -144,7 +145,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Row(
         children: [
-          _BackCircle(onTap: () => Navigator.maybePop(context)),
+          _BackCircle(onTap: () => goBack(context)),
           const SizedBox(width: 12),
           const Text('Medicines & More',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),

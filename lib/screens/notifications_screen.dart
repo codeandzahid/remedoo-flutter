@@ -6,6 +6,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../app_navigator.dart';
 
 /// Notifications: orange gradient header, segmented tabs, read/unread cards.
 class NotificationsScreen extends StatefulWidget {
@@ -63,7 +64,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.arrow_back,
                         color: Colors.white, size: 20),
-                    onPressed: () => Navigator.maybePop(context),
+                    onPressed: () => goBack(context),
                   ),
                 ),
                 const SizedBox(width: 12),

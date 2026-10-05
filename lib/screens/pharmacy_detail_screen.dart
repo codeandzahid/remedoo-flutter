@@ -6,9 +6,10 @@ import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/device_actions.dart';
+import '../app_navigator.dart';
 import '../widgets/widgets.dart';
 import 'cart_screen.dart';
-import 'main_shell.dart';
 
 /// Pharmacy detail: top bar, info card with icon, category chips,
 /// medicine list with ADD → stepper, sticky cart bar — matches PharmacyDetail.tsx.
@@ -85,18 +86,10 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
   }
 
   void _directions() {
-    showResponsiveDialog(
+    openDirections(
       context,
-      (c) => AlertDialog(
-        title: const Text('Directions'),
-        content: const Text('Opening maps… (demo)'),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+      name: widget.pharmacy.name,
+      address: widget.pharmacy.location,
     );
   }
 
@@ -123,26 +116,12 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
     );
   }
 
-  /// Robust back: pops when possible, otherwise returns to the dashboard
-  /// (covers deep links where there is nothing to pop).
-  void _goBack() {
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    } else {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const MainShell()),
-        (r) => false,
-      );
-    }
-  }
-
   Widget _topBar(Pharmacy p) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Row(
         children: [
-          _BackCircle(onTap: _goBack),
+          _BackCircle(onTap: () => goBack(context)),
           const SizedBox(width: 12),
           const Text('Pharmacy Details',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),

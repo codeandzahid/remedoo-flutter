@@ -5,6 +5,7 @@ import '../models.dart';
 import '../responsive/responsive.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../app_navigator.dart';
 
 /// Report detail: gradient header, test info, lab, schedule, results table,
 /// download — matches LabReportDetail.tsx.
@@ -24,7 +25,7 @@ class LabReportDetailScreen extends StatelessWidget {
             child: Row(
               children: [
                 _HeaderBack(
-                    onTap: () => Navigator.maybePop(context)),
+                    onTap: () => goBack(context)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

@@ -5,6 +5,7 @@ import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../theme.dart';
 import '../state/app_state.dart';
+import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
 
@@ -311,20 +312,17 @@ class DoctorDetailScreen extends StatelessWidget {
             variant: RButtonVariant.outline,
             fullWidth: true,
             onPressed: () {
-              showResponsiveDialog(
-                context,
-                (_) => AlertDialog(
-                  title: const Text('Call clinic'),
-                  content: Text(
-                      'Calling ${d.hospital} reception… (demo)'),
-                  actions: [
-                    FilledButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('OK'),
-                    ),
-                  ],
-                ),
-              );
+              final phone =
+                  AppStateScope.of(context).supportPhone;
+              if (phone.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content:
+                          Text('Support number not configured.')),
+                );
+                return;
+              }
+              dialNumber(context, phone);
             },
           ),
         ],

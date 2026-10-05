@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
@@ -49,6 +51,52 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _index = widget.initialIndex;
+  }
+
+  DateTime? _lastBackPress;
+
+  /// On web, browsers ignore programmatic tab-close: the second back press
+  /// arms exit, and the next back press is let through to the browser.
+  bool _allowExit = false;
+
+  /// System back button: while browsing, back walks to the dashboard first
+  /// (never exits from a non-home tab). On the dashboard, the first press
+  /// shows "press again to exit"; a second press within 2s exits.
+  void _onSystemBack(bool didPop, Object? result) {
+    if (didPop) {
+      _allowExit = false;
+      return;
+    }
+    // Not on the home tab: back goes to the dashboard, not out of the app.
+    if (_index != 0) {
+      setState(() => _index = 0);
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastBackPress != null &&
+        now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
+      _lastBackPress = null;
+      if (kIsWeb) {
+        // Arm exit: the next back press goes through to the browser.
+        setState(() => _allowExit = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Press back once more to leave'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        SystemNavigator.pop();
+      }
+      return;
+    }
+    _lastBackPress = now;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Press back again to exit'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   /// Reference-style tab switch: guests get the login toast + redirect when
@@ -115,6 +163,14 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: _allowExit,
+      onPopInvokedWithResult: _onSystemBack,
+      child: _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     final state = AppStateScope.of(context);
 
     // Phones: floating white rounded bottom bar (React look) + orange

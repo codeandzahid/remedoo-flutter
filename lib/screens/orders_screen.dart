@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'order_tracking_screen.dart';
 import 'remedoo_pharmacy_screen.dart';
+import '../app_navigator.dart';
 
 const _months = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -63,7 +64,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   children: [
                     _HeaderBack(
                         onTap: () =>
-                            Navigator.maybePop(context)),
+                            goBack(context)),
                     const SizedBox(width: 12),
                     const Text('My Orders',
                         style: TextStyle(

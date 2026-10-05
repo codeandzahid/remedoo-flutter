@@ -9,6 +9,7 @@ import '../widgets/widgets.dart';
 import 'appointment_detail_screen.dart';
 import 'booking_screen.dart';
 import 'doctors_screen.dart';
+import '../app_navigator.dart';
 
 /// Upcoming / Past appointments with reschedule + cancel.
 /// Mirrors the React Appointments page: orange gradient header with
@@ -62,7 +63,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
                     IconButton(
                       icon:
                           const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.maybePop(context),
+                      onPressed: () => goBack(context),
                     ),
                     const SizedBox(width: 8),
                     Expanded(

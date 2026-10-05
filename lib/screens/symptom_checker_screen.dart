@@ -5,6 +5,7 @@ import '../responsive/responsive.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'care_match_screen.dart';
+import '../app_navigator.dart';
 
 /// Symptom Checker: step flow → possible conditions.
 class SymptomCheckerScreen extends StatefulWidget {
@@ -89,7 +90,7 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
                 IconButton(
                   icon: const Icon(Icons.arrow_back,
                       color: Colors.white),
-                  onPressed: () => Navigator.maybePop(context),
+                  onPressed: () => goBack(context),
                 ),
                 const SizedBox(width: 4),
                 Expanded(
@@ -299,7 +300,7 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
                   icon: const Icon(Icons.arrow_back,
                       color: Colors.white),
                   onPressed: () =>
-                      Navigator.maybePop(context),
+                      goBack(context),
                 ),
                 const SizedBox(width: 4),
                 const Text('Possible Conditions',

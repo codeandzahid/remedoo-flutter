@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../app_navigator.dart';
+import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
 import 'login_screen.dart';
 
@@ -22,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _gender = 'Male';
   bool _loaded = false;
   bool _showPassword = false;
+  bool _locating = false;
 
   @override
   void dispose() {
@@ -80,7 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back),
-                    onPressed: () => Navigator.maybePop(context),
+                    onPressed: () => goBack(context),
                   ),
                   const Text('My Profile',
                       style:
@@ -247,21 +249,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               const SizedBox(width: 8),
                               RButton(
-                                label: 'Use GPS',
+                                label: _locating
+                                    ? 'Locating…'
+                                    : 'Use GPS',
                                 icon: Icons.my_location,
                                 small: true,
                                 variant: RButtonVariant.outline,
-                                onPressed: () {
-                                  _address.text =
-                                      'Bakura, Srinagar (North), Srinagar, Jammu and Kashmir, 190006, India';
-                                  setState(() {});
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Location detected!')),
-                                  );
-                                },
+                                onPressed: _locating
+                                    ? null
+                                    : () async {
+                                        final messenger =
+                                            ScaffoldMessenger.of(
+                                                context);
+                                        setState(
+                                            () => _locating = true);
+                                        final address =
+                                            await fetchCurrentAddress();
+                                        if (!context.mounted) return;
+                                        setState(
+                                            () => _locating = false);
+                                        if (address == null) {
+                                          messenger.showSnackBar(
+                                            const SnackBar(
+                                                content: Text(
+                                                    'Could not detect location. Please allow location access or enter your address manually.')),
+                                          );
+                                          return;
+                                        }
+                                        _address.text = address;
+                                        setState(() {});
+                                        messenger.showSnackBar(
+                                          const SnackBar(
+                                              content: Text(
+                                                  'Location detected!')),
+                                        );
+                                      },
                               ),
                             ],
                           ),
@@ -297,7 +319,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           phone: _phone.text.trim(),
                           address: _address.text.trim(),
                         );
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         setState(() {});
                         messenger.showSnackBar(
                           SnackBar(

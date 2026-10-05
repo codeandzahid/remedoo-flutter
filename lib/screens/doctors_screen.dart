@@ -9,6 +9,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'doctor_detail_screen.dart';
+import '../app_navigator.dart';
 
 const _specialties = [
   'All',
@@ -242,7 +243,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
             child: Row(
               children: [
                 InkWell(
-                  onTap: () => Navigator.maybePop(context),
+                  onTap: () => goBack(context),
                   customBorder: const CircleBorder(),
                   child: Container(
                     width: 36,
