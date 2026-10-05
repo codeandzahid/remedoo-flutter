@@ -23,11 +23,13 @@ BEGIN
   -- NOTE: use explicit ARRAY[...] — the '{a,b}' literal can resolve to
   -- jsonb - text (single-key removal) instead of jsonb - text[], which would
   -- compare status as well and wrongly reject every update.
+  -- NOTE: token_number is excluded because the assign_appointment_token
+  -- trigger (fires before this one) auto-sets it when status -> confirmed.
   IF has_role(auth.uid(), 'doctor'::app_role)
      OR has_role(auth.uid(), 'hospital'::app_role)
      OR has_role(auth.uid(), 'lab'::app_role) THEN
-    IF to_jsonb(NEW) - ARRAY['status','updated_at'] IS DISTINCT FROM
-       to_jsonb(OLD) - ARRAY['status','updated_at'] THEN
+    IF to_jsonb(NEW) - ARRAY['status','updated_at','token_number'] IS DISTINCT FROM
+       to_jsonb(OLD) - ARRAY['status','updated_at','token_number'] THEN
       RAISE EXCEPTION 'Only appointment status may be changed';
     END IF;
     RETURN NEW;
