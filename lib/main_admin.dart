@@ -60,6 +60,8 @@ class _AdminRootGateState extends State<AdminRootGate> {
     // Initialize Supabase first — the login screen needs the client.
     await AuthService.instance.init();
     await state.loadPersistedState();
+    // Listen for sign-in/sign-out so _supaUser stays in sync.
+    state.attachAuthListener();
     await state.checkAdminRole();
     if (mounted) setState(() => _ready = true);
   }
