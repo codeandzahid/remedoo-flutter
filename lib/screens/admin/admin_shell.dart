@@ -30,10 +30,10 @@ class _NavItem {
   const _NavItem(this.section, this.label, this.icon, this.builder);
 }
 
-List<_NavItem> _items(AppState s) => [
+List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // Overview
       _NavItem('Overview', 'Dashboard', Icons.dashboard,
-          (_) => const AdminDashboardScreen()),
+          (_) => AdminDashboardScreen(onNavigate: onNavigate)),
       // Catalog — every listing users see, all backed by Supabase
       _NavItem('Catalog', 'Doctors', Icons.person_search,
           (_) => const AdminTableScreen(table: 'doctors', title: 'Doctors', singular: 'Doctor')),
@@ -131,7 +131,7 @@ class _AdminShellState extends State<AdminShell> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final items = _items(state);
+    final items = _items(state, _go);
     final current = items[_index];
     final page = IndexedStack(
       index: _index,
