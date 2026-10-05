@@ -39,7 +39,7 @@ dependencies:
   url_launcher: ^6.3.1
   file_picker: ^13.1.0
   geolocator: ^13.0.2
-  geocoding: ^3.0.0
+  geocoding: ^5.0.0
   web: ^1.1.1
 
 dev_dependencies:
