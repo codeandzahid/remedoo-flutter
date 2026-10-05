@@ -20,19 +20,23 @@ BEGIN
 
   -- Providers may change status (confirm / complete / cancel) on appointments
   -- RLS already restricts to their own. Still limited to status/updated_at.
+  -- NOTE: use explicit ARRAY[...] — the '{a,b}' literal can resolve to
+  -- jsonb - text (single-key removal) instead of jsonb - text[], which would
+  -- compare status as well and wrongly reject every update.
   IF has_role(auth.uid(), 'doctor'::app_role)
      OR has_role(auth.uid(), 'hospital'::app_role)
      OR has_role(auth.uid(), 'lab'::app_role) THEN
-    IF to_jsonb(NEW) - '{status,updated_at}' IS DISTINCT FROM
-       to_jsonb(OLD) - '{status,updated_at}' THEN
+    IF to_jsonb(NEW) - ARRAY['status','updated_at'] IS DISTINCT FROM
+       to_jsonb(OLD) - ARRAY['status','updated_at'] THEN
       RAISE EXCEPTION 'Only appointment status may be changed';
     END IF;
     RETURN NEW;
   END IF;
 
   -- Patients: only cancellation allowed (original behavior, unchanged).
-  IF to_jsonb(NEW) - '{status,updated_at}' IS DISTINCT FROM
-     to_jsonb(OLD) - '{status,updated_at}' THEN
+  -- Same ARRAY[...] fix as above.
+  IF to_jsonb(NEW) - ARRAY['status','updated_at'] IS DISTINCT FROM
+     to_jsonb(OLD) - ARRAY['status','updated_at'] THEN
     RAISE EXCEPTION 'Only appointment cancellation is allowed';
   END IF;
   IF NEW.status IS DISTINCT FROM OLD.status
