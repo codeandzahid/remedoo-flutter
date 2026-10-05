@@ -479,6 +479,9 @@ class AppState extends ChangeNotifier {
 
   final SupabaseRepository _repo = SupabaseRepository.instance;
 
+  /// Direct access to the Supabase repository (for partner dashboards).
+  SupabaseRepository get supabaseRepository => _repo;
+
   /// Local model id -> Supabase row id, for rows created this session
   /// (Supabase generates its own UUIDs on insert).
   final Map<String, String> _remoteAppointmentIds = {};

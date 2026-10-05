@@ -732,6 +732,157 @@ class SupabaseRepository {
     }
   }
 
+  // ============ Provider-scoped methods (Partner app) ============
+
+  /// Returns the provider's own catalog record (doctors/pharmacies/labs/hospitals
+  /// row where user_id matches), or null.
+  Future<Map<String, dynamic>?> fetchOwnProviderRecord(String table) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return null;
+    try {
+      final rows = await _db
+          .from(table)
+          .select()
+          .eq('user_id', uid)
+          .limit(1);
+      if (rows.isEmpty) return null;
+      return (rows.first as Map).cast<String, dynamic>();
+    } catch (e) {
+      debugPrint('fetchOwnProviderRecord($table) failed: $e');
+      return null;
+    }
+  }
+
+  /// Updates the provider's own catalog record.
+  Future<bool> updateOwnProviderRecord(
+      String table, Map<String, dynamic> values) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return false;
+    try {
+      await _db.from(table).update(values).eq('user_id', uid);
+      return true;
+    } catch (e) {
+      debugPrint('updateOwnProviderRecord($table) failed: $e');
+      return false;
+    }
+  }
+
+  /// Appointments for the signed-in doctor (via their doctors record).
+  Future<List<Map<String, dynamic>>> fetchDoctorAppointments() async {
+    if (!_ready || _uid == null) return const [];
+    try {
+      final me = await fetchOwnProviderRecord('doctors');
+      final doctorId = me?['id'];
+      if (doctorId == null) return const [];
+      final rows = await _db
+          .from('appointments')
+          .select()
+          .eq('doctor_id', doctorId)
+          .order('appointment_date', ascending: true)
+          .order('appointment_time', ascending: true)
+          .limit(200);
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchDoctorAppointments failed: $e');
+      return const [];
+    }
+  }
+
+  /// Appointments for the signed-in hospital.
+  Future<List<Map<String, dynamic>>> fetchHospitalAppointments() async {
+    if (!_ready || _uid == null) return const [];
+    try {
+      final me = await fetchOwnProviderRecord('hospitals');
+      final hospitalId = me?['id'];
+      if (hospitalId == null) return const [];
+      final rows = await _db
+          .from('appointments')
+          .select()
+          .eq('hospital_id', hospitalId)
+          .order('appointment_date', ascending: true)
+          .order('appointment_time', ascending: true)
+          .limit(200);
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchHospitalAppointments failed: $e');
+      return const [];
+    }
+  }
+
+  /// Bookings for the signed-in lab.
+  Future<List<Map<String, dynamic>>> fetchLabBookings() async {
+    if (!_ready || _uid == null) return const [];
+    try {
+      final me = await fetchOwnProviderRecord('labs');
+      final labId = me?['id'];
+      if (labId == null) return const [];
+      final rows = await _db
+          .from('appointments')
+          .select()
+          .eq('lab_id', labId)
+          .order('appointment_date', ascending: true)
+          .order('appointment_time', ascending: true)
+          .limit(200);
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchLabBookings failed: $e');
+      return const [];
+    }
+  }
+
+  /// Orders for the signed-in pharmacy, with items.
+  Future<List<Map<String, dynamic>>> fetchPharmacyOrders() async {
+    if (!_ready || _uid == null) return const [];
+    try {
+      final me = await fetchOwnProviderRecord('pharmacies');
+      final pharmacyId = me?['id'];
+      if (pharmacyId == null) return const [];
+      final rows = await _db
+          .from('orders')
+          .select('*, order_items(*, medicines(name))')
+          .eq('pharmacy_id', pharmacyId)
+          .order('placed_at', ascending: false)
+          .limit(200);
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchPharmacyOrders failed: $e');
+      return const [];
+    }
+  }
+
+  /// Provider updates the status of one of their appointments/bookings.
+  Future<bool> updateAppointmentStatus(String id, String status) async {
+    if (!_ready || _uid == null) return false;
+    try {
+      await _db
+          .from('appointments')
+          .update({'status': status})
+          .eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateAppointmentStatus failed: $e');
+      return false;
+    }
+  }
+
+  /// Pharmacy updates the status of one of their orders.
+  Future<bool> updateOrderStatus(String id, String status) async {
+    if (!_ready || _uid == null) return false;
+    try {
+      final updates = <String, dynamic>{'status': status};
+      final now = DateTime.now().toIso8601String();
+      if (status == 'confirmed') updates['confirmed_at'] = now;
+      if (status == 'out_for_delivery') updates['out_for_delivery_at'] = now;
+      if (status == 'delivered') updates['delivered_at'] = now;
+      if (status == 'cancelled') updates['cancelled_at'] = now;
+      await _db.from('orders').update(updates).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateOrderStatus failed: $e');
+      return false;
+    }
+  }
+
   /// Admin list of announcements (broadcasts), newest first.
   Future<List<Map<String, dynamic>>> fetchAnnouncements() async {
     if (!_ready) return const [];
