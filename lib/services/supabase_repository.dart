@@ -717,6 +717,21 @@ class SupabaseRepository {
     }
   }
 
+  /// Grants a role to a user. Callers must be admin (enforced by RLS).
+  Future<bool> grantUserRole(String userId, String role) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('user_roles').upsert(
+        {'user_id': userId, 'role': role},
+        onConflict: 'user_id,role',
+      );
+      return true;
+    } catch (e) {
+      debugPrint('grantUserRole failed: $e');
+      return false;
+    }
+  }
+
   /// Admin list of announcements (broadcasts), newest first.
   Future<List<Map<String, dynamic>>> fetchAnnouncements() async {
     if (!_ready) return const [];

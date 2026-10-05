@@ -1523,7 +1523,8 @@ class AppState extends ChangeNotifier {
     final ok = await _repo.decideProviderApplication(id, status);
     if (!ok) return false;
     if (status == 'approved') {
-      final table = _appTypeToTable['${app['provider_type'] ?? ''}'];
+      final providerType = '${app['provider_type'] ?? ''}';
+      final table = _appTypeToTable[providerType];
       if (table == null) return false;
       final row = <String, dynamic>{
         'name': app['name'],
@@ -1540,6 +1541,8 @@ class AppState extends ChangeNotifier {
       }
       final newId = await _repo.adminUpsert(table, row);
       if (newId == null) return false;
+      // Grant the provider role so they can sign in to the Partner app.
+      await _repo.grantUserRole('${app['user_id']}', providerType);
     }
     await loadAdminProviderApplications();
     return true;
