@@ -66,8 +66,9 @@ android {
         }
     }
 
-    // Two apps from one codebase: the patient app and the admin panel APK.
+    // Three apps from one codebase: patient, admin panel, and partner APKs.
     // Build the admin APK with: flutter build apk --flavor admin -t lib/main_admin.dart
+    // Build the partner APK with: flutter build apk --flavor partner -t lib/main_partner.dart
     flavorDimensions += "app"
     productFlavors {
         create("patient") {
@@ -79,6 +80,11 @@ android {
             dimension = "app"
             applicationId = "com.remedoo.remedoo_admin"
             resValue("string", "app_name", "Remedoo Admin")
+        }
+        create("partner") {
+            dimension = "app"
+            applicationId = "com.remedoo.remedoo_partner"
+            resValue("string", "app_name", "Remedoo Partner")
         }
     }
 }

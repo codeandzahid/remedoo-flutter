@@ -287,6 +287,27 @@ class AuthService {
     }
   }
 
+  /// Returns the user's provider role (doctor/pharmacy/lab/hospital),
+  /// or null if they don't have one.
+  Future<String?> currentUserRole() async {
+    if (!_initialized) return null;
+    try {
+      final uid = _client.auth.currentUser?.id;
+      if (uid == null) return null;
+      final rows = await _client
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', uid)
+          .inFilter('role', ['doctor', 'pharmacy', 'lab', 'hospital'])
+          .limit(1);
+      if (rows.isEmpty) return null;
+      return '${rows.first['role']}';
+    } catch (e) {
+      debugPrint('currentUserRole failed: $e');
+      return null;
+    }
+  }
+
   /// Maps Supabase/auth errors to short, user-friendly messages.
   /// Never includes raw tokens or sensitive data.
   String _friendlyMessage(Object e) {

@@ -49,6 +49,10 @@ class AppState extends ChangeNotifier {
   String _address = 'Bakura, Srinagar, J&K 190006';
 
   User? _supaUser;
+
+  /// The signed-in Supabase user id, or null.
+  String? get supaUserId => _supaUser?.id;
+
   bool _authAttached = false;
 
   /// Called by RootGate after Supabase init. Restores any persisted session
@@ -1344,6 +1348,16 @@ class AppState extends ChangeNotifier {
 
   Future<void> checkAdminRole() async {
     _isAdmin = await _repo.isCurrentUserAdmin();
+    notifyListeners();
+  }
+
+  String? _providerRole;
+
+  /// The signed-in user's provider role (doctor/pharmacy/lab/hospital).
+  String? get providerRole => _providerRole;
+
+  Future<void> checkProviderRole() async {
+    _providerRole = await AuthService.instance.currentUserRole();
     notifyListeners();
   }
 

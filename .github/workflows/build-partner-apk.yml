@@ -1,0 +1,55 @@
+name: Build Partner APK
+
+# Builds the Remedoo Partner APK (partner flavor, boots to provider login).
+# Providers (doctors, pharmacies, labs, hospitals) sign in and get a
+# dashboard matching their role. Signed with the release keystore.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/screens/partner/**'
+      - 'lib/main_partner.dart'
+
+jobs:
+  build-partner-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Set up Java (for Android build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/remedoo-release.jks
+          cat > android/key.properties <<EOF
+          storeFile=remedoo-release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build partner release APK
+        run: flutter build apk --release --flavor partner --target lib/main_partner.dart
+
+      - name: Upload partner APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: remedoo-partner-release
+          path: build/app/outputs/flutter-apk/app-partner-release.apk
