@@ -767,6 +767,28 @@ class SupabaseRepository {
     }
   }
 
+  /// Reviews for the signed-in provider (public read; filtered by their record).
+  Future<List<Map<String, dynamic>>> fetchProviderReviews(
+      String providerType, String table) async {
+    if (!_ready || _uid == null) return const [];
+    try {
+      final me = await fetchOwnProviderRecord(table);
+      final pid = me?['id'];
+      if (pid == null) return const [];
+      final rows = await _db
+          .from('reviews')
+          .select()
+          .eq('provider_type', providerType)
+          .eq('provider_id', '$pid')
+          .order('created_at', ascending: false)
+          .limit(50);
+      return (rows as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchProviderReviews failed: $e');
+      return const [];
+    }
+  }
+
   /// Appointments for the signed-in doctor (via their doctors record).
   Future<List<Map<String, dynamic>>> fetchDoctorAppointments() async {
     if (!_ready || _uid == null) return const [];
