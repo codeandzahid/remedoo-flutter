@@ -1,5 +1,9 @@
 name: Build Patient APK
 
+concurrency:
+  group: build-patient-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 # Builds the main Remedoo patient app APK (patient flavor). Signed with the
 # persistent Remedoo release keystore so it installs/updates cleanly.
 
@@ -11,6 +15,7 @@ on:
       - 'lib/**'
       - 'android/**'
       - 'pubspec.yaml'
+      - '.github/workflows/build-patient-apk.yml'
 
 jobs:
   build-patient-apk:

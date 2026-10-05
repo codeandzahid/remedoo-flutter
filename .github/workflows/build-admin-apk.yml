@@ -1,5 +1,9 @@
 name: Build Admin APK
 
+concurrency:
+  group: build-admin-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 # Builds the standalone Remedoo Admin panel APK (admin flavor, boots to
 # admin login). Signed with the persistent Remedoo release keystore so it
 # installs/updates cleanly alongside the patient app (different app id).
@@ -12,6 +16,7 @@ on:
       - 'lib/**'
       - 'android/**'
       - 'pubspec.yaml'
+      - '.github/workflows/build-admin-apk.yml'
 
 jobs:
   build-admin-apk:

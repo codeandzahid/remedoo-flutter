@@ -1,5 +1,9 @@
 name: Build Partner APK
 
+concurrency:
+  group: build-partner-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 # Builds the Remedoo Partner APK (partner flavor, boots to provider login).
 # Providers (doctors, pharmacies, labs, hospitals) sign in and get a
 # dashboard matching their role. Signed with the release keystore.
@@ -11,6 +15,8 @@ on:
     paths:
       - 'lib/screens/partner/**'
       - 'lib/main_partner.dart'
+      - 'pubspec.yaml'
+      - '.github/workflows/build-partner-apk.yml'
 
 jobs:
   build-partner-apk:
