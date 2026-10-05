@@ -8,7 +8,11 @@ import '../../widgets/widgets.dart';
 /// Admin sign-in backed by Supabase Auth + the `user_roles` table.
 /// Only accounts with the `admin` role can enter the admin panel.
 class AdminLoginScreen extends StatefulWidget {
-  const AdminLoginScreen({super.key});
+  /// When true, this screen is the app root (admin APK entry): on success
+  /// the parent gate rebuilds into the shell instead of popping.
+  final bool isRoot;
+
+  const AdminLoginScreen({super.key, this.isRoot = false});
 
   @override
   State<AdminLoginScreen> createState() => _AdminLoginScreenState();
@@ -69,6 +73,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     state.switchRole('admin');
     if (!mounted) return;
     setState(() => _busy = false);
+    if (widget.isRoot) {
+      // Admin APK entry: AdminRootGate rebuilds into the shell on the
+      // role change — nothing to pop.
+      return;
+    }
     // Pop back to RootGate, which shows the AdminShell for role=admin.
     Navigator.of(context).pop();
   }

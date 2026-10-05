@@ -1,0 +1,56 @@
+name: Build Admin APK
+
+# Builds the standalone Remedoo Admin panel APK (admin flavor, boots to
+# admin login). Signed with the persistent Remedoo release keystore so it
+# installs/updates cleanly alongside the patient app (different app id).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'android/**'
+      - 'pubspec.yaml'
+
+jobs:
+  build-admin-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Set up Java (for Android build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: <redacted>
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: <redacted>
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/remedoo-release.jks
+          cat > android/key.properties <<EOF
+          storeFile=remedoo-release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build admin release APK
+        run: flutter build apk --release --flavor admin --target lib/main_admin.dart
+
+      - name: Upload admin APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: remedoo-admin-release
+          path: build/app/outputs/flutter-apk/app-admin-release.apk
