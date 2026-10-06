@@ -301,7 +301,7 @@ class EmergencyScreen extends StatelessWidget {
                   onPressed: () =>
                       _callDialog(context, h.name, '0194-000000'),
                 ),
-                if (AppStateScope.of(context).isSignedIn) ...[
+                if (AppStateScope.of(context).isSignedIn && !h.government) ...[
                   const SizedBox(height: 6),
                   RButton(
                     label: 'Book',

@@ -278,6 +278,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
 
   Widget _card(Pharmacy p) {
     final scheme = Theme.of(context).colorScheme;
+    final itemCount = AppStateScope.of(context).medicineCountFor(p.id);
     return RDenseRow(
       leading: RAvatarCircle(
           name: p.name, size: 46, icon: Icons.storefront_outlined),
@@ -286,7 +287,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
       meta: RDenseMeta(
         rating: p.rating,
         parts: [
-          '${p.itemCount} items',
+          '$itemCount items',
           p.deliveryTime,
           if (p.offers > 0) '${p.offers} offers',
         ],

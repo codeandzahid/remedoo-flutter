@@ -1286,6 +1286,9 @@ class AppState extends ChangeNotifier {
   List<Medicine> get activeMedicines =>
       medicines.where((m) => m.active).toList();
 
+  int medicineCountFor(String pharmacyId) =>
+      medicines.where((m) => m.pharmacyId == pharmacyId && m.active).length;
+
   final List<String> prescriptionsSeed = const [];
 
   List<String> get prescriptions => prescriptionsSeed;
