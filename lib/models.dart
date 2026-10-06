@@ -159,6 +159,7 @@ class Medicine {
   final bool rxRequired;
   final String category;
   final bool active;
+  final String? imageUrl;
 
   const Medicine({
     required this.id,
@@ -171,6 +172,7 @@ class Medicine {
     required this.rxRequired,
     required this.category,
     this.active = true,
+    this.imageUrl,
   });
 }
 

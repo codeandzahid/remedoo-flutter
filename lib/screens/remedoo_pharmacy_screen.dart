@@ -329,6 +329,27 @@ class _RemedooPharmacyScreenState extends State<RemedooPharmacyScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Medicine image
+          if (m.imageUrl != null && m.imageUrl!.isNotEmpty)
+            Container(
+              height: 80,
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: scheme.surfaceContainerHighest,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.network(
+                m.imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.medication_outlined,
+                  size: 32,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

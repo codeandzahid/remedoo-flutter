@@ -206,6 +206,7 @@ class SupabaseRepository {
       mrp: mrp,
       rxRequired: r['requires_prescription'] == true,
       category: '${r['category'] ?? 'General'}',
+      imageUrl: r['image_url'] as String?,
     );
   }
 
