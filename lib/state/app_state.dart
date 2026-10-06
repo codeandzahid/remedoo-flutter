@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import '../app_navigator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -444,6 +445,7 @@ class AppState extends ChangeNotifier {
     _mockLoggedIn = false;
     _name = 'Patient';
     _email = '';
+    _providerRole = null;
     appointments.clear();
     orders.clear();
     cart.clear();
@@ -908,7 +910,8 @@ class AppState extends ChangeNotifier {
   }
 
   void cancelAppointment(String id) {
-    final appt = appointments.firstWhere((a) => a.id == id);
+    final appt = appointments.where((a) => a.id == id).firstOrNull;
+    if (appt == null) return;
     appt.status = 'cancelled';
     _syncCancelAppointment(id);
     addNotification(
@@ -920,7 +923,8 @@ class AppState extends ChangeNotifier {
   }
 
   void rescheduleAppointment(String id, DateTime date, String timeLabel) {
-    final appt = appointments.firstWhere((a) => a.id == id);
+    final appt = appointments.where((a) => a.id == id).firstOrNull;
+    if (appt == null) return;
     final updated = Appointment(
       id: 'A${DateTime.now().millisecondsSinceEpoch}',
       doctorName: appt.doctorName,
@@ -1009,7 +1013,8 @@ class AppState extends ChangeNotifier {
   }
 
   void changeQty(String medicineId, int delta) {
-    final line = cart.firstWhere((l) => l.medicine.id == medicineId);
+    final line = cart.where((l) => l.medicine.id == medicineId).firstOrNull;
+    if (line == null) return;
     line.qty += delta;
     if (line.qty <= 0) cart.remove(line);
     if (cart.isEmpty) {
@@ -1181,7 +1186,8 @@ class AppState extends ChangeNotifier {
   }
 
   void toggleReminder(String id) {
-    final r = reminders.firstWhere((e) => e.id == id);
+    final r = reminders.where((e) => e.id == id).firstOrNull;
+    if (r == null) return;
     r.done = !r.done;
     notifyListeners();
   }
@@ -1241,12 +1247,13 @@ class AppState extends ChangeNotifier {
   }
 
   void acceptDelivery(String id) {
-    deliveries.firstWhere((d) => d.id == id).status = 'accepted';
+    deliveries.where((d) => d.id == id).firstOrNull?.status = 'accepted';
     notifyListeners();
   }
 
   void advanceDelivery(String id) {
-    final d = deliveries.firstWhere((e) => e.id == id);
+    final d = deliveries.where((e) => e.id == id).firstOrNull;
+    if (d == null) return;
     if (d.status == 'accepted') {
       d.status = 'picked_up';
     } else if (d.status == 'picked_up') {
@@ -1837,7 +1844,7 @@ class AppState extends ChangeNotifier {
   }
 
   void setApplicationStatus(String id, String status) {
-    providerApplications.firstWhere((a) => a.id == id).status = status;
+    providerApplications.where((a) => a.id == id).firstOrNull?.status = status;
     notifyListeners();
   }
 
@@ -1846,7 +1853,7 @@ class AppState extends ChangeNotifier {
   final List<SosAlert> sosAlerts = [];
 
   void setSosStatus(String id, String status) {
-    sosAlerts.firstWhere((a) => a.id == id).status = status;
+    sosAlerts.where((a) => a.id == id).firstOrNull?.status = status;
     notifyListeners();
   }
 
@@ -1855,7 +1862,7 @@ class AppState extends ChangeNotifier {
   final List<RefundRequest> refundRequests = [];
 
   void setRefundStatus(String id, String status) {
-    refundRequests.firstWhere((r) => r.id == id).status = status;
+    refundRequests.where((r) => r.id == id).firstOrNull?.status = status;
     notifyListeners();
   }
 
@@ -1897,12 +1904,13 @@ class AppState extends ChangeNotifier {
   ];
 
   void setOrderStatus(String id, String status) {
-    orders.firstWhere((o) => o.id == id).status = status;
+    orders.where((o) => o.id == id).firstOrNull?.status = status;
     notifyListeners();
   }
 
   void advanceOrderStatus(String id) {
-    final o = orders.firstWhere((e) => e.id == id);
+    final o = orders.where((e) => e.id == id).firstOrNull;
+    if (o == null) return;
     final i = orderStatuses.indexOf(o.status);
     if (i >= 0 && i < orderStatuses.length - 1) {
       o.status = orderStatuses[i + 1];

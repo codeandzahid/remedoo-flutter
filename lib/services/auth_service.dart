@@ -299,6 +299,7 @@ class AuthService {
           .select('role')
           .eq('user_id', uid)
           .inFilter('role', ['doctor', 'pharmacy', 'lab', 'hospital'])
+          .order('role')
           .limit(1);
       if (rows.isEmpty) return null;
       return '${rows.first['role']}';
