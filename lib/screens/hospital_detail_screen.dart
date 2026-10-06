@@ -76,7 +76,7 @@ class HospitalDetailScreen extends StatelessWidget {
                     ? _mainInfo(context, h, docs)
                     : DetailSplit(
                         main: _mainInfo(context, h, docs),
-                        side: h.government ? null : _bookPanel(context, h),
+                        side: h.government ? const SizedBox.shrink() : _bookPanel(context, h),
                       ),
               ),
             ),
