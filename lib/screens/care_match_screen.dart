@@ -282,7 +282,23 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                               fontSize: 16,
                               fontWeight: FontWeight.w800)),
                       const SizedBox(height: 10),
-                      ..._matches(state),
+                      Builder(builder: (context) {
+                        final matches = _matches(state);
+                        if (matches.isEmpty) {
+                          return const Padding(
+                            padding:
+                                EdgeInsets.symmetric(vertical: 20),
+                            child: Text(
+                              'No matches found for your criteria. Try increasing your budget or distance.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey),
+                            ),
+                          );
+                        }
+                        return Column(children: matches);
+                      }),
                     ],
                   ],
                 ),

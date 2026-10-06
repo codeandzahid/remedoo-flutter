@@ -467,8 +467,10 @@ class _RemedooPharmacyScreenState extends State<RemedooPharmacyScreen> {
           elevation: 6,
           shadowColor: Colors.black.withValues(alpha: 0.2),
           child: InkWell(
-            onTap: () =>
-                pushPage(context, const RemedooCheckoutScreen()),
+            onTap: () {
+              if (!checkLogin(context)) return;
+              pushPage(context, const RemedooCheckoutScreen());
+            },
             borderRadius: BorderRadius.circular(18),
             child: Padding(
               padding: const EdgeInsets.all(14),

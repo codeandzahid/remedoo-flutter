@@ -273,7 +273,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Search doctors, hospitals, labs, medicines...',
+                'Search doctors...',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
