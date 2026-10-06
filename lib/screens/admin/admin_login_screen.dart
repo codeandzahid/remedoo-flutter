@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../services/auth_service.dart';
+import '../../services/supabase_config.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
@@ -40,7 +41,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       final client = HttpClient();
       client.connectionTimeout = const Duration(seconds: 10);
       final req = await client.headUrl(
-          Uri.parse('https://zjlznbgcfzpcveqyjglf.supabase.co/rest/v1/'));
+          Uri.parse('${SupabaseConfig.url}/rest/v1/'));
       req.headers.set('apikey', 'test');
       final resp =
           await req.close().timeout(const Duration(seconds: 10));
