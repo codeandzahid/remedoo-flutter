@@ -55,9 +55,9 @@ class _RemedooPharmacyScreenState extends State<RemedooPharmacyScreen> {
     showResponsiveDialog(
       context,
       (c) => AlertDialog(
-        title: const Text('Switch pharmacy?'),
+        title: const Text('One pharmacy at a time'),
         content: const Text(
-            'Your cart has items from another pharmacy. Clear it and add this item?'),
+            'You can order only from one pharmacy at once. Your cart has items from another pharmacy. Clear it and add this item?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c),

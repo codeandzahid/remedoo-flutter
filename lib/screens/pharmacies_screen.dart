@@ -78,6 +78,16 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
 
   List<Pharmacy> _filtered(AppState state) {
     var list = state.activePharmacies.toList();
+    // Single-vendor mode: show only the admin-selected pharmacy
+    if (!state.pharmacyMultiVendor) {
+      final singleId = state.singleVendorPharmacyId;
+      if (singleId != null) {
+        list = list.where((p) => p.id == singleId).toList();
+      } else if (list.isNotEmpty) {
+        // Fallback to first pharmacy if none selected
+        list = [list.first];
+      }
+    }
     final q = _search.text.trim().toLowerCase();
     if (q.isNotEmpty) {
       list = list

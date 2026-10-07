@@ -1505,6 +1505,14 @@ class AppState extends ChangeNotifier {
   /// One app_config entry (branding, fees, emergency, maintenance...).
   Map<String, dynamic> appConfigValue(String key) => _appConfig[key] ?? {};
 
+  /// True if pharmacy is in multi-vendor mode, false for single vendor.
+  bool get pharmacyMultiVendor =>
+      appConfigValue('pharmacy_mode')['mode'] != 'single';
+
+  /// The ID of the single vendor pharmacy when in single-vendor mode.
+  String? get singleVendorPharmacyId =>
+      appConfigValue('pharmacy_mode')['pharmacy_id'] as String?;
+
   Future<void> loadAppConfig() async {
     final cfg = await _repo.fetchAppConfig();
     _appConfig

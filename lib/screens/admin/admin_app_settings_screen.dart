@@ -26,6 +26,7 @@ class _AdminAppSettingsScreenState
 
   // Pharmacy mode
   bool _pharmacyMultiVendor = true;
+  String? _singleVendorPharmacyId;
 
   // Razorpay
   bool _razorpayEnabled = false;
@@ -88,6 +89,7 @@ class _AdminAppSettingsScreenState
       _maintEnabled = maint['enabled'] == true;
       _maintMsg.text = '${maint['message'] ?? ''}';
       _pharmacyMultiVendor = pharmMode['mode'] != 'single';
+      _singleVendorPharmacyId = pharmMode['pharmacy_id'] as String?;
       _razorpayEnabled = rzp['enabled'] == true;
       _razorpayKeyId.text = '${rzp['key_id'] ?? ''}';
       _razorpayKeySecret.text = '${rzp['key_secret'] ?? ''}';
@@ -248,6 +250,32 @@ class _AdminAppSettingsScreenState
                   contentPadding: EdgeInsets.zero,
                 ),
                 const SizedBox(height: 8),
+                if (!_pharmacyMultiVendor) ...[
+                  const SizedBox(height: 8),
+                  Builder(
+                    builder: (ctx) {
+                      final state = AppStateScope.of(ctx);
+                      final pharmacies = state.activePharmacies;
+                      return DropdownButtonFormField<String>(
+                        value: _singleVendorPharmacyId,
+                        decoration: const InputDecoration(
+                          labelText: 'Single vendor pharmacy',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: [
+                          for (final p in pharmacies)
+                            DropdownMenuItem(
+                              value: p.id,
+                              child: Text(p.name),
+                            ),
+                        ],
+                        onChanged: (v) => setState(
+                            () => _singleVendorPharmacyId = v),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Align(
                   alignment: Alignment.centerRight,
                   child: RButton(
@@ -259,6 +287,10 @@ class _AdminAppSettingsScreenState
                               'mode': _pharmacyMultiVendor
                                   ? 'multi'
                                   : 'single',
+                              if (!_pharmacyMultiVendor &&
+                                  _singleVendorPharmacyId != null)
+                                'pharmacy_id':
+                                    _singleVendorPharmacyId,
                             }),
                   ),
                 ),
