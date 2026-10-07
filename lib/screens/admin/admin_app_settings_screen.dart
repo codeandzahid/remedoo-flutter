@@ -27,6 +27,11 @@ class _AdminAppSettingsScreenState
   // Pharmacy mode
   bool _pharmacyMultiVendor = true;
 
+  // Razorpay
+  bool _razorpayEnabled = false;
+  late final TextEditingController _razorpayKeyId;
+  late final TextEditingController _razorpayKeySecret;
+
   // Fees
   late final TextEditingController _deliveryFee;
   late final TextEditingController _freeThreshold;
@@ -50,6 +55,8 @@ class _AdminAppSettingsScreenState
     _supportPhone = TextEditingController();
     _supportEmail = TextEditingController();
     _supportHours = TextEditingController();
+    _razorpayKeyId = TextEditingController();
+    _razorpayKeySecret = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -62,6 +69,8 @@ class _AdminAppSettingsScreenState
     _supportPhone.dispose();
     _supportEmail.dispose();
     _supportHours.dispose();
+    _razorpayKeyId.dispose();
+    _razorpayKeySecret.dispose();
     super.dispose();
   }
 
@@ -74,10 +83,14 @@ class _AdminAppSettingsScreenState
     final emg = state.appConfigValue('emergency');
     final support = state.appConfigValue('support');
     final pharmMode = state.appConfigValue('pharmacy_mode');
+    final rzp = state.appConfigValue('razorpay');
     setState(() {
       _maintEnabled = maint['enabled'] == true;
       _maintMsg.text = '${maint['message'] ?? ''}';
       _pharmacyMultiVendor = pharmMode['mode'] != 'single';
+      _razorpayEnabled = rzp['enabled'] == true;
+      _razorpayKeyId.text = '${rzp['key_id'] ?? ''}';
+      _razorpayKeySecret.text = '${rzp['key_secret'] ?? ''}';
       _deliveryFee.text = '${fees['delivery_fee'] ?? 30}';
       _freeThreshold.text =
           '${fees['free_delivery_threshold'] ?? 499}';
@@ -343,6 +356,60 @@ class _AdminAppSettingsScreenState
                             'email': _supportEmail.text.trim(),
                             'hours': _supportHours.text.trim(),
                           }),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          // ---- Payment Gateway ----
+          const RSectionHeader(
+              title: 'Payment Gateway (Razorpay)',
+              subtitle: 'In-app UPI, cards, netbanking payments'),
+          const SizedBox(height: 12),
+          RCard(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  value: _razorpayEnabled,
+                  onChanged: (v) =>
+                      setState(() => _razorpayEnabled = v),
+                  title: const Text('Enable online payments',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                      _razorpayEnabled
+                          ? 'Users can pay via UPI/cards in-app'
+                          : 'Online payments disabled',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant)),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 8),
+                RTextField(
+                    label: 'Razorpay Key ID',
+                    hint: 'rzp_test_... or rzp_live_...',
+                    controller: _razorpayKeyId),
+                const SizedBox(height: 8),
+                RTextField(
+                    label: 'Razorpay Key Secret',
+                    hint: 'Keep this secret',
+                    controller: _razorpayKeySecret,
+                    obscureText: true),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: RButton(
+                    label: 'Save',
+                    small: true,
+                    onPressed: _saving
+                        ? null
+                        : () => _save('razorpay', {
+                              'enabled': _razorpayEnabled,
+                              'key_id': _razorpayKeyId.text.trim(),
+                              'key_secret':
+                                  _razorpayKeySecret.text.trim(),
+                            }),
+                  ),
                 ),
               ],
             ),

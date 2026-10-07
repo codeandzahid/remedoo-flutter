@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 import '../models.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
+import '../services/payment_service.dart';
 import '../widgets/upi_payment_sheet.dart';
-import 'online_payment_screen.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'appointments_screen.dart';
@@ -156,6 +157,38 @@ class _BookingScreenState extends State<BookingScreen> {
     return null;
   }
 
+  /// Process in-app Razorpay payment. Returns true if payment succeeded.
+  Future<bool> _processRazorpayPayment(String orderId) async {
+    final completer = Completer<bool>();
+    final state = AppStateScope.of(context);
+
+    PaymentService.instance.pay(
+      amount: widget.fee,
+      orderId: orderId,
+      description: 'Appointment: ${widget.title}',
+      contact: state.phone.isNotEmpty ? state.phone : null,
+      email: state.email.isNotEmpty ? state.email : null,
+      onPaymentSuccess: (paymentId) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment successful: $paymentId')),
+          );
+        }
+        if (!completer.isCompleted) completer.complete(true);
+      },
+      onPaymentError: (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment failed: $error')),
+          );
+        }
+        if (!completer.isCompleted) completer.complete(false);
+      },
+    );
+
+    return completer.future;
+  }
+
   void _confirm(bool isReschedule) async {
     if (!checkLogin(context, 'Please login to book appointments')) return;
     final state = AppStateScope.of(context);
@@ -169,26 +202,24 @@ class _BookingScreenState extends State<BookingScreen> {
         const SnackBar(content: Text('Appointment rescheduled!')),
       );
     } else {
-      // "Pay Online" opens the payment page first — the appointment is
-      // only booked after the user completes (or skips) payment there.
+      // "Pay Online" uses in-app Razorpay (UPI/cards/netbanking).
+      // The appointment is only booked after payment succeeds.
       if (_payment == 'Pay Online') {
-        final upiId = _providerUpiId(state);
         final orderId =
             'APT${DateTime.now().millisecondsSinceEpoch}';
-        final paid = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => OnlinePaymentScreen(
-              amount: widget.fee,
-              recipientName: widget.title,
-              recipientUpiId: upiId,
-              orderId: orderId,
-              orderLabel: 'Appointment Fee',
-            ),
-          ),
-        );
-        // Payment page dismissed or payment not completed: do not book.
-        if (paid != true || !mounted) return;
+        if (!PaymentService.instance.isConfigured) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text(
+                      'Online payments not configured. Please choose another method.')),
+            );
+          }
+          return;
+        }
+        final paid = await _processRazorpayPayment(orderId);
+        // Payment failed or cancelled: do not book.
+        if (!paid || !mounted) return;
       }
       // If UPI payment selected, show the UPI payment sheet first.
       if (_payment == 'UPI') {

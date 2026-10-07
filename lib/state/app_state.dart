@@ -10,6 +10,7 @@ import '../models.dart';
 import '../data/mock_data.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_repository.dart';
+import '../services/payment_service.dart';
 import '../theme.dart';
 
 /// Inherited access to the single AppState for the whole app.
@@ -1474,6 +1475,14 @@ class AppState extends ChangeNotifier {
     final maint = cfg['maintenance'];
     if (maint is Map<String, dynamic>) {
       _maintenanceMode = maint['enabled'] == true;
+    }
+    // Configure payment gateway from admin settings
+    final rzp = cfg['razorpay'];
+    if (rzp is Map<String, dynamic>) {
+      PaymentService.instance.configure(
+        keyId: '${rzp['key_id'] ?? ''}',
+        enabled: rzp['enabled'] == true,
+      );
     }
     notifyListeners();
   }
