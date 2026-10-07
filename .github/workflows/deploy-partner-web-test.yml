@@ -19,6 +19,13 @@ jobs:
       - name: Build partner web release
         run: flutter build web --release --wasm --no-web-resources-cdn --target lib/main_partner.dart
 
+      - name: Create Pages project if needed
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create remedoo-partner-test --production-branch=main || true
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
