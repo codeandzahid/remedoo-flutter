@@ -452,6 +452,12 @@ class AppState extends ChangeNotifier {
     cartPharmacyId = null;
     cartPharmacyName = null;
     testCart.clear();
+    notifications.clear();
+    family.clear();
+    reminders.clear();
+    _favorites.clear();
+    reports.clear();
+    tickets.clear();
     if (notify) notifyListeners();
   }
 
@@ -590,6 +596,17 @@ class AppState extends ChangeNotifier {
       if (n.isNotEmpty) _name = n;
       if (p.isNotEmpty) _phone = p;
     }
+    final nrows = await _repo.fetchNotifications();
+    notifications
+      ..clear()
+      ..addAll(nrows.map((r) => AppNotification(
+            id: '${r['id']}',
+            title: '${r['title'] ?? ''}',
+            message: '${r['message'] ?? ''}',
+            time: DateTime.tryParse('${r['created_at']}') ?? DateTime.now(),
+            category: '${r['type'] ?? 'system'}',
+            read: r['read'] == true,
+          )));
     notifyListeners();
   }
 
@@ -1122,6 +1139,15 @@ class AppState extends ChangeNotifier {
     for (final n in notifications) {
       n.read = true;
     }
+    unawaited(_repo.markAllNotificationsRead());
+    notifyListeners();
+  }
+
+  void markRead(String id) {
+    for (final n in notifications) {
+      if (n.id == id) n.read = true;
+    }
+    unawaited(_repo.markNotificationRead(id));
     notifyListeners();
   }
 

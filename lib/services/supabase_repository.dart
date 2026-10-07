@@ -396,6 +396,46 @@ class SupabaseRepository {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchNotifications() async {
+    final uid = _uid;
+    if (!_ready || uid == null) return const [];
+    try {
+      final rows = await _db
+          .from('notifications')
+          .select()
+          .eq('user_id', uid)
+          .order('created_at', ascending: false)
+          .limit(50);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      debugPrint('fetchNotifications failed: $e');
+      return const [];
+    }
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    if (!_ready) return;
+    try {
+      await _db.from('notifications').update({'read': true}).eq('id', id);
+    } catch (e) {
+      debugPrint('markNotificationRead failed: $e');
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final uid = _uid;
+    if (!_ready || uid == null) return;
+    try {
+      await _db
+          .from('notifications')
+          .update({'read': true})
+          .eq('user_id', uid)
+          .eq('read', false);
+    } catch (e) {
+      debugPrint('markAllNotificationsRead failed: $e');
+    }
+  }
+
   Future<bool> addFavorite(String type, String providerId) async {
     final uid = _uid;
     if (!_ready || uid == null) return false;
