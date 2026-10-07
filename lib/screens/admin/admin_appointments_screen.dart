@@ -193,8 +193,22 @@ class _AdminAppointmentsScreenState
       confirmLabel: 'Approve',
     );
     if (!ok || !mounted) return;
-    final done = await AppStateScope.of(context)
+    final state = AppStateScope.of(context);
+    final done = await state
         .updateAdminAppointment('${a['id']}', {'status': 'upcoming'});
+    if (done) {
+      // Notify patient
+      final patientId = '${a['patient_id'] ?? a['user_id'] ?? ''}';
+      if (patientId.isNotEmpty) {
+        await state.supabaseRepository.sendNotificationToUser(
+              userId: patientId,
+              title: 'Appointment Confirmed',
+              message:
+                  'Your appointment was successfully booked. You can now view and print your appointment letter.',
+              type: 'appointment',
+            );
+      }
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -212,8 +226,21 @@ class _AdminAppointmentsScreenState
       confirmLabel: 'Reject',
     );
     if (!ok || !mounted) return;
-    final done = await AppStateScope.of(context)
+    final state = AppStateScope.of(context);
+    final done = await state
         .updateAdminAppointment('${a['id']}', {'status': 'cancelled'});
+    if (done) {
+      final patientId = '${a['patient_id'] ?? a['user_id'] ?? ''}';
+      if (patientId.isNotEmpty) {
+        await state.supabaseRepository.sendNotificationToUser(
+              userId: patientId,
+              title: 'Appointment Not Approved',
+              message:
+                  'Your appointment request was not approved. Please try another slot.',
+              type: 'appointment',
+            );
+      }
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

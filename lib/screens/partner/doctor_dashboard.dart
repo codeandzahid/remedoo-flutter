@@ -79,6 +79,28 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
         final i = _appointments.indexWhere((x) => '${x['id']}' == '${a['id']}');
         if (i >= 0) _appointments[i] = {..._appointments[i], 'status': status};
       });
+      // Notify the patient
+      final patientId = '${a['patient_id'] ?? a['user_id'] ?? ''}';
+      if (patientId.isNotEmpty) {
+        if (status == 'confirmed') {
+          await _repo.sendNotificationToUser(
+            userId: patientId,
+            title: 'Appointment Confirmed',
+            message:
+                'Your appointment was successfully booked for ${a['appointment_date'] ?? ''} at ${a['appointment_time'] ?? ''}. You can now view and print your appointment letter.',
+            type: 'appointment',
+          );
+        } else if (status == 'cancelled') {
+          await _repo.sendNotificationToUser(
+            userId: patientId,
+            title: 'Appointment Not Approved',
+            message:
+                'Your appointment request for ${a['appointment_date'] ?? ''} was not approved by the doctor. Please try another slot.',
+            type: 'appointment',
+          );
+        }
+      }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Appointment marked as $status.')),
       );
@@ -441,7 +463,8 @@ class _AppointmentsTab extends StatelessWidget {
                   if (status == 'pending')
                     Expanded(
                       child: RButton(
-                        label: 'Confirm visit',
+                        label: 'Approve',
+                        icon: Icons.check_circle,
                         small: true,
                         onPressed: () =>
                             onSetStatus(a, 'confirmed'),
@@ -461,7 +484,7 @@ class _AppointmentsTab extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: RButton(
-                      label: 'Cancel',
+                      label: status == 'pending' ? 'Reject' : 'Cancel',
                       small: true,
                       variant: RButtonVariant.danger,
                       onPressed: () =>
@@ -470,6 +493,26 @@ class _AppointmentsTab extends StatelessWidget {
                   ),
                 ],
               ),
+              // View uploaded prescription if attached
+              if ('${a['prescription_url'] ?? ''}'.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                RButton(
+                  label: 'View Prescription',
+                  icon: Icons.description,
+                  small: true,
+                  variant: RButtonVariant.outline,
+                  fullWidth: true,
+                  onPressed: () {
+                    final url = '${a['prescription_url']}';
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Prescription: $url'),
+                        duration: const Duration(seconds: 5),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ],
         ),

@@ -557,6 +557,29 @@ class SupabaseRepository {
     }
   }
 
+  /// Send a notification to a specific user (e.g. doctor approving → patient)
+  Future<bool> sendNotificationToUser({
+    required String userId,
+    required String title,
+    required String message,
+    String type = 'appointment',
+  }) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('notifications').insert({
+        'user_id': userId,
+        'title': title,
+        'message': message,
+        'type': type,
+        'read': false,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('sendNotificationToUser failed: $e');
+      return false;
+    }
+  }
+
   Future<bool> addFavorite(String type, String providerId) async {
     final uid = _uid;
     if (!_ready || uid == null) return false;
@@ -1031,21 +1054,6 @@ class SupabaseRepository {
     } catch (e) {
       debugPrint('fetchPharmacyOrders failed: $e');
       return const [];
-    }
-  }
-
-  /// Provider updates the status of one of their appointments/bookings.
-  Future<bool> updateAppointmentStatus(String id, String status) async {
-    if (!_ready || _uid == null) return false;
-    try {
-      await _db
-          .from('appointments')
-          .update({'status': status})
-          .eq('id', id);
-      return true;
-    } catch (e) {
-      debugPrint('updateAppointmentStatus failed: $e');
-      return false;
     }
   }
 
