@@ -24,6 +24,9 @@ class _AdminAppSettingsScreenState
   bool _maintEnabled = false;
   late final TextEditingController _maintMsg;
 
+  // Pharmacy mode
+  bool _pharmacyMultiVendor = true;
+
   // Fees
   late final TextEditingController _deliveryFee;
   late final TextEditingController _freeThreshold;
@@ -70,9 +73,11 @@ class _AdminAppSettingsScreenState
     final fees = state.appConfigValue('fees');
     final emg = state.appConfigValue('emergency');
     final support = state.appConfigValue('support');
+    final pharmMode = state.appConfigValue('pharmacy_mode');
     setState(() {
       _maintEnabled = maint['enabled'] == true;
       _maintMsg.text = '${maint['message'] ?? ''}';
+      _pharmacyMultiVendor = pharmMode['mode'] != 'single';
       _deliveryFee.text = '${fees['delivery_fee'] ?? 30}';
       _freeThreshold.text =
           '${fees['free_delivery_threshold'] ?? 499}';
@@ -201,6 +206,48 @@ class _AdminAppSettingsScreenState
                                 num.tryParse(_freeThreshold.text) ??
                                     499,
                           }),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          // ---- Pharmacy Mode ----
+          const RSectionHeader(
+              title: 'Pharmacy Mode',
+              subtitle: 'Single vendor or multi-vendor marketplace'),
+          const SizedBox(height: 12),
+          RCard(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  value: _pharmacyMultiVendor,
+                  onChanged: (v) =>
+                      setState(() => _pharmacyMultiVendor = v),
+                  title: const Text('Multi-vendor mode',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                      _pharmacyMultiVendor
+                          ? 'Users can browse all pharmacies'
+                          : 'Single pharmacy store only',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant)),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: RButton(
+                    label: 'Save',
+                    small: true,
+                    onPressed: _saving
+                        ? null
+                        : () => _save('pharmacy_mode', {
+                              'mode': _pharmacyMultiVendor
+                                  ? 'multi'
+                                  : 'single',
+                            }),
+                  ),
                 ),
               ],
             ),
