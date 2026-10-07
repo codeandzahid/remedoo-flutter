@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
 import '../responsive/animations.dart';
@@ -371,27 +372,105 @@ class AppointmentDetailScreen extends StatelessWidget {
             title: Text(a.prescriptionName ?? 'Prescription',
                 style: const TextStyle(fontSize: 13)),
             trailing: TextButton(
-              onPressed: () {
-                final url = a.prescriptionPath;
-                if (url != null && url.isNotEmpty) {
-                  // Open in browser/new tab
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Opening: ${a.prescriptionName}'),
-                      action: SnackBarAction(
-                        label: 'Open',
-                        onPressed: () {
-                          // URL is available at: $url
-                        },
-                      ),
-                    ),
-                  );
-                }
-              },
+              onPressed: () => _viewPrescription(context, a),
               child: const Text('View'),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _viewPrescription(BuildContext context, Appointment a) {
+    final url = a.prescriptionPath;
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No prescription attached')),
+      );
+      return;
+    }
+    final isPdf =
+        (a.prescriptionName ?? '').toLowerCase().endsWith('.pdf');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      a.prescriptionName ?? 'Prescription',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: isPdf
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.picture_as_pdf,
+                              size: 64, color: Colors.red),
+                          const SizedBox(height: 16),
+                          const Text(
+                              'PDF preview not available in-app.\nTap Open to view in browser.'),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.open_in_new),
+                            label: const Text('Open PDF'),
+                            onPressed: () async {
+                              final uri = Uri.tryParse(url);
+                              if (uri != null &&
+                                  await canLaunchUrl(uri)) {
+                                await launchUrl(uri,
+                                    mode:
+                                        LaunchMode.externalApplication);
+                              }
+                            },
+                          ),
+                        ],
+                      )
+                    : InteractiveViewer(
+                        child: Image.network(
+                          url,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (c, child, progress) =>
+                              progress == null
+                                  ? child
+                                  : const Center(
+                                      child:
+                                          CircularProgressIndicator()),
+                          errorBuilder: (c, e, s) => const Column(
+                            mainAxisAlignment:
+                                MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.broken_image,
+                                  size: 48, color: Colors.grey),
+                              SizedBox(height: 8),
+                              Text('Could not load image'),
+                            ],
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

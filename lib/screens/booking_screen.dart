@@ -109,22 +109,52 @@ class _BookingScreenState extends State<BookingScreen> {
                 color: Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.check_circle,
-                      color: Colors.green, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(_prescriptionName!,
-                        style: const TextStyle(fontSize: 13)),
+                  Row(
+                    children: [
+                      const Icon(Icons.check_circle,
+                          color: Colors.green, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(_prescriptionName!,
+                            style: const TextStyle(fontSize: 13)),
+                      ),
+                      TextButton(
+                        onPressed: () =>
+                            _previewPrescription(context),
+                        child: const Text('Preview'),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () => setState(() {
+                          _prescriptionPath = null;
+                          _prescriptionName = null;
+                          _prescriptionBytes = null;
+                        }),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 18),
-                    onPressed: () => setState(() {
-                      _prescriptionPath = null;
-                      _prescriptionName = null;
-                    }),
-                  ),
+                  // Show image thumbnail preview
+                  if (_prescriptionBytes != null &&
+                      !_prescriptionName!
+                          .toLowerCase()
+                          .endsWith('.pdf')) ...[
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => _previewPrescription(context),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(
+                          _prescriptionBytes!,
+                          height: 120,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             )
@@ -158,8 +188,65 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
-  Widget _bookingForCard(AppState st) {
-    final members = st.family;
+  void _previewPrescription(BuildContext context) {
+    if (_prescriptionBytes == null || _prescriptionName == null) return;
+    final isPdf = _prescriptionName!.toLowerCase().endsWith('.pdf');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
+          constraints:
+              const BoxConstraints(maxWidth: 600, maxHeight: 700),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _prescriptionName!,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: isPdf
+                    ? const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.picture_as_pdf,
+                              size: 64, color: Colors.red),
+                          SizedBox(height: 16),
+                          Text(
+                              'PDF selected. It will be uploaded with your booking.'),
+                        ],
+                      )
+                    : InteractiveViewer(
+                        child: Image.memory(
+                          _prescriptionBytes!,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bookingForCard(AppState st) {    final members = st.family;
     return RCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
