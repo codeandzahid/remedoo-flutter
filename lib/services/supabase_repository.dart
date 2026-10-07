@@ -63,6 +63,8 @@ class SupabaseRepository {
       upiId: r['upi_id']?.toString(),
       payInClinicEnabled: r['pay_in_clinic_enabled'] != false,
       upiEnabled: r['upi_enabled'] != false,
+      consultationDuration:
+          (r['consultation_duration'] as num?)?.toInt() ?? 30,
     );
   }
 
@@ -1016,10 +1018,35 @@ class SupabaseRepository {
           .select('user_id, full_name, email, phone, created_at')
           .order('created_at', ascending: false)
           .limit(500);
-      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      final profiles = rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      // Attach roles
+      try {
+        final roleRows = await _db.from('user_roles').select('user_id, role');
+        final roleMap = <String, String>{};
+        for (final r in roleRows) {
+          roleMap['${r['user_id']}'] = '${r['role']}';
+        }
+        for (final p in profiles) {
+          p['role'] = roleMap['${p['user_id']}'] ?? 'user';
+        }
+      } catch (_) {}
+      return profiles;
     } catch (e) {
       debugPrint('fetchAllProfiles failed: $e');
       return const [];
+    }
+  }
+
+  Future<bool> setUserRole(String userId, String role) async {
+    if (!_ready) return false;
+    try {
+      // Remove existing roles, then insert the new one (one role per user)
+      await _db.from('user_roles').delete().eq('user_id', userId);
+      await _db.from('user_roles').insert({'user_id': userId, 'role': role});
+      return true;
+    } catch (e) {
+      debugPrint('setUserRole failed: $e');
+      return false;
     }
   }
 

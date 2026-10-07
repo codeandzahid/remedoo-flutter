@@ -21,6 +21,7 @@ class Doctor {
   final String? upiId;
   final bool payInClinicEnabled;
   final bool upiEnabled;
+  final int consultationDuration;
 
   const Doctor({
     required this.id,
@@ -39,6 +40,7 @@ class Doctor {
     this.upiId,
     this.payInClinicEnabled = true,
     this.upiEnabled = true,
+    this.consultationDuration = 30,
   });
 }
 
@@ -230,6 +232,8 @@ class Appointment {
   final String notes;
   final List<LabTest> tests;
   String status; // upcoming, cancelled
+  final String? bookingForMemberId;
+  final String? bookingForName;
 
   Appointment({
     required this.id,
@@ -245,6 +249,8 @@ class Appointment {
     this.notes = '',
     this.tests = const [],
     this.status = 'upcoming',
+    this.bookingForMemberId,
+    this.bookingForName,
   });
 
   String get dateLabel => '${date.day}/${date.month}/${date.year}';
@@ -286,12 +292,14 @@ class FamilyMember {
   final String name;
   final String relation;
   final int age;
+  final String? reason;
 
   FamilyMember({
     required this.id,
     required this.name,
     required this.relation,
     required this.age,
+    this.reason,
   });
 }
 

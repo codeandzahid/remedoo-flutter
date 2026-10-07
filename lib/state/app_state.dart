@@ -727,6 +727,7 @@ class AppState extends ChangeNotifier {
       name: '${r['name'] ?? ''}',
       relation: '${r['relationship'] ?? ''}',
       age: age,
+      reason: r['reason']?.toString(),
     );
   }
 
@@ -899,6 +900,8 @@ class AppState extends ChangeNotifier {
     required String payment,
     String notes = '',
     List<LabTest> tests = const [],
+    String? bookingForMemberId,
+    String? bookingForName,
   }) {
     final appt = Appointment(
       id: 'A${DateTime.now().millisecondsSinceEpoch}',
@@ -913,6 +916,8 @@ class AppState extends ChangeNotifier {
       refId: refId,
       notes: notes,
       tests: List.of(tests),
+      bookingForMemberId: bookingForMemberId,
+      bookingForName: bookingForName,
     );
     appointments.add(appt);
     _takenSlots.add(_slotKey(title, date, timeLabel));
@@ -971,16 +976,38 @@ class AppState extends ChangeNotifier {
 
   /// 09:00–16:30 pill grid; some slots deterministically pre-booked.
   List<String> timeSlotsFor(String title, DateTime day) {
+    return doctorSlotsFor('', title, day);
+  }
+
+  /// Generate real time slots for a provider based on their working hours
+  /// and consultation duration. Filters out already-booked slots.
+  List<String> doctorSlotsFor(String providerId, String title, DateTime day) {
+    // Find the doctor to get real duration
+    int duration = 30; // default
+    if (providerId.isNotEmpty) {
+      final doc = doctors.where((d) => d.id == providerId).firstOrNull;
+      if (doc != null && doc.consultationDuration > 0) {
+        duration = doc.consultationDuration;
+      }
+    }
+
     final out = <String>[];
-    for (var h = 9; h <= 16; h++) {
-      for (final m in [0, 30]) {
-        if (h == 16 && m == 30) continue;
+    // Standard working hours 9 AM to 5 PM
+    for (var h = 9; h < 17; h++) {
+      for (var m = 0; m < 60; m += duration) {
         final label =
             '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
-        final pseudoBooked =
-            (title.hashCode + day.day * 31 + h * 7 + m) % 10 < 3;
+        // Skip slots already taken (from real bookings)
         final taken = _takenSlots.contains(_slotKey(title, day, label));
-        if (!pseudoBooked && !taken) out.add(label);
+        // Also check against actual appointments in the list
+        final booked = appointments.any((a) =>
+            a.doctorName == title &&
+            a.date.year == day.year &&
+            a.date.month == day.month &&
+            a.date.day == day.day &&
+            a.timeLabel == label &&
+            a.status == 'upcoming');
+        if (!taken && !booked) out.add(label);
       }
     }
     return out;

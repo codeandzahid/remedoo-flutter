@@ -66,6 +66,7 @@ class _BookingScreenState extends State<BookingScreen> {
   late String _payment;
   final _notes = TextEditingController();
   late List<DateTime> _days;
+  String? _bookingForMemberId; // null = for self
 
   @override
   void initState() {
@@ -78,6 +79,45 @@ class _BookingScreenState extends State<BookingScreen> {
     _time = widget.prefill?.timeLabel ?? '10:00';
     _payment = widget.prefill?.payment ?? 'At Clinic';
     if (widget.prefill != null) _notes.text = widget.prefill!.notes;
+  }
+
+  Widget _bookingForCard(AppState st) {
+    final members = st.family;
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Booking for',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              ChoiceChip(
+                label: Text('Myself (${st.displayName})'),
+                selected: _bookingForMemberId == null,
+                onSelected: (_) =>
+                    setState(() => _bookingForMemberId = null),
+              ),
+              ...members.map((m) => ChoiceChip(
+                    label: Text('${m.name} (${m.relation})'),
+                    selected: _bookingForMemberId == m.id,
+                    onSelected: (_) =>
+                        setState(() => _bookingForMemberId = m.id),
+                  )),
+            ],
+          ),
+          if (members.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Add family members in Family section to book for them.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -185,6 +225,13 @@ class _BookingScreenState extends State<BookingScreen> {
         payment: _payment,
         notes: _notes.text.trim(),
         tests: widget.tests ?? const [],
+        bookingForMemberId: _bookingForMemberId,
+        bookingForName: _bookingForMemberId == null
+            ? null
+            : state.family
+                .where((m) => m.id == _bookingForMemberId)
+                .firstOrNull
+                ?.name,
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Appointment booked successfully!')),
@@ -199,9 +246,9 @@ class _BookingScreenState extends State<BookingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final slots = AppStateScope.of(context).slotsFor(_date);
-    final isReschedule = widget.prefill != null;
     final st = AppStateScope.of(context);
+    final slots = st.doctorSlotsFor(widget.refId, widget.title, _date);
+    final isReschedule = widget.prefill != null;
     final upiId = _providerUpiId(st);
     final prov = _provider(st);
     final payInClinic = prov?.payInClinicEnabled ?? true;
@@ -211,6 +258,8 @@ class _BookingScreenState extends State<BookingScreen> {
 
     final sections = <Widget>[
       _providerCard(),
+      const SizedBox(height: 12),
+      _bookingForCard(st),
       if (widget.tests != null && widget.tests!.isNotEmpty) ...[
         const SizedBox(height: 12),
         _testsCard(),

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../widgets/widgets.dart';
 
-/// Real user list from Supabase profiles. Read-only.
+/// Real user list from Supabase profiles with role management.
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
 
@@ -24,6 +25,55 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Future<void> _load() async {
     await AppStateScope.of(context).loadAllProfiles();
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _changeRole(Map<String, dynamic> user, String newRole) async {
+    final ok = await SupabaseRepository.instance
+        .setUserRole('${user['user_id']}', newRole);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Role updated to $newRole for ${user['email']}'
+            : 'Failed to update role'),
+      ),
+    );
+    if (ok) _load();
+  }
+
+  void _showRoleDialog(Map<String, dynamic> user) {
+    const roles = ['user', 'doctor', 'pharmacy', 'lab', 'hospital', 'driver', 'admin'];
+    final current = '${user['role'] ?? 'user'}';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Role for ${user['email'] ?? 'user'}'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: roles
+                .map((r) => ListTile(
+                      title: Text(r[0].toUpperCase() + r.substring(1)),
+                      trailing: current == r
+                          ? const Icon(Icons.check, color: Colors.green)
+                          : null,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        if (current != r) _changeRole(user, r);
+                      },
+                    ))
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _fmtDate(String? iso) {
@@ -118,11 +168,31 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                     style: const TextStyle(fontSize: 12)),
                             ],
                           ),
-                          trailing: Text(
-                            _fmtDate(u['created_at']?.toString()),
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: scheme.onSurfaceVariant),
+                          trailing: InkWell(
+                            onTap: () => _showRoleDialog(u),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: scheme.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${u['role'] ?? 'user'}',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: scheme.primary),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.edit,
+                                      size: 14, color: scheme.primary),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
