@@ -384,14 +384,24 @@ class SupabaseRepository {
     }
   }
 
-  /// Upload prescription file to storage, returns public URL
-  Future<String?> uploadPrescription(
-      String localPath, String fileName) async {
+  /// Upload prescription file to storage, returns public URL.
+  /// Accepts either in-memory bytes (web) or a local file path (mobile).
+  Future<String?> uploadPrescriptionData(
+    Uint8List? bytes,
+    String? localPath,
+    String fileName,
+  ) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
     try {
-      final file = File(localPath);
-      final bytes = await file.readAsBytes();
+      Uint8List data;
+      if (bytes != null) {
+        data = bytes;
+      } else if (localPath != null) {
+        data = await File(localPath).readAsBytes();
+      } else {
+        return null;
+      }
       final ext = fileName.split('.').last.toLowerCase();
       final contentType = ext == 'pdf'
           ? 'application/pdf'
@@ -400,7 +410,7 @@ class SupabaseRepository {
           '$uid/${DateTime.now().millisecondsSinceEpoch}_$fileName';
       await _db.storage.from('prescriptions').uploadBinary(
             storagePath,
-            bytes,
+            data,
             fileOptions: FileOptions(contentType: contentType),
           );
       // Create signed URL (valid 1 year) since bucket is private
@@ -412,6 +422,12 @@ class SupabaseRepository {
       debugPrint('uploadPrescription failed: $e');
       return null;
     }
+  }
+
+  /// Upload prescription file to storage, returns public URL
+  Future<String?> uploadPrescription(
+      String localPath, String fileName) async {
+    return uploadPrescriptionData(null, localPath, fileName);
   }
 
   Future<List<Map<String, dynamic>>> fetchUserTickets() async {

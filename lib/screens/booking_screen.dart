@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
@@ -86,6 +87,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   String? _prescriptionPath;
   String? _prescriptionName;
+  Uint8List? _prescriptionBytes;
 
   Widget _prescriptionCard() {
     return RCard(
@@ -132,17 +134,21 @@ class _BookingScreenState extends State<BookingScreen> {
               icon: Icons.upload_file,
               variant: RButtonVariant.outline,
               onPressed: () async {
-                final result = await FilePicker.pickFiles(
+                final files = await FilePicker.pickFiles(
                   type: FileType.custom,
                   allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
                 );
-                if (result != null &&
-                    result.files.single.path != null) {
+                if (files != null && files.isNotEmpty) {
+                  final file = files.single;
+                  Uint8List? data;
+                  try {
+                    data = await file.readAsBytes();
+                  } catch (_) {}
+                  if (!context.mounted) return;
                   setState(() {
-                    _prescriptionPath =
-                        result.files.single.path;
-                    _prescriptionName =
-                        result.files.single.name;
+                    _prescriptionPath = file.path;
+                    _prescriptionName = file.name;
+                    _prescriptionBytes = data;
                   });
                 }
               },
@@ -373,15 +379,17 @@ class _BookingScreenState extends State<BookingScreen> {
       }
       // Upload prescription if attached
       String? prescriptionUrl;
-      if (_prescriptionPath != null && _prescriptionName != null) {
+      if (_prescriptionName != null &&
+          (_prescriptionBytes != null || _prescriptionPath != null)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Uploading prescription...')),
           );
         }
         prescriptionUrl =
-            await SupabaseRepository.instance.uploadPrescription(
-          _prescriptionPath!,
+            await SupabaseRepository.instance.uploadPrescriptionData(
+          _prescriptionBytes,
+          _prescriptionPath,
           _prescriptionName!,
         );
       }
