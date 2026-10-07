@@ -47,9 +47,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
       return const GuestGate();
     }
     final upcoming =
-        state.appointments.where((a) => a.status == 'upcoming').toList();
+        state.appointments.where((a) => a.status == 'upcoming' || a.status == 'pending').toList();
     final past =
-        state.appointments.where((a) => a.status != 'upcoming').toList();
+        state.appointments.where((a) => a.status != 'upcoming' && a.status != 'pending').toList();
     return Scaffold(
       body: Column(
         children: [

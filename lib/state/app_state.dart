@@ -921,14 +921,45 @@ class AppState extends ChangeNotifier {
     );
     appointments.add(appt);
     _takenSlots.add(_slotKey(title, date, timeLabel));
+    // New bookings start as pending - require doctor/hospital approval
+    appt.status = 'pending';
     _syncBookAppointment(appt);
     addNotification(
-      title: 'Appointment booked',
-      message: '$title on ${date.day}/${date.month} at $timeLabel',
+      title: 'Appointment request sent',
+      message: '$title on ${date.day}/${date.month} at $timeLabel is pending approval',
       category: 'appointments',
     );
     notifyListeners();
     return appt;
+  }
+
+  /// Approve a pending appointment (called by doctor/hospital panel or admin)
+  Future<void> approveAppointment(String id) async {
+    final appt = appointments.where((a) => a.id == id).firstOrNull;
+    if (appt == null) return;
+    appt.status = 'upcoming';
+    // Sync to backend
+    unawaited(_repo.updateAppointmentStatus(id, 'upcoming'));
+    addNotification(
+      title: 'Appointment confirmed',
+      message: '${appt.doctorName} on ${appt.date.day}/${appt.date.month} at ${appt.timeLabel} is confirmed',
+      category: 'appointments',
+    );
+    notifyListeners();
+  }
+
+  /// Reject a pending appointment
+  Future<void> rejectAppointment(String id, {String reason = ''}) async {
+    final appt = appointments.where((a) => a.id == id).firstOrNull;
+    if (appt == null) return;
+    appt.status = 'cancelled';
+    unawaited(_repo.updateAppointmentStatus(id, 'cancelled'));
+    addNotification(
+      title: 'Appointment not approved',
+      message: '${appt.doctorName} on ${appt.date.day}/${appt.date.month} was not approved${reason.isNotEmpty ? ': $reason' : ''}',
+      category: 'appointments',
+    );
+    notifyListeners();
   }
 
   void cancelAppointment(String id) {

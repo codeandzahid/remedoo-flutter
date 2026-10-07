@@ -311,6 +311,17 @@ class SupabaseRepository {
     }
   }
 
+  Future<bool> updateAppointmentStatus(String id, String status) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('appointments').update({'status': status}).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateAppointmentStatus failed: $e');
+      return false;
+    }
+  }
+
   // ------------------------------------------------------------------ orders
 
   /// Places a pharmacy order + its items. Returns the order id or null.
