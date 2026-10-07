@@ -608,6 +608,8 @@ class AppState extends ChangeNotifier {
             category: '${r['type'] ?? 'system'}',
             read: r['read'] == true,
           )));
+    // Load support tickets so pending/open show correctly
+    unawaited(loadUserTickets());
     notifyListeners();
   }
 
@@ -903,6 +905,8 @@ class AppState extends ChangeNotifier {
     List<LabTest> tests = const [],
     String? bookingForMemberId,
     String? bookingForName,
+    String? prescriptionPath,
+    String? prescriptionName,
   }) {
     final appt = Appointment(
       id: 'A${DateTime.now().millisecondsSinceEpoch}',
@@ -919,6 +923,8 @@ class AppState extends ChangeNotifier {
       tests: List.of(tests),
       bookingForMemberId: bookingForMemberId,
       bookingForName: bookingForName,
+      prescriptionPath: prescriptionPath,
+      prescriptionName: prescriptionName,
     );
     appointments.add(appt);
     _takenSlots.add(_slotKey(title, date, timeLabel));
@@ -1291,16 +1297,49 @@ class AppState extends ChangeNotifier {
     required String category,
     required String description,
   }) {
-    tickets.insert(
-      0,
-      SupportTicket(
-        id: 'T${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-        subject: subject,
-        category: category,
-        description: description,
-        date: DateTime.now(),
-      ),
+    final ticket = SupportTicket(
+      id: 'T${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+      subject: subject,
+      category: category,
+      description: description,
+      date: DateTime.now(),
     );
+    tickets.insert(0, ticket);
+    // Sync to backend so it appears in admin panel
+    _syncTicket(ticket);
+    notifyListeners();
+  }
+
+  void _syncTicket(SupportTicket ticket) {
+    if (_supaUser == null) return;
+    _repo
+        .createSupportTicket(
+      subject: ticket.subject,
+      category: ticket.category,
+      description: ticket.description,
+    )
+        .then((remoteId) {
+      if (remoteId != null) _remoteTicketIds[ticket.id] = remoteId;
+    });
+  }
+
+  final Map<String, String> _remoteTicketIds = {};
+
+  Future<void> loadUserTickets() async {
+    if (_supaUser == null) return;
+    final rows = await _repo.fetchUserTickets();
+    tickets
+      ..clear()
+      ..addAll(rows.map((r) => SupportTicket(
+            id: '${r['id']}',
+            subject: '${r['subject'] ?? ''}',
+            category: '${r['category'] ?? 'general'}',
+            description: '${r['description'] ?? ''}',
+            date: DateTime.tryParse('${r['created_at']}') ??
+                DateTime.now(),
+            status: '${r['status'] ?? 'open'}',
+            response: '${r['admin_response'] ?? ''}',
+          )));
     notifyListeners();
   }
 

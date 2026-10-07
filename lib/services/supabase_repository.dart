@@ -359,6 +359,45 @@ class SupabaseRepository {
     }
   }
 
+  Future<String?> createSupportTicket({
+    required String subject,
+    required String category,
+    required String description,
+  }) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return null;
+    try {
+      final row = await _db.from('support_tickets').insert({
+        'user_id': uid,
+        'subject': subject,
+        'category': category,
+        'description': description,
+        'status': 'open',
+        'sender_type': 'patient',
+      }).select('id').single();
+      return '${row['id']}';
+    } catch (e) {
+      debugPrint('createSupportTicket failed: $e');
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchUserTickets() async {
+    final uid = _uid;
+    if (!_ready || uid == null) return const [];
+    try {
+      final rows = await _db
+          .from('support_tickets')
+          .select()
+          .eq('user_id', uid)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      debugPrint('fetchUserTickets failed: $e');
+      return const [];
+    }
+  }
+
   // ------------------------------------------------------------------ orders
 
   /// Places a pharmacy order + its items. Returns the order id or null.

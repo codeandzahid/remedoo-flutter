@@ -234,6 +234,8 @@ class Appointment {
   String status; // upcoming, cancelled
   final String? bookingForMemberId;
   final String? bookingForName;
+  final String? prescriptionPath;
+  final String? prescriptionName;
 
   Appointment({
     required this.id,
@@ -251,6 +253,8 @@ class Appointment {
     this.status = 'upcoming',
     this.bookingForMemberId,
     this.bookingForName,
+    this.prescriptionPath,
+    this.prescriptionName,
   });
 
   String get dateLabel => '${date.day}/${date.month}/${date.year}';

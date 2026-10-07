@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:file_picker/file_picker.dart';
 
 import '../models.dart';
 import '../responsive/responsive.dart';
@@ -80,6 +81,74 @@ class _BookingScreenState extends State<BookingScreen> {
     _time = widget.prefill?.timeLabel ?? '10:00';
     _payment = widget.prefill?.payment ?? 'At Clinic';
     if (widget.prefill != null) _notes.text = widget.prefill!.notes;
+  }
+
+  String? _prescriptionPath;
+  String? _prescriptionName;
+
+  Widget _prescriptionCard() {
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Prescription (optional)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          const Text(
+            'Upload a prescription for the doctor to review',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          if (_prescriptionName != null)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle,
+                      color: Colors.green, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(_prescriptionName!,
+                        style: const TextStyle(fontSize: 13)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: () => setState(() {
+                      _prescriptionPath = null;
+                      _prescriptionName = null;
+                    }),
+                  ),
+                ],
+              ),
+            )
+          else
+            RButton(
+              label: 'Upload Prescription',
+              icon: Icons.upload_file,
+              variant: RButtonVariant.outline,
+              onPressed: () async {
+                final result = await FilePicker.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+                );
+                if (result != null &&
+                    result.files.single.path != null) {
+                  setState(() {
+                    _prescriptionPath =
+                        result.files.single.path;
+                    _prescriptionName =
+                        result.files.single.name;
+                  });
+                }
+              },
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _bookingForCard(AppState st) {
@@ -192,6 +261,63 @@ class _BookingScreenState extends State<BookingScreen> {
   void _confirm(bool isReschedule) async {
     if (!checkLogin(context, 'Please login to book appointments')) return;
     final state = AppStateScope.of(context);
+
+    // Pay at clinic: show warning with double confirmation
+    if (!isReschedule &&
+        (_payment == 'At Clinic' ||
+            _payment == 'Pay at Hospital' ||
+            _payment == 'Pay at Lab')) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Pay at Clinic'),
+          content: const Text(
+            'Please note:\n\n'
+            '• This booking is NOT 100% guaranteed\n'
+            '• The doctor may cancel or reschedule\n'
+            '• You may have to wait in queue at the clinic\n'
+            '• Payment is due at the clinic\n\n'
+            'Do you want to proceed?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('I Understand, Confirm'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+
+      // Second confirmation
+      final doubleConfirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Final Confirmation'),
+          content: Text(
+            'Book appointment with ${widget.title}\n'
+            'on ${_date.day}/${_date.month}/${_date.year} at $_time?\n\n'
+            'This will send a request to the doctor for approval.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Go Back'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Book Appointment'),
+            ),
+          ],
+        ),
+      );
+      if (doubleConfirmed != true || !mounted) return;
+    }
+
     if (isReschedule) {
       state.rescheduleAppointment(
         widget.prefill!.id,
@@ -263,6 +389,8 @@ class _BookingScreenState extends State<BookingScreen> {
                 .where((m) => m.id == _bookingForMemberId)
                 .firstOrNull
                 ?.name,
+        prescriptionPath: _prescriptionPath,
+        prescriptionName: _prescriptionName,
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Appointment booked successfully!')),
@@ -310,6 +438,8 @@ class _BookingScreenState extends State<BookingScreen> {
         controller: _notes,
         maxLines: 2,
       ),
+      const SizedBox(height: 14),
+      _prescriptionCard(),
       const SizedBox(height: 14),
       _sectionTitle(Icons.credit_card, 'Payment Method'),
       const SizedBox(height: 10),
