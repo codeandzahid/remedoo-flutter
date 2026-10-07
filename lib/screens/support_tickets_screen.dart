@@ -8,6 +8,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import '../app_navigator.dart';
+import 'support_chat_screen.dart';
 
 /// Support tickets ("My Queries"): search + ticket cards + new-ticket form.
 class SupportTicketsScreen extends StatefulWidget {
@@ -206,6 +207,18 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                         fontSize: 11,
                         color: scheme.onSurfaceVariant)),
                 const Spacer(),
+                if (expanded)
+                  TextButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SupportChatScreen(ticket: t),
+                      ),
+                    ),
+                    icon: const Icon(Icons.chat, size: 16),
+                    label: const Text('Chat'),
+                  ),
                 Icon(
                     expanded
                         ? Icons.expand_less

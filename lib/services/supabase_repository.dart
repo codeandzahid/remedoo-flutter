@@ -322,6 +322,43 @@ class SupabaseRepository {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchTicketMessages(
+      String ticketId) async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('support_messages')
+          .select()
+          .eq('ticket_id', ticketId)
+          .order('created_at', ascending: true);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      debugPrint('fetchTicketMessages failed: $e');
+      return const [];
+    }
+  }
+
+  Future<bool> sendTicketMessage({
+    required String ticketId,
+    required String message,
+    required String senderRole,
+  }) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return false;
+    try {
+      await _db.from('support_messages').insert({
+        'ticket_id': ticketId,
+        'sender_id': uid,
+        'sender_role': senderRole,
+        'message': message,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('sendTicketMessage failed: $e');
+      return false;
+    }
+  }
+
   // ------------------------------------------------------------------ orders
 
   /// Places a pharmacy order + its items. Returns the order id or null.
