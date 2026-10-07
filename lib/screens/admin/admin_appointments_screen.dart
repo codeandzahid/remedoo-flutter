@@ -43,7 +43,7 @@ class _AdminAppointmentsScreenState
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final statuses = ['All', 'upcoming', 'cancelled', 'completed'];
+    final statuses = ['All', 'pending', 'upcoming', 'cancelled', 'completed'];
     var list = state.adminAppointments.toList();
     if (_filter != 'All') {
       list = list
@@ -132,8 +132,24 @@ class _AdminAppointmentsScreenState
             mainAxisSize: MainAxisSize.min,
             children: [
               StatusChip(status: '${a['status'] ?? ''}'),
+              if ('${a['status'] ?? ''}' == 'pending') ...[
+                IconButton(
+                  icon: Icon(Icons.check_circle,
+                      color: Colors.green.shade700, size: 22),
+                  tooltip: 'Approve appointment',
+                  onPressed: () => _approve(a),
+                ),
+                IconButton(
+                  icon: Icon(Icons.cancel,
+                      color: Theme.of(context).colorScheme.error,
+                      size: 22),
+                  tooltip: 'Reject appointment',
+                  onPressed: () => _reject(a),
+                ),
+              ],
               if ('${a['status'] ?? ''}' != 'cancelled' &&
-                  '${a['status'] ?? ''}' != 'completed') ...[
+                  '${a['status'] ?? ''}' != 'completed' &&
+                  '${a['status'] ?? ''}' != 'pending') ...[
                 IconButton(
                   icon: Icon(Icons.cancel_outlined,
                       color: Theme.of(context).colorScheme.error,
@@ -166,6 +182,44 @@ class _AdminAppointmentsScreenState
           content: Text(done
               ? 'Appointment cancelled.'
               : 'Could not cancel. Try again.')),
+    );
+  }
+
+  Future<void> _approve(Map<String, dynamic> a) async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Approve appointment?',
+      message: 'The patient will be notified that their appointment is confirmed.',
+      confirmLabel: 'Approve',
+    );
+    if (!ok || !mounted) return;
+    final done = await AppStateScope.of(context)
+        .updateAdminAppointment('${a['id']}', {'status': 'upcoming'});
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(done
+              ? 'Appointment approved. Patient notified.'
+              : 'Could not approve. Try again.')),
+    );
+  }
+
+  Future<void> _reject(Map<String, dynamic> a) async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Reject appointment?',
+      message: 'The patient will be notified that their request was not approved.',
+      confirmLabel: 'Reject',
+    );
+    if (!ok || !mounted) return;
+    final done = await AppStateScope.of(context)
+        .updateAdminAppointment('${a['id']}', {'status': 'cancelled'});
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(done
+              ? 'Appointment rejected. Patient notified.'
+              : 'Could not reject. Try again.')),
     );
   }
 }

@@ -6,6 +6,7 @@ import '../models.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../services/payment_service.dart';
+import '../services/supabase_repository.dart';
 import '../widgets/upi_payment_sheet.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -370,6 +371,21 @@ class _BookingScreenState extends State<BookingScreen> {
         // Book the appointment with UPI as payment method.
         // The patient completes the UPI payment in their UPI app.
       }
+      // Upload prescription if attached
+      String? prescriptionUrl;
+      if (_prescriptionPath != null && _prescriptionName != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Uploading prescription...')),
+          );
+        }
+        prescriptionUrl =
+            await SupabaseRepository.instance.uploadPrescription(
+          _prescriptionPath!,
+          _prescriptionName!,
+        );
+      }
+
       state.bookAppointment(
         kind: widget.kind,
         refId: widget.refId,
@@ -389,7 +405,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 .where((m) => m.id == _bookingForMemberId)
                 .firstOrNull
                 ?.name,
-        prescriptionPath: _prescriptionPath,
+        prescriptionPath: prescriptionUrl ?? _prescriptionPath,
         prescriptionName: _prescriptionName,
       );
       ScaffoldMessenger.of(context).showSnackBar(

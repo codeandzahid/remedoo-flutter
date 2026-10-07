@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'appointment_detail_screen.dart';
+import 'appointment_receipt_screen.dart';
 import 'booking_screen.dart';
 import 'doctors_screen.dart';
 import '../app_navigator.dart';
@@ -206,6 +207,21 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
               const SizedBox(height: 12),
               Row(
                 children: [
+                  if (a.status == 'upcoming')
+                    Expanded(
+                      child: RButton(
+                        label: 'Receipt',
+                        icon: Icons.receipt,
+                        variant: RButtonVariant.outline,
+                        small: true,
+                        onPressed: () => pushPage(
+                          context,
+                          AppointmentReceiptScreen(appointment: a),
+                        ),
+                      ),
+                    ),
+                  if (a.status == 'upcoming')
+                    const SizedBox(width: 10),
                   Expanded(
                     child: RButton(
                       label: 'Reschedule',

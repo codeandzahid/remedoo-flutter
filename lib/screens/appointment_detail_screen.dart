@@ -80,6 +80,10 @@ class AppointmentDetailScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       _notesCard(context, a),
                     ],
+                    if (a.prescriptionName != null) ...[
+                      const SizedBox(height: 12),
+                      _prescriptionCard(context, a),
+                    ],
                   ],
                 ),
                 side: Column(
@@ -346,6 +350,45 @@ class AppointmentDetailScreen extends StatelessWidget {
               a.notes,
               style: TextStyle(
                   fontSize: 13, color: scheme.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _prescriptionCard(BuildContext context, Appointment a) {
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Prescription',
+              style:
+                  TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          ListTile(
+            leading: const Icon(Icons.description),
+            title: Text(a.prescriptionName ?? 'Prescription',
+                style: const TextStyle(fontSize: 13)),
+            trailing: TextButton(
+              onPressed: () {
+                final url = a.prescriptionPath;
+                if (url != null && url.isNotEmpty) {
+                  // Open in browser/new tab
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Opening: ${a.prescriptionName}'),
+                      action: SnackBarAction(
+                        label: 'Open',
+                        onPressed: () {
+                          // URL is available at: $url
+                        },
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('View'),
             ),
           ),
         ],

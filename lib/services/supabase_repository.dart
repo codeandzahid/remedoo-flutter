@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -378,6 +380,36 @@ class SupabaseRepository {
       return '${row['id']}';
     } catch (e) {
       debugPrint('createSupportTicket failed: $e');
+      return null;
+    }
+  }
+
+  /// Upload prescription file to storage, returns public URL
+  Future<String?> uploadPrescription(
+      String localPath, String fileName) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return null;
+    try {
+      final file = File(localPath);
+      final bytes = await file.readAsBytes();
+      final ext = fileName.split('.').last.toLowerCase();
+      final contentType = ext == 'pdf'
+          ? 'application/pdf'
+          : 'image/${ext == 'jpg' ? 'jpeg' : ext}';
+      final storagePath =
+          '$uid/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+      await _db.storage.from('prescriptions').uploadBinary(
+            storagePath,
+            bytes,
+            fileOptions: FileOptions(contentType: contentType),
+          );
+      // Create signed URL (valid 1 year) since bucket is private
+      final url = await _db.storage
+          .from('prescriptions')
+          .createSignedUrl(storagePath, 365 * 24 * 60 * 60);
+      return url;
+    } catch (e) {
+      debugPrint('uploadPrescription failed: $e');
       return null;
     }
   }
