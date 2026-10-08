@@ -115,6 +115,11 @@ class _ProviderPaymentsTabState
     final upiId = (r['upi_id'] as String?)?.trim() ?? '';
     final upiEnabled = r['upi_enabled'] != false;
     final payInClinic = r['pay_in_clinic_enabled'] != false;
+    final routeAccountId =
+        (r['razorpay_account_id'] as String?)?.trim() ?? '';
+    final routeStatus =
+        (r['route_onboarding_status'] as String?)?.trim() ??
+            'not_started';
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: RCard(
@@ -199,6 +204,39 @@ class _ProviderPaymentsTabState
                 }
               },
             ),
+            const Divider(height: 16),
+            // Razorpay Route status
+            Row(
+              children: [
+                Icon(Icons.account_balance,
+                    size: 18,
+                    color: scheme.onSurfaceVariant),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text('Razorpay Route (direct payouts)',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                ),
+                StatusChip(
+                  status: routeAccountId.isEmpty
+                      ? 'not onboarded'
+                      : routeStatus == 'created'
+                          ? 'active'
+                          : routeStatus,
+                ),
+              ],
+            ),
+            if (routeAccountId.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Account: $routeAccountId',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: scheme.onSurfaceVariant,
+                    fontFamily: 'monospace'),
+              ),
+            ],
           ],
         ),
       ),

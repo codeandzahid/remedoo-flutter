@@ -88,6 +88,58 @@ class PaymentService {
     }
   }
 
+  /// Open Razorpay checkout with a pre-created order (for Route split payments).
+  /// The order already contains transfer instructions to the provider.
+  void payWithOrder({
+    required String razorpayOrderId,
+    String? keyId,
+    required double amount,
+    required String description,
+    String? contact,
+    String? email,
+    required void Function(String paymentId) onPaymentSuccess,
+    required void Function(String error) onPaymentError,
+  }) {
+    final useKeyId = (keyId != null && keyId.startsWith('rzp_'))
+        ? keyId
+        : (_enabled ? _keyId : '');
+
+    if (useKeyId.isEmpty || !useKeyId.startsWith('rzp_')) {
+      onPaymentError('Payment gateway not configured. Contact admin.');
+      return;
+    }
+
+    onSuccess = onPaymentSuccess;
+    onError = onPaymentError;
+    _ensureInitialized();
+
+    final options = {
+      'key': useKeyId,
+      'order_id': razorpayOrderId, // Route order with transfers
+      'amount': (amount * 100).toInt(),
+      'currency': 'INR',
+      'name': 'Remedoo',
+      'description': description,
+      'prefill': {
+        if (contact != null) 'contact': contact,
+        if (email != null) 'email': email,
+      },
+      'theme': {'color': '#2196F3'},
+      'method': {
+        'upi': true,
+        'card': true,
+        'netbanking': true,
+        'wallet': true,
+      },
+    };
+
+    try {
+      _razorpay!.open(options);
+    } catch (e) {
+      onPaymentError('Could not open payment: $e');
+    }
+  }
+
   void dispose() {
     _razorpay?.clear();
     _razorpay = null;

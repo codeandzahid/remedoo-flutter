@@ -31,7 +31,6 @@ class _AdminAppSettingsScreenState
   // Razorpay
   bool _razorpayEnabled = false;
   late final TextEditingController _razorpayKeyId;
-  late final TextEditingController _razorpayKeySecret;
 
   // Fees
   late final TextEditingController _deliveryFee;
@@ -57,7 +56,6 @@ class _AdminAppSettingsScreenState
     _supportEmail = TextEditingController();
     _supportHours = TextEditingController();
     _razorpayKeyId = TextEditingController();
-    _razorpayKeySecret = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -71,7 +69,6 @@ class _AdminAppSettingsScreenState
     _supportEmail.dispose();
     _supportHours.dispose();
     _razorpayKeyId.dispose();
-    _razorpayKeySecret.dispose();
     super.dispose();
   }
 
@@ -92,7 +89,6 @@ class _AdminAppSettingsScreenState
       _singleVendorPharmacyId = pharmMode['pharmacy_id'] as String?;
       _razorpayEnabled = rzp['enabled'] == true;
       _razorpayKeyId.text = '${rzp['key_id'] ?? ''}';
-      _razorpayKeySecret.text = '${rzp['key_secret'] ?? ''}';
       _deliveryFee.text = '${fees['delivery_fee'] ?? 30}';
       _freeThreshold.text =
           '${fees['free_delivery_threshold'] ?? 499}';
@@ -422,11 +418,19 @@ class _AdminAppSettingsScreenState
                     hint: 'rzp_test_... or rzp_live_...',
                     controller: _razorpayKeyId),
                 const SizedBox(height: 8),
-                RTextField(
-                    label: 'Razorpay Key Secret',
-                    hint: 'Keep this secret',
-                    controller: _razorpayKeySecret,
-                    obscureText: true),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Security note: The Key Secret must NEVER be stored in the app. '
+                    'Set RAZORPAY_KEY_SECRET as a Supabase Edge Function secret instead. '
+                    'Only the Key ID (public) belongs here.',
+                    style: TextStyle(fontSize: 12, height: 1.5),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerRight,
@@ -438,8 +442,7 @@ class _AdminAppSettingsScreenState
                         : () => _save('razorpay', {
                               'enabled': _razorpayEnabled,
                               'key_id': _razorpayKeyId.text.trim(),
-                              'key_secret':
-                                  _razorpayKeySecret.text.trim(),
+                              // key_secret removed: must be set as Edge Function secret
                             }),
                   ),
                 ),
