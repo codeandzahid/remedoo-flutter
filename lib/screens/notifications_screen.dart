@@ -251,8 +251,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           borderRadius:
               BorderRadius.circular(RemedooRadius.card),
           onTap: () {
-            n.read = true;
-            AppStateScope.of(context).refresh();
+            AppStateScope.of(context).markRead(n.id);
           },
           child: Padding(
             padding: const EdgeInsets.all(14),
