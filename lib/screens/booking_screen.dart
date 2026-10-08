@@ -516,13 +516,15 @@ class _BookingScreenState extends State<BookingScreen> {
         }
         final orderId =
             'APT${DateTime.now().millisecondsSinceEpoch}';
-        showUpiPaymentSheet(
+        final upiInitiated = await showUpiPaymentSheet(
           context,
           upiId: upiId,
           providerName: widget.title,
           amount: widget.fee,
           orderId: orderId,
         );
+        // User dismissed the sheet without paying: do not book.
+        if (!upiInitiated || !mounted) return;
         // Book the appointment with UPI as payment method.
         // The patient completes the UPI payment in their UPI app.
       }

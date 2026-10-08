@@ -39,25 +39,24 @@ class UpiPaymentSheet extends StatelessWidget {
 
   Future<void> _launchUpi(BuildContext context) async {
     final uri = Uri.parse(_upiLink);
+    bool launched = false;
     try {
-      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!ok && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Could not open UPI app. Please pay manually to the UPI ID shown.'),
-          ),
-        );
-      }
+      launched =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Could not open UPI app. Please pay manually to the UPI ID shown.'),
-          ),
-        );
-      }
+      launched = false;
+    }
+    if (!context.mounted) return;
+    if (launched) {
+      // UPI app opened: close the sheet and signal payment initiated.
+      Navigator.of(context).pop(true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Could not open UPI app. Please pay manually to the UPI ID shown, then tap "I have paid".'),
+        ),
+      );
     }
   }
 
@@ -180,6 +179,18 @@ class UpiPaymentSheet extends StatelessWidget {
             icon: Icons.open_in_new,
             fullWidth: true,
             onPressed: () => _launchUpi(context),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.check, size: 18),
+            label: const Text('I have paid manually'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
           ),
           const SizedBox(height: 12),
           Container(
