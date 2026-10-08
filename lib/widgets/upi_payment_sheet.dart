@@ -7,7 +7,7 @@ import 'widgets.dart';
 /// UPI payment sheet: shows the provider's UPI ID and a button to pay
 /// via UPI app. The payment goes DIRECTLY to the provider's UPI ID —
 /// Remedoo never touches the money.
-class UpiPaymentSheet extends StatelessWidget {
+class UpiPaymentSheet extends StatefulWidget {
   final String upiId;
   final String providerName;
   final double amount;
@@ -20,6 +20,20 @@ class UpiPaymentSheet extends StatelessWidget {
     required this.amount,
     required this.orderId,
   });
+
+  @override
+  State<UpiPaymentSheet> createState() => _UpiPaymentSheetState();
+}
+
+class _UpiPaymentSheetState extends State<UpiPaymentSheet> {
+  /// True once the UPI app was launched — we then wait for the user
+  /// to confirm they completed the payment.
+  bool _upiAppOpened = false;
+
+  String get upiId => widget.upiId;
+  String get providerName => widget.providerName;
+  double get amount => widget.amount;
+  String get orderId => widget.orderId;
 
   /// Builds a UPI deep link: upi://pay?pa=...&pn=...&am=...&cu=INR&tn=...
   String get _upiLink {
@@ -48,13 +62,15 @@ class UpiPaymentSheet extends StatelessWidget {
     }
     if (!context.mounted) return;
     if (launched) {
-      // UPI app opened: close the sheet and signal payment initiated.
-      Navigator.of(context).pop(true);
+      // UPI app opened. Do NOT close the sheet yet — the user must
+      // confirm they completed the payment when they return.
+      // Update the UI to show we're waiting for confirmation.
+      setState(() => _upiAppOpened = true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              'Could not open UPI app. Please pay manually to the UPI ID shown, then tap "I have paid".'),
+              'Could not open UPI app. Please pay manually to the UPI ID shown, then tap "I have completed payment".'),
         ),
       );
     }
@@ -174,24 +190,64 @@ class UpiPaymentSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          RButton(
-            label: 'Pay ₹${amount.toStringAsFixed(0)} via UPI App',
-            icon: Icons.open_in_new,
-            fullWidth: true,
-            onPressed: () => _launchUpi(context),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.check, size: 18),
-            label: const Text('I have paid manually'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          if (_upiAppOpened) ...[
+            // UPI app was opened — wait for the user to confirm payment.
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.orange.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.hourglass_top,
+                      color: Colors.orange, size: 20),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Complete the payment in your UPI app, then confirm below.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
               ),
             ),
-            onPressed: () => Navigator.of(context).pop(true),
-          ),
+            const SizedBox(height: 12),
+            RButton(
+              label: 'I have completed the payment',
+              icon: Icons.check_circle,
+              fullWidth: true,
+              onPressed: () => Navigator.of(context).pop(true),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => setState(() => _upiAppOpened = false),
+              child: const Text('Re-open UPI app'),
+            ),
+          ] else ...[
+            RButton(
+              label:
+                  'Pay ₹${amount.toStringAsFixed(0)} via UPI App',
+              icon: Icons.open_in_new,
+              fullWidth: true,
+              onPressed: () => _launchUpi(context),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.check, size: 18),
+              label: const Text('I have paid manually'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+            ),
+          ],
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
