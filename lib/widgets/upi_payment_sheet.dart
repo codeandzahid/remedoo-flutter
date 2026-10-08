@@ -25,10 +25,84 @@ class UpiPaymentSheet extends StatefulWidget {
   State<UpiPaymentSheet> createState() => _UpiPaymentSheetState();
 }
 
-class _UpiPaymentSheetState extends State<UpiPaymentSheet> {
+class _UpiPaymentSheetState extends State<UpiPaymentSheet>
+    with WidgetsBindingObserver {
   /// True once the UPI app was launched — we then wait for the user
-  /// to confirm they completed the payment.
+  /// to return and confirm they completed the payment.
   bool _upiAppOpened = false;
+
+  /// Guards against showing the return-confirm dialog more than once.
+  bool _returnDialogShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // User came back from the UPI app: automatically ask for confirmation.
+    if (state == AppLifecycleState.resumed &&
+        _upiAppOpened &&
+        !_returnDialogShown &&
+        mounted) {
+      _returnDialogShown = true;
+      // Small delay so the sheet is fully visible again.
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _showReturnConfirmDialog();
+      });
+    }
+  }
+
+  /// Auto-shown when the user returns from the UPI app.
+  /// Asks whether the payment succeeded — Yes books, No cancels.
+  void _showReturnConfirmDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.verified, color: Colors.green, size: 28),
+            SizedBox(width: 10),
+            Text('Verify Payment'),
+          ],
+        ),
+        content: Text(
+          'Did your payment of ₹${amount.toStringAsFixed(0)} to $providerName go through in your UPI app?',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              // Payment failed/cancelled: close dialog and sheet, book nothing.
+              Navigator.of(ctx).pop(); // close dialog
+              Navigator.of(context).pop(false); // close sheet, no booking
+            },
+            child: const Text('No, cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              // Payment succeeded: close dialog and sheet, book appointment.
+              Navigator.of(ctx).pop(); // close dialog
+              Navigator.of(context).pop(true); // close sheet, book
+            },
+            child: const Text('Yes, payment done'),
+          ),
+        ],
+      ),
+    );
+  }
 
   String get upiId => widget.upiId;
   String get providerName => widget.providerName;
@@ -208,7 +282,7 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet> {
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
-                      'Complete the payment in your UPI app, then confirm below.',
+                      'Complete the payment in your UPI app. When you return here, we\'ll ask you to confirm.',
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
