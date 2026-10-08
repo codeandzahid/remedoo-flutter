@@ -37,6 +37,7 @@ dependencies:
   supabase_flutter: ^2.18.0
   shared_preferences: ^2.5.3
   url_launcher: ^6.3.1
+  http: ^1.2.0
   file_picker: ^13.1.0
   geolocator: ^13.0.2
   geocoding: ^5.0.0

@@ -1,17 +1,19 @@
 import 'dart:async';
-import 'dart:js_interop';
-import 'dart:js_interop_unsafe';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:razorpay_flutter/razorpay_flutter.dart';
-import 'package:web/web.dart' as web;
+import 'package:url_launcher/url_launcher.dart';
+
+import 'supabase_config.dart';
 
 /// In-app UPI/card payment via Razorpay.
 /// API keys are configured in Admin Panel > Settings > Payments.
 /// Keys are stored in app_config, never hardcoded.
 ///
 /// Supports both mobile (razorpay_flutter plugin) and web
-/// (Razorpay JS checkout via checkout.razorpay.com).
+/// (Razorpay Payment Links — opens in browser, no JS SDK needed).
 class PaymentService {
   static final PaymentService instance = PaymentService._();
   PaymentService._();
@@ -34,7 +36,7 @@ class PaymentService {
       _enabled && _keyId.isNotEmpty && _keyId.startsWith('rzp_');
 
   void _ensureInitialized() {
-    if (kIsWeb) return; // Web uses JS checkout, no plugin needed
+    if (kIsWeb) return; // Web uses Payment Links, no plugin needed
     _razorpay ??= Razorpay();
     _razorpay!.clear();
     _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS,
@@ -51,13 +53,45 @@ class PaymentService {
     });
   }
 
-  Map<String, dynamic> _buildOptions({
+  /// Open Razorpay checkout for in-app UPI/card payment.
+  /// Amount is in INR.
+  ///
+  /// On web: creates a Razorpay Payment Link via backend and opens it
+  /// in a new browser tab. Polls for payment completion.
+  /// On mobile: uses the razorpay_flutter plugin (native checkout).
+  void pay({
     required double amount,
+    required String orderId,
     required String description,
     String? contact,
     String? email,
+    String? customerName,
+    required void Function(String paymentId) onPaymentSuccess,
+    required void Function(String error) onPaymentError,
   }) {
-    return {
+    if (!isConfigured) {
+      onPaymentError('Payment gateway not configured. Contact admin.');
+      return;
+    }
+
+    onSuccess = onPaymentSuccess;
+    onError = onPaymentError;
+
+    if (kIsWeb) {
+      _payViaPaymentLink(
+        amount: amount,
+        orderId: orderId,
+        description: description,
+        contact: contact,
+        email: email,
+        customerName: customerName,
+      );
+      return;
+    }
+
+    _ensureInitialized();
+
+    final options = {
       'key': _keyId,
       'amount': (amount * 100).toInt(), // paise
       'currency': 'INR',
@@ -75,40 +109,7 @@ class PaymentService {
         'wallet': true,
       },
     };
-  }
 
-  /// Open Razorpay checkout for in-app UPI/card payment.
-  /// Amount is in INR (will be converted to paise).
-  void pay({
-    required double amount,
-    required String orderId,
-    required String description,
-    String? contact,
-    String? email,
-    required void Function(String paymentId) onPaymentSuccess,
-    required void Function(String error) onPaymentError,
-  }) {
-    if (!isConfigured) {
-      onPaymentError('Payment gateway not configured. Contact admin.');
-      return;
-    }
-
-    onSuccess = onPaymentSuccess;
-    onError = onPaymentError;
-
-    final options = _buildOptions(
-      amount: amount,
-      description: description,
-      contact: contact,
-      email: email,
-    );
-
-    if (kIsWeb) {
-      _openWebCheckout(options);
-      return;
-    }
-
-    _ensureInitialized();
     try {
       _razorpay!.open(options);
     } catch (e) {
@@ -116,135 +117,130 @@ class PaymentService {
     }
   }
 
-  /// Opens Razorpay checkout on Flutter web using JS interop.
-  void _openWebCheckout(Map<String, dynamic> options) {
+  /// Web: create a Razorpay Payment Link via Edge Function, open it,
+  /// and poll for payment completion.
+  void _payViaPaymentLink({
+    required double amount,
+    required String orderId,
+    required String description,
+    String? contact,
+    String? email,
+    String? customerName,
+  }) async {
     try {
-      // Check if Razorpay JS is already loaded
-      final ctorProp = globalContext.getProperty('Razorpay'.toJS);
-      if (ctorProp == null || ctorProp.isUndefinedOrNull) {
-        // Not loaded yet — try loading it dynamically, then retry
-        _loadRazorpayScript(options);
+      // 1. Create payment link via backend
+      final functionUrl =
+          '${SupabaseConfig.url}/functions/v1/razorpay-payment-link';
+
+      final res = await http
+          .post(
+            Uri.parse(functionUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SupabaseConfig.anonKey,
+              'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+            },
+            body: jsonEncode({
+              'amount': amount,
+              'description': description,
+              'customer_name': customerName,
+              'customer_contact': contact,
+              'customer_email': email,
+              'reference_id': orderId,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (res.statusCode != 200) {
+        String msg = 'Failed to create payment link';
+        try {
+          final body = jsonDecode(res.body);
+          if (body['error'] != null) msg = body['error'].toString();
+        } catch (_) {}
+        onError?.call(msg);
         return;
       }
-      _launchRazorpay(ctorProp, options);
+
+      final data = jsonDecode(res.body);
+      final paymentUrl = data['payment_url'] as String?;
+      final paymentLinkId = data['payment_link_id'] as String?;
+
+      if (paymentUrl == null || paymentUrl.isEmpty) {
+        onError?.call('Payment link not created. Please try again.');
+        return;
+      }
+
+      // 2. Open payment link in new tab
+      final uri = Uri.parse(paymentUrl);
+      final launched = await launchUrl(
+        uri,
+        webOnlyWindowName: '_blank',
+      );
+      if (!launched) {
+        onError?.call('Could not open payment page. Please try again.');
+        return;
+      }
+
+      // 3. Poll for payment status
+      if (paymentLinkId != null) {
+        _pollPaymentStatus(paymentLinkId);
+      } else {
+        // No link ID to poll — user must return manually.
+        // We can't confirm payment; treat as pending.
+        onError?.call(
+            'Payment page opened in a new tab. Please complete the payment there and check your bookings.');
+      }
     } catch (e) {
-      onError?.call('Could not open Razorpay: $e');
+      onError?.call('Payment failed: $e');
     }
   }
 
-  /// Dynamically loads checkout.js then launches Razorpay.
-  void _loadRazorpayScript(Map<String, dynamic> options) async {
-    try {
-      // Append the script tag (no event listeners — we'll poll for the global)
-      final script = web.HTMLScriptElement()
-        ..src = 'https://checkout.razorpay.com/v1/checkout.js'
-        ..async = true;
-      web.document.head!.append(script);
+  /// Polls the payment link status until paid, expired, or timeout.
+  void _pollPaymentStatus(String paymentLinkId) async {
+    const maxAttempts = 120; // 10 minutes (5s interval)
+    var attempts = 0;
 
-      // Poll for window.Razorpay to appear (up to 15 seconds)
-      for (var i = 0; i < 30; i++) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        try {
-          final prop = globalContext.getProperty('Razorpay'.toJS);
-          if (prop != null && !prop.isUndefinedOrNull) {
-            _launchRazorpay(prop, options);
+    final statusUrl =
+        '${SupabaseConfig.url}/functions/v1/razorpay-payment-status';
+
+    while (attempts < maxAttempts) {
+      await Future.delayed(const Duration(seconds: 5));
+      attempts++;
+
+      try {
+        final res = await http
+            .post(
+              Uri.parse(statusUrl),
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SupabaseConfig.anonKey,
+                'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+              },
+              body: jsonEncode({'payment_link_id': paymentLinkId}),
+            )
+            .timeout(const Duration(seconds: 15));
+
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body);
+          final status = data['status'] as String?;
+
+          if (status == 'paid') {
+            final paymentId = data['payment_id'] as String? ?? paymentLinkId;
+            onSuccess?.call(paymentId);
+            return;
+          } else if (status == 'cancelled' || status == 'expired') {
+            onError?.call('Payment $status. Please try again.');
             return;
           }
-        } catch (_) {
-          // Ignore and keep polling
+          // else: created / partially_paid — keep polling
         }
+      } catch (_) {
+        // Network hiccup — keep polling
       }
-
-      onError?.call(
-          'Could not load Razorpay checkout. Please check your internet connection and try again.');
-    } catch (e) {
-      onError?.call('Could not load Razorpay: $e');
     }
-  }
 
-  /// Launches the Razorpay checkout with the given constructor.
-  void _launchRazorpay(JSAny ctorProp, Map<String, dynamic> options) {
-    try {
-      // Success handler
-      options['handler'] = ((JSAny? response) {
-        String paymentId = '';
-        try {
-          final r = response as JSObject;
-          final id = r.getProperty('razorpay_payment_id'.toJS);
-          if (id != null) paymentId = (id as JSString).toDart;
-        } catch (_) {}
-        onSuccess?.call(paymentId);
-      }).toJS;
-
-      // Modal dismiss handler (user closed without paying)
-      options['modal'] = {
-        'ondismiss': (() {
-          onError?.call('Payment cancelled');
-        }).toJS,
-      };
-
-      // new Razorpay(options)
-      final jsOptions = _mapToJs(options);
-      final ctor = ctorProp as JSFunction;
-      final rzp = ctor.callAsConstructor(jsOptions) as JSObject;
-
-      // payment.failed handler
-      rzp.callMethod(
-        'on'.toJS,
-        'payment.failed'.toJS,
-        ((JSAny? response) {
-          String message = 'Payment failed';
-          try {
-            final r = response as JSObject;
-            final error = r.getProperty('error'.toJS);
-            if (error != null && error.isDefinedAndNotNull) {
-              final desc = (error as JSObject)
-                  .getProperty('description'.toJS);
-              if (desc != null && desc.isDefinedAndNotNull) {
-                message = (desc as JSString).toDart;
-              }
-            }
-          } catch (_) {}
-          onError?.call(message);
-        }).toJS,
-      );
-
-      // Open the checkout
-      rzp.callMethod('open'.toJS);
-    } catch (e) {
-      onError?.call('Could not open Razorpay: $e');
-    }
-  }
-
-  /// Recursively converts a Dart map/list to a JS value.
-  JSAny _mapToJs(dynamic value) {
-    if (value is Map) {
-      final obj = JSObject();
-      value.forEach((k, v) {
-        // Skip functions here; they're already JS via .toJS
-        if (v is JSAny) {
-          obj.setProperty(k.toString().toJS, v);
-        } else {
-          obj.setProperty(k.toString().toJS, _mapToJs(v));
-        }
-      });
-      return obj;
-    } else if (value is List) {
-      final arr = JSArray();
-      for (final item in value) {
-        arr.add(_mapToJs(item));
-      }
-      return arr;
-    } else if (value is String) {
-      return value.toJS;
-    } else if (value is num) {
-      return value.toJS;
-    } else if (value is bool) {
-      return value.toJS;
-    } else if (value is JSAny) {
-      return value;
-    }
-    throw ArgumentError('Unsupported value in Razorpay options: $value');
+    onError?.call(
+        'Payment timed out. If you completed the payment, it will be confirmed shortly. Check your bookings.');
   }
 
   void dispose() {
