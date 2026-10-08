@@ -848,10 +848,44 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---------- UPI UTR Verification ----------
+
+  /// Submits a UTR for admin verification. Returns true on success.
+  Future<bool> submitUpiUtr({
+    required String appointmentId,
+    required String utr,
+    required double amount,
+    required String providerType,
+    String? providerId,
+    String? providerName,
+  }) async {
+    // Get the provider's UPI ID for the record
+    String? providerUpiId;
+    if (providerType == 'doctor') {
+      providerUpiId = doctors
+          .where((d) => d.id == providerId)
+          .firstOrNull
+          ?.upiId;
+    } else if (providerType == 'hospital') {
+      providerUpiId = hospitals
+          .where((h) => h.id == providerId)
+          .firstOrNull
+          ?.upiId;
+    }
+    return _repo.submitUtrVerification(
+      appointmentId: appointmentId,
+      utr: utr,
+      amount: amount,
+      providerType: providerType,
+      providerId: providerId,
+      providerName: providerName,
+      providerUpiId: providerUpiId,
+    );
+  }
+
   // ---------- Favorites ----------
 
-  final Set<String> _favorites = {};
-  Set<String> get favorites => _favorites;
+  final Set<String> _favorites = {};  Set<String> get favorites => _favorites;
 
   bool isFavorite(String key) => _favorites.contains(key);
 

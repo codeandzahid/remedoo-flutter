@@ -1434,4 +1434,72 @@ class SupabaseRepository {
       return false;
     }
   }
+
+  /// Submits a UTR for UPI payment verification (SMM-panel style).
+  /// Returns true on success, false if the UTR was already used or failed.
+  Future<bool> submitUtrVerification({
+    required String appointmentId,
+    required String utr,
+    required double amount,
+    required String providerType,
+    String? providerId,
+    String? providerName,
+    String? providerUpiId,
+  }) async {
+    if (!_ready) return false;
+    try {
+      final user = _db.auth.currentUser;
+      await _db.from('upi_payment_verifications').insert({
+        'appointment_id': appointmentId,
+        'utr': utr,
+        'amount': amount,
+        'patient_id': user?.id,
+        'patient_name': user?.email,
+        'provider_type': providerType,
+        'provider_id': providerId,
+        'provider_name': providerName,
+        'provider_upi_id': providerUpiId,
+        'status': 'pending',
+      });
+      return true;
+    } catch (e) {
+      debugPrint('submitUtrVerification failed: $e');
+      return false;
+    }
+  }
+
+  /// Fetches pending UTR verifications (admin).
+  Future<List<Map<String, dynamic>>> fetchPendingUtrVerifications() async {
+    if (!_ready) return [];
+    try {
+      final rows = await _db
+          .from('upi_payment_verifications')
+          .select()
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      debugPrint('fetchPendingUtrVerifications failed: $e');
+      return [];
+    }
+  }
+
+  /// Approves or rejects a UTR verification (admin).
+  Future<bool> resolveUtrVerification(
+      String id, bool approve, String? note) async {
+    if (!_ready) return false;
+    try {
+      final user = _db.auth.currentUser;
+      await _db.from('upi_payment_verifications').update({
+        'status': approve ? 'approved' : 'rejected',
+        'admin_note': note,
+        'verified_by': user?.id,
+        'verified_at': DateTime.now().toIso8601String(),
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('resolveUtrVerification failed: $e');
+      return false;
+    }
+  }
 }

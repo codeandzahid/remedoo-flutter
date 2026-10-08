@@ -27,20 +27,22 @@ class UpiPaymentSheet extends StatefulWidget {
 
 class _UpiPaymentSheetState extends State<UpiPaymentSheet>
     with WidgetsBindingObserver {
-  /// True once the UPI app was launched — we then wait for the user
-  /// to return and confirm they completed the payment.
-  bool _upiAppOpened = false;
+  /// Step 1 = pay, Step 2 = enter UTR.
+  int _step = 1;
 
   /// Guards against showing the return-confirm dialog more than once.
   bool _returnDialogShown = false;
 
   /// When the UPI app was launched. Used to auto-detect a completed payment:
   /// if the user spent enough time in the UPI app (PIN entry takes time),
-  /// we treat it as paid and book automatically.
+  /// we move them to the UTR step automatically.
   DateTime? _upiLaunchTime;
 
-  /// Minimum seconds in the UPI app to count as a completed payment.
-  static const _autoVerifySeconds = 15;
+  /// Minimum seconds in the UPI app to auto-advance to the UTR step.
+  static const _autoAdvanceSeconds = 15;
+
+  final _utrController = TextEditingController();
+  bool _utrError = false;
 
   @override
   void initState() {
@@ -51,37 +53,34 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _utrController.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // User came back from the UPI app.
+    // User came back from the UPI app: move to the UTR entry step.
     if (state == AppLifecycleState.resumed &&
-        _upiAppOpened &&
+        _step == 1 &&
+        _upiLaunchTime != null &&
         !_returnDialogShown &&
         mounted) {
       _returnDialogShown = true;
-      final elapsed = _upiLaunchTime == null
-          ? 0
-          : DateTime.now().difference(_upiLaunchTime!).inSeconds;
-      // Small delay so the sheet is fully visible again.
+      final elapsed = DateTime.now().difference(_upiLaunchTime!).inSeconds;
       Future.delayed(const Duration(milliseconds: 500), () {
         if (!mounted) return;
-        if (elapsed >= _autoVerifySeconds) {
-          // User spent enough time in the UPI app to complete payment
-          // (PIN entry takes time) — auto-book, no taps needed.
-          Navigator.of(context).pop(true);
+        if (elapsed >= _autoAdvanceSeconds) {
+          // Spent long enough to have paid — go to UTR step automatically.
+          setState(() => _step = 2);
         } else {
-          // Quick return: probably cancelled — ask to confirm.
+          // Quick return: probably didn't pay — ask what happened.
           _showReturnConfirmDialog();
         }
       });
     }
   }
 
-  /// Auto-shown when the user returns from the UPI app.
-  /// Asks whether the payment succeeded — Yes books, No cancels.
+  /// Shown on quick return from the UPI app (didn't spend long enough).
   void _showReturnConfirmDialog() {
     showDialog(
       context: context,
@@ -90,37 +89,44 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        title: const Row(
-          children: [
-            Icon(Icons.verified, color: Colors.green, size: 28),
-            SizedBox(width: 10),
-            Text('Verify Payment'),
-          ],
-        ),
-        content: Text(
-          'Did your payment of ₹${amount.toStringAsFixed(0)} to $providerName go through in your UPI app?',
-          style: const TextStyle(fontSize: 14),
+        title: const Text('Did you complete the payment?'),
+        content: const Text(
+          'If you paid in your UPI app, enter the UTR number next. '
+          'If not, you can try again.',
+          style: TextStyle(fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () {
-              // Payment failed/cancelled: close dialog and sheet, book nothing.
-              Navigator.of(ctx).pop(); // close dialog
-              Navigator.of(context).pop(false); // close sheet, no booking
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pop(null); // cancel everything
             },
-            child: const Text('No, cancel'),
+            child: const Text('Cancel booking'),
           ),
           FilledButton(
             onPressed: () {
-              // Payment succeeded: close dialog and sheet, book appointment.
-              Navigator.of(ctx).pop(); // close dialog
-              Navigator.of(context).pop(true); // close sheet, book
+              Navigator.of(ctx).pop();
+              setState(() {
+                _step = 2; // go to UTR entry
+                _returnDialogShown = false; // allow re-entry if needed
+              });
             },
-            child: const Text('Yes, payment done'),
+            child: const Text('Yes, I paid'),
           ),
         ],
       ),
     );
+  }
+
+  /// Validates and submits the UTR. Returns the UTR string to the caller.
+  void _submitUtr() {
+    final utr = _utrController.text.trim();
+    // UTR is 12 digits
+    if (!RegExp(r'^\d{12}$').hasMatch(utr)) {
+      setState(() => _utrError = true);
+      return;
+    }
+    Navigator.of(context).pop(utr);
   }
 
   String get upiId => widget.upiId;
@@ -155,10 +161,10 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
     }
     if (!context.mounted) return;
     if (launched) {
-      // UPI app opened. Record the time — if the user spends long enough
-      // in the UPI app, we'll auto-book on return.
+      // UPI app opened. Record the time — on return we'll advance
+      // to the UTR entry step.
       _upiLaunchTime = DateTime.now();
-      setState(() => _upiAppOpened = true);
+      setState(() {});
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -283,25 +289,25 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
             ],
           ),
           const SizedBox(height: 14),
-          if (_upiAppOpened) ...[
-            // UPI app was opened — wait for the user to confirm payment.
+          if (_step == 2) ...[
+            // ---- STEP 2: Enter UTR ----
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.08),
+                color: Colors.green.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: Colors.orange.withValues(alpha: 0.3),
+                  color: Colors.green.withValues(alpha: 0.3),
                 ),
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  const Icon(Icons.hourglass_top,
-                      color: Colors.orange, size: 20),
-                  const SizedBox(width: 10),
-                  const Expanded(
+                  Icon(Icons.receipt_long,
+                      color: Colors.green, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
                     child: Text(
-                      'Complete the payment in your UPI app and return here — we\'ll detect it automatically.',
+                      'Enter the 12-digit UTR / UPI Ref No. from your payment receipt.',
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
@@ -309,18 +315,65 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
               ),
             ),
             const SizedBox(height: 12),
+            TextField(
+              controller: _utrController,
+              keyboardType: TextInputType.number,
+              maxLength: 12,
+              decoration: InputDecoration(
+                labelText: 'UTR / UPI Reference Number',
+                hintText: 'e.g. 412345678901',
+                prefixIcon: const Icon(Icons.numbers),
+                errorText:
+                    _utrError ? 'Enter a valid 12-digit UTR' : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onChanged: (_) {
+                if (_utrError) setState(() => _utrError = false);
+              },
+            ),
+            const SizedBox(height: 4),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text(
+                'Where do I find the UTR?',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blue),
+              ),
+              children: const [
+                Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    '• Google Pay: tap the transaction → "UPI transaction ID"\n'
+                    '• PhonePe: History → tap payment → "Transaction ID"\n'
+                    '• Paytm: Passbook → tap payment → "UTR number"\n'
+                    '• BHIM: History → tap transaction → "Ref No."',
+                    style: TextStyle(fontSize: 12, height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             RButton(
-              label: 'I have completed the payment',
-              icon: Icons.check_circle,
+              label: 'Submit UTR & Confirm Booking',
+              icon: Icons.verified,
               fullWidth: true,
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: _submitUtr,
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => setState(() => _upiAppOpened = false),
-              child: const Text('Re-open UPI app'),
+              onPressed: () => setState(() {
+                _step = 1;
+                _returnDialogShown = false;
+              }),
+              child: const Text('Back to payment'),
             ),
           ] else ...[
+            // ---- STEP 1: Pay ----
             RButton(
               label:
                   'Pay ₹${amount.toStringAsFixed(0)} via UPI App',
@@ -331,15 +384,16 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
             const SizedBox(height: 8),
             OutlinedButton.icon(
               icon: const Icon(Icons.check, size: 18),
-              label: const Text('I have paid manually'),
+              label: const Text('I have paid — enter UTR'),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 48),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () => setState(() => _step = 2),
             ),
+          ],
           ],
           const SizedBox(height: 12),
           Container(
@@ -413,15 +467,15 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
 }
 
 /// Shows the UPI payment sheet as a modal bottom sheet.
-/// Returns true if the user initiated payment.
-Future<bool> showUpiPaymentSheet(
+/// Returns the 12-digit UTR if the user submitted one, null if cancelled.
+Future<String?> showUpiPaymentSheet(
   BuildContext context, {
   required String upiId,
   required String providerName,
   required double amount,
   required String orderId,
 }) async {
-  final result = await showModalBottomSheet<bool>(
+  final result = await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
@@ -439,5 +493,5 @@ Future<bool> showUpiPaymentSheet(
       ),
     ),
   );
-  return result ?? false;
+  return result;
 }

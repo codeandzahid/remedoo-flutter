@@ -17,6 +17,7 @@ import 'admin_revenue_screen.dart';
 import 'admin_analytics_screen.dart';
 import 'admin_config_screens.dart';
 import 'admin_ops_screens.dart';
+import 'admin_utr_verification_screen.dart';
 import 'admin_payments_screen.dart';
 import 'admin_app_settings_screen.dart';
 import 'admin_users_screen.dart';
@@ -63,6 +64,8 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const AdminAppointmentsScreen()),
       _NavItem('Orders & Care', 'Refunds', Icons.replay,
           (_) => const AdminRefundsScreen()),
+      _NavItem('Orders & Care', 'Verify UPI Payments', Icons.verified,
+          (_) => const AdminUtrVerificationScreen()),
       _NavItem('Orders & Care', 'Emergencies', Icons.sos,
           (_) => const AdminEmergenciesScreen()),
       _NavItem('Orders & Care', 'Ambulance', Icons.emergency,

@@ -88,6 +88,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   String? _prescriptionPath;
   String? _prescriptionName;
+  String? _submittedUtr;
   Uint8List? _prescriptionBytes;
 
   Widget _prescriptionCard() {
@@ -516,17 +517,19 @@ class _BookingScreenState extends State<BookingScreen> {
         }
         final orderId =
             'APT${DateTime.now().millisecondsSinceEpoch}';
-        final upiInitiated = await showUpiPaymentSheet(
+        final utr = await showUpiPaymentSheet(
           context,
           upiId: upiId,
           providerName: widget.title,
           amount: widget.fee,
           orderId: orderId,
         );
-        // User dismissed the sheet without paying: do not book.
-        if (!upiInitiated || !mounted) return;
+        // User dismissed the sheet without submitting UTR: do not book.
+        if (utr == null || utr.isEmpty || !mounted) return;
+        // Store the UTR for the verification step after booking.
+        _submittedUtr = utr;
         // Book the appointment with UPI as payment method.
-        // The patient completes the UPI payment in their UPI app.
+        // Admin verifies the UTR against their bank statement.
       }
       // Upload prescription if attached
       String? prescriptionUrl;
@@ -545,7 +548,7 @@ class _BookingScreenState extends State<BookingScreen> {
         );
       }
 
-      state.bookAppointment(
+      final appt = state.bookAppointment(
         kind: widget.kind,
         refId: widget.refId,
         title: widget.title,
@@ -567,9 +570,29 @@ class _BookingScreenState extends State<BookingScreen> {
         prescriptionPath: prescriptionUrl ?? _prescriptionPath,
         prescriptionName: _prescriptionName,
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Appointment booked successfully!')),
-      );
+      // Submit UTR for admin verification (SMM-panel style)
+      if (_submittedUtr != null && _submittedUtr!.isNotEmpty) {
+        final ok = await state.submitUpiUtr(
+          appointmentId: appt.id,
+          utr: _submittedUtr!,
+          amount: widget.fee,
+          providerType: widget.kind,
+          providerId: widget.refId,
+          providerName: widget.title,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ok
+                ? 'UTR submitted! Your payment is under verification.'
+                : 'Booking saved but UTR submission failed. Contact support with your UTR.'),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Appointment booked successfully!')),
+        );
+      }
     }
     Navigator.pushAndRemoveUntil(
       context,
