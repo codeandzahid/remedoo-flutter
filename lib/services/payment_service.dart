@@ -116,28 +116,20 @@ class PaymentService {
     }
   }
 
-  /// Loads the Razorpay checkout.js script if not already loaded.
+  /// Checks that the Razorpay checkout.js script is loaded
+  /// (it's included in web/index.html).
   Future<void> _ensureCheckoutJs() async {
+    // Script is loaded via web/index.html - just verify it's available
     if (globalContext.has('Razorpay')) return;
 
-    final completer = Completer<void>();
-    final script = web.HTMLScriptElement()
-      ..src = 'https://checkout.razorpay.com/v1/checkout.js'
-      ..async = true
-      ..onLoad.listen((_) {
-        if (!completer.isCompleted) completer.complete();
-      })
-      ..onError.listen((_) {
-        if (!completer.isCompleted) {
-          completer.completeError('Failed to load Razorpay checkout.js');
-        }
-      });
-    web.document.head!.append(script);
-
-    return completer.future.timeout(
-      const Duration(seconds: 15),
-      onTimeout: () => throw 'Razorpay checkout timed out. Check internet.',
-    );
+    // Fallback: wait a moment in case it's still loading
+    for (var i = 0; i < 10; i++) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (globalContext.has('Razorpay')) return;
+    }
+    throw 'Razorpay checkout.js not loaded. '
+        'It may be blocked by an ad blocker. '
+        'Please disable ad blocker for this site and try again.';
   }
 
   /// Opens Razorpay checkout on Flutter web using JS interop.
