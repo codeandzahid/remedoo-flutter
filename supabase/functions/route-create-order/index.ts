@@ -48,8 +48,6 @@ serve(async (req) => {
       });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
     // Get provider's Razorpay linked account
     const tableMap: Record<string, string> = {
       doctor: 'doctors',

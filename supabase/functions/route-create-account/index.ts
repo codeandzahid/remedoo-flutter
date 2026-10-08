@@ -117,7 +117,6 @@ serve(async (req) => {
     }
 
     // Step 3: Save to database
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const tableMap: Record<string, string> = {
       doctor: 'doctors',
       hospital: 'hospitals',
