@@ -1,10 +1,8 @@
-import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
 import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
-import 'package:web/web.dart' as web;
 
 /// In-app UPI/card payment via Razorpay.
 /// API keys are configured in Admin Panel > Settings > Payments.
@@ -116,41 +114,17 @@ class PaymentService {
     }
   }
 
-  /// Checks that the Razorpay checkout.js script is loaded
-  /// (it's included in web/index.html).
-  Future<void> _ensureCheckoutJs() async {
-    // Diagnostic: check if script tag exists in DOM
-    final scripts = web.document.querySelectorAll(
-        'script[src*="checkout.razorpay.com"]');
-    final scriptFound = scripts.length > 0;
-
-    // Script is loaded via web/index.html - just verify it's available
-    if (globalContext.has('Razorpay')) return;
-
-    // Fallback: wait a moment in case it's still loading
-    for (var i = 0; i < 10; i++) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (globalContext.has('Razorpay')) return;
-    }
-
-    // Detailed diagnostics for debugging
-    String diag = 'Razorpay JS not available. ';
-    diag += 'Script tag in page: ${scriptFound ? "yes" : "NO"}. ';
-    try {
-      final rzpProp = globalContext.getProperty('Razorpay'.toJS);
-      diag += 'Razorpay property: ${rzpProp == null ? "null" : "exists but has()=false"}. ';
-    } catch (e) {
-      diag += 'Property access error: $e. ';
-    }
-    diag += 'If script tag is missing, refresh the page. '
-        'If present but not loaded, it may be blocked by network/ad blocker.';
-    throw diag;
-  }
-
   /// Opens Razorpay checkout on Flutter web using JS interop.
-  void _openWebCheckout(Map<String, dynamic> options) async {
+  void _openWebCheckout(Map<String, dynamic> options) {
     try {
-      await _ensureCheckoutJs();
+      // Check if Razorpay JS is loaded
+      final ctorProp = globalContext.getProperty('Razorpay'.toJS);
+      if (ctorProp == null || ctorProp.isUndefinedOrNull) {
+        onError?.call(
+            'Razorpay checkout not loaded. Please refresh the page and try again. '
+            'If it still fails, disable any ad blocker for this site.');
+        return;
+      }
 
       // Success handler
       options['handler'] = ((JSAny? response) {
@@ -170,13 +144,10 @@ class PaymentService {
         }).toJS,
       };
 
-      final jsOptions = _mapToJs(options);
-
       // new Razorpay(options)
-      final ctor =
-          globalContext.getProperty('Razorpay'.toJS) as JSFunction;
-      final rzp =
-          ctor.callAsConstructor(jsOptions) as JSObject;
+      final jsOptions = _mapToJs(options);
+      final ctor = ctorProp as JSFunction;
+      final rzp = ctor.callAsConstructor(jsOptions) as JSObject;
 
       // payment.failed handler
       rzp.callMethod(
