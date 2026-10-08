@@ -1,8 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+
+import 'razorpay_web.dart'
+    if (dart.library.html) 'razorpay_web_impl.dart';
 
 /// In-app UPI/card payment via Razorpay.
 /// API keys are configured in Admin Panel > Settings > Payments.
 /// Keys are stored in app_config, never hardcoded.
+///
+/// Supports both mobile (razorpay_flutter plugin) and web
+/// (Razorpay JS checkout via checkout.razorpay.com).
 class PaymentService {
   static final PaymentService instance = PaymentService._();
   PaymentService._();
@@ -25,6 +32,7 @@ class PaymentService {
       _enabled && _keyId.isNotEmpty && _keyId.startsWith('rzp_');
 
   void _ensureInitialized() {
+    if (kIsWeb) return; // Web uses JS checkout, no plugin needed
     _razorpay ??= Razorpay();
     _razorpay!.clear();
     _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS,
@@ -39,6 +47,33 @@ class PaymentService {
         (ExternalWalletResponse response) {
       // External wallet selected, treat as pending
     });
+  }
+
+  Map<String, dynamic> _buildOptions({
+    required double amount,
+    required String description,
+    String? contact,
+    String? email,
+  }) {
+    return {
+      'key': _keyId,
+      'amount': (amount * 100).toInt(), // paise
+      'currency': 'INR',
+      'name': 'Remedoo',
+      'description': description,
+      'prefill': {
+        if (contact != null) 'contact': contact,
+        if (email != null) 'email': email,
+      },
+      'theme': {'color': '#2196F3'},
+      // Enable UPI, cards, netbanking, wallets
+      'method': {
+        'upi': true,
+        'card': true,
+        'netbanking': true,
+        'wallet': true,
+      },
+    };
   }
 
   /// Open Razorpay checkout for in-app UPI/card payment.
@@ -59,80 +94,25 @@ class PaymentService {
 
     onSuccess = onPaymentSuccess;
     onError = onPaymentError;
-    _ensureInitialized();
 
-    final options = {
-      'key': _keyId,
-      'amount': (amount * 100).toInt(), // paise
-      'currency': 'INR',
-      'name': 'Remedoo',
-      'description': description,
-      'prefill': {
-        if (contact != null) 'contact': contact,
-        if (email != null) 'email': email,
-      },
-      'theme': {'color': '#2196F3'},
-      // Enable UPI, cards, netbanking, wallets
-      'method': {
-        'upi': true,
-        'card': true,
-        'netbanking': true,
-        'wallet': true,
-      },
-    };
+    final options = _buildOptions(
+      amount: amount,
+      description: description,
+      contact: contact,
+      email: email,
+    );
 
-    try {
-      _razorpay!.open(options);
-    } catch (e) {
-      onPaymentError('Could not open payment: $e');
-    }
-  }
-
-  /// Open Razorpay checkout with a pre-created order (for Route split payments).
-  /// The order already contains transfer instructions to the provider.
-  void payWithOrder({
-    required String razorpayOrderId,
-    String? keyId,
-    required double amount,
-    required String description,
-    String? contact,
-    String? email,
-    required void Function(String paymentId) onPaymentSuccess,
-    required void Function(String error) onPaymentError,
-  }) {
-    final useKeyId = (keyId != null && keyId.startsWith('rzp_'))
-        ? keyId
-        : (_enabled ? _keyId : '');
-
-    if (useKeyId.isEmpty || !useKeyId.startsWith('rzp_')) {
-      onPaymentError('Payment gateway not configured. Contact admin.');
+    if (kIsWeb) {
+      // Web: use Razorpay JS checkout
+      openRazorpayWeb(
+        options,
+        onPaymentSuccess: (paymentId) => onSuccess?.call(paymentId),
+        onPaymentError: (error) => onError?.call(error),
+      );
       return;
     }
 
-    onSuccess = onPaymentSuccess;
-    onError = onPaymentError;
     _ensureInitialized();
-
-    final options = {
-      'key': useKeyId,
-      'order_id': razorpayOrderId, // Route order with transfers
-      'amount': (amount * 100).toInt(),
-      'currency': 'INR',
-      'name': 'Remedoo',
-      'description': description,
-      'prefill': {
-        if (contact != null) 'contact': contact,
-        if (email != null) 'email': email,
-      },
-      'theme': {'color': '#2196F3'},
-      'method': {
-        'upi': true,
-        'card': true,
-        'netbanking': true,
-        'wallet': true,
-      },
-    };
-
     try {
       _razorpay!.open(options);
     } catch (e) {
