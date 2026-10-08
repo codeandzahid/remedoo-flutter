@@ -4,6 +4,7 @@ import 'dart:js_interop_unsafe';
 
 import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:web/web.dart' as web;
 
 /// In-app UPI/card payment via Razorpay.
 /// API keys are configured in Admin Panel > Settings > Payments.
@@ -134,41 +135,34 @@ class PaymentService {
   /// Dynamically loads checkout.js then launches Razorpay.
   void _loadRazorpayScript(Map<String, dynamic> options) async {
     try {
-      final document = globalContext.getProperty('document'.toJS) as JSObject;
-      final head = document.getProperty('head'.toJS) as JSObject;
-
       final completer = Completer<bool>();
-      final script = (globalContext.getProperty('document'.toJS) as JSObject)
-          .callMethod('createElement'.toJS, 'script'.toJS) as JSObject;
-      script.setProperty('src'.toJS,
-          'https://checkout.razorpay.com/v1/checkout.js'.toJS);
-      script.setProperty(
-          'onload'.toJS,
-          ((JSAny? _) {
-            if (!completer.isCompleted) completer.complete(true);
-          }).toJS);
-      script.setProperty(
-          'onerror'.toJS,
-          ((JSAny? _) {
-            if (!completer.isCompleted) completer.complete(false);
-          }).toJS);
-      head.callMethod('appendChild'.toJS, script);
+      final script = web.HTMLScriptElement()
+        ..src = 'https://checkout.razorpay.com/v1/checkout.js'
+        ..onLoad.listen((_) {
+          if (!completer.isCompleted) completer.complete(true);
+        })
+        ..onError.listen((_) {
+          if (!completer.isCompleted) completer.complete(false);
+        });
+      web.document.head!.append(script);
 
       final loaded = await completer.future
           .timeout(const Duration(seconds: 15), onTimeout: () => false);
 
       if (!loaded) {
         onError?.call(
-            'Could not load Razorpay checkout. Please check your internet connection and try again. '
-            'If it still fails, the payment gateway may be blocked on your network.');
+            'Could not load Razorpay checkout. Please check your internet connection and try again.');
         return;
       }
+
+      // Give the script a moment to initialize the global
+      await Future.delayed(const Duration(milliseconds: 500));
 
       // Script loaded — now check the global again
       final ctorProp = globalContext.getProperty('Razorpay'.toJS);
       if (ctorProp == null || ctorProp.isUndefinedOrNull) {
         onError?.call(
-            'Razorpay loaded but not initialized. Please refresh and try again.');
+            'Razorpay script loaded but did not initialize. Please refresh the page and try again.');
         return;
       }
       _launchRazorpay(ctorProp, options);
