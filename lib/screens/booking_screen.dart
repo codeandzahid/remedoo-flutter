@@ -9,7 +9,6 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../services/payment_service.dart';
 import '../services/supabase_repository.dart';
-import '../widgets/upi_payment_sheet.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'appointments_screen.dart';
@@ -82,13 +81,12 @@ class _BookingScreenState extends State<BookingScreen> {
         ? DateTime(now.year, now.month, now.day)
         : _days.first;
     _time = widget.prefill?.timeLabel ?? '10:00';
-    _payment = widget.prefill?.payment ?? 'UPI';
+    _payment = widget.prefill?.payment ?? 'Pay Online';
     if (widget.prefill != null) _notes.text = widget.prefill!.notes;
   }
 
   String? _prescriptionPath;
   String? _prescriptionName;
-  String? _submittedUtr;
   Uint8List? _prescriptionBytes;
 
   Widget _prescriptionCard() {
@@ -307,21 +305,6 @@ class _BookingScreenState extends State<BookingScreen> {
     return null;
   }
 
-  /// Returns the provider's UPI ID if they have one set, null otherwise.
-  String? _providerUpiId(AppState state) {
-    if (widget.kind == 'doctor') {
-      final d = state.activeDoctors.where((d) => d.id == widget.refId);
-      if (d.isNotEmpty) return d.first.upiId;
-    } else if (widget.kind == 'lab') {
-      final l = state.activeLabs.where((l) => l.id == widget.refId);
-      if (l.isNotEmpty) return l.first.upiId;
-    } else if (widget.kind == 'hospital') {
-      final h = state.activeHospitals.where((h) => h.id == widget.refId);
-      if (h.isNotEmpty) return h.first.upiId;
-    }
-    return null;
-  }
-
   /// Process in-app Razorpay payment. Returns true if payment succeeded.
   /// Process Razorpay Route payment: creates a split order via Edge Function
   /// (money auto-splits to provider), then opens Razorpay checkout.
@@ -504,33 +487,6 @@ class _BookingScreenState extends State<BookingScreen> {
         // Payment failed or cancelled: do not book.
         if (!paid || !mounted) return;
       }
-      // If UPI payment selected, show the UPI payment sheet first.
-      if (_payment == 'UPI') {
-        final upiId = _providerUpiId(state);
-        if (upiId == null || upiId.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(
-                    'Provider has not set up UPI yet. Please choose another payment method.')),
-          );
-          return;
-        }
-        final orderId =
-            'APT${DateTime.now().millisecondsSinceEpoch}';
-        final utr = await showUpiPaymentSheet(
-          context,
-          upiId: upiId,
-          providerName: widget.title,
-          amount: widget.fee,
-          orderId: orderId,
-        );
-        // User dismissed the sheet without submitting UTR: do not book.
-        if (utr == null || utr.isEmpty || !mounted) return;
-        // Store the UTR for the verification step after booking.
-        _submittedUtr = utr;
-        // Book the appointment with UPI as payment method.
-        // Admin verifies the UTR against their bank statement.
-      }
       // Upload prescription if attached
       String? prescriptionUrl;
       if (_prescriptionName != null &&
@@ -548,12 +504,6 @@ class _BookingScreenState extends State<BookingScreen> {
         );
       }
 
-      // Build notes with UTR if provided (stored in DB for verification)
-      var bookingNotes = _notes.text.trim();
-      if (_submittedUtr != null && _submittedUtr!.isNotEmpty) {
-        bookingNotes =
-            '${bookingNotes.isNotEmpty ? '$bookingNotes | ' : ''}UTR:${_submittedUtr!}';
-      }
       final appt = state.bookAppointment(
         kind: widget.kind,
         refId: widget.refId,
@@ -564,7 +514,7 @@ class _BookingScreenState extends State<BookingScreen> {
         date: _date,
         timeLabel: _time,
         payment: _payment,
-        notes: bookingNotes,
+        notes: _notes.text.trim(),
         tests: widget.tests ?? const [],
         bookingForMemberId: _bookingForMemberId,
         bookingForName: _bookingForMemberId == null
@@ -576,29 +526,9 @@ class _BookingScreenState extends State<BookingScreen> {
         prescriptionPath: prescriptionUrl ?? _prescriptionPath,
         prescriptionName: _prescriptionName,
       );
-      // Submit UTR for verification (checks duplicate, marks verified)
-      if (_submittedUtr != null && _submittedUtr!.isNotEmpty) {
-        final ok = await state.submitUpiUtr(
-          appointmentId: appt.id,
-          utr: _submittedUtr!,
-          amount: widget.fee,
-          providerType: widget.kind,
-          providerId: widget.refId,
-          providerName: widget.title,
-        );
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ok
-                ? 'Payment verified! Appointment confirmed.'
-                : 'This UTR was already used or is invalid. Please check and try again.'),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Appointment booked successfully!')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Appointment booked successfully!')),
+      );
     }
     Navigator.pushAndRemoveUntil(
       context,
@@ -612,12 +542,8 @@ class _BookingScreenState extends State<BookingScreen> {
     final st = AppStateScope.of(context);
     final slots = st.doctorSlotsFor(widget.refId, widget.title, _date);
     final isReschedule = widget.prefill != null;
-    final upiId = _providerUpiId(st);
     final prov = _provider(st);
     final payInClinic = prov?.payInClinicEnabled ?? true;
-    final upiOn = (prov?.upiEnabled ?? true) &&
-        upiId != null &&
-        upiId.isNotEmpty;
 
     final sections = <Widget>[
       _providerCard(),
@@ -647,12 +573,6 @@ class _BookingScreenState extends State<BookingScreen> {
       const SizedBox(height: 14),
       _sectionTitle(Icons.credit_card, 'Payment Method'),
       const SizedBox(height: 10),
-      // Direct UPI first (recommended - no gateway needed)
-      if (upiOn)
-        _payCard('UPI', 'Pay directly to provider • Recommended',
-            Icons.qr_code_2,
-            badge: 'Recommended'),
-      if (upiOn) const SizedBox(height: 10),
       _payCard('Pay Online', 'UPI / Card via Razorpay',
           Icons.credit_card),
       if (payInClinic) const SizedBox(height: 10),

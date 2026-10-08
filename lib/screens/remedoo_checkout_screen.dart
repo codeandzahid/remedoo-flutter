@@ -6,7 +6,6 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
-import '../widgets/upi_payment_sheet.dart';
 import 'online_payment_screen.dart';
 import '../app_navigator.dart';
 
@@ -160,31 +159,6 @@ class _RemedooCheckoutScreenState
       );
       // Payment page dismissed or payment not completed: do not order.
       if (paid != true || !mounted) return;
-    }
-    // If UPI selected, show the provider's UPI payment sheet first.
-    if (_payment == 'UPI') {
-      final pharmacies = state.activePharmacies
-          .where((p) => p.id == state.cartPharmacyId);
-      final upiId =
-          pharmacies.isNotEmpty ? pharmacies.first.upiId : null;
-      if (upiId == null || upiId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'Pharmacy has not set up UPI yet. Please choose another payment method.')),
-        );
-        return;
-      }
-      final total = state.cartTotal + state.deliveryFee; // + delivery
-      final orderId = 'ORD${DateTime.now().millisecondsSinceEpoch}';
-      showUpiPaymentSheet(
-        context,
-        upiId: upiId,
-        providerName:
-            pharmacies.first.name,
-        amount: total,
-        orderId: orderId,
-      );
     }
     state.placeOrder(
       address: _address.text.trim(),
@@ -480,12 +454,9 @@ class _RemedooCheckoutScreenState
     final pharmacy =
         pharmacies.isNotEmpty ? pharmacies.first : null;
     final codOn = pharmacy?.payInClinicEnabled ?? true;
-    final upiOn = (pharmacy?.upiEnabled ?? true) &&
-        (pharmacy?.upiId?.isNotEmpty ?? false);
     final methods = [
       if (codOn) 'Cash on Delivery',
       'Pay Online',
-      if (upiOn) 'UPI',
     ];
 
     return RCard(
