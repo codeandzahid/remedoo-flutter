@@ -308,60 +308,21 @@ class _BookingScreenState extends State<BookingScreen> {
   /// Process in-app Razorpay payment. Returns true if payment succeeded.
   /// Process Razorpay Route payment: creates a split order via Edge Function
   /// (money auto-splits to provider), then opens Razorpay checkout.
+  /// Standard Razorpay checkout (no Route needed).
+  /// Uses the test/live key from Admin > Settings > Payments.
   Future<bool> _processRazorpayPayment(String orderId) async {
     final completer = Completer<bool>();
     final state = AppStateScope.of(context);
 
-    // Step 1: Create Route order with automatic split to provider
-    String? razorpayOrderId;
-    String? razorpayKeyId;
-    try {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Creating secure payment order...')),
-        );
-      }
-      final res = await Supabase.instance.client.functions.invoke(
-        'route-create-order',
-        body: {
-          'amount': widget.fee,
-          'provider_type': _providerType,
-          'provider_id': widget.refId,
-          'receipt': orderId,
-          'notes': {'appointment': orderId},
-        },
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Opening Razorpay...')),
       );
-
-      if (res.data?['success'] == true) {
-        razorpayOrderId = res.data['order_id'];
-        razorpayKeyId = res.data['key_id'];
-      } else if (res.data?['code'] == 'PROVIDER_NOT_ONBOARDED') {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Provider has not set up direct payouts yet. Please choose another payment method.'),
-            ),
-          );
-        }
-        return false;
-      } else {
-        throw Exception(res.data?['error'] ?? 'Order creation failed');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Payment setup failed: $e')),
-        );
-      }
-      return false;
     }
 
-    // Step 2: Open Razorpay with the Route order
-    PaymentService.instance.payWithOrder(
-      razorpayOrderId: razorpayOrderId!,
-      keyId: razorpayKeyId,
+    PaymentService.instance.pay(
       amount: widget.fee,
+      orderId: orderId,
       description: 'Appointment: ${widget.title}',
       contact: state.phone.isNotEmpty ? state.phone : null,
       email: state.email.isNotEmpty ? state.email : null,
@@ -386,17 +347,6 @@ class _BookingScreenState extends State<BookingScreen> {
     return completer.future;
   }
 
-  /// Map booking kind to provider type for Route
-  String get _providerType {
-    switch (widget.kind) {
-      case 'hospital':
-        return 'hospital';
-      case 'lab':
-        return 'lab';
-      default:
-        return 'doctor';
-    }
-  }
 
   void _confirm(bool isReschedule) async {
     if (!checkLogin(context, 'Please login to book appointments')) return;
