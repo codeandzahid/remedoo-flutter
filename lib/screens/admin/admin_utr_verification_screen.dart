@@ -19,8 +19,6 @@ class _AdminUtrVerificationScreenState
     extends State<AdminUtrVerificationScreen> {
   List<Map<String, dynamic>> _verifications = [];
   bool _loading = true;
-  bool _showPendingOnly = false;
-  final Set<String> _resolving = {};
 
   @override
   void initState() {
@@ -31,58 +29,12 @@ class _AdminUtrVerificationScreenState
   Future<void> _load() async {
     setState(() => _loading = true);
     final rows = await SupabaseRepository.instance
-        .fetchPendingUtrVerifications(pendingOnly: _showPendingOnly);
+        .fetchPendingUtrVerifications();
     if (mounted) {
       setState(() {
         _verifications = rows;
         _loading = false;
       });
-    }
-  }
-
-  Future<void> _resolve(String id, bool approve) async {
-    String? note;
-    if (!approve) {
-      note = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Rejection reason'),
-          content: TextField(
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'e.g. UTR not found in statement',
-              border: OutlineInputBorder(),
-            ),
-            onSubmitted: (v) => Navigator.of(ctx).pop(v),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(''),
-              child: const Text('Reject'),
-            ),
-          ],
-        ),
-      );
-      // Dialog dismissed without choosing: abort
-      if (note == null && mounted) return;
-    }
-    setState(() => _resolving.add(id));
-    final ok = await SupabaseRepository.instance
-        .resolveUtrVerification(id, approve, note);
-    if (mounted) {
-      setState(() => _resolving.remove(id));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ok
-              ? (approve ? 'Payment approved' : 'Payment rejected')
-              : 'Failed to update. Try again.'),
-        ),
-      );
-      if (ok) _load();
     }
   }
 
@@ -93,20 +45,6 @@ class _AdminUtrVerificationScreenState
       appBar: AppBar(
         title: const Text('UPI Payment Records'),
         actions: [
-          // Toggle between pending-only and all records
-          Row(
-            children: [
-              const Text('Pending only',
-                  style: TextStyle(fontSize: 12)),
-              Switch(
-                value: _showPendingOnly,
-                onChanged: (v) {
-                  setState(() => _showPendingOnly = v);
-                  _load();
-                },
-              ),
-            ],
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _load,
@@ -154,18 +92,30 @@ class _AdminUtrVerificationScreenState
     );
   }
 
+  /// Extracts the UTR from appointment notes (format: "UTR:123456789012")
+  String _extractUtr(String? notes) {
+    if (notes == null) return '-';
+    final match = RegExp(r'UTR:(\d{12})').firstMatch(notes);
+    return match?.group(1) ?? '-';
+  }
+
+  /// Gets the provider name from the joined data
+  String _providerName(Map<String, dynamic> v) {
+    if (v['doctors'] != null) return '${v['doctors']['name']}';
+    if (v['hospitals'] != null) return '${v['hospitals']['name']}';
+    if (v['labs'] != null) return '${v['labs']['name']}';
+    return '-';
+  }
+
   Widget _verificationCard(Map<String, dynamic> v) {
     final scheme = Theme.of(context).colorScheme;
-    final id = v['id'] as String;
-    final busy = _resolving.contains(id);
-    final status = '${v['status'] ?? 'pending'}';
+    final id = '${v['id']}';
+    final utr = _extractUtr(v['notes'] as String?);
+    // All UTR payments are auto-approved (optimistic); this screen is
+    // for reconciliation against the bank statement.
+    const status = 'approved';
+    const statusColor = Colors.green;
     final created = DateTime.tryParse(v['created_at'] ?? '');
-    final isPending = status == 'pending';
-    final statusColor = isPending
-        ? Colors.orange
-        : status == 'approved'
-            ? Colors.green
-            : Colors.red;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -222,7 +172,7 @@ class _AdminUtrVerificationScreenState
                                 color: scheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w600)),
                         Text(
-                          '${v['utr'] ?? '-'}',
+                          utr,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
@@ -237,7 +187,7 @@ class _AdminUtrVerificationScreenState
                     tooltip: 'Copy UTR',
                     onPressed: () {
                       Clipboard.setData(
-                          ClipboardData(text: '${v['utr']}'));
+                          ClipboardData(text: utr));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                             content: Text('UTR copied')),
@@ -248,96 +198,35 @@ class _AdminUtrVerificationScreenState
               ),
             ),
             const SizedBox(height: 12),
-            _infoRow('Amount', '₹${v['amount'] ?? '-'}', true),
-            _infoRow(
-                'Patient', '${v['patient_name'] ?? '-'}', false),
-            _infoRow(
-                'Provider', '${v['provider_name'] ?? '-'}', false),
-            _infoRow('Provider UPI',
-                '${v['provider_upi_id'] ?? '-'}', false),
-            _infoRow('Appointment',
-                '${v['appointment_id'] ?? '-'}', false),
+            _infoRow('Provider', _providerName(v), false),
+            _infoRow('Date', '${v['appointment_date'] ?? '-'}', false),
+            _infoRow('Appointment ID', '$id', false),
+            _infoRow('Full notes', '${v['notes'] ?? '-'}', false),
             const SizedBox(height: 16),
-            // Only show Approve/Reject for pending items.
-            // Auto-approved items are here for reconciliation —
-            // admin can still reject if the UTR isn't in their statement.
-            if (isPending) ...[
-              Row(
+            // Reconciliation note — all UTRs are auto-approved (SMM style).
+            // Cross-check against bank statement; flag fraud if needed.
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest
+                    .withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.close,
-                          size: 18, color: Colors.red),
-                      label: const Text('Reject',
-                          style: TextStyle(color: Colors.red)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.red),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed:
-                          busy ? null : () => _resolve(id, false),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      icon: busy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white))
-                          : const Icon(Icons.check, size: 18),
-                      label: Text(busy ? 'Working...' : 'Approve'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed:
-                          busy ? null : () => _resolve(id, true),
+                  Icon(Icons.info_outline,
+                      size: 16,
+                      color: scheme.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Auto-approved on submit. Cross-check this UTR in your bank/UPI statement.',
+                      style: TextStyle(fontSize: 11),
                     ),
                   ),
                 ],
               ),
-            ] else ...[
-              // Reconciliation note for auto-approved
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest
-                      .withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline,
-                        size: 16,
-                        color: scheme.onSurfaceVariant),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Auto-approved. Cross-check this UTR in your bank statement.',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: scheme.onSurfaceVariant),
-                      ),
-                    ),
-                    if (status == 'approved')
-                      TextButton(
-                        onPressed: busy
-                            ? null
-                            : () => _resolve(id, false),
-                        child: const Text('Flag as fraud',
-                            style: TextStyle(
-                                color: Colors.red, fontSize: 12)),
-                      ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ],
         ),
       ),

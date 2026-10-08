@@ -548,6 +548,12 @@ class _BookingScreenState extends State<BookingScreen> {
         );
       }
 
+      // Build notes with UTR if provided (stored in DB for verification)
+      var bookingNotes = _notes.text.trim();
+      if (_submittedUtr != null && _submittedUtr!.isNotEmpty) {
+        bookingNotes =
+            '${bookingNotes.isNotEmpty ? '$bookingNotes | ' : ''}UTR:${_submittedUtr!}';
+      }
       final appt = state.bookAppointment(
         kind: widget.kind,
         refId: widget.refId,
@@ -558,7 +564,7 @@ class _BookingScreenState extends State<BookingScreen> {
         date: _date,
         timeLabel: _time,
         payment: _payment,
-        notes: _notes.text.trim(),
+        notes: bookingNotes,
         tests: widget.tests ?? const [],
         bookingForMemberId: _bookingForMemberId,
         bookingForName: _bookingForMemberId == null
@@ -570,7 +576,7 @@ class _BookingScreenState extends State<BookingScreen> {
         prescriptionPath: prescriptionUrl ?? _prescriptionPath,
         prescriptionName: _prescriptionName,
       );
-      // Submit UTR for admin verification (SMM-panel style)
+      // Submit UTR for verification (checks duplicate, marks verified)
       if (_submittedUtr != null && _submittedUtr!.isNotEmpty) {
         final ok = await state.submitUpiUtr(
           appointmentId: appt.id,

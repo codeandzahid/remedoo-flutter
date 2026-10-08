@@ -1435,10 +1435,10 @@ class SupabaseRepository {
     }
   }
 
-  /// Submits a UTR for UPI payment verification (SMM-panel style).
-  /// Uses optimistic verification: valid format + not a duplicate =
-  /// instant approval. Admin reconciles against bank statement later.
-  /// Returns true on success, false if the UTR was already used or failed.
+  /// Verifies a UTR for UPI payment (SMM-panel style, optimistic).
+  /// Checks: valid 12-digit format + not already used.
+  /// The UTR itself is stored in the appointment's notes by the booking flow.
+  /// Returns true if valid and unique, false otherwise.
   Future<bool> submitUtrVerification({
     required String appointmentId,
     required String utr,
@@ -1452,43 +1452,37 @@ class SupabaseRepository {
     // Validate: must be 12 digits
     if (!RegExp(r'^\d{12}$').hasMatch(utr)) return false;
     try {
-      final user = _db.auth.currentUser;
-      // Optimistic: mark as approved immediately (like SMM panels).
-      // Admin reconciles against bank statement in the panel later.
-      await _db.from('upi_payment_verifications').insert({
-        'appointment_id': appointmentId,
-        'utr': utr,
-        'amount': amount,
-        'patient_id': user?.id,
-        'patient_name': user?.email,
-        'provider_type': providerType,
-        'provider_id': providerId,
-        'provider_name': providerName,
-        'provider_upi_id': providerUpiId,
-        'status': 'approved',
-        'admin_note': 'Auto-approved (optimistic verification)',
-        'verified_at': DateTime.now().toIso8601String(),
-      });
+      // Check for duplicate UTR across all appointments
+      final existing = await _db
+          .from('appointments')
+          .select('id')
+          .ilike('notes', '%UTR:$utr%')
+          .limit(1);
+      if ((existing as List).isNotEmpty) {
+        debugPrint('submitUtrVerification: duplicate UTR $utr');
+        return false;
+      }
       return true;
     } catch (e) {
-      // Likely a duplicate UTR (unique constraint) — reject
       debugPrint('submitUtrVerification failed: $e');
-      return false;
+      // If the check fails, allow it (fail open) — admin reconciles later
+      return true;
     }
   }
 
-  /// Fetches UTR verifications (admin). Defaults to pending; set
-  /// [pendingOnly] false to see all for reconciliation.
+  /// Fetches appointments with UTR payments (admin reconciliation).
+  /// Returns appointments where notes contain a UTR, newest first.
   Future<List<Map<String, dynamic>>> fetchPendingUtrVerifications(
       {bool pendingOnly = true}) async {
     if (!_ready) return [];
     try {
-      var query = _db.from('upi_payment_verifications').select();
-      if (pendingOnly) {
-        query = query.eq('status', 'pending');
-      }
-      final rows =
-          await query.order('created_at', ascending: false).limit(100);
+      final rows = await _db
+          .from('appointments')
+          .select('id, notes, created_at, status, appointment_date, '
+              'doctors(name), hospitals(name), labs(name)')
+          .ilike('notes', '%UTR:%')
+          .order('created_at', ascending: false)
+          .limit(100);
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
       debugPrint('fetchPendingUtrVerifications failed: $e');
