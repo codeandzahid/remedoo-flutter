@@ -1,8 +1,10 @@
+import 'dart:async';
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
+
 import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
-
-import 'razorpay_web.dart'
-    if (dart.library.js_interop) 'razorpay_web_impl.dart';
+import 'package:web/web.dart' as web;
 
 /// In-app UPI/card payment via Razorpay.
 /// API keys are configured in Admin Panel > Settings > Payments.
@@ -66,7 +68,6 @@ class PaymentService {
         if (email != null) 'email': email,
       },
       'theme': {'color': '#2196F3'},
-      // Enable UPI, cards, netbanking, wallets
       'method': {
         'upi': true,
         'card': true,
@@ -103,12 +104,7 @@ class PaymentService {
     );
 
     if (kIsWeb) {
-      // Web: use Razorpay JS checkout
-      openRazorpayWeb(
-        options,
-        onPaymentSuccess: (paymentId) => onSuccess?.call(paymentId),
-        onPaymentError: (error) => onError?.call(error),
-      );
+      _openWebCheckout(options);
       return;
     }
 
@@ -118,6 +114,120 @@ class PaymentService {
     } catch (e) {
       onPaymentError('Could not open payment: $e');
     }
+  }
+
+  /// Loads the Razorpay checkout.js script if not already loaded.
+  Future<void> _ensureCheckoutJs() async {
+    if (globalContext.has('Razorpay')) return;
+
+    final completer = Completer<void>();
+    final script = web.HTMLScriptElement()
+      ..src = 'https://checkout.razorpay.com/v1/checkout.js'
+      ..async = true
+      ..onLoad.listen((_) {
+        if (!completer.isCompleted) completer.complete();
+      })
+      ..onError.listen((_) {
+        if (!completer.isCompleted) {
+          completer.completeError('Failed to load Razorpay checkout.js');
+        }
+      });
+    web.document.head!.append(script);
+
+    return completer.future.timeout(
+      const Duration(seconds: 15),
+      onTimeout: () => throw 'Razorpay checkout timed out. Check internet.',
+    );
+  }
+
+  /// Opens Razorpay checkout on Flutter web using JS interop.
+  void _openWebCheckout(Map<String, dynamic> options) async {
+    try {
+      await _ensureCheckoutJs();
+
+      // Success handler
+      options['handler'] = ((JSAny? response) {
+        String paymentId = '';
+        try {
+          final r = response as JSObject;
+          final id = r.getProperty('razorpay_payment_id'.toJS);
+          if (id != null) paymentId = (id as JSString).toDart;
+        } catch (_) {}
+        onSuccess?.call(paymentId);
+      }).toJS;
+
+      // Modal dismiss handler (user closed without paying)
+      options['modal'] = {
+        'ondismiss': (() {
+          onError?.call('Payment cancelled');
+        }).toJS,
+      };
+
+      final jsOptions = _mapToJs(options);
+
+      // new Razorpay(options)
+      final ctor =
+          globalContext.getProperty('Razorpay'.toJS) as JSFunction;
+      final rzp =
+          ctor.callAsConstructor(jsOptions) as JSObject;
+
+      // payment.failed handler
+      rzp.callMethod(
+        'on'.toJS,
+        'payment.failed'.toJS,
+        ((JSAny? response) {
+          String message = 'Payment failed';
+          try {
+            final r = response as JSObject;
+            final error = r.getProperty('error'.toJS);
+            if (error != null && error.isDefinedAndNotNull) {
+              final desc = (error as JSObject)
+                  .getProperty('description'.toJS);
+              if (desc != null && desc.isDefinedAndNotNull) {
+                message = (desc as JSString).toDart;
+              }
+            }
+          } catch (_) {}
+          onError?.call(message);
+        }).toJS,
+      );
+
+      // Open the checkout
+      rzp.callMethod('open'.toJS);
+    } catch (e) {
+      onError?.call('Could not open Razorpay: $e');
+    }
+  }
+
+  /// Recursively converts a Dart map/list to a JS value.
+  JSAny _mapToJs(dynamic value) {
+    if (value is Map) {
+      final obj = JSObject();
+      value.forEach((k, v) {
+        // Skip functions here; they're already JS via .toJS
+        if (v is JSAny) {
+          obj.setProperty(k.toString().toJS, v);
+        } else {
+          obj.setProperty(k.toString().toJS, _mapToJs(v));
+        }
+      });
+      return obj;
+    } else if (value is List) {
+      final arr = JSArray();
+      for (final item in value) {
+        arr.add(_mapToJs(item));
+      }
+      return arr;
+    } else if (value is String) {
+      return value.toJS;
+    } else if (value is num) {
+      return value.toJS;
+    } else if (value is bool) {
+      return value.toJS;
+    } else if (value is JSAny) {
+      return value;
+    }
+    throw ArgumentError('Unsupported value in Razorpay options: $value');
   }
 
   void dispose() {
