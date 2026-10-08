@@ -119,6 +119,11 @@ class PaymentService {
   /// Checks that the Razorpay checkout.js script is loaded
   /// (it's included in web/index.html).
   Future<void> _ensureCheckoutJs() async {
+    // Diagnostic: check if script tag exists in DOM
+    final scripts = web.document.querySelectorAll(
+        'script[src*="checkout.razorpay.com"]');
+    final scriptFound = scripts.length > 0;
+
     // Script is loaded via web/index.html - just verify it's available
     if (globalContext.has('Razorpay')) return;
 
@@ -127,9 +132,19 @@ class PaymentService {
       await Future.delayed(const Duration(milliseconds: 500));
       if (globalContext.has('Razorpay')) return;
     }
-    throw 'Razorpay checkout.js not loaded. '
-        'It may be blocked by an ad blocker. '
-        'Please disable ad blocker for this site and try again.';
+
+    // Detailed diagnostics for debugging
+    String diag = 'Razorpay JS not available. ';
+    diag += 'Script tag in page: ${scriptFound ? "yes" : "NO"}. ';
+    try {
+      final rzpProp = globalContext.getProperty('Razorpay'.toJS);
+      diag += 'Razorpay property: ${rzpProp == null ? "null" : "exists but has()=false"}. ';
+    } catch (e) {
+      diag += 'Property access error: $e. ';
+    }
+    diag += 'If script tag is missing, refresh the page. '
+        'If present but not loaded, it may be blocked by network/ad blocker.';
+    throw diag;
   }
 
   /// Opens Razorpay checkout on Flutter web using JS interop.
