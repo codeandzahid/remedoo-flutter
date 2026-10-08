@@ -8,14 +8,16 @@ import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'dashboard_screen.dart';
 import 'doctors_screen.dart';
+import 'favorites_screen.dart';
 import 'hospitals_screen.dart';
 import 'labs_screen.dart';
 import 'orders_screen.dart';
 import 'pharmacies_screen.dart';
 
-/// Adaptive shell: floating white bottom bar on phones (the React 5-tab set:
-/// Home / Hospitals / Labs / Pharmacy / Orders), rail on tablets, permanent
-/// side drawer on desktop/TV. Orange circular support FAB, bottom-right.
+/// Adaptive shell: floating white bottom bar on phones (6 tabs:
+/// Home / Doctors / Hospitals / Labs / Pharmacy / Orders), rail on tablets,
+/// permanent side drawer on desktop/TV (adds Favorites after Orders).
+/// Orange circular support FAB, bottom-right.
 class MainShell extends StatefulWidget {
   final int initialIndex;
 
@@ -35,12 +37,12 @@ class _MainShellState extends State<MainShell> {
     LabsScreen(),
     PharmaciesScreen(),
     OrdersScreen(),
+    FavoritesScreen(),
   ];
 
-  /// The phone bottom bar mirrors the React BottomNav's 5 tabs, so the
-  /// Doctors page (index 1) has no tab — it stays reachable from the
-  /// dashboard service grid and drawer.
-  static const _navToPage = [0, 2, 3, 4, 5];
+  /// The phone bottom bar now has 6 tabs: Home, Doctors, Hospitals, Labs,
+  /// Pharmacy, Orders — matching the page order directly.
+  static const _navToPage = [0, 1, 2, 3, 4, 5];
 
   static int _navIndexFor(int page) {
     final i = _navToPage.indexOf(page);
@@ -104,7 +106,7 @@ class _MainShellState extends State<MainShell> {
   /// IndexedStack builds every page eagerly, so the gate cannot live in the
   /// page's own initState.
   void _switchTab(int pageIndex) {
-    if (pageIndex == 5) {
+    if (pageIndex == 5 || pageIndex == 6) {
       if (!checkLogin(context)) return;
     }
     setState(() => _index = pageIndex);
@@ -144,6 +146,11 @@ class _MainShellState extends State<MainShell> {
           icon: Icons.receipt_long_outlined,
           selectedIcon: Icons.receipt_long,
           label: 'Orders',
+        ),
+        const NavDestinationItem(
+          icon: Icons.favorite_outline,
+          selectedIcon: Icons.favorite,
+          label: 'Favorites',
         ),
       ];
 

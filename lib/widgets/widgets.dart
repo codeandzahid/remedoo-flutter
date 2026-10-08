@@ -2130,6 +2130,7 @@ class RBottomNav extends StatelessWidget {
 
   static const _items = [
     ('Home', Icons.home_outlined, Icons.home),
+    ('Doctors', Icons.person_search_outlined, Icons.person_search),
     ('Hospitals', Icons.business_outlined, Icons.business),
     ('Labs', Icons.science_outlined, Icons.science),
     ('Pharmacy', Icons.storefront_outlined, Icons.storefront),
