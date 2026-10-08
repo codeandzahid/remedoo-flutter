@@ -12,6 +12,7 @@ import 'hospital_detail_screen.dart';
 import '../app_navigator.dart';
 
 const _filters = [
+  'Favorites',
   'Relevance',
   'Rating 4.0+',
   'Has ICU',
@@ -85,6 +86,11 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
           .where((h) =>
               h.name.toLowerCase().contains(q) ||
               h.location.toLowerCase().contains(q))
+          .toList();
+    }
+    if (_filter == 'Favorites') {
+      list = list
+          .where((h) => state.isFavorite('hospital:${h.id}'))
           .toList();
     }
     if (_filter == 'Rating 4.0+') {
@@ -173,6 +179,11 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
                 padding: const EdgeInsets.only(right: 8),
                 child: RFilterChip(
                   label: f,
+                  icon: f == 'Favorites'
+                      ? (_filter == 'Favorites'
+                          ? Icons.favorite
+                          : Icons.favorite_outline)
+                      : null,
                   selected: _filter == f,
                   onTap: () => setState(() => _filter = f),
                 ),

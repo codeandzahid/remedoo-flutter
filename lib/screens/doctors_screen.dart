@@ -69,6 +69,7 @@ class DoctorsScreen extends StatefulWidget {
 class _DoctorsScreenState extends State<DoctorsScreen> {
   late final TextEditingController _search;
   String _specialty = 'All';
+  bool _showFavorites = false;
   String _sort = _sortOptions.first;
   bool _rating4 = false;
   bool _lowFee = false;
@@ -104,6 +105,12 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
 
   List<Doctor> _filtered(AppState state) {
     var list = state.activeDoctors.toList();
+    // Favorites quick-access filter
+    if (_showFavorites) {
+      list = list
+          .where((d) => state.isFavorite('doctor:${d.id}'))
+          .toList();
+    }
     final q = _search.text.trim().toLowerCase();
     if (q.isNotEmpty) {
       list = list
@@ -296,6 +303,20 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
+                // Favorites quick-access tab
+                Center(
+                  child: RFilterChip(
+                    label: 'Favorites',
+                    icon: _showFavorites
+                        ? Icons.favorite
+                        : Icons.favorite_outline,
+                    selected: _showFavorites,
+                    onTap: () => setState(() {
+                      _showFavorites = !_showFavorites;
+                    }),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 for (final sp in _specialties) ...[
                   Center(
                     child: RFilterChip(
