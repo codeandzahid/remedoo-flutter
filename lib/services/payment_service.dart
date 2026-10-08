@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import 'razorpay_web.dart'
-    if (dart.library.html) 'razorpay_web_impl.dart';
+    if (dart.library.js_interop) 'razorpay_web_impl.dart';
 
 /// In-app UPI/card payment via Razorpay.
 /// API keys are configured in Admin Panel > Settings > Payments.
