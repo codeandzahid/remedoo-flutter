@@ -17,8 +17,9 @@ class AdminUtrVerificationScreen extends StatefulWidget {
 
 class _AdminUtrVerificationScreenState
     extends State<AdminUtrVerificationScreen> {
-  List<Map<String, dynamic>> _pending = [];
+  List<Map<String, dynamic>> _verifications = [];
   bool _loading = true;
+  bool _showPendingOnly = false;
   final Set<String> _resolving = {};
 
   @override
@@ -29,11 +30,11 @@ class _AdminUtrVerificationScreenState
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final rows =
-        await SupabaseRepository.instance.fetchPendingUtrVerifications();
+    final rows = await SupabaseRepository.instance
+        .fetchPendingUtrVerifications(pendingOnly: _showPendingOnly);
     if (mounted) {
       setState(() {
-        _pending = rows;
+        _verifications = rows;
         _loading = false;
       });
     }
@@ -90,8 +91,22 @@ class _AdminUtrVerificationScreenState
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Verify UPI Payments'),
+        title: const Text('UPI Payment Records'),
         actions: [
+          // Toggle between pending-only and all records
+          Row(
+            children: [
+              const Text('Pending only',
+                  style: TextStyle(fontSize: 12)),
+              Switch(
+                value: _showPendingOnly,
+                onChanged: (v) {
+                  setState(() => _showPendingOnly = v);
+                  _load();
+                },
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _load,
@@ -101,7 +116,7 @@ class _AdminUtrVerificationScreenState
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _pending.isEmpty
+          : _verifications.isEmpty
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -112,13 +127,15 @@ class _AdminUtrVerificationScreenState
                               .withValues(alpha: 0.5)),
                       const SizedBox(height: 16),
                       const Text(
-                        'No pending verifications',
+                        'No records found',
                         style: TextStyle(
                             fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'UTR submissions from patients will appear here.',
+                        'UTR submissions from patients will appear here.\n'
+                        'Cross-check against your bank statement.',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                             color: scheme.onSurfaceVariant, fontSize: 13),
                       ),
@@ -129,9 +146,9 @@ class _AdminUtrVerificationScreenState
                   onRefresh: _load,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _pending.length,
+                    itemCount: _verifications.length,
                     itemBuilder: (ctx, i) =>
-                        _verificationCard(_pending[i]),
+                        _verificationCard(_verifications[i]),
                   ),
                 ),
     );
@@ -141,7 +158,14 @@ class _AdminUtrVerificationScreenState
     final scheme = Theme.of(context).colorScheme;
     final id = v['id'] as String;
     final busy = _resolving.contains(id);
+    final status = '${v['status'] ?? 'pending'}';
     final created = DateTime.tryParse(v['created_at'] ?? '');
+    final isPending = status == 'pending';
+    final statusColor = isPending
+        ? Colors.orange
+        : status == 'approved'
+            ? Colors.green
+            : Colors.red;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -155,15 +179,16 @@ class _AdminUtrVerificationScreenState
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.15),
+                    color:
+                        statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
-                    'PENDING',
+                  child: Text(
+                    status.toUpperCase(),
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: Colors.orange),
+                        color: statusColor),
                   ),
                 ),
                 const Spacer(),
@@ -233,46 +258,86 @@ class _AdminUtrVerificationScreenState
             _infoRow('Appointment',
                 '${v['appointment_id'] ?? '-'}', false),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.close,
-                        size: 18, color: Colors.red),
-                    label: const Text('Reject',
-                        style: TextStyle(color: Colors.red)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red),
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 12),
+            // Only show Approve/Reject for pending items.
+            // Auto-approved items are here for reconciliation —
+            // admin can still reject if the UTR isn't in their statement.
+            if (isPending) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.close,
+                          size: 18, color: Colors.red),
+                      label: const Text('Reject',
+                          style: TextStyle(color: Colors.red)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed:
+                          busy ? null : () => _resolve(id, false),
                     ),
-                    onPressed:
-                        busy ? null : () => _resolve(id, false),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.icon(
-                    icon: busy
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white))
-                        : const Icon(Icons.check, size: 18),
-                    label: Text(busy ? 'Working...' : 'Approve'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 12),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      icon: busy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white))
+                          : const Icon(Icons.check, size: 18),
+                      label: Text(busy ? 'Working...' : 'Approve'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed:
+                          busy ? null : () => _resolve(id, true),
                     ),
-                    onPressed:
-                        busy ? null : () => _resolve(id, true),
                   ),
+                ],
+              ),
+            ] else ...[
+              // Reconciliation note for auto-approved
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest
+                      .withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ],
-            ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 16,
+                        color: scheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Auto-approved. Cross-check this UTR in your bank statement.',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: scheme.onSurfaceVariant),
+                      ),
+                    ),
+                    if (status == 'approved')
+                      TextButton(
+                        onPressed: busy
+                            ? null
+                            : () => _resolve(id, false),
+                        child: const Text('Flag as fraud',
+                            style: TextStyle(
+                                color: Colors.red, fontSize: 12)),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

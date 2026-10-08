@@ -584,8 +584,8 @@ class _BookingScreenState extends State<BookingScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(ok
-                ? 'UTR submitted! Your payment is under verification.'
-                : 'Booking saved but UTR submission failed. Contact support with your UTR.'),
+                ? 'Payment verified! Appointment confirmed.'
+                : 'This UTR was already used or is invalid. Please check and try again.'),
           ),
         );
       } else {

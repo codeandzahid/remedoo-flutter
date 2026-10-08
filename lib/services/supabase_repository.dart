@@ -1436,6 +1436,8 @@ class SupabaseRepository {
   }
 
   /// Submits a UTR for UPI payment verification (SMM-panel style).
+  /// Uses optimistic verification: valid format + not a duplicate =
+  /// instant approval. Admin reconciles against bank statement later.
   /// Returns true on success, false if the UTR was already used or failed.
   Future<bool> submitUtrVerification({
     required String appointmentId,
@@ -1447,8 +1449,12 @@ class SupabaseRepository {
     String? providerUpiId,
   }) async {
     if (!_ready) return false;
+    // Validate: must be 12 digits
+    if (!RegExp(r'^\d{12}$').hasMatch(utr)) return false;
     try {
       final user = _db.auth.currentUser;
+      // Optimistic: mark as approved immediately (like SMM panels).
+      // Admin reconciles against bank statement in the panel later.
       await _db.from('upi_payment_verifications').insert({
         'appointment_id': appointmentId,
         'utr': utr,
@@ -1459,24 +1465,30 @@ class SupabaseRepository {
         'provider_id': providerId,
         'provider_name': providerName,
         'provider_upi_id': providerUpiId,
-        'status': 'pending',
+        'status': 'approved',
+        'admin_note': 'Auto-approved (optimistic verification)',
+        'verified_at': DateTime.now().toIso8601String(),
       });
       return true;
     } catch (e) {
+      // Likely a duplicate UTR (unique constraint) — reject
       debugPrint('submitUtrVerification failed: $e');
       return false;
     }
   }
 
-  /// Fetches pending UTR verifications (admin).
-  Future<List<Map<String, dynamic>>> fetchPendingUtrVerifications() async {
+  /// Fetches UTR verifications (admin). Defaults to pending; set
+  /// [pendingOnly] false to see all for reconciliation.
+  Future<List<Map<String, dynamic>>> fetchPendingUtrVerifications(
+      {bool pendingOnly = true}) async {
     if (!_ready) return [];
     try {
-      final rows = await _db
-          .from('upi_payment_verifications')
-          .select()
-          .eq('status', 'pending')
-          .order('created_at', ascending: false);
+      var query = _db.from('upi_payment_verifications').select();
+      if (pendingOnly) {
+        query = query.eq('status', 'pending');
+      }
+      final rows =
+          await query.order('created_at', ascending: false).limit(100);
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
       debugPrint('fetchPendingUtrVerifications failed: $e');

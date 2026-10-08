@@ -394,7 +394,6 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
               onPressed: () => setState(() => _step = 2),
             ),
           ],
-          ],
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
