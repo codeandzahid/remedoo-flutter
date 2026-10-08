@@ -181,13 +181,70 @@ class UpiPaymentSheet extends StatelessWidget {
             fullWidth: true,
             onPressed: () => _launchUpi(context),
           ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'How it works:',
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                _howStep('1', 'Tap the button above'),
+                _howStep('2',
+                    'Your UPI app opens with provider details filled'),
+                _howStep('3', 'Confirm payment in your UPI app'),
+                _howStep('4',
+                    'Money goes directly to the provider — no middleman'),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
-            'You will be redirected to your UPI app (GPay, PhonePe, Paytm, etc.) to complete the payment directly to the provider.',
+            'No gateway fees. No signup needed. Works with GPay, PhonePe, Paytm, BHIM and all UPI apps.',
             style: TextStyle(
               fontSize: 11,
               color: scheme.onSurfaceVariant,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _howStep(String num, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(num,
+                  style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.blue)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text,
+                style:
+                    const TextStyle(fontSize: 12, height: 1.4)),
           ),
         ],
       ),

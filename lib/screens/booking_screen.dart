@@ -82,7 +82,7 @@ class _BookingScreenState extends State<BookingScreen> {
         ? DateTime(now.year, now.month, now.day)
         : _days.first;
     _time = widget.prefill?.timeLabel ?? '10:00';
-    _payment = widget.prefill?.payment ?? 'At Clinic';
+    _payment = widget.prefill?.payment ?? 'UPI';
     if (widget.prefill != null) _notes.text = widget.prefill!.notes;
   }
 
@@ -616,16 +616,18 @@ class _BookingScreenState extends State<BookingScreen> {
       const SizedBox(height: 14),
       _sectionTitle(Icons.credit_card, 'Payment Method'),
       const SizedBox(height: 10),
+      // Direct UPI first (recommended - no gateway needed)
+      if (upiOn)
+        _payCard('UPI', 'Pay directly to provider • Recommended',
+            Icons.qr_code_2,
+            badge: 'Recommended'),
+      if (upiOn) const SizedBox(height: 10),
+      _payCard('Pay Online', 'UPI / Card via Razorpay',
+          Icons.credit_card),
+      if (payInClinic) const SizedBox(height: 10),
       if (payInClinic)
         _payCard('At Clinic', 'Pay when you visit',
             Icons.payments_outlined),
-      if (payInClinic) const SizedBox(height: 10),
-      _payCard('Pay Online', 'Auto-confirm your slot',
-          Icons.credit_card),
-      if (upiOn) const SizedBox(height: 10),
-      if (upiOn)
-        _payCard('UPI', 'Pay directly to provider via UPI',
-            Icons.qr_code_2),
     ];
 
     final summary = _summaryCard();
@@ -857,7 +859,8 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
-  Widget _payCard(String value, String sub, IconData icon) {
+  Widget _payCard(String value, String sub, IconData icon,
+      {String? badge}) {
     final scheme = Theme.of(context).colorScheme;
     final sel = _payment == value;
     return InkWell(
@@ -895,12 +898,32 @@ class _BookingScreenState extends State<BookingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(value,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: sel
-                                ? scheme.primary
-                                : scheme.onSurface)),
+                    Row(
+                      children: [
+                        Text(value,
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: sel
+                                    ? scheme.primary
+                                    : scheme.onSurface)),
+                        if (badge != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(badge,
+                                style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.green)),
+                          ),
+                        ],
+                      ],
+                    ),
                     Text(sub,
                         style: TextStyle(
                             fontSize: 12,
