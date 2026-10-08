@@ -1,7 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const RAZORPAY_WEBHOOK_SECRET = Deno.env.get('RAZORPAY_WEBHOOK_SECRET')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -23,6 +22,21 @@ async function verifySignature(body: string, signature: string, secret: string):
 
 serve(async (req) => {
   try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+    // Read webhook secret from admin-configured secure settings
+    const { data: secretRow } = await supabase
+      .from('secure_settings')
+      .select('value')
+      .eq('key', 'razorpay_webhook_secret')
+      .single();
+    const RAZORPAY_WEBHOOK_SECRET = secretRow?.value;
+
+    if (!RAZORPAY_WEBHOOK_SECRET) {
+      console.error('Webhook secret not configured');
+      return new Response(JSON.stringify({ error: 'Not configured' }), { status: 500 });
+    }
+
     const body = await req.text();
     const signature = req.headers.get('x-razorpay-signature') || '';
 
@@ -33,7 +47,6 @@ serve(async (req) => {
     }
 
     const event = JSON.parse(body);
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     console.log('Webhook event:', event.event);
 

@@ -828,6 +828,40 @@ class SupabaseRepository {
     }
   }
 
+  /// Save a sensitive setting to secure_settings (admin-only table).
+  /// Used for Razorpay secrets — never stored in client-readable app_config.
+  Future<bool> saveSecureSetting(String key, String value) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('secure_settings').upsert({
+        'key': key,
+        'value': value,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('saveSecureSetting failed: $e');
+      return false;
+    }
+  }
+
+  /// Read secure settings (admin only). Returns map of key->value.
+  Future<Map<String, String>> fetchSecureSettings(List<String> keys) async {
+    if (!_ready) return {};
+    try {
+      final rows = await _db
+          .from('secure_settings')
+          .select('key, value')
+          .inFilter('key', keys);
+      return {
+        for (final r in rows) '${r['key']}': '${r['value']}',
+      };
+    } catch (e) {
+      debugPrint('fetchSecureSettings failed: $e');
+      return {};
+    }
+  }
+
   /// Admin read of any catalog table (all rows, incl. non-approved).
   Future<List<Map<String, dynamic>>> adminFetchAll(String table) async {
     if (!_ready) return const [];

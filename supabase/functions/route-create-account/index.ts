@@ -1,10 +1,18 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID')!;
-const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+/// Read a secret from secure_settings table (admin-configured via admin panel)
+async function getSecret(supabase: any, key: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('secure_settings')
+    .select('value')
+    .eq('key', key)
+    .single();
+  return data?.value ?? null;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +25,22 @@ serve(async (req) => {
   }
 
   try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+    // Read Razorpay credentials from admin-configured secure settings
+    const RAZORPAY_KEY_ID = await getSecret(supabase, 'razorpay_key_id');
+    const RAZORPAY_KEY_SECRET = await getSecret(supabase, 'razorpay_key_secret');
+
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      return new Response(
+        JSON.stringify({
+          error: 'Razorpay not configured. Admin must set keys in Admin Panel > Settings > Payments.',
+          code: 'NOT_CONFIGURED',
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { provider_type, provider_id, email, phone, business_name, account_number, ifsc, beneficiary_name } =
       await req.json();
 

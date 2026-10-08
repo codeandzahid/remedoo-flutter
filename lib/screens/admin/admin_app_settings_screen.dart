@@ -31,6 +31,8 @@ class _AdminAppSettingsScreenState
   // Razorpay
   bool _razorpayEnabled = false;
   late final TextEditingController _razorpayKeyId;
+  late final TextEditingController _razorpayKeySecret;
+  late final TextEditingController _razorpayWebhookSecret;
 
   // Fees
   late final TextEditingController _deliveryFee;
@@ -56,6 +58,8 @@ class _AdminAppSettingsScreenState
     _supportEmail = TextEditingController();
     _supportHours = TextEditingController();
     _razorpayKeyId = TextEditingController();
+    _razorpayKeySecret = TextEditingController();
+    _razorpayWebhookSecret = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -69,6 +73,8 @@ class _AdminAppSettingsScreenState
     _supportEmail.dispose();
     _supportHours.dispose();
     _razorpayKeyId.dispose();
+    _razorpayKeySecret.dispose();
+    _razorpayWebhookSecret.dispose();
     super.dispose();
   }
 
@@ -89,22 +95,34 @@ class _AdminAppSettingsScreenState
       _singleVendorPharmacyId = pharmMode['pharmacy_id'] as String?;
       _razorpayEnabled = rzp['enabled'] == true;
       _razorpayKeyId.text = '${rzp['key_id'] ?? ''}';
-      _deliveryFee.text = '${fees['delivery_fee'] ?? 30}';
-      _freeThreshold.text =
-          '${fees['free_delivery_threshold'] ?? 499}';
-      _numbers = [
-        for (final n in (emg['numbers'] as List? ?? []))
-          {
-            'label': '${(n as Map)['label'] ?? ''}',
-            'number': '${n['number'] ?? ''}',
-          }
-      ];
-      _sosMsg.text = '${emg['sos_message'] ?? ''}';
-      _supportPhone.text = '${support['phone'] ?? ''}';
-      _supportEmail.text = '${support['email'] ?? ''}';
-      _supportHours.text = '${support['hours'] ?? ''}';
-      _loading = false;
     });
+    // Load secrets from secure_settings (admin-only)
+    final secrets = await state.supabaseRepository.fetchSecureSettings([
+      'razorpay_key_secret',
+      'razorpay_webhook_secret',
+    ]);
+    if (mounted) {
+      setState(() {
+        _razorpayKeySecret.text = secrets['razorpay_key_secret'] ?? '';
+        _razorpayWebhookSecret.text =
+            secrets['razorpay_webhook_secret'] ?? '';
+        _deliveryFee.text = '${fees['delivery_fee'] ?? 30}';
+        _freeThreshold.text =
+            '${fees['free_delivery_threshold'] ?? 499}';
+        _numbers = [
+          for (final n in (emg['numbers'] as List? ?? []))
+            {
+              'label': '${(n as Map)['label'] ?? ''}',
+              'number': '${n['number'] ?? ''}',
+            }
+        ];
+        _sosMsg.text = '${emg['sos_message'] ?? ''}';
+        _supportPhone.text = '${support['phone'] ?? ''}';
+        _supportEmail.text = '${support['email'] ?? ''}';
+        _supportHours.text = '${support['hours'] ?? ''}';
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _save(String key, Map<String, dynamic> patch) async {
@@ -119,6 +137,51 @@ class _AdminAppSettingsScreenState
       SnackBar(
           content: Text(ok
               ? 'Saved — live across website and app'
+              : 'Could not save (admin only)')),
+    );
+  }
+
+  /// Save Razorpay config: public settings to app_config,
+  /// secrets to secure_settings (admin-only).
+  Future<void> _saveRazorpay() async {
+    setState(() => _saving = true);
+    final state = AppStateScope.of(context);
+    final repo = state.supabaseRepository;
+
+    // Public config (key_id is safe to expose to clients)
+    final okPublic = await state.saveAppConfigValue('razorpay', {
+      'enabled': _razorpayEnabled,
+      'key_id': _razorpayKeyId.text.trim(),
+    });
+
+    // Secrets go to admin-only table
+    bool okSecrets = true;
+    final secret = _razorpayKeySecret.text.trim();
+    final webhook = _razorpayWebhookSecret.text.trim();
+    if (secret.isNotEmpty) {
+      okSecrets = await repo.saveSecureSetting(
+              'razorpay_key_secret', secret) &&
+          okSecrets;
+    }
+    if (webhook.isNotEmpty) {
+      okSecrets = await repo.saveSecureSetting(
+              'razorpay_webhook_secret', webhook) &&
+          okSecrets;
+    }
+    // Also store key_id in secure settings for Edge Functions
+    final keyId = _razorpayKeyId.text.trim();
+    if (keyId.isNotEmpty) {
+      okSecrets =
+          await repo.saveSecureSetting('razorpay_key_id', keyId) &&
+              okSecrets;
+    }
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(okPublic && okSecrets
+              ? 'Razorpay saved securely — Route payments ready'
               : 'Could not save (admin only)')),
     );
   }
@@ -414,20 +477,32 @@ class _AdminAppSettingsScreenState
                 ),
                 const SizedBox(height: 8),
                 RTextField(
-                    label: 'Razorpay Key ID',
+                    label: 'Razorpay Key ID (public)',
                     hint: 'rzp_test_... or rzp_live_...',
                     controller: _razorpayKeyId),
+                const SizedBox(height: 8),
+                RTextField(
+                    label: 'Razorpay Key Secret',
+                    hint: 'Stored securely, never shown to users',
+                    controller: _razorpayKeySecret,
+                    obscureText: true),
+                const SizedBox(height: 8),
+                RTextField(
+                    label: 'Razorpay Webhook Secret',
+                    hint: 'From Razorpay dashboard > Webhooks',
+                    controller: _razorpayWebhookSecret,
+                    obscureText: true),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.08),
+                    color: Colors.green.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
-                    'Security note: The Key Secret must NEVER be stored in the app. '
-                    'Set RAZORPAY_KEY_SECRET as a Supabase Edge Function secret instead. '
-                    'Only the Key ID (public) belongs here.',
+                    'All keys are stored in a secure admin-only table. '
+                    'The Key Secret is never sent to user devices. '
+                    'Route split payments (95% provider / 5% platform) use these keys.',
                     style: TextStyle(fontSize: 12, height: 1.5),
                   ),
                 ),
@@ -439,11 +514,7 @@ class _AdminAppSettingsScreenState
                     small: true,
                     onPressed: _saving
                         ? null
-                        : () => _save('razorpay', {
-                              'enabled': _razorpayEnabled,
-                              'key_id': _razorpayKeyId.text.trim(),
-                              // key_secret removed: must be set as Edge Function secret
-                            }),
+                        : () => _saveRazorpay(),
                   ),
                 ),
               ],

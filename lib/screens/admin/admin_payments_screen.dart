@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/route_onboarding_sheet.dart';
 import '../../widgets/widgets.dart';
 
 void _snack(BuildContext context, String msg) {
@@ -236,11 +237,38 @@ class _ProviderPaymentsTabState
                     color: scheme.onSurfaceVariant,
                     fontFamily: 'monospace'),
               ),
+            ] else ...[
+              const SizedBox(height: 8),
+              RButton(
+                label: 'Onboard to Route',
+                icon: Icons.account_balance,
+                small: true,
+                variant: RButtonVariant.outline,
+                onPressed: () => _onboardRoute(context, state, id,
+                    '${r['name'] ?? 'Provider'}'),
+              ),
             ],
           ],
         ),
       ),
     );
+  }
+
+  /// Admin triggers Route onboarding for a provider.
+  /// Opens the bank details sheet pre-filled for this provider.
+  Future<void> _onboardRoute(BuildContext context, AppState state,
+      String providerId, String providerName) async {
+    final providerType = widget.table.replaceAll('s', ''); // doctors->doctor
+    final done = await showRouteOnboarding(
+      context,
+      providerType: providerType,
+      providerId: providerId,
+      providerName: providerName,
+    );
+    if (done == true && context.mounted) {
+      _snack(context, 'Route onboarding started for $providerName');
+      _load();
+    }
   }
 
   Widget _toggleRow(BuildContext context,

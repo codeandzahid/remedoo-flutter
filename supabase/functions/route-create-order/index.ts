@@ -1,10 +1,17 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID')!;
-const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+async function getSecret(supabase: any, key: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('secure_settings')
+    .select('value')
+    .eq('key', key)
+    .single();
+  return data?.value ?? null;
+}
 
 // Platform commission percentage (configurable)
 const PLATFORM_FEE_PERCENT = 5;
@@ -20,6 +27,18 @@ serve(async (req) => {
   }
 
   try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+    const RAZORPAY_KEY_ID = await getSecret(supabase, 'razorpay_key_id');
+    const RAZORPAY_KEY_SECRET = await getSecret(supabase, 'razorpay_key_secret');
+
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      return new Response(
+        JSON.stringify({ error: 'Razorpay not configured', code: 'NOT_CONFIGURED' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { amount, currency = 'INR', provider_type, provider_id, receipt, notes } = await req.json();
 
     if (!amount || !provider_type || !provider_id) {
