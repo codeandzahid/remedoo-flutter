@@ -135,37 +135,28 @@ class PaymentService {
   /// Dynamically loads checkout.js then launches Razorpay.
   void _loadRazorpayScript(Map<String, dynamic> options) async {
     try {
-      final completer = Completer<bool>();
+      // Append the script tag (no event listeners — we'll poll for the global)
       final script = web.HTMLScriptElement()
         ..src = 'https://checkout.razorpay.com/v1/checkout.js'
-        ..onLoad.listen((_) {
-          if (!completer.isCompleted) completer.complete(true);
-        })
-        ..onError.listen((_) {
-          if (!completer.isCompleted) completer.complete(false);
-        });
+        ..async = true;
       web.document.head!.append(script);
 
-      final loaded = await completer.future
-          .timeout(const Duration(seconds: 15), onTimeout: () => false);
-
-      if (!loaded) {
-        onError?.call(
-            'Could not load Razorpay checkout. Please check your internet connection and try again.');
-        return;
+      // Poll for window.Razorpay to appear (up to 15 seconds)
+      for (var i = 0; i < 30; i++) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        try {
+          final prop = globalContext.getProperty('Razorpay'.toJS);
+          if (prop != null && !prop.isUndefinedOrNull) {
+            _launchRazorpay(prop, options);
+            return;
+          }
+        } catch (_) {
+          // Ignore and keep polling
+        }
       }
 
-      // Give the script a moment to initialize the global
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Script loaded — now check the global again
-      final ctorProp = globalContext.getProperty('Razorpay'.toJS);
-      if (ctorProp == null || ctorProp.isUndefinedOrNull) {
-        onError?.call(
-            'Razorpay script loaded but did not initialize. Please refresh the page and try again.');
-        return;
-      }
-      _launchRazorpay(ctorProp, options);
+      onError?.call(
+          'Could not load Razorpay checkout. Please check your internet connection and try again.');
     } catch (e) {
       onError?.call('Could not load Razorpay: $e');
     }
