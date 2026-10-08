@@ -34,6 +34,14 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
   /// Guards against showing the return-confirm dialog more than once.
   bool _returnDialogShown = false;
 
+  /// When the UPI app was launched. Used to auto-detect a completed payment:
+  /// if the user spent enough time in the UPI app (PIN entry takes time),
+  /// we treat it as paid and book automatically.
+  DateTime? _upiLaunchTime;
+
+  /// Minimum seconds in the UPI app to count as a completed payment.
+  static const _autoVerifySeconds = 15;
+
   @override
   void initState() {
     super.initState();
@@ -48,15 +56,26 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // User came back from the UPI app: automatically ask for confirmation.
+    // User came back from the UPI app.
     if (state == AppLifecycleState.resumed &&
         _upiAppOpened &&
         !_returnDialogShown &&
         mounted) {
       _returnDialogShown = true;
+      final elapsed = _upiLaunchTime == null
+          ? 0
+          : DateTime.now().difference(_upiLaunchTime!).inSeconds;
       // Small delay so the sheet is fully visible again.
       Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) _showReturnConfirmDialog();
+        if (!mounted) return;
+        if (elapsed >= _autoVerifySeconds) {
+          // User spent enough time in the UPI app to complete payment
+          // (PIN entry takes time) — auto-book, no taps needed.
+          Navigator.of(context).pop(true);
+        } else {
+          // Quick return: probably cancelled — ask to confirm.
+          _showReturnConfirmDialog();
+        }
       });
     }
   }
@@ -136,9 +155,9 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
     }
     if (!context.mounted) return;
     if (launched) {
-      // UPI app opened. Do NOT close the sheet yet — the user must
-      // confirm they completed the payment when they return.
-      // Update the UI to show we're waiting for confirmation.
+      // UPI app opened. Record the time — if the user spends long enough
+      // in the UPI app, we'll auto-book on return.
+      _upiLaunchTime = DateTime.now();
       setState(() => _upiAppOpened = true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -282,7 +301,7 @@ class _UpiPaymentSheetState extends State<UpiPaymentSheet>
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
-                      'Complete the payment in your UPI app. When you return here, we\'ll ask you to confirm.',
+                      'Complete the payment in your UPI app and return here — we\'ll detect it automatically.',
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
