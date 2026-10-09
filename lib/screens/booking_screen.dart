@@ -316,7 +316,9 @@ class _BookingScreenState extends State<BookingScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Opening Razorpay...')),
+        SnackBar(
+            content: Text(
+                'Opening ${PaymentService.instance.gatewayDisplayName} payment...')),
       );
     }
 
@@ -326,6 +328,7 @@ class _BookingScreenState extends State<BookingScreen> {
       description: 'Appointment: ${widget.title}',
       contact: state.phone.isNotEmpty ? state.phone : null,
       email: state.email.isNotEmpty ? state.email : null,
+      customerName: state.userName.isNotEmpty ? state.userName : null,
       onPaymentSuccess: (paymentId) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -523,7 +526,8 @@ class _BookingScreenState extends State<BookingScreen> {
       const SizedBox(height: 14),
       _sectionTitle(Icons.credit_card, 'Payment Method'),
       const SizedBox(height: 10),
-      _payCard('Pay Online', 'UPI / Card via Razorpay',
+      _payCard('Pay Online',
+          'UPI / Card via ${PaymentService.instance.gatewayDisplayName}',
           Icons.credit_card),
       if (payInClinic) const SizedBox(height: 10),
       if (payInClinic)

@@ -30,9 +30,28 @@ class _AdminAppSettingsScreenState
 
   // Razorpay
   bool _razorpayEnabled = false;
+  bool _razorpayTest = true;
   late final TextEditingController _razorpayKeyId;
   late final TextEditingController _razorpayKeySecret;
   late final TextEditingController _razorpayWebhookSecret;
+
+  // Multi-gateway
+  String _activeGateway = 'razorpay';
+  // Cashfree
+  bool _cashfreeEnabled = false;
+  bool _cashfreeTest = true;
+  late final TextEditingController _cashfreeKeyId;
+  late final TextEditingController _cashfreeSecret;
+  // Instamojo
+  bool _instamojoEnabled = false;
+  bool _instamojoTest = true;
+  late final TextEditingController _instamojoKeyId;
+  late final TextEditingController _instamojoSecret;
+  // PayU
+  bool _payuEnabled = false;
+  bool _payuTest = true;
+  late final TextEditingController _payuKeyId;
+  late final TextEditingController _payuSecret;
 
   // Fees
   late final TextEditingController _deliveryFee;
@@ -60,6 +79,12 @@ class _AdminAppSettingsScreenState
     _razorpayKeyId = TextEditingController();
     _razorpayKeySecret = TextEditingController();
     _razorpayWebhookSecret = TextEditingController();
+    _cashfreeKeyId = TextEditingController();
+    _cashfreeSecret = TextEditingController();
+    _instamojoKeyId = TextEditingController();
+    _instamojoSecret = TextEditingController();
+    _payuKeyId = TextEditingController();
+    _payuSecret = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -75,6 +100,12 @@ class _AdminAppSettingsScreenState
     _razorpayKeyId.dispose();
     _razorpayKeySecret.dispose();
     _razorpayWebhookSecret.dispose();
+    _cashfreeKeyId.dispose();
+    _cashfreeSecret.dispose();
+    _instamojoKeyId.dispose();
+    _instamojoSecret.dispose();
+    _payuKeyId.dispose();
+    _payuSecret.dispose();
     super.dispose();
   }
 
@@ -88,24 +119,55 @@ class _AdminAppSettingsScreenState
     final support = state.appConfigValue('support');
     final pharmMode = state.appConfigValue('pharmacy_mode');
     final rzp = state.appConfigValue('razorpay');
+    final pg = state.appConfigValue('payment_gateways');
+    final pgGateways = (pg['gateways'] as Map?) ?? {};
+    Map<String, dynamic> gwOf(String name) {
+      final g = pgGateways[name];
+      return g is Map ? Map<String, dynamic>.from(g) : {};
+    }
     setState(() {
       _maintEnabled = maint['enabled'] == true;
       _maintMsg.text = '${maint['message'] ?? ''}';
       _pharmacyMultiVendor = pharmMode['mode'] != 'single';
       _singleVendorPharmacyId = pharmMode['pharmacy_id'] as String?;
-      _razorpayEnabled = rzp['enabled'] == true;
-      _razorpayKeyId.text = '${rzp['key_id'] ?? ''}';
+      // Multi-gateway config, with fallback to legacy 'razorpay' config
+      _activeGateway = '${pg['active'] ?? 'razorpay'}';
+      final rzpGw = gwOf('razorpay');
+      _razorpayEnabled = rzpGw.isNotEmpty
+          ? rzpGw['enabled'] == true
+          : rzp['enabled'] == true;
+      _razorpayTest = rzpGw['test_mode'] != false;
+      _razorpayKeyId.text =
+          '${rzpGw['key_id'] ?? rzp['key_id'] ?? ''}';
+      final cfGw = gwOf('cashfree');
+      _cashfreeEnabled = cfGw['enabled'] == true;
+      _cashfreeTest = cfGw['test_mode'] != false;
+      _cashfreeKeyId.text = '${cfGw['key_id'] ?? ''}';
+      final imGw = gwOf('instamojo');
+      _instamojoEnabled = imGw['enabled'] == true;
+      _instamojoTest = imGw['test_mode'] != false;
+      _instamojoKeyId.text = '${imGw['key_id'] ?? ''}';
+      final puGw = gwOf('payu');
+      _payuEnabled = puGw['enabled'] == true;
+      _payuTest = puGw['test_mode'] != false;
+      _payuKeyId.text = '${puGw['key_id'] ?? ''}';
     });
     // Load secrets from secure_settings (admin-only)
     final secrets = await state.supabaseRepository.fetchSecureSettings([
       'razorpay_key_secret',
       'razorpay_webhook_secret',
+      'cashfree_secret_key',
+      'instamojo_auth_token',
+      'payu_salt',
     ]);
     if (mounted) {
       setState(() {
         _razorpayKeySecret.text = secrets['razorpay_key_secret'] ?? '';
         _razorpayWebhookSecret.text =
             secrets['razorpay_webhook_secret'] ?? '';
+        _cashfreeSecret.text = secrets['cashfree_secret_key'] ?? '';
+        _instamojoSecret.text = secrets['instamojo_auth_token'] ?? '';
+        _payuSecret.text = secrets['payu_salt'] ?? '';
         _deliveryFee.text = '${fees['delivery_fee'] ?? 30}';
         _freeThreshold.text =
             '${fees['free_delivery_threshold'] ?? 499}';
@@ -183,6 +245,137 @@ class _AdminAppSettingsScreenState
           content: Text(okPublic && okSecrets
               ? 'Razorpay saved securely — Route payments ready'
               : 'Could not save (admin only)')),
+    );
+  }
+
+  /// Save multi-gateway config: gateway list + active choice to
+  /// app_config ('payment_gateways'), secrets to secure_settings.
+  Future<void> _saveGateways() async {
+    setState(() => _saving = true);
+    final state = AppStateScope.of(context);
+    final repo = state.supabaseRepository;
+
+    final config = {
+      'active': _activeGateway,
+      'gateways': {
+        'razorpay': {
+          'enabled': _razorpayEnabled,
+          'key_id': _razorpayKeyId.text.trim(),
+          'test_mode': _razorpayTest,
+        },
+        'cashfree': {
+          'enabled': _cashfreeEnabled,
+          'key_id': _cashfreeKeyId.text.trim(),
+          'test_mode': _cashfreeTest,
+        },
+        'instamojo': {
+          'enabled': _instamojoEnabled,
+          'key_id': _instamojoKeyId.text.trim(),
+          'test_mode': _instamojoTest,
+        },
+        'payu': {
+          'enabled': _payuEnabled,
+          'key_id': _payuKeyId.text.trim(),
+          'test_mode': _payuTest,
+        },
+      },
+    };
+    bool ok = await state.saveAppConfigValue('payment_gateways', config);
+    // Keep legacy 'razorpay' config in sync (older builds read it)
+    await state.saveAppConfigValue('razorpay', {
+      'enabled': _razorpayEnabled,
+      'key_id': _razorpayKeyId.text.trim(),
+    });
+
+    Future<void> saveSecret(String key, String value) async {
+      final v = value.trim();
+      if (v.isNotEmpty) {
+        ok = await repo.saveSecureSetting(key, v) && ok;
+      }
+    }
+
+    await saveSecret('razorpay_key_id', _razorpayKeyId.text);
+    await saveSecret('razorpay_key_secret', _razorpayKeySecret.text);
+    await saveSecret('razorpay_webhook_secret', _razorpayWebhookSecret.text);
+    await saveSecret('cashfree_secret_key', _cashfreeSecret.text);
+    await saveSecret('instamojo_auth_token', _instamojoSecret.text);
+    await saveSecret('payu_salt', _payuSecret.text);
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(ok
+              ? 'Payment gateways saved — active: $_activeGateway'
+              : 'Could not save (admin only)')),
+    );
+  }
+
+  /// One gateway settings card (enable switch, keys, test mode).
+  Widget _gatewayCard({
+    required String name,
+    required String keyLabel,
+    required String keyHint,
+    required String secretLabel,
+    required String secretHint,
+    required bool enabled,
+    required bool testMode,
+    required TextEditingController keyController,
+    required TextEditingController secretController,
+    required ValueChanged<bool> onEnabled,
+    required ValueChanged<bool> onTestMode,
+    bool showWebhook = false,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: RCard(
+        child: Column(
+          children: [
+            SwitchListTile(
+              value: enabled,
+              onChanged: onEnabled,
+              title: Text(name,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(
+                  enabled ? 'Enabled' : 'Disabled',
+                  style: TextStyle(
+                      fontSize: 12, color: scheme.onSurfaceVariant)),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 8),
+            RTextField(
+                label: keyLabel, hint: keyHint, controller: keyController),
+            const SizedBox(height: 8),
+            RTextField(
+                label: secretLabel,
+                hint: secretHint,
+                controller: secretController,
+                obscureText: true),
+            if (showWebhook) ...[
+              const SizedBox(height: 8),
+              RTextField(
+                  label: 'Webhook Secret (optional)',
+                  hint: 'From Razorpay dashboard > Webhooks',
+                  controller: _razorpayWebhookSecret,
+                  obscureText: true),
+            ],
+            SwitchListTile(
+              value: testMode,
+              onChanged: onTestMode,
+              title: const Text('Test mode',
+                  style: TextStyle(fontSize: 14)),
+              subtitle: Text(
+                  testMode
+                      ? 'Test keys — no real money moves'
+                      : 'LIVE mode — real money',
+                  style: TextStyle(
+                      fontSize: 12, color: scheme.onSurfaceVariant)),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -452,72 +645,122 @@ class _AdminAppSettingsScreenState
             ),
           ),
           const SizedBox(height: 24),
-          // ---- Payment Gateway ----
+          // ---- Payment Gateways (multi-gateway, switchable) ----
           const RSectionHeader(
-              title: 'Payment Gateway (Razorpay)',
-              subtitle: 'In-app UPI, cards, netbanking payments'),
+              title: 'Payment Gateways',
+              subtitle:
+                  'Add keys for any gateway, pick the active one — '
+                  'switch anytime. Payments open as a secure hosted page.'),
           const SizedBox(height: 12),
           RCard(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SwitchListTile(
-                  value: _razorpayEnabled,
-                  onChanged: (v) =>
-                      setState(() => _razorpayEnabled = v),
-                  title: const Text('Enable online payments',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(
-                      _razorpayEnabled
-                          ? 'Users can pay via UPI/cards in-app'
-                          : 'Online payments disabled',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurfaceVariant)),
-                  contentPadding: EdgeInsets.zero,
+                const Text('Active gateway',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final g in const [
+                      ('razorpay', 'Razorpay'),
+                      ('cashfree', 'Cashfree'),
+                      ('instamojo', 'Instamojo'),
+                      ('payu', 'PayU'),
+                    ])
+                      ChoiceChip(
+                        label: Text(g.$2),
+                        selected: _activeGateway == g.$1,
+                        onSelected: (_) =>
+                            setState(() => _activeGateway = g.$1),
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                RTextField(
-                    label: 'Razorpay Key ID (public)',
-                    hint: 'rzp_test_... or rzp_live_...',
-                    controller: _razorpayKeyId),
-                const SizedBox(height: 8),
-                RTextField(
-                    label: 'Razorpay Key Secret',
-                    hint: 'Stored securely, never shown to users',
-                    controller: _razorpayKeySecret,
-                    obscureText: true),
-                const SizedBox(height: 8),
-                RTextField(
-                    label: 'Razorpay Webhook Secret',
-                    hint: 'From Razorpay dashboard > Webhooks',
-                    controller: _razorpayWebhookSecret,
-                    obscureText: true),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'All keys are stored in a secure admin-only table. '
-                    'The Key Secret is never sent to user devices. '
-                    'Route split payments (95% provider / 5% platform) use these keys.',
-                    style: TextStyle(fontSize: 12, height: 1.5),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: RButton(
-                    label: 'Save',
-                    small: true,
-                    onPressed: _saving
-                        ? null
-                        : () => _saveRazorpay(),
-                  ),
-                ),
+                const SizedBox(height: 4),
+                Text(
+                    'Users will pay via the active gateway. Make sure it is enabled below with keys saved.',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color:
+                            Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _gatewayCard(
+            name: 'Razorpay',
+            keyLabel: 'Key ID',
+            keyHint: 'rzp_test_... or rzp_live_...',
+            secretLabel: 'Key Secret',
+            secretHint: 'Stored securely, never shown to users',
+            enabled: _razorpayEnabled,
+            testMode: _razorpayTest,
+            keyController: _razorpayKeyId,
+            secretController: _razorpayKeySecret,
+            onEnabled: (v) => setState(() => _razorpayEnabled = v),
+            onTestMode: (v) => setState(() => _razorpayTest = v),
+            showWebhook: true,
+          ),
+          _gatewayCard(
+            name: 'Cashfree',
+            keyLabel: 'App ID (Client ID)',
+            keyHint: 'From Cashfree dashboard > Developers',
+            secretLabel: 'Secret Key (Client Secret)',
+            secretHint: 'Stored securely',
+            enabled: _cashfreeEnabled,
+            testMode: _cashfreeTest,
+            keyController: _cashfreeKeyId,
+            secretController: _cashfreeSecret,
+            onEnabled: (v) => setState(() => _cashfreeEnabled = v),
+            onTestMode: (v) => setState(() => _cashfreeTest = v),
+          ),
+          _gatewayCard(
+            name: 'Instamojo',
+            keyLabel: 'API Key',
+            keyHint: 'From Instamojo dashboard > API',
+            secretLabel: 'Auth Token',
+            secretHint: 'Stored securely',
+            enabled: _instamojoEnabled,
+            testMode: _instamojoTest,
+            keyController: _instamojoKeyId,
+            secretController: _instamojoSecret,
+            onEnabled: (v) => setState(() => _instamojoEnabled = v),
+            onTestMode: (v) => setState(() => _instamojoTest = v),
+          ),
+          _gatewayCard(
+            name: 'PayU',
+            keyLabel: 'Merchant Key',
+            keyHint: 'From PayU dashboard',
+            secretLabel: 'Merchant Salt',
+            secretHint: 'Stored securely',
+            enabled: _payuEnabled,
+            testMode: _payuTest,
+            keyController: _payuKeyId,
+            secretController: _payuSecret,
+            onEnabled: (v) => setState(() => _payuEnabled = v),
+            onTestMode: (v) => setState(() => _payuTest = v),
+          ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'All secrets are stored in a secure admin-only table and '
+              'never sent to user devices. Only the active gateway is '
+              'used for new payments.',
+              style: TextStyle(fontSize: 12, height: 1.5),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: RButton(
+              label: 'Save Gateways',
+              small: true,
+              onPressed: _saving ? null : () => _saveGateways(),
             ),
           ),
           const SizedBox(height: 32),

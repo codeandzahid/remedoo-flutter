@@ -1522,13 +1522,32 @@ class AppState extends ChangeNotifier {
     if (maint is Map<String, dynamic>) {
       _maintenanceMode = maint['enabled'] == true;
     }
-    // Configure payment gateway from admin settings
-    final rzp = cfg['razorpay'];
-    if (rzp is Map<String, dynamic>) {
-      PaymentService.instance.configure(
-        keyId: '${rzp['key_id'] ?? ''}',
-        enabled: rzp['enabled'] == true,
-      );
+    // Configure payment gateway from admin settings (multi-gateway)
+    final pg = cfg['payment_gateways'];
+    bool configured = false;
+    if (pg is Map<String, dynamic>) {
+      final active = '${pg['active'] ?? 'razorpay'}';
+      final gateways = pg['gateways'];
+      if (gateways is Map && gateways[active] is Map) {
+        final gw = gateways[active] as Map;
+        PaymentService.instance.configure(
+          keyId: '${gw['key_id'] ?? ''}',
+          enabled: gw['enabled'] == true,
+          gateway: active,
+        );
+        configured = true;
+      }
+    }
+    if (!configured) {
+      // Legacy single-gateway (Razorpay) config
+      final rzp = cfg['razorpay'];
+      if (rzp is Map<String, dynamic>) {
+        PaymentService.instance.configure(
+          keyId: '${rzp['key_id'] ?? ''}',
+          enabled: rzp['enabled'] == true,
+          gateway: 'razorpay',
+        );
+      }
     }
     notifyListeners();
   }

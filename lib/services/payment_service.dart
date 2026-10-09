@@ -8,12 +8,14 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'supabase_config.dart';
 
-/// In-app UPI/card payment via Razorpay.
-/// API keys are configured in Admin Panel > Settings > Payments.
-/// Keys are stored in app_config, never hardcoded.
+/// Online payment via the admin-selected gateway.
 ///
-/// Supports both mobile (razorpay_flutter plugin) and web
-/// (Razorpay Payment Links — opens in browser, no JS SDK needed).
+/// Gateways are configured in Admin > Settings > Payment Gateways and
+/// can be switched anytime. Supported: Razorpay, Cashfree, Instamojo,
+/// PayU. All use hosted checkout pages created by the backend
+/// (Supabase Edge Function `payment-create`), so no fragile in-page
+/// JS SDK is needed. Payment completion is detected by polling
+/// `payment-status`.
 class PaymentService {
   static final PaymentService instance = PaymentService._();
   PaymentService._();
@@ -22,21 +24,44 @@ class PaymentService {
   void Function(String paymentId)? onSuccess;
   void Function(String error)? onError;
 
+  String _activeGateway = 'razorpay';
   String _keyId = '';
   bool _enabled = false;
 
-  /// Configure from admin settings (call on app start and when settings change)
-  void configure({required String keyId, required bool enabled}) {
+  /// Configure from admin settings (call on app start and when
+  /// settings change). [gateway] is the active gateway id.
+  void configure({
+    required String keyId,
+    required bool enabled,
+    String gateway = 'razorpay',
+  }) {
     _keyId = keyId;
     _enabled = enabled;
+    _activeGateway = gateway;
   }
 
-  /// Check if Razorpay is configured and enabled
-  bool get isConfigured =>
-      _enabled && _keyId.isNotEmpty && _keyId.startsWith('rzp_');
+  String get activeGateway => _activeGateway;
+
+  /// Check if a payment gateway is configured and enabled
+  bool get isConfigured => _enabled;
+
+  /// Human-readable name of the active gateway.
+  String get gatewayDisplayName {
+    switch (_activeGateway) {
+      case 'cashfree':
+        return 'Cashfree';
+      case 'instamojo':
+        return 'Instamojo';
+      case 'payu':
+        return 'PayU';
+      case 'razorpay':
+      default:
+        return 'Razorpay';
+    }
+  }
 
   void _ensureInitialized() {
-    if (kIsWeb) return; // Web uses Payment Links, no plugin needed
+    if (kIsWeb) return; // Web uses hosted checkout links
     _razorpay ??= Razorpay();
     _razorpay!.clear();
     _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS,
@@ -53,12 +78,12 @@ class PaymentService {
     });
   }
 
-  /// Open Razorpay checkout for in-app UPI/card payment.
-  /// Amount is in INR.
+  /// Start a payment. Amount is in INR.
   ///
-  /// On web: creates a Razorpay Payment Link via backend and opens it
-  /// in a new browser tab. Polls for payment completion.
-  /// On mobile: uses the razorpay_flutter plugin (native checkout).
+  /// Web + mobile: creates a hosted checkout via the backend for the
+  /// admin-selected gateway, opens it in the browser, and polls for
+  /// completion. (Mobile Razorpay uses the native plugin when Razorpay
+  /// is the active gateway, for a smoother in-app flow.)
   void pay({
     required double amount,
     required String orderId,
@@ -77,20 +102,34 @@ class PaymentService {
     onSuccess = onPaymentSuccess;
     onError = onPaymentError;
 
-    if (kIsWeb) {
-      _payViaPaymentLink(
+    // Native in-app checkout only for Razorpay on mobile
+    if (!kIsWeb && _activeGateway == 'razorpay' && _keyId.isNotEmpty) {
+      _payWithRazorpayPlugin(
         amount: amount,
-        orderId: orderId,
         description: description,
         contact: contact,
         email: email,
-        customerName: customerName,
       );
       return;
     }
 
-    _ensureInitialized();
+    _payViaHostedCheckout(
+      amount: amount,
+      orderId: orderId,
+      description: description,
+      contact: contact,
+      email: email,
+      customerName: customerName,
+    );
+  }
 
+  void _payWithRazorpayPlugin({
+    required double amount,
+    required String description,
+    String? contact,
+    String? email,
+  }) {
+    _ensureInitialized();
     final options = {
       'key': _keyId,
       'amount': (amount * 100).toInt(), // paise
@@ -109,17 +148,15 @@ class PaymentService {
         'wallet': true,
       },
     };
-
     try {
       _razorpay!.open(options);
     } catch (e) {
-      onPaymentError('Could not open payment: $e');
+      onError?.call('Could not open payment: $e');
     }
   }
 
-  /// Web: create a Razorpay Payment Link via Edge Function, open it,
-  /// and poll for payment completion.
-  void _payViaPaymentLink({
+  /// Hosted checkout via backend for the active gateway.
+  void _payViaHostedCheckout({
     required double amount,
     required String orderId,
     required String description,
@@ -128,9 +165,8 @@ class PaymentService {
     String? customerName,
   }) async {
     try {
-      // 1. Create payment link via backend
       final functionUrl =
-          '${SupabaseConfig.url}/functions/v1/razorpay-payment-link';
+          '${SupabaseConfig.url}/functions/v1/payment-create';
 
       final res = await http
           .post(
@@ -152,7 +188,7 @@ class PaymentService {
           .timeout(const Duration(seconds: 30));
 
       if (res.statusCode != 200) {
-        String msg = 'Failed to create payment link';
+        String msg = 'Failed to start payment';
         try {
           final body = jsonDecode(res.body);
           if (body['error'] != null) msg = body['error'].toString();
@@ -163,45 +199,43 @@ class PaymentService {
 
       final data = jsonDecode(res.body);
       final paymentUrl = data['payment_url'] as String?;
-      final paymentLinkId = data['payment_link_id'] as String?;
+      final gateway = (data['gateway'] as String?) ?? _activeGateway;
+      final reference = data['reference'] as String?;
 
       if (paymentUrl == null || paymentUrl.isEmpty) {
-        onError?.call('Payment link not created. Please try again.');
+        onError?.call('Payment page not created. Please try again.');
         return;
       }
 
-      // 2. Open payment link in new tab
       final uri = Uri.parse(paymentUrl);
       final launched = await launchUrl(
         uri,
         webOnlyWindowName: '_blank',
+        mode: LaunchMode.externalApplication,
       );
       if (!launched) {
         onError?.call('Could not open payment page. Please try again.');
         return;
       }
 
-      // 3. Poll for payment status
-      if (paymentLinkId != null) {
-        _pollPaymentStatus(paymentLinkId);
+      if (reference != null) {
+        _pollPaymentStatus(gateway, reference);
       } else {
-        // No link ID to poll — user must return manually.
-        // We can't confirm payment; treat as pending.
         onError?.call(
-            'Payment page opened in a new tab. Please complete the payment there and check your bookings.');
+            'Payment page opened. Please complete the payment there.');
       }
     } catch (e) {
       onError?.call('Payment failed: $e');
     }
   }
 
-  /// Polls the payment link status until paid, expired, or timeout.
-  void _pollPaymentStatus(String paymentLinkId) async {
-    const maxAttempts = 120; // 10 minutes (5s interval)
+  /// Polls payment status until paid, failed, or timeout (10 min).
+  void _pollPaymentStatus(String gateway, String reference) async {
+    const maxAttempts = 120; // 10 minutes at 5s interval
     var attempts = 0;
 
     final statusUrl =
-        '${SupabaseConfig.url}/functions/v1/razorpay-payment-status';
+        '${SupabaseConfig.url}/functions/v1/payment-status';
 
     while (attempts < maxAttempts) {
       await Future.delayed(const Duration(seconds: 5));
@@ -216,7 +250,10 @@ class PaymentService {
                 'apikey': SupabaseConfig.anonKey,
                 'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
               },
-              body: jsonEncode({'payment_link_id': paymentLinkId}),
+              body: jsonEncode({
+                'gateway': gateway,
+                'reference': reference,
+              }),
             )
             .timeout(const Duration(seconds: 15));
 
@@ -225,14 +262,16 @@ class PaymentService {
           final status = data['status'] as String?;
 
           if (status == 'paid') {
-            final paymentId = data['payment_id'] as String? ?? paymentLinkId;
+            final paymentId =
+                (data['payment_id'] as String?) ?? reference;
             onSuccess?.call(paymentId);
             return;
-          } else if (status == 'cancelled' || status == 'expired') {
-            onError?.call('Payment $status. Please try again.');
+          } else if (status == 'failed' || status == 'expired') {
+            onError?.call(
+                'Payment $status. Please try booking again.');
             return;
           }
-          // else: created / partially_paid — keep polling
+          // pending/unknown — keep polling
         }
       } catch (_) {
         // Network hiccup — keep polling
@@ -240,7 +279,8 @@ class PaymentService {
     }
 
     onError?.call(
-        'Payment timed out. If you completed the payment, it will be confirmed shortly. Check your bookings.');
+        'Payment timed out. If you completed the payment, your booking '
+        'will be confirmed once verified. Please check your bookings.');
   }
 
   void dispose() {
