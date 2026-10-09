@@ -1591,17 +1591,6 @@ class AppState extends ChangeNotifier {
   bool get pharmacyMultiVendor =>
       appConfigValue('pharmacy_mode')['mode'] != 'single';
 
-  /// Support chat: can users attach media? Admin-controlled
-  /// (Admin > Settings > Support Chat). Default OFF.
-  bool get supportMediaEnabled =>
-      appConfigValue('support_chat')['media_enabled'] == true;
-
-  /// Support chat: max media files a user may attach per query.
-  int get supportMediaPerTicket =>
-      (appConfigValue('support_chat')['media_per_ticket'] as num?)
-              ?.toInt() ??
-          5;
-
   /// The ID of the single vendor pharmacy when in single-vendor mode.
   String? get singleVendorPharmacyId =>
       appConfigValue('pharmacy_mode')['pharmacy_id'] as String?;

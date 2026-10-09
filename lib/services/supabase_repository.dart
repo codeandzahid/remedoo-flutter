@@ -367,6 +367,19 @@ class SupabaseRepository {
     }
   }
 
+  /// One support ticket row by id (media settings etc.).
+  Future<Map<String, dynamic>?> fetchTicketById(String id) async {
+    if (!_ready) return null;
+    try {
+      final row =
+          await _db.from('support_tickets').select().eq('id', id).single();
+      return Map<String, dynamic>.from(row);
+    } catch (e) {
+      debugPrint('fetchTicketById failed: $e');
+      return null;
+    }
+  }
+
   /// Upload a support-chat attachment (image/PDF) to the private
   /// storage bucket under chat/<ticketId>/ and return a 1-year
   /// signed URL, mirroring the prescription upload pattern.

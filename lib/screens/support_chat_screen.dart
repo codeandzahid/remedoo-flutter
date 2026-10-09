@@ -37,6 +37,25 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   String? _pendingType; // 'image' | 'file'
   bool _uploading = false;
 
+  // Per-query media permission, set by the admin for THIS chat
+  // (support_tickets.media_enabled / media_limit).
+  bool _mediaEnabled = false;
+  int _mediaLimit = 5;
+
+  Future<void> _loadMediaSettings() async {
+    final row = await SupabaseRepository.instance
+        .fetchTicketById(widget.ticket.id);
+    if (!mounted || row == null) return;
+    final enabled = row['media_enabled'] == true;
+    final limit = (row['media_limit'] as num?)?.toInt() ?? 5;
+    if (enabled != _mediaEnabled || limit != _mediaLimit) {
+      setState(() {
+        _mediaEnabled = enabled;
+        _mediaLimit = limit;
+      });
+    }
+  }
+
   /// How many media files I have already attached in this chat.
   int get _myMediaCount => _messages
       .where((m) =>
@@ -47,9 +66,11 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   void initState() {
     super.initState();
     _loadMessages(markRead: true);
+    _loadMediaSettings();
     // Near-live refresh while the chat is open.
     _poll = Timer.periodic(const Duration(seconds: 8), (_) {
       _loadMessages(markRead: true, silent: true);
+      _loadMediaSettings();
     });
   }
 
@@ -103,12 +124,12 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     });
   }
 
-  Future<void> _pickMedia(AppState state) async {
-    if (_myMediaCount >= state.supportMediaPerTicket) {
+  Future<void> _pickMedia() async {
+    if (_myMediaCount >= _mediaLimit) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'You can attach up to ${state.supportMediaPerTicket} files in this chat.'),
+              'You can attach up to $_mediaLimit files in this chat.'),
         ),
       );
       return;
@@ -153,9 +174,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   /// Preview strip for a picked-but-unsent attachment, with the
   /// remaining-quota hint.
   Widget _pendingPreview(ColorScheme scheme) {
-    final state = AppStateScope.of(context);
-    final remaining =
-        state.supportMediaPerTicket - _myMediaCount;
+    final remaining = _mediaLimit - _myMediaCount;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -190,7 +209,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                 Text(
                   _uploading
                       ? 'Uploading…'
-                      : '$remaining of ${state.supportMediaPerTicket} attachments left in this chat',
+                      : '$remaining of $_mediaLimit attachments left in this chat',
                   style: TextStyle(
                       fontSize: 11.5,
                       color: scheme.onSurfaceVariant),
@@ -424,20 +443,17 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                   if (_pendingBytes != null) _pendingPreview(scheme),
                   Row(
                     children: [
-                      if (AppStateScope.of(context).supportMediaEnabled)
+                      if (_mediaEnabled)
                         IconButton(
                           icon: Icon(
                             Icons.attach_file,
-                            color: _myMediaCount >=
-                                    AppStateScope.of(context)
-                                        .supportMediaPerTicket
+                            color: _myMediaCount >= _mediaLimit
                                 ? scheme.onSurfaceVariant
                                     .withValues(alpha: 0.4)
                                 : scheme.primary,
                           ),
                           tooltip: 'Attach photo or file',
-                          onPressed: () => _pickMedia(
-                              AppStateScope.of(context)),
+                          onPressed: _pickMedia,
                         ),
                       Expanded(
                         child: TextField(

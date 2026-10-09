@@ -296,6 +296,85 @@ class _AdminSupportChatScreenState
                   ),
               ],
             ),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 6),
+            const Text('Media uploads (this chat only)',
+                style:
+                    TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+            const SizedBox(height: 4),
+            Text(
+              'Allow this user to attach photos & files in this query only.',
+              style: TextStyle(
+                  fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+            StatefulBuilder(
+              builder: (ctx2, setSheet) {
+                final enabled =
+                    widget.ticket['media_enabled'] == true;
+                final limit =
+                    (widget.ticket['media_limit'] as num?)?.toInt() ??
+                        5;
+                Future<void> save(Map<String, dynamic> patch) async {
+                  await AppStateScope.of(context)
+                      .updateSupportTicket(_ticketId, patch);
+                  if (mounted) {
+                    setState(() => widget.ticket.addAll(patch));
+                    setSheet(() {});
+                  }
+                }
+
+                return Column(
+                  children: [
+                    SwitchListTile(
+                      value: enabled,
+                      onChanged: (v) =>
+                          save({'media_enabled': v}),
+                      title: const Text('Allow media uploads',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                      subtitle: Text(
+                          enabled
+                              ? 'User sees the attach button in this chat'
+                              : 'Text-only for this chat',
+                          style: const TextStyle(fontSize: 12)),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.attach_file, size: 19),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text('Max files in this chat',
+                              style: TextStyle(fontSize: 13.5)),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                              Icons.remove_circle_outline),
+                          onPressed: limit > 1
+                              ? () => save(
+                                  {'media_limit': limit - 1})
+                              : null,
+                        ),
+                        Text('$limit',
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800)),
+                        IconButton(
+                          icon:
+                              const Icon(Icons.add_circle_outline),
+                          onPressed: limit < 50
+                              ? () => save(
+                                  {'media_limit': limit + 1})
+                              : null,
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
           ],
         ),
       ),

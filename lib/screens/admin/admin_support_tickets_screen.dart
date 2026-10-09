@@ -133,11 +133,6 @@ class _AdminSupportTicketsScreenState
                 ),
               ],
               IconButton(
-                icon: const Icon(Icons.tune),
-                tooltip: 'Chat media settings',
-                onPressed: () => _mediaSettings(context, state),
-              ),
-              IconButton(
                 icon: const Icon(Icons.refresh),
                 tooltip: 'Refresh',
                 onPressed: _load,
@@ -162,90 +157,6 @@ class _AdminSupportTicketsScreenState
                 ),
         ),
       ],
-    );
-  }
-
-  /// Quick media settings for support chat (same values as
-  /// Admin > Settings > Support Chat).
-  void _mediaSettings(BuildContext context, AppState state) {
-    var enabled = state.supportMediaEnabled;
-    final limitCtrl = TextEditingController(
-        text: '${state.supportMediaPerTicket}');
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.fromLTRB(
-              20, 8, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Support Chat Media',
-                  style: TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 4),
-              const Text(
-                'Control whether users can attach photos & files in support chats.',
-                style: TextStyle(fontSize: 12.5),
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                value: enabled,
-                onChanged: (v) => setSheet(() => enabled = v),
-                title: const Text('Allow media uploads',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text(enabled
-                    ? 'Users see the attach button in chat'
-                    : 'Text-only chat'),
-                contentPadding: EdgeInsets.zero,
-              ),
-              TextField(
-                controller: limitCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Max files per chat',
-                  hintText: '5',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () async {
-                    final limit =
-                        (int.tryParse(limitCtrl.text.trim()) ?? 5)
-                            .clamp(1, 50);
-                    final merged =
-                        Map<String, dynamic>.from(
-                                state.appConfigValue('support_chat'))
-                            ..addAll({
-                              'media_enabled': enabled,
-                              'media_per_ticket': limit,
-                            });
-                    final ok =
-                        await state.saveAppConfigValue(
-                            'support_chat', merged);
-                    if (ctx.mounted) {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(ok
-                              ? 'Media settings saved'
-                              : 'Could not save settings'),
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text('Save'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

@@ -24,10 +24,6 @@ class _AdminAppSettingsScreenState
   bool _maintEnabled = false;
   late final TextEditingController _maintMsg;
 
-  // Support chat media
-  bool _supportMediaEnabled = false;
-  late final TextEditingController _supportMediaLimit;
-
   // Pharmacy mode
   bool _pharmacyMultiVendor = true;
   String? _singleVendorPharmacyId;
@@ -74,7 +70,6 @@ class _AdminAppSettingsScreenState
   void initState() {
     super.initState();
     _maintMsg = TextEditingController();
-    _supportMediaLimit = TextEditingController(text: '5');
     _deliveryFee = TextEditingController();
     _freeThreshold = TextEditingController();
     _sosMsg = TextEditingController();
@@ -96,7 +91,6 @@ class _AdminAppSettingsScreenState
   @override
   void dispose() {
     _maintMsg.dispose();
-    _supportMediaLimit.dispose();
     _deliveryFee.dispose();
     _freeThreshold.dispose();
     _sosMsg.dispose();
@@ -123,7 +117,6 @@ class _AdminAppSettingsScreenState
     final fees = state.appConfigValue('fees');
     final emg = state.appConfigValue('emergency');
     final support = state.appConfigValue('support');
-    final supportChat = state.appConfigValue('support_chat');
     final pharmMode = state.appConfigValue('pharmacy_mode');
     final rzp = state.appConfigValue('razorpay');
     final pg = state.appConfigValue('payment_gateways');
@@ -135,9 +128,6 @@ class _AdminAppSettingsScreenState
     setState(() {
       _maintEnabled = maint['enabled'] == true;
       _maintMsg.text = '${maint['message'] ?? ''}';
-      _supportMediaEnabled = supportChat['media_enabled'] == true;
-      _supportMediaLimit.text =
-          '${(supportChat['media_per_ticket'] as num?)?.toInt() ?? 5}';
       _pharmacyMultiVendor = pharmMode['mode'] != 'single';
       _singleVendorPharmacyId = pharmMode['pharmacy_id'] as String?;
       // Multi-gateway config, with fallback to legacy 'razorpay' config
@@ -694,65 +684,6 @@ class _AdminAppSettingsScreenState
                       : () => _save('maintenance', {
                             'enabled': _maintEnabled,
                             'message': _maintMsg.text.trim(),
-                          }),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          // ---- Support Chat ----
-          const RSectionHeader(
-              title: 'Support Chat',
-              subtitle: 'Media attachments in user support chats'),
-          const SizedBox(height: 12),
-          RCard(
-            child: Column(
-              children: [
-                SwitchListTile(
-                  value: _supportMediaEnabled,
-                  onChanged: (v) =>
-                      setState(() => _supportMediaEnabled = v),
-                  title: const Text('Allow media uploads',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(
-                      _supportMediaEnabled
-                          ? 'Users can attach photos & files in support chat'
-                          : 'Users can only send text in support chat',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurfaceVariant)),
-                  contentPadding: EdgeInsets.zero,
-                ),
-                const SizedBox(height: 8),
-                RTextField(
-                  label: 'Max files per chat',
-                  hint: '5',
-                  controller: _supportMediaLimit,
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 6),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'How many photos/files one user can attach inside a single support query. Images & PDF, max 10 MB each.',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: scheme.onSurfaceVariant),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                RButton(
-                  label: 'Save',
-                  small: true,
-                  onPressed: _saving
-                      ? null
-                      : () => _save('support_chat', {
-                            'media_enabled': _supportMediaEnabled,
-                            'media_per_ticket': (int.tryParse(
-                                        _supportMediaLimit.text
-                                            .trim()) ??
-                                    5)
-                                .clamp(1, 50),
                           }),
                 ),
               ],
