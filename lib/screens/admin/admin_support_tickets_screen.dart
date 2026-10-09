@@ -110,6 +110,7 @@ class _AdminSupportTicketsScreenState
     final sections = <(String, String, int)>[
       ('all', 'All', state.supportTickets.length),
       ('open', 'Waiting in Queue', countOf('open')),
+      ('opened', 'Opened', countOf('opened')),
       ('in_progress', 'Pending', countOf('in_progress')),
       ('resolved', 'Solved', countOf('resolved')),
       ('closed', 'Closed', countOf('closed')),
@@ -190,6 +191,7 @@ class _AdminSupportTicketsScreenState
 
   String _sectionLabel(String key) => switch (key) {
         'open' => 'Waiting in Queue',
+        'opened' => 'Opened',
         'in_progress' => 'Pending',
         'resolved' => 'Solved',
         'closed' => 'Closed',

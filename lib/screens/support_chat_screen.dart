@@ -42,16 +42,30 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   bool _mediaEnabled = false;
   int _mediaLimit = 5;
 
+  /// Latest ticket status from the server (refreshed on the poll),
+  /// so admin changes — Opened / Pending / Solved — show live here.
+  String? _liveStatus;
+
+  String get _status => _liveStatus ?? widget.ticket.status;
+
+  /// Solved or Closed chats are finished: the user can read them
+  /// but can no longer send messages in them.
+  bool get _isFinished => _status == 'resolved' || _status == 'closed';
+
   Future<void> _loadMediaSettings() async {
     final row = await SupabaseRepository.instance
         .fetchTicketById(widget.ticket.id);
     if (!mounted || row == null) return;
     final enabled = row['media_enabled'] == true;
     final limit = (row['media_limit'] as num?)?.toInt() ?? 5;
-    if (enabled != _mediaEnabled || limit != _mediaLimit) {
+    final status = row['status'] as String?;
+    if (enabled != _mediaEnabled ||
+        limit != _mediaLimit ||
+        status != _liveStatus) {
       setState(() {
         _mediaEnabled = enabled;
         _mediaLimit = limit;
+        if (status != null) _liveStatus = status;
       });
     }
   }
@@ -173,6 +187,41 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
 
   /// Preview strip for a picked-but-unsent attachment, with the
   /// remaining-quota hint.
+  /// Shown instead of the composer once the chat is Solved/Closed:
+  /// the conversation stays readable but is locked for new messages.
+  Widget _finishedBanner(ColorScheme scheme) {
+    final solved = _status == 'resolved';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            solved ? Icons.check_circle : Icons.lock_outline,
+            size: 20,
+            color: solved
+                ? const Color(0xFF1FA855)
+                : scheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              solved
+                  ? 'This query was marked as Solved — this chat is now closed. For more help, start a new query.'
+                  : 'This chat was closed by the support team. For more help, start a new query.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _pendingPreview(ColorScheme scheme) {
     final remaining = _mediaLimit - _myMediaCount;
     return Padding(
@@ -233,6 +282,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   }
 
   Future<void> _send() async {
+    if (_isFinished) return; // Solved/Closed chats are locked.
     final text = _controller.text.trim();
     if ((text.isEmpty && _pendingBytes == null) || _sending) return;
     setState(() => _sending = true);
@@ -307,7 +357,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                       style: TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w700)),
                   Text(
-                    '${t.subject} • #$_shortId • ${ticketStatusLabel(t.status)}',
+                    '${t.subject} • #$_shortId • ${ticketStatusLabel(_status)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -437,7 +487,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               ],
             ),
             child: SafeArea(
-              child: Column(
+              child: _isFinished
+                  ? _finishedBanner(scheme)
+                  : Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (_pendingBytes != null) _pendingPreview(scheme),

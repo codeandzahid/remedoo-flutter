@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 /// are "Waiting in Queue" (not the vague "Open").
 String ticketStatusLabel(String status) => switch (status.toLowerCase()) {
       'open' => 'Waiting in Queue',
+      'opened' => 'Opened',
       'in_progress' => 'Pending',
       'resolved' => 'Solved',
       'closed' => 'Closed',

@@ -81,22 +81,24 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final scheme = Theme.of(context).colorScheme;
-    // Sections: Opened = open or in progress; Solved = resolved or
-    // closed (both finished states read as "solved" for the user).
+    // Sections: the first section groups every unfinished query
+    // (waiting in queue, opened, or pending); Solved = resolved or
+    // closed. The per-chat chip still shows the exact status.
     bool inSection(SupportTicket t) {
       final s = t.status.toLowerCase();
       return switch (_section) {
-        'opened' => s == 'open' || s == 'in_progress',
+        'opened' =>
+          s == 'open' || s == 'opened' || s == 'in_progress',
         'solved' => s == 'resolved' || s == 'closed',
         _ => true,
       };
     }
 
-    final openedCount = state.tickets.where((t) {
+    final activeCount = state.tickets.where((t) {
       final s = t.status.toLowerCase();
-      return s == 'open' || s == 'in_progress';
+      return s == 'open' || s == 'opened' || s == 'in_progress';
     }).length;
-    final solvedCount = state.tickets.length - openedCount;
+    final solvedCount = state.tickets.length - activeCount;
     final tickets = state.tickets.where((t) {
       if (!inSection(t)) return false;
       if (_search.trim().isEmpty) return true;
@@ -187,7 +189,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                   ChatSectionChips(
                     sections: [
                       ('all', 'All', state.tickets.length),
-                      ('opened', 'Waiting in Queue', openedCount),
+                      ('opened', 'Waiting in Queue', activeCount),
                       ('solved', 'Solved', solvedCount),
                     ],
                     selected: _section,

@@ -65,7 +65,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             '${a['status']}' != 'dispatched')
         .length;
     final pendingQueries = state.supportTickets
-        .where((t) => '${t['status'] ?? 'open'}' == 'open')
+        .where((t) =>
+            '${t['status'] ?? 'open'}' == 'open' ||
+            '${t['status'] ?? 'open'}' == 'opened')
         .length;
 
     final stats = [
