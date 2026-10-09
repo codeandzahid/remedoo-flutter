@@ -45,7 +45,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final state = AppStateScope.of(context);
     final scheme = Theme.of(context).colorScheme;
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const RLoading();
     }
 
     final revenue = state.adminOrders.fold<double>(

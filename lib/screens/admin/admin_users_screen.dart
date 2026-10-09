@@ -88,7 +88,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final state = AppStateScope.of(context);
     final scheme = Theme.of(context).colorScheme;
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const RLoading();
     }
     final q = _query.trim().toLowerCase();
     final users = state.allProfiles.where((u) {

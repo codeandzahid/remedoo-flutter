@@ -413,14 +413,14 @@ class _AdminAppSettingsScreenState
     late final String title;
     late final String body;
     if (activeEnabled && activeHasKey) {
-      color = Colors.green;
+      color = RemedooTheme.success;
       icon = Icons.check_circle;
       title = '$name is ACTIVE for customers';
       body = _gwTest(_activeGateway)
           ? 'Test mode — no real money moves. Customers see Pay Online via $name, plus offline options.'
           : 'LIVE mode — real payments. Customers see Pay Online via $name, plus offline options.';
     } else if (activeEnabled) {
-      color = Colors.orange;
+      color = RemedooTheme.warning;
       icon = Icons.warning_amber_rounded;
       title = '$name is active but its key is missing';
       body =
@@ -565,8 +565,8 @@ class _AdminAppSettingsScreenState
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: testMode
-                          ? Colors.orange.withValues(alpha: 0.14)
-                          : Colors.green.withValues(alpha: 0.14),
+                          ? RemedooTheme.warning.withValues(alpha: 0.14)
+                          : RemedooTheme.success.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(testMode ? 'TEST' : 'LIVE',
@@ -574,8 +574,8 @@ class _AdminAppSettingsScreenState
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                             color: testMode
-                                ? Colors.orange.shade800
-                                : Colors.green.shade800)),
+                                ? RemedooTheme.warning
+                                : RemedooTheme.success)),
                   ),
                 ],
               ),
@@ -640,7 +640,7 @@ class _AdminAppSettingsScreenState
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const RLoading();
     }
     return ResponsiveBody(
       maxWidth: 640,
@@ -1022,7 +1022,7 @@ class _AdminAppSettingsScreenState
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.08),
+              color: RemedooTheme.success.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Text(

@@ -99,7 +99,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const RLoading()
           : RefreshIndicator(
               onRefresh: _load,
               child: _error != null

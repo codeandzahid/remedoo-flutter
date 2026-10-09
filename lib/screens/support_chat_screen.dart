@@ -6,6 +6,7 @@ import '../models.dart';
 import '../services/supabase_repository.dart';
 import '../state/app_state.dart';
 import '../widgets/support_chat_widgets.dart';
+import '../widgets/widgets.dart';
 
 /// WhatsApp-style chat for one support query.
 /// The user chats here; the admin replies from the admin panel.
@@ -153,7 +154,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
         children: [
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const RLoading()
                 : _displayMessages.isEmpty
                     ? const Center(
                         child: Text(

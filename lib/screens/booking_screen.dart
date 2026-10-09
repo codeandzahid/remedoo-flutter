@@ -547,15 +547,17 @@ class _BookingScreenState extends State<BookingScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.orange.withValues(alpha: 0.08),
-            border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+            color: RemedooTheme.warning.withValues(alpha: 0.08),
+            border:
+                Border.all(color: RemedooTheme.warning.withValues(alpha: 0.4)),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.info_outline, size: 18, color: Colors.orange),
-              SizedBox(width: 8),
-              Expanded(
+              Icon(Icons.info_outline,
+                  size: 18, color: RemedooTheme.warning),
+              const SizedBox(width: 8),
+              const Expanded(
                 child: Text(
                     'Online payment is not available right now — please pay at the clinic.',
                     style: TextStyle(fontSize: 12.5)),

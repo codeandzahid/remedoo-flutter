@@ -125,7 +125,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const RLoading()
           : _error != null
               ? ListView(
                   padding: const EdgeInsets.all(24),

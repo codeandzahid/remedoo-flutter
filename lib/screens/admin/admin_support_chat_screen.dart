@@ -370,7 +370,7 @@ class _AdminSupportChatScreenState
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const RLoading()
                 : _displayMessages.isEmpty
                     ? const Center(child: Text('No messages yet.'))
                     : ListView.builder(

@@ -41,7 +41,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     final state = AppStateScope.of(context);
     final scheme = Theme.of(context).colorScheme;
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const RLoading();
     }
 
     // Catalog mix

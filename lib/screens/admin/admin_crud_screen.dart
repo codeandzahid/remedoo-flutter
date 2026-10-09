@@ -136,7 +136,7 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const RLoading()
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: rows.isEmpty

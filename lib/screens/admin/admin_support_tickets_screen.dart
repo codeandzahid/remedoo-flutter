@@ -88,7 +88,7 @@ class _AdminSupportTicketsScreenState
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const RLoading();
     }
     var tickets = [...state.supportTickets];
     // Latest conversation activity first.

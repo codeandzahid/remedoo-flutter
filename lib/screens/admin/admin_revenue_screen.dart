@@ -31,7 +31,7 @@ class _AdminRevenueScreenState extends State<AdminRevenueScreen> {
     final state = AppStateScope.of(context);
     final scheme = Theme.of(context).colorScheme;
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const RLoading();
     }
     final orders = state.adminOrders;
     final total = orders.fold<double>(

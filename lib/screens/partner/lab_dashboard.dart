@@ -99,7 +99,7 @@ class _LabDashboardState extends State<LabDashboard> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const RLoading()
           : RefreshIndicator(
               onRefresh: _load,
               child: _error != null

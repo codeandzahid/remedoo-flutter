@@ -2116,8 +2116,65 @@ class REmptyState extends StatelessWidget {
       );
 }
 
+/// Branded full-screen loading state: app mark in a gradient tile,
+/// a slim spinner and an optional message. Use instead of a bare
+/// CircularProgressIndicator so loading feels like part of the app.
+class RLoading extends StatelessWidget {
+  final String? message;
+
+  const RLoading({super.key, this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 62,
+            height: 62,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [scheme.primary, RemedooTheme.primaryDark],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: 0.30),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.medical_services,
+                color: Colors.white, size: 30),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.6,
+              color: scheme.primary,
+            ),
+          ),
+          if (message != null) ...[
+            const SizedBox(height: 12),
+            Text(message!,
+                style: TextStyle(
+                    fontSize: 13, color: scheme.onSurfaceVariant)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// Floating white rounded-2xl bottom bar with soft shadow.
-/// 5 items: Home, Hospitals, Labs, Pharmacy, Orders — active = orange.
+/// 5 items: Home, Hospitals, Labs, Pharmacy, Orders — active = theme primary.
 class RBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;

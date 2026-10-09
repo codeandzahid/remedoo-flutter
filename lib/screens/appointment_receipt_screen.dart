@@ -5,6 +5,7 @@ import 'package:printing/printing.dart';
 
 import '../models.dart';
 import '../state/app_state.dart';
+import '../theme.dart';
 
 /// Printable appointment letter with all booking details.
 /// Shown after doctor confirms the appointment.
@@ -213,8 +214,8 @@ class AppointmentReceiptScreen extends StatelessWidget {
                       horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: a.status == 'upcoming'
-                        ? Colors.green.withValues(alpha: 0.15)
-                        : Colors.orange.withValues(alpha: 0.15),
+                        ? RemedooTheme.success.withValues(alpha: 0.15)
+                        : RemedooTheme.warning.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -224,8 +225,8 @@ class AppointmentReceiptScreen extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       color: a.status == 'upcoming'
-                          ? Colors.green.shade800
-                          : Colors.orange.shade800,
+                          ? RemedooTheme.success
+                          : RemedooTheme.warning,
                     ),
                   ),
                 ),

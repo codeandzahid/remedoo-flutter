@@ -151,7 +151,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const RLoading();
     }
     return _Scaffold(
       child: Column(
@@ -317,7 +317,7 @@ class _PlanListScreenState extends State<_PlanListScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const RLoading();
     }
     return _Scaffold(
       child: Column(
@@ -582,7 +582,7 @@ class _ThemePackAdminCardState extends State<_ThemePackAdminCard> {
     if (_loading) {
       return const RCard(
         padding: EdgeInsets.all(20),
-        child: Center(child: CircularProgressIndicator()),
+        child: const RLoading(),
       );
     }
     return RCard(
@@ -753,7 +753,7 @@ class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const RLoading();
     }
     return _Scaffold(
       child: Column(
@@ -867,7 +867,7 @@ class _FeaturedScreenState extends State<FeaturedScreen>
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const RLoading();
     }
     return Column(
       children: [

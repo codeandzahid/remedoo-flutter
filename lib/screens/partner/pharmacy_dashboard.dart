@@ -136,7 +136,7 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const RLoading()
           : RefreshIndicator(
               onRefresh: _load,
               child: _error != null

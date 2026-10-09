@@ -533,8 +533,8 @@ class _CartScreenState extends State<CartScreen> {
           if (!onlineAvailable)
             Row(
               children: [
-                const Icon(Icons.info_outline,
-                    size: 15, color: Colors.orange),
+                Icon(Icons.info_outline,
+                    size: 15, color: RemedooTheme.warning),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
