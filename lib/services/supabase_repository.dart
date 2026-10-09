@@ -953,13 +953,14 @@ class SupabaseRepository {
   }
 
   /// Grants a role to a user. Callers must be admin (enforced by RLS).
+  /// Roles are strictly separated: one user holds exactly one role, so
+  /// any existing role is replaced (matches the DB unique constraint on
+  /// user_roles.user_id).
   Future<bool> grantUserRole(String userId, String role) async {
     if (!_ready) return false;
     try {
-      await _db.from('user_roles').upsert(
-        {'user_id': userId, 'role': role},
-        onConflict: 'user_id,role',
-      );
+      await _db.from('user_roles').delete().eq('user_id', userId);
+      await _db.from('user_roles').insert({'user_id': userId, 'role': role});
       return true;
     } catch (e) {
       debugPrint('grantUserRole failed: $e');
