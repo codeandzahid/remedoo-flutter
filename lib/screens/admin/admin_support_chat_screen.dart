@@ -121,6 +121,16 @@ class _AdminSupportChatScreenState
     setState(() => _sending = false);
     if (ok) {
       _controller.clear();
+      // Notify the user in-app (persistent notification + bell badge).
+      if (_userId.isNotEmpty) {
+        unawaited(repo.sendNotificationToUser(
+          userId: _userId,
+          title: 'Support Team',
+          message:
+              'You have a new reply on "${widget.ticket['subject'] ?? 'your query'}". Tap Support to read it.',
+          type: 'support',
+        ));
+      }
       // First admin reply moves the ticket to in_progress.
       if (_status == 'open') {
         await AppStateScope.of(context)
@@ -268,6 +278,16 @@ class _AdminSupportChatScreenState
                       await AppStateScope.of(context)
                           .updateSupportTicket(
                               _ticketId, {'status': s});
+                      if (s == 'resolved' && _userId.isNotEmpty) {
+                        unawaited(SupabaseRepository.instance
+                            .sendNotificationToUser(
+                          userId: _userId,
+                          title: 'Support Team',
+                          message:
+                              'Your query "${widget.ticket['subject'] ?? ''}" was marked as resolved. Thank you!',
+                          type: 'support',
+                        ));
+                      }
                       if (mounted) {
                         setState(
                             () => widget.ticket['status'] = s);
