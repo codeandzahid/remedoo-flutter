@@ -396,7 +396,7 @@ class SupabaseRepository {
           ? 'application/pdf'
           : 'image/${ext == 'jpg' ? 'jpeg' : ext}';
       final storagePath =
-          'chat/$ticketId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+          '$uid/chat/$ticketId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
       await _db.storage.from('prescriptions').uploadBinary(
             storagePath,
             bytes,

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/supabase_repository.dart';
@@ -36,6 +38,12 @@ class _AdminSupportChatScreenState
   bool _loading = true;
   bool _sending = false;
   Timer? _poll;
+
+  // Pending attachment (picked, not yet sent).
+  Uint8List? _pendingBytes;
+  String? _pendingName;
+  String? _pendingType; // 'image' | 'file'
+  bool _uploading = false;
 
   String get _ticketId => '${widget.ticket['id']}';
   String get _userId => '${widget.ticket['user_id'] ?? ''}';
@@ -107,20 +115,84 @@ class _AdminSupportChatScreenState
     });
   }
 
+  Future<void> _pickMedia() async {
+    final files = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+    );
+    if (files.isEmpty || !mounted) return;
+    final f = files.single;
+    Uint8List? bytes;
+    try {
+      bytes = await f.readAsBytes();
+    } catch (_) {
+      bytes = null;
+    }
+    if (bytes == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not read that file.')),
+        );
+      }
+      return;
+    }
+    if (bytes.length > 10 * 1024 * 1024) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('File is too large — max 10 MB.')),
+        );
+      }
+      return;
+    }
+    final ext = (f.extension ?? '').toLowerCase();
+    setState(() {
+      _pendingBytes = bytes;
+      _pendingName = f.name;
+      _pendingType = ext == 'pdf' ? 'file' : 'image';
+    });
+  }
+
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty || _sending) return;
+    if ((text.isEmpty && _pendingBytes == null) || _sending) return;
     setState(() => _sending = true);
     final repo = SupabaseRepository.instance;
+    String? attachmentUrl;
+    if (_pendingBytes != null) {
+      setState(() => _uploading = true);
+      attachmentUrl = await repo.uploadChatMediaData(
+          _pendingBytes!, _pendingName ?? 'file', _ticketId);
+      if (mounted) setState(() => _uploading = false);
+      if (attachmentUrl == null) {
+        if (mounted) {
+          setState(() => _sending = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Upload failed — check your connection and try again.')),
+          );
+        }
+        return;
+      }
+    }
     final ok = await repo.sendTicketMessage(
       ticketId: _ticketId,
       message: text,
       senderRole: 'admin',
+      attachmentUrl: attachmentUrl,
+      attachmentName: attachmentUrl != null ? _pendingName : null,
+      attachmentType: attachmentUrl != null ? _pendingType : null,
     );
     if (!mounted) return;
     setState(() => _sending = false);
     if (ok) {
       _controller.clear();
+      setState(() {
+        _pendingBytes = null;
+        _pendingName = null;
+        _pendingType = null;
+      });
       // Notify the user in-app (persistent notification + bell badge).
       if (_userId.isNotEmpty) {
         unawaited(repo.sendNotificationToUser(
@@ -567,10 +639,69 @@ class _AdminSupportChatScreenState
               ],
             ),
             child: SafeArea(
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: TextField(
+                  if (_pendingBytes != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          if (_pendingType == 'image')
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.memory(_pendingBytes!,
+                                  width: 44,
+                                  height: 44,
+                                  fit: BoxFit.cover),
+                            )
+                          else
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: scheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.picture_as_pdf,
+                                  color: Color(0xFFD64545)),
+                            ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _uploading
+                                  ? 'Uploading…'
+                                  : (_pendingName ?? 'Attachment'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: _uploading
+                                ? null
+                                : () => setState(() {
+                                      _pendingBytes = null;
+                                      _pendingName = null;
+                                      _pendingType = null;
+                                    }),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.attach_file,
+                            color: scheme.primary),
+                        tooltip: 'Attach photo or file',
+                        onPressed: _pickMedia,
+                      ),
+                      Expanded(
+                        child: TextField(
                       controller: _controller,
                       minLines: 1,
                       maxLines: 4,
@@ -604,6 +735,8 @@ class _AdminSupportChatScreenState
                               size: 19, color: Colors.white),
                       onPressed: _sending ? null : _send,
                     ),
+                  ),
+                    ],
                   ),
                 ],
               ),
