@@ -345,6 +345,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           if (!_emailVerified)
                             EmailOtpField(
                               controller: _email,
+                              blockExistingEmail: true,
                               onVerifiedChanged: (v) =>
                                   setState(() {
                                 _emailVerified = v;

@@ -319,6 +319,7 @@ class _ProviderRegisterScreenState
                             controller: _email,
                             label: null,
                             hint: 'you@example.com',
+                            blockExistingEmail: true,
                             onVerifiedChanged: (v) =>
                                 setState(() {
                               _emailVerified = v;

@@ -65,12 +65,19 @@ class EmailOtpField extends StatefulWidget {
   final String? label;
   final String hint;
 
+  /// When true (signup / registration), an email that already belongs to
+  /// an existing account is rejected with "email already used" before any
+  /// OTP is sent. Leave false for login flows, where existing emails are
+  /// expected.
+  final bool blockExistingEmail;
+
   const EmailOtpField({
     super.key,
     required this.controller,
     required this.onVerifiedChanged,
     this.label = 'Email',
     this.hint = 'you@example.com',
+    this.blockExistingEmail = false,
   });
 
   @override
@@ -152,6 +159,19 @@ class _EmailOtpFieldState extends State<EmailOtpField> {
       _error = null;
       _info = null;
     });
+    if (widget.blockExistingEmail) {
+      final used =
+          await AuthService.instance.emailAlreadyRegistered(email);
+      if (!mounted) return;
+      if (used) {
+        setState(() {
+          _busy = false;
+          _error =
+              'This email is already used. Please log in instead.';
+        });
+        return;
+      }
+    }
     final result = await AuthService.instance.sendEmailOtp(email);
     if (!mounted) return;
     setState(() => _busy = false);

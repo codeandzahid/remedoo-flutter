@@ -160,6 +160,23 @@ class AuthService {
     }
   }
 
+  /// Whether this email already belongs to a registered account.
+  /// Backed by the `email_registered` RPC, which returns only true/false
+  /// (no account data is exposed). Fails open (false) if the check can't
+  /// run, so signup is never blocked by the check itself.
+  Future<bool> emailAlreadyRegistered(String email) async {
+    try {
+      final res = await _client.rpc(
+        'email_registered',
+        params: {'check_email': email.trim()},
+      );
+      return res == true;
+    } catch (e) {
+      debugPrint('emailAlreadyRegistered failed: $e');
+      return false;
+    }
+  }
+
   /// Send an email OTP for registration verification.
   /// Unlike [sendMagicLink], this omits the redirect so Supabase sends a
   /// code the user types back into the form.
