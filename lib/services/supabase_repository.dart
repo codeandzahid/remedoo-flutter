@@ -361,6 +361,77 @@ class SupabaseRepository {
     }
   }
 
+  /// Recent messages across many tickets (newest first) — used for
+  /// WhatsApp-style chat lists: last-message previews + unread counts.
+  Future<List<Map<String, dynamic>>> fetchMessagesForTickets(
+    List<String> ticketIds, {
+    int limit = 500,
+  }) async {
+    if (!_ready || ticketIds.isEmpty) return const [];
+    try {
+      final rows = await _db
+          .from('support_messages')
+          .select()
+          .inFilter('ticket_id', ticketIds)
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      debugPrint('fetchMessagesForTickets failed: $e');
+      return const [];
+    }
+  }
+
+  /// Mark the OTHER side's messages in a ticket as read.
+  /// [readerRole] 'user' reads admin messages; 'admin' reads user ones.
+  Future<void> markTicketMessagesRead({
+    required String ticketId,
+    required String readerRole,
+  }) async {
+    if (!_ready) return;
+    try {
+      await _db
+          .from('support_messages')
+          .update({'is_read': true})
+          .eq('ticket_id', ticketId)
+          .neq('sender_role', readerRole)
+          .eq('is_read', false);
+    } catch (e) {
+      debugPrint('markTicketMessagesRead failed: $e');
+    }
+  }
+
+  /// One user's profile — admin checks who sent a support query.
+  /// Includes the user's role when one is assigned.
+  Future<Map<String, dynamic>?> fetchProfileByUserId(String userId) async {
+    if (!_ready) return null;
+    try {
+      final rows = await _db
+          .from('profiles')
+          .select('user_id, full_name, email, phone, created_at')
+          .eq('user_id', userId)
+          .limit(1);
+      if (rows.isEmpty) return null;
+      final profile = Map<String, dynamic>.from(rows.first);
+      try {
+        final roleRows = await _db
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userId)
+            .limit(1);
+        if (roleRows.isNotEmpty) {
+          profile['role'] = '${roleRows.first['role']}';
+        }
+      } catch (_) {
+        // Role is decorative here; the profile still loads.
+      }
+      return profile;
+    } catch (e) {
+      debugPrint('fetchProfileByUserId failed: $e');
+      return null;
+    }
+  }
+
   Future<String?> createSupportTicket({
     required String subject,
     required String category,

@@ -336,6 +336,8 @@ class AppState extends ChangeNotifier {
     // Guests have no account: drop the seeded demo notifications (e.g. the
     // fake "Order Update") so a guest never sees order/booking alerts.
     notifications.clear();
+    _supportUnread = 0;
+    _supportUnreadByTicket.clear();
     notifyListeners();
   }
 
@@ -454,6 +456,8 @@ class AppState extends ChangeNotifier {
     cartPharmacyName = null;
     testCart.clear();
     notifications.clear();
+    _supportUnread = 0;
+    _supportUnreadByTicket.clear();
     family.clear();
     reminders.clear();
     _favorites.clear();
@@ -1317,12 +1321,25 @@ class AppState extends ChangeNotifier {
       category: ticket.category,
       description: ticket.description,
     )
-        .then((remoteId) {
-      if (remoteId != null) _remoteTicketIds[ticket.id] = remoteId;
+        .then((remoteId) async {
+      if (remoteId != null) {
+        _remoteTicketIds[ticket.id] = remoteId;
+        // The query text becomes the first chat message, so the admin
+        // sees it inside the WhatsApp-style thread (and list previews).
+        await _repo.sendTicketMessage(
+          ticketId: remoteId,
+          message: ticket.description,
+          senderRole: 'user',
+        );
+      }
     });
   }
 
   final Map<String, String> _remoteTicketIds = {};
+
+  /// The Supabase id for a ticket (chat/messages are keyed by it).
+  String remoteTicketIdFor(SupportTicket t) =>
+      _remoteTicketIds[t.id] ?? t.id;
 
   Future<void> loadUserTickets() async {
     if (_supaUser == null) return;
@@ -1339,6 +1356,70 @@ class AppState extends ChangeNotifier {
             status: '${r['status'] ?? 'open'}',
             response: '${r['admin_response'] ?? ''}',
           )));
+    notifyListeners();
+    unawaited(refreshSupportUnread());
+  }
+
+  // ---------- Support chat unread (FAB badge + list badges) ----------
+
+  int _supportUnread = 0;
+  final Map<String, int> _supportUnreadByTicket = {};
+  bool _supportUnreadInit = false;
+
+  /// Total unread support replies — drives the badge on the support
+  /// floating button.
+  int get supportUnreadCount => _supportUnread;
+
+  /// Unread replies on one ticket (accepts local or remote ids).
+  int supportUnreadFor(SupportTicket t) =>
+      _supportUnreadByTicket[t.id] ??
+      _supportUnreadByTicket[_remoteTicketIds[t.id]] ??
+      0;
+
+  /// Recompute unread support replies for the signed-in user. When the
+  /// count grows (a new admin reply arrived), an in-app notification
+  /// is added too.
+  Future<void> refreshSupportUnread() async {
+    if (_supaUser == null) {
+      _supportUnread = 0;
+      _supportUnreadByTicket.clear();
+      notifyListeners();
+      return;
+    }
+    final ids = <String>{
+      for (final t in tickets) t.id,
+      ..._remoteTicketIds.values,
+    }.where((id) => id.length > 10).toList(); // remote UUIDs only
+    if (ids.isEmpty) {
+      _supportUnread = 0;
+      _supportUnreadByTicket.clear();
+      _supportUnreadInit = true;
+      notifyListeners();
+      return;
+    }
+    final msgs = await _repo.fetchMessagesForTickets(ids);
+    var total = 0;
+    final byTicket = <String, int>{};
+    for (final m in msgs) {
+      if (m['sender_role'] == 'admin' && m['is_read'] != true) {
+        total++;
+        final tid = '${m['ticket_id']}';
+        byTicket[tid] = (byTicket[tid] ?? 0) + 1;
+      }
+    }
+    final increased = _supportUnreadInit && total > _supportUnread;
+    _supportUnread = total;
+    _supportUnreadByTicket
+      ..clear()
+      ..addAll(byTicket);
+    _supportUnreadInit = true;
+    if (increased) {
+      addNotification(
+        title: 'Support Team',
+        message: 'You have a new reply from the support team.',
+        category: 'support',
+      );
+    }
     notifyListeners();
   }
 

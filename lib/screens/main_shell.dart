@@ -13,6 +13,7 @@ import 'hospitals_screen.dart';
 import 'labs_screen.dart';
 import 'orders_screen.dart';
 import 'pharmacies_screen.dart';
+import 'support_tickets_screen.dart';
 
 /// Adaptive shell: floating white bottom bar on phones (6 tabs:
 /// Home / Doctors / Hospitals / Labs / Pharmacy / Orders), rail on tablets,
@@ -155,16 +156,53 @@ class _MainShellState extends State<MainShell> {
       ];
 
   Widget _supportFab(BuildContext context) {
-    return FloatingActionButton(
-      backgroundColor: RemedooTheme.primary,
-      foregroundColor: Colors.white,
-      shape: const CircleBorder(),
-      tooltip: 'Support',
-      onPressed: () {
-        if (!checkLogin(context, 'Please login to access support')) return;
-        showHelpDialog(context);
-      },
-      child: const Icon(Icons.support_agent),
+    final state = AppStateScope.of(context);
+    final unread = state.supportUnreadCount;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        FloatingActionButton(
+          backgroundColor: RemedooTheme.primary,
+          foregroundColor: Colors.white,
+          shape: const CircleBorder(),
+          tooltip: 'Support',
+          onPressed: () {
+            if (!checkLogin(context, 'Please login to access support')) {
+              return;
+            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const SupportTicketsScreen()),
+            );
+          },
+          child: const Icon(Icons.support_agent),
+        ),
+        if (unread > 0)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              constraints: const BoxConstraints(minWidth: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE53935),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Text(
+                unread > 99 ? '99+' : '$unread',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 

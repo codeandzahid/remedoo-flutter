@@ -1,13 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../services/supabase_repository.dart';
 import '../state/app_state.dart';
-import '../widgets/widgets.dart';
+import '../widgets/support_chat_widgets.dart';
 
-/// Real-time chat for a support ticket.
-/// Users chat here, admins reply from the admin panel.
-/// Both sides get app notifications on new messages.
+/// WhatsApp-style chat for one support query.
+/// The user chats here; the admin replies from the admin panel.
+/// Opening the chat marks the support team's messages as read
+/// (clears the badge on the support button).
 class SupportChatScreen extends StatefulWidget {
   final SupportTicket ticket;
 
@@ -23,30 +26,54 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
   bool _sending = false;
+  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _loadMessages(markRead: true);
+    // Near-live refresh while the chat is open.
+    _poll = Timer.periodic(const Duration(seconds: 8), (_) {
+      _loadMessages(markRead: true, silent: true);
+    });
   }
 
   @override
   void dispose() {
+    _poll?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
+  String get _shortId => widget.ticket.id.length > 8
+      ? widget.ticket.id.substring(0, 8)
+      : widget.ticket.id;
+
+  Future<void> _loadMessages({
+    bool markRead = false,
+    bool silent = false,
+  }) async {
     final repo = SupabaseRepository.instance;
     final msgs = await repo.fetchTicketMessages(widget.ticket.id);
-    if (mounted) {
-      setState(() {
-        _messages = msgs;
-        _loading = false;
-      });
-      _scrollToBottom();
+    if (markRead) {
+      await repo.markTicketMessagesRead(
+          ticketId: widget.ticket.id, readerRole: 'user');
+      if (mounted) {
+        unawaited(AppStateScope.of(context).refreshSupportUnread());
+      }
     }
+    if (!mounted) return;
+    final changed = msgs.length != _messages.length ||
+        (msgs.isNotEmpty &&
+            _messages.isNotEmpty &&
+            '${msgs.last['id']}' != '${_messages.last['id']}') ||
+        (msgs.isNotEmpty && _messages.isEmpty);
+    setState(() {
+      _messages = msgs;
+      _loading = false;
+    });
+    if (!silent || changed) _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -78,12 +105,6 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       if (ok) {
         _controller.clear();
         _loadMessages();
-        // Notify admin of new user message
-        AppStateScope.of(context).addNotification(
-          title: 'Support reply sent',
-          message: 'Your message was sent to support',
-          category: 'support',
-        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to send message')),
@@ -95,16 +116,36 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final t = widget.ticket;
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        titleSpacing: 0,
+        title: Row(
           children: [
-            Text(widget.ticket.subject,
-                style: const TextStyle(fontSize: 16)),
-            Text('Ticket #${widget.ticket.id.substring(0, 8)}',
-                style: TextStyle(
-                    fontSize: 12, color: scheme.onSurfaceVariant)),
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: scheme.primary.withValues(alpha: 0.12),
+              child: Icon(Icons.support_agent,
+                  color: scheme.primary, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Remedoo Support',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700)),
+                  Text(
+                    '${t.subject} • #$_shortId • ${t.status.replaceAll('_', ' ')}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -113,36 +154,45 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _messages.isEmpty
+                : _displayMessages.isEmpty
                     ? const Center(
-                        child: Text('No messages yet. Start the conversation!'),
+                        child: Text(
+                            'No messages yet. Start the conversation!'),
                       )
                     : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
-                        itemCount: _messages.length,
+                        itemCount: _displayMessages.length,
                         itemBuilder: (ctx, i) {
-                          final m = _messages[i];
+                          final m = _displayMessages[i];
                           final isUser = m['sender_role'] == 'user';
+                          final when =
+                              DateTime.tryParse('${m['created_at'] ?? ''}');
                           return Align(
                             alignment: isUser
                                 ? Alignment.centerRight
                                 : Alignment.centerLeft,
                             child: Container(
-                              margin:
-                                  const EdgeInsets.only(bottom: 8),
+                              margin: const EdgeInsets.only(bottom: 8),
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 14, vertical: 10),
                               constraints: BoxConstraints(
                                 maxWidth:
                                     MediaQuery.of(context).size.width *
-                                        0.75,
+                                        0.78,
                               ),
                               decoration: BoxDecoration(
                                 color: isUser
                                     ? scheme.primary
                                     : scheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(16),
+                                  topRight: const Radius.circular(16),
+                                  bottomLeft:
+                                      Radius.circular(isUser ? 16 : 4),
+                                  bottomRight:
+                                      Radius.circular(isUser ? 4 : 16),
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment:
@@ -150,7 +200,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                                 children: [
                                   if (!isUser)
                                     Text(
-                                      'Support',
+                                      'Support Team',
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w700,
@@ -165,6 +215,23 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                                           : scheme.onSurface,
                                     ),
                                   ),
+                                  if (when != null) ...[
+                                    const SizedBox(height: 4),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Text(
+                                        chatBubbleTime(
+                                            when.toLocal()),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: isUser
+                                              ? Colors.white70
+                                              : scheme
+                                                  .onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -190,6 +257,10 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                   Expanded(
                     child: TextField(
                       controller: _controller,
+                      minLines: 1,
+                      maxLines: 4,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _send(),
                       decoration: const InputDecoration(
                         hintText: 'Type a message...',
                         border: OutlineInputBorder(
@@ -199,22 +270,25 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                         contentPadding: EdgeInsets.symmetric(
                             horizontal: 16, vertical: 10),
                       ),
-                      onSubmitted: (_) => _send(),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _sending ? null : _send,
-                    icon: _sending
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.send),
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: scheme.primary,
+                    child: IconButton(
+                      icon: _sending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white),
+                            )
+                          : const Icon(Icons.send,
+                              size: 19, color: Colors.white),
+                      onPressed: _sending ? null : _send,
+                    ),
                   ),
                 ],
               ),
@@ -223,5 +297,21 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
         ],
       ),
     );
+  }
+
+  /// Real messages; when the thread has none yet, the query's own
+  /// description is shown as the first message (older queries were
+  /// created before descriptions were saved as messages).
+  List<Map<String, dynamic>> get _displayMessages {
+    if (_messages.isNotEmpty) return _messages;
+    final desc = widget.ticket.description.trim();
+    if (desc.isEmpty) return const [];
+    return [
+      {
+        'sender_role': 'user',
+        'message': desc,
+        'created_at': widget.ticket.date.toIso8601String(),
+      }
+    ];
   }
 }
