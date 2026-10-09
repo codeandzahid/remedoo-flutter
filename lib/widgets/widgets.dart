@@ -370,9 +370,13 @@ class StatusChip extends StatelessWidget {
       bg = Theme.of(context).colorScheme.primary.withValues(alpha: 0.12);
     }
     final label = status.replaceAll('_', ' ');
-    final pretty = label.isEmpty
-        ? label
-        : '${label[0].toUpperCase()}${label.substring(1)}';
+    // Support tickets: a brand-new ticket reads "Waiting in Queue",
+    // not the vague "Open" ('open' is a support-only status).
+    final pretty = lower == 'open'
+        ? 'Waiting in Queue'
+        : label.isEmpty
+            ? label
+            : '${label[0].toUpperCase()}${label.substring(1)}';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(

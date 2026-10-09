@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+/// Friendly display label for a support ticket status. New tickets
+/// are "Waiting in Queue" (not the vague "Open").
+String ticketStatusLabel(String status) => switch (status.toLowerCase()) {
+      'open' => 'Waiting in Queue',
+      'in_progress' => 'Pending',
+      'resolved' => 'Solved',
+      'closed' => 'Closed',
+      _ => status.replaceAll('_', ' '),
+    };
+
 /// Horizontal section filter for chat lists (WhatsApp-style tabs):
-/// All / Opened / Pending / Solved / Closed with counts.
+/// All / Waiting in Queue / Pending / Solved / Closed with counts.
 class ChatSectionChips extends StatelessWidget {
   /// (key, label, count) triples.
   final List<(String, String, int)> sections;

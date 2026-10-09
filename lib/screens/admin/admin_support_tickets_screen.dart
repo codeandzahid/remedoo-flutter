@@ -109,7 +109,7 @@ class _AdminSupportTicketsScreenState
         .length;
     final sections = <(String, String, int)>[
       ('all', 'All', state.supportTickets.length),
-      ('open', 'Opened', countOf('open')),
+      ('open', 'Waiting in Queue', countOf('open')),
       ('in_progress', 'Pending', countOf('in_progress')),
       ('resolved', 'Solved', countOf('resolved')),
       ('closed', 'Closed', countOf('closed')),
@@ -172,7 +172,9 @@ class _AdminSupportTicketsScreenState
                       : 'Nothing here',
                   subtitle: _section == 'all'
                       ? 'User queries will appear here as chats.'
-                      : 'No ${_sectionLabel(_section).toLowerCase()} queries right now.',
+                      : _section == 'open'
+                          ? 'No queries are waiting in queue right now.'
+                          : 'No ${_sectionLabel(_section).toLowerCase()} queries right now.',
                 )
               : RefreshIndicator(
                   onRefresh: _load,
@@ -187,7 +189,7 @@ class _AdminSupportTicketsScreenState
   }
 
   String _sectionLabel(String key) => switch (key) {
-        'open' => 'Opened',
+        'open' => 'Waiting in Queue',
         'in_progress' => 'Pending',
         'resolved' => 'Solved',
         'closed' => 'Closed',

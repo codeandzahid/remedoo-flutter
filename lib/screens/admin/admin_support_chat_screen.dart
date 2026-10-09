@@ -344,7 +344,7 @@ class _AdminSupportChatScreenState
                   'closed'
                 ])
                   ChoiceChip(
-                    label: Text(s.replaceAll('_', ' ')),
+                    label: Text(ticketStatusLabel(s)),
                     selected: _status == s,
                     onSelected: (_) async {
                       Navigator.pop(ctx);

@@ -307,7 +307,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                       style: TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w700)),
                   Text(
-                    '${t.subject} • #$_shortId • ${t.status.replaceAll('_', ' ')}',
+                    '${t.subject} • #$_shortId • ${ticketStatusLabel(t.status)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

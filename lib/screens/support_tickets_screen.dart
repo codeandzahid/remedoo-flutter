@@ -187,7 +187,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                   ChatSectionChips(
                     sections: [
                       ('all', 'All', state.tickets.length),
-                      ('opened', 'Opened', openedCount),
+                      ('opened', 'Waiting in Queue', openedCount),
                       ('solved', 'Solved', solvedCount),
                     ],
                     selected: _section,
@@ -213,7 +213,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                           : REmptyState(
                               icon: Icons.support_agent,
                               title: _section == 'opened'
-                                  ? 'No opened queries'
+                                  ? 'Nothing waiting in queue'
                                   : 'No solved queries',
                               subtitle: _section == 'opened'
                                   ? 'All your queries are solved. New queries will appear here.'
