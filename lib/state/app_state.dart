@@ -1299,6 +1299,7 @@ class AppState extends ChangeNotifier {
     required String subject,
     required String category,
     required String description,
+    String priority = 'medium',
   }) {
     final ticket = SupportTicket(
       id: 'T${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
@@ -1309,17 +1310,18 @@ class AppState extends ChangeNotifier {
     );
     tickets.insert(0, ticket);
     // Sync to backend so it appears in admin panel
-    _syncTicket(ticket);
+    _syncTicket(ticket, priority: priority);
     notifyListeners();
   }
 
-  void _syncTicket(SupportTicket ticket) {
+  void _syncTicket(SupportTicket ticket, {String priority = 'medium'}) {
     if (_supaUser == null) return;
     _repo
         .createSupportTicket(
       subject: ticket.subject,
       category: ticket.category,
       description: ticket.description,
+      priority: priority,
     )
         .then((remoteId) async {
       if (remoteId != null) {

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../data/mock_data.dart';
 import '../models.dart';
 import '../responsive/responsive.dart';
 import '../services/supabase_repository.dart';
@@ -10,6 +9,7 @@ import '../state/app_state.dart';
 import '../widgets/support_chat_widgets.dart';
 import '../widgets/widgets.dart';
 import '../app_navigator.dart';
+import 'new_query_sheet.dart';
 import 'support_chat_screen.dart';
 
 /// Support chats ("My Queries") — WhatsApp-style chat list: each query
@@ -293,68 +293,6 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   }
 
   void _newTicket(BuildContext context, AppState state) {
-    final subject = TextEditingController();
-    final desc = TextEditingController();
-    String category = ticketCategories.first;
-    showResponsiveDialog(
-      context,
-      (_) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          title: const Text('New Support Query'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RTextField(
-                  label: 'Subject',
-                  hint: 'Brief summary...',
-                  controller: subject),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: category,
-                decoration: const InputDecoration(
-                    labelText: 'Category'),
-                items: ticketCategories
-                    .map((c) => DropdownMenuItem(
-                        value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (v) =>
-                    setD(() => category = v ?? category),
-              ),
-              const SizedBox(height: 12),
-              RTextField(
-                  label: 'Message',
-                  hint: 'Describe your issue...',
-                  controller: desc,
-                  maxLines: 3),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            RButton(
-              label: 'Start Chat',
-              small: true,
-              onPressed: () {
-                if (subject.text.trim().isEmpty) return;
-                state.addTicket(
-                  subject: subject.text.trim(),
-                  category: category,
-                  description: desc.text.trim(),
-                );
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text(
-                          'Query sent! Our team will reply in the chat.')),
-                );
-                _loadPreviews();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+    NewQuerySheet.show(context, onSubmitted: _loadPreviews);
   }
 }

@@ -436,6 +436,7 @@ class SupabaseRepository {
     required String subject,
     required String category,
     required String description,
+    String priority = 'medium',
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
@@ -445,6 +446,7 @@ class SupabaseRepository {
         'subject': subject,
         'category': category,
         'description': description,
+        'priority': priority,
         'status': 'open',
         'sender_type': 'patient',
       }).select('id').single();
