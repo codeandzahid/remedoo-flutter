@@ -10,13 +10,6 @@ concurrency:
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'lib/screens/partner/**'
-      - 'lib/main_partner.dart'
-      - 'pubspec.yaml'
-      - '.github/workflows/build-partner-apk.yml'
 
 jobs:
   build-partner-apk:
