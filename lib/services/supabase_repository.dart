@@ -400,8 +400,14 @@ class SupabaseRepository {
       final contentType = ext == 'pdf'
           ? 'application/pdf'
           : 'image/${ext == 'jpg' ? 'jpeg' : ext}';
+      // Storage rejects keys with spaces/special characters
+      // ("Invalid key") — phone photo names often contain them.
+      // Keep the original name for display (attachment_name) but
+      // store under a sanitized key.
+      final safeName =
+          fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
       final storagePath =
-          '$uid/chat/$ticketId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+          '$uid/chat/$ticketId/${DateTime.now().millisecondsSinceEpoch}_$safeName';
       await _db.storage.from('prescriptions').uploadBinary(
             storagePath,
             bytes,
@@ -536,8 +542,10 @@ class SupabaseRepository {
       final contentType = ext == 'pdf'
           ? 'application/pdf'
           : 'image/${ext == 'jpg' ? 'jpeg' : ext}';
+      final safeName =
+          fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
       final storagePath =
-          '$uid/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+          '$uid/${DateTime.now().millisecondsSinceEpoch}_$safeName';
       await _db.storage.from('prescriptions').uploadBinary(
             storagePath,
             data,
