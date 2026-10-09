@@ -383,13 +383,18 @@ class SupabaseRepository {
   /// Upload a support-chat attachment (image/PDF) to the private
   /// storage bucket under chat/<ticketId>/ and return a 1-year
   /// signed URL, mirroring the prescription upload pattern.
-  Future<String?> uploadChatMediaData(
+  /// Returns (signedUrl, errorMessage) — exactly one of them is null.
+  /// The error is surfaced so upload failures are diagnosable in-app
+  /// instead of failing silently.
+  Future<(String?, String?)> uploadChatMediaData(
     Uint8List bytes,
     String fileName,
     String ticketId,
   ) async {
     final uid = _uid;
-    if (!_ready || uid == null) return null;
+    if (!_ready || uid == null) {
+      return (null, 'Not signed in — please log in again.');
+    }
     try {
       final ext = fileName.split('.').last.toLowerCase();
       final contentType = ext == 'pdf'
@@ -402,12 +407,14 @@ class SupabaseRepository {
             bytes,
             fileOptions: FileOptions(contentType: contentType),
           );
-      return await _db.storage
+      final url = await _db.storage
           .from('prescriptions')
           .createSignedUrl(storagePath, 365 * 24 * 60 * 60);
+      return (url, null);
     } catch (e) {
       debugPrint('uploadChatMedia failed: $e');
-      return null;
+      final msg = e is StorageException ? e.message : '$e';
+      return (null, msg);
     }
   }
 

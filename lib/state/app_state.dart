@@ -1897,9 +1897,12 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get supportTickets => _supportTickets;
 
   Future<void> loadSupportTickets() async {
+    final rows = await _repo.fetchSupportTickets();
+    // De-duplicate by id — a query must never appear twice.
+    final seen = <String>{};
     _supportTickets
       ..clear()
-      ..addAll(await _repo.fetchSupportTickets());
+      ..addAll(rows.where((r) => seen.add('${r['id']}')));
     notifyListeners();
   }
 

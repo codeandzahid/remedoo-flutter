@@ -60,6 +60,7 @@ class _NewQuerySheetState extends State<NewQuerySheet> {
   }
 
   Future<void> _submit() async {
+    if (_submitting || _done) return; // double-tap guard
     final subject = _subject.text.trim();
     final message = _message.text.trim();
     setState(() {

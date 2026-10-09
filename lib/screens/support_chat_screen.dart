@@ -241,16 +241,16 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     String? attachmentUrl;
     if (_pendingBytes != null) {
       setState(() => _uploading = true);
-      attachmentUrl = await repo.uploadChatMediaData(
+      String? uploadError;
+      (attachmentUrl, uploadError) = await repo.uploadChatMediaData(
           _pendingBytes!, _pendingName ?? 'file', widget.ticket.id);
       if (mounted) setState(() => _uploading = false);
       if (attachmentUrl == null) {
         if (mounted) {
           setState(() => _sending = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(
-                    'Upload failed — check your connection and try again.')),
+            SnackBar(
+                content: Text('Upload failed: ${uploadError ?? 'unknown error'}')),
           );
         }
         return;
