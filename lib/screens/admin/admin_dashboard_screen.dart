@@ -36,6 +36,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       state.loadAdminOrders(),
       state.loadAdminProviderApplications(),
       state.loadEmergencyRequests(),
+      state.loadSupportTickets(),
     ]);
     if (mounted) setState(() => _loading = false);
   }
@@ -63,6 +64,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             '${a['status']}' != 'resolved' &&
             '${a['status']}' != 'dispatched')
         .length;
+    final pendingQueries = state.supportTickets
+        .where((t) => '${t['status'] ?? 'open'}' == 'open')
+        .length;
 
     final stats = [
       _stat(context, 'Total Users', '${state.allProfiles.length}',
@@ -77,6 +81,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Icons.shopping_bag, RemedooTheme.warning),
       _stat(context, 'Pending Approvals', '$pendingApprovals',
           Icons.approval, scheme.primary),
+      _stat(
+          context,
+          'Pending Queries',
+          '$pendingQueries',
+          Icons.mark_chat_unread_outlined,
+          RemedooTheme.emergency,
+          onTap: () => widget.onNavigate?.call(16)),
       _stat(context, 'Active Emergencies', '$activeEmergencies',
           Icons.sos, RemedooTheme.emergency),
       _stat(context, 'Revenue', inr(revenue), Icons.currency_rupee,
@@ -415,9 +426,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _stat(BuildContext context, String label, String value,
-      IconData icon, Color color) {
+      IconData icon, Color color,
+      {VoidCallback? onTap}) {
     final scheme = Theme.of(context).colorScheme;
-    return RCard(
+    final card = RCard(
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -438,6 +450,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   color: scheme.onSurfaceVariant, fontSize: 12)),
         ],
       ),
+    );
+    if (onTap == null) return card;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: card,
     );
   }
 

@@ -316,11 +316,19 @@ class _AdminSupportChatScreenState
                     (widget.ticket['media_limit'] as num?)?.toInt() ??
                         5;
                 Future<void> save(Map<String, dynamic> patch) async {
-                  await AppStateScope.of(context)
+                  final ok = await AppStateScope.of(context)
                       .updateSupportTicket(_ticketId, patch);
-                  if (mounted) {
+                  if (!mounted) return;
+                  if (ok) {
                     setState(() => widget.ticket.addAll(patch));
                     setSheet(() {});
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'Could not save. If this keeps happening, the chat-media SQL update has not been applied to the database yet.'),
+                      ),
+                    );
                   }
                 }
 
