@@ -111,6 +111,14 @@ void main() {
     expect(confirm, findsOneWidget);
     await tester.tap(confirm);
     await tester.pumpAndSettle();
+    // No gateway in tests: booking falls back to At Clinic, which asks
+    // for the pay-at-clinic double confirmation.
+    await tester.tap(find.text('I Understand, Confirm'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Book Appointment')));
+    await tester.pumpAndSettle();
     expect(find.text('Appointments (1)'), findsOneWidget);
     expect(find.textContaining('Appointment booked successfully!'),
         findsOneWidget);

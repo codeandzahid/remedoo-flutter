@@ -114,14 +114,18 @@ void main() {
       expect(target.evaluate().isNotEmpty, isTrue);
     }
 
-    // "Pay Online" now opens the payment page instead of booking directly.
-    await reveal(find.text('Pay Online'));
-    final payOnlineCard = find.ancestor(
-      of: find.text('Pay Online'),
+    // No payment gateway is configured in tests, so "Pay Online" is
+    // hidden and only the offline option remains.
+    await reveal(find.text('At Clinic'));
+    expect(find.text('Pay Online'), findsNothing);
+    expect(
+        find.textContaining('Online payment is not available'), findsWidgets);
+    final atClinicCard = find.ancestor(
+      of: find.text('At Clinic'),
       matching: find.byType(InkWell),
     );
-    expect(payOnlineCard.evaluate().isNotEmpty, isTrue);
-    await tester.tap(payOnlineCard);
+    expect(atClinicCard.evaluate().isNotEmpty, isTrue);
+    await tester.tap(atClinicCard);
     await tester.pump();
 
     await tester.drag(pageList, const Offset(0, -10000));
@@ -134,15 +138,16 @@ void main() {
     await tester.tap(confirmBtn);
     await tester.pumpAndSettle();
 
-    // Payment page opens; nothing is booked yet.
-    expect(find.byType(OnlinePaymentScreen), findsOneWidget);
-    expect(state.appointments, isEmpty);
-
-    // Cancelling the payment page leaves the booking unmade.
-    await tester.tap(find.text('Cancel'));
+    // Pay-at-clinic double confirmation, then the booking is made.
+    await tester.tap(find.text('I Understand, Confirm'));
     await tester.pumpAndSettle();
-    expect(find.byType(OnlinePaymentScreen), findsNothing);
-    expect(state.appointments, isEmpty);
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Book Appointment')));
+    await tester.pumpAndSettle();
+
+    expect(state.appointments, hasLength(1));
+    expect(state.appointments.first.payment, 'At Clinic');
   });
 
   testWidgets('booking with At Clinic payment books directly',
@@ -189,6 +194,14 @@ void main() {
       matching: find.byType(FilledButton),
     );
     await tester.tap(confirmBtn);
+    await tester.pumpAndSettle();
+
+    // Pay-at-clinic double confirmation.
+    await tester.tap(find.text('I Understand, Confirm'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Book Appointment')));
     await tester.pumpAndSettle();
 
     expect(state.appointments, hasLength(1));

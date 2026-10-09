@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
+import '../services/payment_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../utils/device_actions.dart';
@@ -136,8 +137,18 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _placeOrder(AppState state, double total) {
+  Future<void> _placeOrder(AppState state, double total) async {
     if (!checkLogin(context)) return;
+    // No active gateway: popup explains online payment is unavailable
+    // and the order continues as Cash on Delivery only.
+    if (_payment == 'Pay Online' &&
+        !PaymentService.instance.hasActiveGateway) {
+      await PaymentService.showNoGatewayDialog(context,
+          offlineLabel: 'Cash on Delivery');
+      if (!mounted) return;
+      setState(() => _payment = 'Cash on Delivery');
+      return;
+    }
     if (_address.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -420,6 +431,13 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _paymentCard() {
     final scheme = Theme.of(context).colorScheme;
+    final onlineAvailable = PaymentService.instance.hasActiveGateway;
+    // With no active gateway, customers only get Cash on Delivery.
+    if (!onlineAvailable && _payment == 'Pay Online') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _payment = 'Cash on Delivery');
+      });
+    }
     return RCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,8 +447,14 @@ class _CartScreenState extends State<CartScreen> {
                   fontWeight: FontWeight.w700, fontSize: 14)),
           const SizedBox(height: 10),
           ...[
-            ('Cash on Delivery', '💵'),
-            ('Pay Online', '💳'),
+            ('Cash on Delivery', '💵', 'Pay when your order arrives'),
+            if (onlineAvailable)
+              (
+                'Pay Online',
+                '💳',
+                'UPI, Cards & Netbanking via '
+                    '${PaymentService.instance.gatewayDisplayName} · Secure'
+              ),
           ].map((p) {
             final selected = _payment == p.$1;
             return Padding(
@@ -483,10 +507,22 @@ class _CartScreenState extends State<CartScreen> {
                               : null,
                         ),
                         const SizedBox(width: 12),
-                        Text('${p.$2} ${p.$1}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13.5)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${p.$2} ${p.$1}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.5)),
+                              const SizedBox(height: 1),
+                              Text(p.$3,
+                                  style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: scheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -494,6 +530,21 @@ class _CartScreenState extends State<CartScreen> {
               ),
             );
           }),
+          if (!onlineAvailable)
+            Row(
+              children: [
+                const Icon(Icons.info_outline,
+                    size: 15, color: Colors.orange),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                      'Online payment is not available right now — Cash on Delivery only.',
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          color: scheme.onSurfaceVariant)),
+                ),
+              ],
+            ),
         ],
       ),
     );

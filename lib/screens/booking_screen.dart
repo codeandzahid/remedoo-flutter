@@ -427,12 +427,12 @@ class _BookingScreenState extends State<BookingScreen> {
         final orderId =
             'APT${DateTime.now().millisecondsSinceEpoch}';
         if (!PaymentService.instance.isConfigured) {
+          // No gateway active: popup explains and switches the
+          // customer to the offline option instead of booking online.
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text(
-                      'Online payments not configured. Please choose another method.')),
-            );
+            await PaymentService.showNoGatewayDialog(context,
+                offlineLabel: 'Pay at Clinic');
+            if (mounted) setState(() => _payment = 'At Clinic');
           }
           return;
         }
@@ -498,6 +498,15 @@ class _BookingScreenState extends State<BookingScreen> {
     final prov = _provider(st);
     final payInClinic = prov?.payInClinicEnabled ?? true;
 
+    // No active gateway: Pay Online is hidden, so never leave it
+    // selected — fall back to the offline option automatically.
+    if (!PaymentService.instance.hasActiveGateway &&
+        _payment == 'Pay Online') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _payment = 'At Clinic');
+      });
+    }
+
     final sections = <Widget>[
       _providerCard(),
       const SizedBox(height: 12),
@@ -526,10 +535,36 @@ class _BookingScreenState extends State<BookingScreen> {
       const SizedBox(height: 14),
       _sectionTitle(Icons.credit_card, 'Payment Method'),
       const SizedBox(height: 10),
-      _payCard('Pay Online',
-          'UPI / Card via ${PaymentService.instance.gatewayDisplayName}',
-          Icons.credit_card),
-      if (payInClinic) const SizedBox(height: 10),
+      if (PaymentService.instance.hasActiveGateway) ...[
+        _payCard(
+            'Pay Online',
+            'UPI, Cards & Netbanking via '
+                '${PaymentService.instance.gatewayDisplayName}',
+            Icons.credit_card,
+            badge: 'Secure'),
+        if (payInClinic) const SizedBox(height: 10),
+      ] else ...[
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.orange.withValues(alpha: 0.08),
+            border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.info_outline, size: 18, color: Colors.orange),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                    'Online payment is not available right now — please pay at the clinic.',
+                    style: TextStyle(fontSize: 12.5)),
+              ),
+            ],
+          ),
+        ),
+        if (payInClinic) const SizedBox(height: 10),
+      ],
       if (payInClinic)
         _payCard('At Clinic', 'Pay when you visit',
             Icons.payments_outlined),

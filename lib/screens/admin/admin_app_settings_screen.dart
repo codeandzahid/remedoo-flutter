@@ -250,7 +250,45 @@ class _AdminAppSettingsScreenState
 
   /// Save multi-gateway config: gateway list + active choice to
   /// app_config ('payment_gateways'), secrets to secure_settings.
+  ///
+  /// Double-check: if the save would leave customers with NO working
+  /// online gateway, warn the admin first — saving then means
+  /// customers only get Cash on Delivery / Pay at Clinic.
   Future<void> _saveGateways() async {
+    final activeName = _gwName(_activeGateway);
+    final activeEnabled = _gwEnabled(_activeGateway);
+    final activeHasKey = _gwHasKey(_activeGateway);
+    if (!activeEnabled || !activeHasKey) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: Icon(Icons.warning_amber_rounded,
+              size: 36, color: RemedooTheme.emergency),
+          title: Text(!activeEnabled
+              ? 'No payment gateway is active'
+              : '$activeName key is missing'),
+          content: Text(!activeEnabled
+              ? 'You are saving with no active payment gateway.\n\n'
+                  'Customers will NOT see "Pay Online" — they will only '
+                  'get Cash on Delivery / Pay at Clinic.\n\nSave anyway?'
+              : 'The active gateway ($activeName) has no key saved, so '
+                  'online payments will fail.\n\nCustomers will only be '
+                  'able to use Cash on Delivery / Pay at Clinic.\n\n'
+                  'Save anyway?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Go Back'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Save Anyway'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true || !mounted) return;
+    }
     setState(() => _saving = true);
     final state = AppStateScope.of(context);
     final repo = state.supabaseRepository;
@@ -305,15 +343,136 @@ class _AdminAppSettingsScreenState
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text(ok
-              ? 'Payment gateways saved — active: $_activeGateway'
-              : 'Could not save (admin only)')),
+          content: Text(!ok
+              ? 'Could not save (admin only)'
+              : (activeEnabled && activeHasKey)
+                  ? 'Saved — customers will pay online via $activeName'
+                  : 'Saved — online payments are OFF. Customers get Cash on Delivery / Pay at Clinic only.')),
+    );
+  }
+
+  // ---- Gateway state helpers (used by the status banner + checks) ----
+  static const _gatewayIds = ['razorpay', 'cashfree', 'instamojo', 'payu'];
+
+  String _gwName(String id) => switch (id) {
+        'cashfree' => 'Cashfree',
+        'instamojo' => 'Instamojo',
+        'payu' => 'PayU',
+        _ => 'Razorpay',
+      };
+
+  bool _gwEnabled(String id) => switch (id) {
+        'cashfree' => _cashfreeEnabled,
+        'instamojo' => _instamojoEnabled,
+        'payu' => _payuEnabled,
+        _ => _razorpayEnabled,
+      };
+
+  bool _gwTest(String id) => switch (id) {
+        'cashfree' => _cashfreeTest,
+        'instamojo' => _instamojoTest,
+        'payu' => _payuTest,
+        _ => _razorpayTest,
+      };
+
+  bool _gwHasKey(String id) => switch (id) {
+        'cashfree' => _cashfreeKeyId.text.trim().isNotEmpty,
+        'instamojo' => _instamojoKeyId.text.trim().isNotEmpty,
+        'payu' => _payuKeyId.text.trim().isNotEmpty,
+        _ => _razorpayKeyId.text.trim().isNotEmpty,
+      };
+
+  /// Make [id] the active gateway AND enable it, so one tap is enough
+  /// to switch what customers pay with.
+  void _setActiveGateway(String id) {
+    setState(() {
+      _activeGateway = id;
+      switch (id) {
+        case 'cashfree':
+          _cashfreeEnabled = true;
+        case 'instamojo':
+          _instamojoEnabled = true;
+        case 'payu':
+          _payuEnabled = true;
+        default:
+          _razorpayEnabled = true;
+      }
+    });
+  }
+
+  /// Live status banner for the Payment Gateways section: tells the
+  /// admin at a glance whether customers can pay online right now.
+  Widget _gatewayStatusBanner() {
+    final name = _gwName(_activeGateway);
+    final activeEnabled = _gwEnabled(_activeGateway);
+    final activeHasKey = _gwHasKey(_activeGateway);
+    final anyEnabled = _gatewayIds.any(_gwEnabled);
+
+    late final Color color;
+    late final IconData icon;
+    late final String title;
+    late final String body;
+    if (activeEnabled && activeHasKey) {
+      color = Colors.green;
+      icon = Icons.check_circle;
+      title = '$name is ACTIVE for customers';
+      body = _gwTest(_activeGateway)
+          ? 'Test mode — no real money moves. Customers see Pay Online via $name, plus offline options.'
+          : 'LIVE mode — real payments. Customers see Pay Online via $name, plus offline options.';
+    } else if (activeEnabled) {
+      color = Colors.orange;
+      icon = Icons.warning_amber_rounded;
+      title = '$name is active but its key is missing';
+      body =
+          'Add the $name key in its card below and Save. Until then online payments fail and customers only get Cash on Delivery / Pay at Clinic.';
+    } else {
+      color = RemedooTheme.emergency;
+      icon = Icons.error_outline;
+      title = 'No payment gateway is active';
+      body = anyEnabled
+          ? 'A gateway below is enabled but not set as Active. Tap "Set as Active" on it — until then customers only see Cash on Delivery / Pay at Clinic.'
+          : 'Every gateway is disabled. Customers will only see Cash on Delivery / Pay at Clinic — there will be no Pay Online option.';
+    }
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 26),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: color)),
+                const SizedBox(height: 3),
+                Text(body,
+                    style: const TextStyle(fontSize: 12.5, height: 1.45)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   /// One gateway settings card (enable switch, keys, test mode).
   Widget _gatewayCard({
+    required String id,
     required String name,
+    required String tagline,
+    required Color brandColor,
+    required bool isActive,
+    required VoidCallback onSetActive,
     required String keyLabel,
     required String keyHint,
     required String secretLabel,
@@ -329,51 +488,149 @@ class _AdminAppSettingsScreenState
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: RCard(
-        child: Column(
-          children: [
-            SwitchListTile(
-              value: enabled,
-              onChanged: onEnabled,
-              title: Text(name,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(
-                  enabled ? 'Enabled' : 'Disabled',
-                  style: TextStyle(
-                      fontSize: 12, color: scheme.onSurfaceVariant)),
-              contentPadding: EdgeInsets.zero,
-            ),
-            const SizedBox(height: 8),
-            RTextField(
-                label: keyLabel, hint: keyHint, controller: keyController),
-            const SizedBox(height: 8),
-            RTextField(
-                label: secretLabel,
-                hint: secretHint,
-                controller: secretController,
-                obscureText: true),
-            if (showWebhook) ...[
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: scheme.primary.withValues(alpha: 0.05),
+          border: Border.all(
+            color: isActive
+                ? scheme.primary
+                : Theme.of(context).dividerColor,
+            width: isActive ? 1.6 : 1,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            children: [
+              // Branded header: monogram, name, tagline, status chips.
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: brandColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      name[0],
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(name,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16)),
+                            if (isActive) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: scheme.primary,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Text('ACTIVE',
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white)),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(tagline,
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: scheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: testMode
+                          ? Colors.orange.withValues(alpha: 0.14)
+                          : Colors.green.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(testMode ? 'TEST' : 'LIVE',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: testMode
+                                ? Colors.orange.shade800
+                                : Colors.green.shade800)),
+                  ),
+                ],
+              ),
+              SwitchListTile(
+                value: enabled,
+                onChanged: onEnabled,
+                title: const Text('Enabled',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                    enabled ? 'Turned on' : 'Turned off',
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant)),
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 4),
+              RTextField(
+                  label: keyLabel, hint: keyHint, controller: keyController),
               const SizedBox(height: 8),
               RTextField(
-                  label: 'Webhook Secret (optional)',
-                  hint: 'From Razorpay dashboard > Webhooks',
-                  controller: _razorpayWebhookSecret,
+                  label: secretLabel,
+                  hint: secretHint,
+                  controller: secretController,
                   obscureText: true),
+              if (showWebhook) ...[
+                const SizedBox(height: 8),
+                RTextField(
+                    label: 'Webhook Secret (optional)',
+                    hint: 'From Razorpay dashboard > Webhooks',
+                    controller: _razorpayWebhookSecret,
+                    obscureText: true),
+              ],
+              SwitchListTile(
+                value: testMode,
+                onChanged: onTestMode,
+                title: const Text('Test mode',
+                    style: TextStyle(fontSize: 14)),
+                subtitle: Text(
+                    testMode
+                        ? 'Test keys — no real money moves'
+                        : 'LIVE mode — real money',
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant)),
+                contentPadding: EdgeInsets.zero,
+              ),
+              if (!isActive)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: onSetActive,
+                    icon: const Icon(Icons.bolt, size: 16),
+                    label: Text('Set as Active — customers will pay via $name'),
+                  ),
+                ),
             ],
-            SwitchListTile(
-              value: testMode,
-              onChanged: onTestMode,
-              title: const Text('Test mode',
-                  style: TextStyle(fontSize: 14)),
-              subtitle: Text(
-                  testMode
-                      ? 'Test keys — no real money moves'
-                      : 'LIVE mode — real money',
-                  style: TextStyle(
-                      fontSize: 12, color: scheme.onSurfaceVariant)),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -652,6 +909,8 @@ class _AdminAppSettingsScreenState
                   'Add keys for any gateway, pick the active one — '
                   'switch anytime. Payments open as a secure hosted page.'),
           const SizedBox(height: 12),
+          _gatewayStatusBanner(),
+          const SizedBox(height: 12),
           RCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -672,8 +931,7 @@ class _AdminAppSettingsScreenState
                       ChoiceChip(
                         label: Text(g.$2),
                         selected: _activeGateway == g.$1,
-                        onSelected: (_) =>
-                            setState(() => _activeGateway = g.$1),
+                        onSelected: (_) => _setActiveGateway(g.$1),
                       ),
                   ],
                 ),
@@ -689,7 +947,12 @@ class _AdminAppSettingsScreenState
           ),
           const SizedBox(height: 12),
           _gatewayCard(
+            id: 'razorpay',
             name: 'Razorpay',
+            tagline: 'UPI · Cards · Netbanking · Wallets',
+            brandColor: const Color(0xFF0F52BA),
+            isActive: _activeGateway == 'razorpay',
+            onSetActive: () => _setActiveGateway('razorpay'),
             keyLabel: 'Key ID',
             keyHint: 'rzp_test_... or rzp_live_...',
             secretLabel: 'Key Secret',
@@ -703,7 +966,12 @@ class _AdminAppSettingsScreenState
             showWebhook: true,
           ),
           _gatewayCard(
+            id: 'cashfree',
             name: 'Cashfree',
+            tagline: 'UPI · Cards · Netbanking · Pay Later',
+            brandColor: const Color(0xFF00A86B),
+            isActive: _activeGateway == 'cashfree',
+            onSetActive: () => _setActiveGateway('cashfree'),
             keyLabel: 'App ID (Client ID)',
             keyHint: 'From Cashfree dashboard > Developers',
             secretLabel: 'Secret Key (Client Secret)',
@@ -716,7 +984,12 @@ class _AdminAppSettingsScreenState
             onTestMode: (v) => setState(() => _cashfreeTest = v),
           ),
           _gatewayCard(
+            id: 'instamojo',
             name: 'Instamojo',
+            tagline: 'UPI · Cards · Payment Links — easy for individuals',
+            brandColor: const Color(0xFF5B4BC4),
+            isActive: _activeGateway == 'instamojo',
+            onSetActive: () => _setActiveGateway('instamojo'),
             keyLabel: 'API Key',
             keyHint: 'From Instamojo dashboard > API',
             secretLabel: 'Auth Token',
@@ -729,7 +1002,12 @@ class _AdminAppSettingsScreenState
             onTestMode: (v) => setState(() => _instamojoTest = v),
           ),
           _gatewayCard(
+            id: 'payu',
             name: 'PayU',
+            tagline: 'UPI · Cards · Netbanking · EMI',
+            brandColor: const Color(0xFF6CBE45),
+            isActive: _activeGateway == 'payu',
+            onSetActive: () => _setActiveGateway('payu'),
             keyLabel: 'Merchant Key',
             keyHint: 'From PayU dashboard',
             secretLabel: 'Merchant Salt',

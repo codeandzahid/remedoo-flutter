@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -42,8 +43,13 @@ class PaymentService {
 
   String get activeGateway => _activeGateway;
 
-  /// Check if a payment gateway is configured and enabled
-  bool get isConfigured => _enabled;
+  /// True only when a gateway is ACTIVE and ready for customers:
+  /// enabled in Admin AND a key is saved. When false, customers must
+  /// only be offered offline options (Cash on Delivery / At Clinic).
+  bool get isConfigured => _enabled && _keyId.isNotEmpty;
+
+  /// Alias used by checkout UIs deciding whether to show "Pay Online".
+  bool get hasActiveGateway => isConfigured;
 
   /// Human-readable name of the active gateway.
   String get gatewayDisplayName {
@@ -286,5 +292,32 @@ class PaymentService {
   void dispose() {
     _razorpay?.clear();
     _razorpay = null;
+  }
+
+  /// Popup shown to customers when no payment gateway is active:
+  /// online payment is unavailable and only the offline option
+  /// ([offlineLabel], e.g. "Cash on Delivery" / "Pay at Clinic")
+  /// can be used.
+  static Future<void> showNoGatewayDialog(
+    BuildContext context, {
+    String offlineLabel = 'Cash on Delivery',
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.payments_outlined, size: 36),
+        title: const Text('Online payment not available'),
+        content: Text(
+          'No payment gateway is active right now, so online payment '
+          'is not available. You can continue with $offlineLabel.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Use $offlineLabel'),
+          ),
+        ],
+      ),
+    );
   }
 }
