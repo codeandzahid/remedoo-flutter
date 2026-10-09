@@ -348,6 +348,9 @@ class StatusChip extends StatelessWidget {
     if (lower.contains('cancel') || lower.contains('reject')) {
       color = RemedooTheme.destructive;
       bg = RemedooTheme.destructive.withValues(alpha: 0.12);
+    } else if (lower.contains('clos')) {
+      color = const Color(0xFF6B7280);
+      bg = const Color(0xFF6B7280).withValues(alpha: 0.12);
     } else if (lower.contains('deliver') ||
         lower.contains('complet') ||
         lower.contains('approv') ||

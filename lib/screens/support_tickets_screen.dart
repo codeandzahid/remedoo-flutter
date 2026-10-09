@@ -25,6 +25,7 @@ class SupportTicketsScreen extends StatefulWidget {
 
 class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   String _search = '';
+  String _section = 'all';
 
   /// remote ticket id -> latest message row (preview + time).
   final Map<String, Map<String, dynamic>> _lastMsg = {};
@@ -80,7 +81,24 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final scheme = Theme.of(context).colorScheme;
+    // Sections: Opened = open or in progress; Solved = resolved or
+    // closed (both finished states read as "solved" for the user).
+    bool inSection(SupportTicket t) {
+      final s = t.status.toLowerCase();
+      return switch (_section) {
+        'opened' => s == 'open' || s == 'in_progress',
+        'solved' => s == 'resolved' || s == 'closed',
+        _ => true,
+      };
+    }
+
+    final openedCount = state.tickets.where((t) {
+      final s = t.status.toLowerCase();
+      return s == 'open' || s == 'in_progress';
+    }).length;
+    final solvedCount = state.tickets.length - openedCount;
     final tickets = state.tickets.where((t) {
+      if (!inSection(t)) return false;
       if (_search.trim().isEmpty) return true;
       final q = _search.toLowerCase();
       return t.subject.toLowerCase().contains(q) ||
@@ -165,20 +183,42 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                           setState(() => _search = v),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  ChatSectionChips(
+                    sections: [
+                      ('all', 'All', state.tickets.length),
+                      ('opened', 'Opened', openedCount),
+                      ('solved', 'Solved', solvedCount),
+                    ],
+                    selected: _section,
+                    onSelect: (k) =>
+                        setState(() => _section = k),
+                  ),
                 ],
               ),
             ),
             Expanded(
               child: tickets.isEmpty
                   ? MaxWidthBox(
-                      child: REmptyState(
-                        icon: Icons.support_agent,
-                        title: 'No queries yet',
-                        subtitle:
-                            'Need help? Create a query and chat with our support team.',
-                        actionLabel: 'Create Query',
-                        onAction: () => _newTicket(context, state),
-                      ),
+                      child: _section == 'all'
+                          ? REmptyState(
+                              icon: Icons.support_agent,
+                              title: 'No queries yet',
+                              subtitle:
+                                  'Need help? Create a query and chat with our support team.',
+                              actionLabel: 'Create Query',
+                              onAction: () =>
+                                  _newTicket(context, state),
+                            )
+                          : REmptyState(
+                              icon: Icons.support_agent,
+                              title: _section == 'opened'
+                                  ? 'No opened queries'
+                                  : 'No solved queries',
+                              subtitle: _section == 'opened'
+                                  ? 'All your queries are solved. New queries will appear here.'
+                                  : 'Queries the support team solves will appear here.',
+                            ),
                     )
                   : MaxWidthBox(
                       child: RefreshIndicator(

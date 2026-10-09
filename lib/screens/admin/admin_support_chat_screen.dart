@@ -340,7 +340,8 @@ class _AdminSupportChatScreenState
                 for (final s in const [
                   'open',
                   'in_progress',
-                  'resolved'
+                  'resolved',
+                  'closed'
                 ])
                   ChoiceChip(
                     label: Text(s.replaceAll('_', ' ')),
@@ -357,6 +358,16 @@ class _AdminSupportChatScreenState
                           title: 'Support Team',
                           message:
                               'Your query "${widget.ticket['subject'] ?? ''}" was marked as resolved. Thank you!',
+                          type: 'support',
+                        ));
+                      }
+                      if (s == 'closed' && _userId.isNotEmpty) {
+                        unawaited(SupabaseRepository.instance
+                            .sendNotificationToUser(
+                          userId: _userId,
+                          title: 'Support Team',
+                          message:
+                              'Your query "${widget.ticket['subject'] ?? ''}" was closed by the support team.',
                           type: 'support',
                         ));
                       }

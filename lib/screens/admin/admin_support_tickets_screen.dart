@@ -22,6 +22,7 @@ class _AdminSupportTicketsScreenState
     extends State<AdminSupportTicketsScreen> {
   bool _loading = true;
   String _search = '';
+  String _section = 'all';
 
   /// user_id -> profile (full_name, email, phone, role, created_at).
   final Map<String, Map<String, dynamic>> _profiles = {};
@@ -102,6 +103,22 @@ class _AdminSupportTicketsScreenState
             '${last?['message'] ?? ''}'.toLowerCase().contains(q);
       }).toList();
     }
+    // Status sections: Opened / Pending / Solved / Closed.
+    int countOf(String status) => state.supportTickets
+        .where((t) => '${t['status'] ?? 'open'}' == status)
+        .length;
+    final sections = <(String, String, int)>[
+      ('all', 'All', state.supportTickets.length),
+      ('open', 'Opened', countOf('open')),
+      ('in_progress', 'Pending', countOf('in_progress')),
+      ('resolved', 'Solved', countOf('resolved')),
+      ('closed', 'Closed', countOf('closed')),
+    ];
+    if (_section != 'all') {
+      tickets = tickets
+          .where((t) => '${t['status'] ?? 'open'}' == _section)
+          .toList();
+    }
     return Column(
       children: [
         Padding(
@@ -140,13 +157,22 @@ class _AdminSupportTicketsScreenState
             ],
           ),
         ),
+        ChatSectionChips(
+          sections: sections,
+          selected: _section,
+          onSelect: (k) => setState(() => _section = k),
+        ),
+        const SizedBox(height: 4),
         Expanded(
           child: tickets.isEmpty
-              ? const REmptyState(
+              ? REmptyState(
                   icon: Icons.support_agent_outlined,
-                  title: 'No chats',
-                  subtitle:
-                      'User queries will appear here as chats.',
+                  title: _section == 'all'
+                      ? 'No chats'
+                      : 'Nothing here',
+                  subtitle: _section == 'all'
+                      ? 'User queries will appear here as chats.'
+                      : 'No ${_sectionLabel(_section).toLowerCase()} queries right now.',
                 )
               : RefreshIndicator(
                   onRefresh: _load,
@@ -159,6 +185,14 @@ class _AdminSupportTicketsScreenState
       ],
     );
   }
+
+  String _sectionLabel(String key) => switch (key) {
+        'open' => 'Opened',
+        'in_progress' => 'Pending',
+        'resolved' => 'Solved',
+        'closed' => 'Closed',
+        _ => 'All',
+      };
 
   Widget _row(Map<String, dynamic> t) {
     final scheme = Theme.of(context).colorScheme;

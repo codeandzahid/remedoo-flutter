@@ -1,6 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+/// Horizontal section filter for chat lists (WhatsApp-style tabs):
+/// All / Opened / Pending / Solved / Closed with counts.
+class ChatSectionChips extends StatelessWidget {
+  /// (key, label, count) triples.
+  final List<(String, String, int)> sections;
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  const ChatSectionChips({
+    super.key,
+    required this.sections,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: sections.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final (key, label, count) = sections[i];
+          final isSel = key == selected;
+          return ChoiceChip(
+            label: Text('$label ($count)'),
+            selected: isSel,
+            showCheckmark: false,
+            onSelected: (_) => onSelect(key),
+            labelStyle: TextStyle(
+              fontSize: 13,
+              fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+              color: isSel ? Colors.white : scheme.onSurface,
+            ),
+            selectedColor: scheme.primary,
+            backgroundColor:
+                scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            side: BorderSide(
+              color: isSel ? scheme.primary : scheme.outlineVariant,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            visualDensity: VisualDensity.compact,
+          );
+        },
+      ),
+    );
+  }
+}
+
 /// Short label for a chat attachment, used in list previews.
 String attachmentPreviewLabel(Map<String, dynamic> m) =>
     m['attachment_type'] == 'image' ? '📷 Photo' : '📄 File';
