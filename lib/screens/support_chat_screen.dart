@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -28,6 +30,18 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   bool _loading = true;
   bool _sending = false;
   Timer? _poll;
+
+  // Pending attachment (picked, not yet sent).
+  Uint8List? _pendingBytes;
+  String? _pendingName;
+  String? _pendingType; // 'image' | 'file'
+  bool _uploading = false;
+
+  /// How many media files I have already attached in this chat.
+  int get _myMediaCount => _messages
+      .where((m) =>
+          m['sender_role'] == 'user' && m['attachment_url'] != null)
+      .length;
 
   @override
   void initState() {
@@ -89,22 +103,158 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     });
   }
 
+  Future<void> _pickMedia(AppState state) async {
+    if (_myMediaCount >= state.supportMediaPerTicket) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'You can attach up to ${state.supportMediaPerTicket} files in this chat.'),
+        ),
+      );
+      return;
+    }
+    final files = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+    );
+    if (files.isEmpty || !mounted) return;
+    final f = files.single;
+    Uint8List? bytes;
+    try {
+      bytes = await f.readAsBytes();
+    } catch (_) {
+      bytes = null;
+    }
+    if (bytes == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not read that file.')),
+        );
+      }
+      return;
+    }
+    if (bytes.length > 10 * 1024 * 1024) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('File is too large — max 10 MB.')),
+        );
+      }
+      return;
+    }
+    final ext = (f.extension ?? '').toLowerCase();
+    setState(() {
+      _pendingBytes = bytes;
+      _pendingName = f.name;
+      _pendingType = ext == 'pdf' ? 'file' : 'image';
+    });
+  }
+
+  /// Preview strip for a picked-but-unsent attachment, with the
+  /// remaining-quota hint.
+  Widget _pendingPreview(ColorScheme scheme) {
+    final state = AppStateScope.of(context);
+    final remaining =
+        state.supportMediaPerTicket - _myMediaCount;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          if (_pendingType == 'image' && _pendingBytes != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.memory(_pendingBytes!,
+                  width: 44, height: 44, fit: BoxFit.cover),
+            )
+          else
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.picture_as_pdf,
+                  color: Color(0xFFD64545)),
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_pendingName ?? 'Attachment',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  _uploading
+                      ? 'Uploading…'
+                      : '$remaining of ${state.supportMediaPerTicket} attachments left in this chat',
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            onPressed: _uploading
+                ? null
+                : () => setState(() {
+                      _pendingBytes = null;
+                      _pendingName = null;
+                      _pendingType = null;
+                    }),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty || _sending) return;
+    if ((text.isEmpty && _pendingBytes == null) || _sending) return;
     setState(() => _sending = true);
 
     final repo = SupabaseRepository.instance;
+    String? attachmentUrl;
+    if (_pendingBytes != null) {
+      setState(() => _uploading = true);
+      attachmentUrl = await repo.uploadChatMediaData(
+          _pendingBytes!, _pendingName ?? 'file', widget.ticket.id);
+      if (mounted) setState(() => _uploading = false);
+      if (attachmentUrl == null) {
+        if (mounted) {
+          setState(() => _sending = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Upload failed — check your connection and try again.')),
+          );
+        }
+        return;
+      }
+    }
     final ok = await repo.sendTicketMessage(
       ticketId: widget.ticket.id,
       message: text,
       senderRole: 'user',
+      attachmentUrl: attachmentUrl,
+      attachmentName: attachmentUrl != null ? _pendingName : null,
+      attachmentType: attachmentUrl != null ? _pendingType : null,
     );
 
     if (mounted) {
       setState(() => _sending = false);
       if (ok) {
         _controller.clear();
+        setState(() {
+          _pendingBytes = null;
+          _pendingName = null;
+          _pendingType = null;
+        });
         _loadMessages();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -208,14 +358,29 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                                         color: scheme.primary,
                                       ),
                                     ),
-                                  Text(
-                                    '${m['message'] ?? ''}',
-                                    style: TextStyle(
-                                      color: isUser
-                                          ? Colors.white
-                                          : scheme.onSurface,
+                                  if (m['attachment_url'] != null) ...[
+                                    ChatAttachment(
+                                      url: '${m['attachment_url']}',
+                                      name: m['attachment_name'] as String?,
+                                      type: m['attachment_type'] as String?,
+                                      isMine: isUser,
                                     ),
-                                  ),
+                                    if ('${m['message'] ?? ''}'
+                                        .trim()
+                                        .isNotEmpty)
+                                      const SizedBox(height: 6),
+                                  ],
+                                  if ('${m['message'] ?? ''}'
+                                      .trim()
+                                      .isNotEmpty)
+                                    Text(
+                                      '${m['message'] ?? ''}',
+                                      style: TextStyle(
+                                        color: isUser
+                                            ? Colors.white
+                                            : scheme.onSurface,
+                                      ),
+                                    ),
                                   if (when != null) ...[
                                     const SizedBox(height: 4),
                                     Align(
@@ -253,10 +418,29 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               ],
             ),
             child: SafeArea(
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: TextField(
+                  if (_pendingBytes != null) _pendingPreview(scheme),
+                  Row(
+                    children: [
+                      if (AppStateScope.of(context).supportMediaEnabled)
+                        IconButton(
+                          icon: Icon(
+                            Icons.attach_file,
+                            color: _myMediaCount >=
+                                    AppStateScope.of(context)
+                                        .supportMediaPerTicket
+                                ? scheme.onSurfaceVariant
+                                    .withValues(alpha: 0.4)
+                                : scheme.primary,
+                          ),
+                          tooltip: 'Attach photo or file',
+                          onPressed: () => _pickMedia(
+                              AppStateScope.of(context)),
+                        ),
+                      Expanded(
+                        child: TextField(
                       controller: _controller,
                       minLines: 1,
                       maxLines: 4,
@@ -290,6 +474,8 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                               size: 19, color: Colors.white),
                       onPressed: _sending ? null : _send,
                     ),
+                  ),
+                    ],
                   ),
                 ],
               ),

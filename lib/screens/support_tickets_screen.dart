@@ -215,7 +215,11 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
     String preview;
     if (last != null) {
       final mine = last['sender_role'] == 'user';
-      preview = '${mine ? 'You: ' : ''}${last['message'] ?? ''}';
+      var msg = '${last['message'] ?? ''}'.trim();
+      if (msg.isEmpty && last['attachment_url'] != null) {
+        msg = attachmentPreviewLabel(last);
+      }
+      preview = '${mine ? 'You: ' : ''}$msg';
     } else {
       preview = t.description;
     }

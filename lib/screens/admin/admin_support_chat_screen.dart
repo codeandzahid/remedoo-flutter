@@ -421,14 +421,29 @@ class _AdminSupportChatScreenState
                                         color: RemedooTheme.success,
                                       ),
                                     ),
-                                  Text(
-                                    '${m['message'] ?? ''}',
-                                    style: TextStyle(
-                                      color: isAdmin
-                                          ? Colors.white
-                                          : scheme.onSurface,
+                                  if (m['attachment_url'] != null) ...[
+                                    ChatAttachment(
+                                      url: '${m['attachment_url']}',
+                                      name: m['attachment_name'] as String?,
+                                      type: m['attachment_type'] as String?,
+                                      isMine: isAdmin,
                                     ),
-                                  ),
+                                    if ('${m['message'] ?? ''}'
+                                        .trim()
+                                        .isNotEmpty)
+                                      const SizedBox(height: 6),
+                                  ],
+                                  if ('${m['message'] ?? ''}'
+                                      .trim()
+                                      .isNotEmpty)
+                                    Text(
+                                      '${m['message'] ?? ''}',
+                                      style: TextStyle(
+                                        color: isAdmin
+                                            ? Colors.white
+                                            : scheme.onSurface,
+                                      ),
+                                    ),
                                   if (when != null) ...[
                                     const SizedBox(height: 4),
                                     Align(

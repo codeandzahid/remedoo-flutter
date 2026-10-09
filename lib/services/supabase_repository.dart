@@ -344,6 +344,9 @@ class SupabaseRepository {
     required String ticketId,
     required String message,
     required String senderRole,
+    String? attachmentUrl,
+    String? attachmentName,
+    String? attachmentType,
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return false;
@@ -353,11 +356,45 @@ class SupabaseRepository {
         'sender_id': uid,
         'sender_role': senderRole,
         'message': message,
+        if (attachmentUrl != null) 'attachment_url': attachmentUrl,
+        if (attachmentName != null) 'attachment_name': attachmentName,
+        if (attachmentType != null) 'attachment_type': attachmentType,
       });
       return true;
     } catch (e) {
       debugPrint('sendTicketMessage failed: $e');
       return false;
+    }
+  }
+
+  /// Upload a support-chat attachment (image/PDF) to the private
+  /// storage bucket under chat/<ticketId>/ and return a 1-year
+  /// signed URL, mirroring the prescription upload pattern.
+  Future<String?> uploadChatMediaData(
+    Uint8List bytes,
+    String fileName,
+    String ticketId,
+  ) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return null;
+    try {
+      final ext = fileName.split('.').last.toLowerCase();
+      final contentType = ext == 'pdf'
+          ? 'application/pdf'
+          : 'image/${ext == 'jpg' ? 'jpeg' : ext}';
+      final storagePath =
+          'chat/$ticketId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+      await _db.storage.from('prescriptions').uploadBinary(
+            storagePath,
+            bytes,
+            fileOptions: FileOptions(contentType: contentType),
+          );
+      return await _db.storage
+          .from('prescriptions')
+          .createSignedUrl(storagePath, 365 * 24 * 60 * 60);
+    } catch (e) {
+      debugPrint('uploadChatMedia failed: $e');
+      return null;
     }
   }
 
