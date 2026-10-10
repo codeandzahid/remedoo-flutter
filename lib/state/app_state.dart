@@ -96,6 +96,12 @@ class AppState extends ChangeNotifier {
           _mockLoggedIn = false;
           notifyListeners();
           unawaited(loadUserProductionData());
+          // Fresh sign-in: route by backend role (admin / provider /
+          // patient). Token refreshes deliberately do NOT re-resolve,
+          // so a provider who switched to the patient view stays there.
+          if (event == AuthChangeEvent.signedIn) {
+            unawaited(resolveBackendRole());
+          }
         }
       } else if (event == AuthChangeEvent.passwordRecovery) {
         _supaUser = data.session?.user;
@@ -449,6 +455,7 @@ class AppState extends ChangeNotifier {
     _name = 'Patient';
     _email = '';
     _providerRole = null;
+    _role = 'patient';
     appointments.clear();
     orders.clear();
     cart.clear();
@@ -1578,6 +1585,21 @@ class AppState extends ChangeNotifier {
   Future<void> checkProviderRole() async {
     _providerRole = await AuthService.instance.currentUserRole();
     notifyListeners();
+  }
+
+  /// Resolves the app role from the backend roles: admin wins,
+  /// then the provider role (doctor/pharmacy/lab/hospital),
+  /// otherwise patient. Called on sign-in and session restore so
+  /// RootGate routes every account type to its own shell — a
+  /// doctor must never land in the patient app.
+  Future<void> resolveBackendRole() async {
+    await checkAdminRole();
+    if (_isAdmin) {
+      switchRole('admin');
+      return;
+    }
+    await checkProviderRole();
+    switchRole(_providerRole ?? 'patient');
   }
 
   // ---------- App config ----------

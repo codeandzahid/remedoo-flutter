@@ -10,6 +10,10 @@ import 'screens/main_shell.dart';
 import 'screens/maintenance_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/admin/admin_shell.dart';
+import 'screens/partner/doctor_dashboard.dart';
+import 'screens/partner/hospital_dashboard.dart';
+import 'screens/partner/lab_dashboard.dart';
+import 'screens/partner/pharmacy_dashboard.dart';
 
 /// Global navigator key: lets the auth listener route to the new-password
 /// screen when a password-recovery link is opened, from anywhere.
@@ -85,11 +89,11 @@ class _RootGateState extends State<RootGate> {
       // when a gated action requires it.
       if (!state.isLoggedIn) {
         state.loginAsGuest();
-      } else {
-        // Returning admin session: restore the admin role so RootGate
-        // routes to the AdminShell instead of the patient view.
-        await state.checkAdminRole();
-        if (state.isAdmin) state.switchRole('admin');
+      } else if (AuthService.instance.currentSession?.user != null) {
+        // Returning session: restore the backend role (admin /
+        // provider / patient) so RootGate routes to the right shell
+        // instead of dropping providers into the patient view.
+        await state.resolveBackendRole();
       }
       if (mounted) setState(() => _authReady = true);
     });
@@ -116,6 +120,18 @@ class _RootGateState extends State<RootGate> {
     if (!_splashDone || !_authReady) return const SplashView();
     if (!state.seenOnboarding) return const OnboardingScreen();
     if (state.role == 'admin') return const AdminShell();
+    // Provider accounts land in their own dashboard, not the
+    // patient app (same routing as the partner app).
+    switch (state.role) {
+      case 'doctor':
+        return const DoctorDashboard();
+      case 'pharmacy':
+        return const PharmacyDashboard();
+      case 'lab':
+        return const LabDashboard();
+      case 'hospital':
+        return const HospitalDashboard();
+    }
     return const MainShell();
   }
 }
