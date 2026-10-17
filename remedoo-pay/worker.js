@@ -1,8 +1,10 @@
 // Remedoo Pay — Cloudflare Worker (YouPI-style self-hosted UPI gateway)
 //
 // A Cloudflare-native re-implementation of the YouPI PG pattern:
-// hosted UPI checkout page (QR + app intent links), a single-active-
-// payment FIFO queue, and payment verification by a bank-SMS observer
+// hosted UPI checkout page (QR + app intent links), ONE payment at a
+// time (no queue — a new payment can start only after the current one
+// is paid, cancelled, or expires), and payment verification by a
+// bank-SMS observer
 // (a free SMS-forwarder app on the merchant's phone POSTs each bank
 // credit SMS to /api/v1/observer/sms).
 //
@@ -23,7 +25,7 @@
 // Worker secrets (set in the Cloudflare dashboard, never in code):
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
-const ACTIVE_WINDOW_MS = 5 * 60 * 1000; // a payment gets 5 minutes
+const ACTIVE_WINDOW_MS = 1 * 60 * 1000; // a payment gets 1 minute
 
 // ------------------------------------------------------------------
 // Supabase REST helpers (service role; server-side only)
@@ -83,21 +85,26 @@ async function patchSession(env, id, patch) {
   return rows?.[0] ?? null;
 }
 
-/// Expire a stale ACTIVE session and promote the oldest QUEUED one.
-/// Called lazily on every touch — no background process needed.
-async function promote(env) {
+/// Single-payment rule (no queue): at most one ACTIVE session.
+/// Expires stale ACTIVE sessions (older than the 1-minute window)
+/// and returns the still-open ACTIVE session, or null. Also rescues
+/// a legacy QUEUED row (from the old queue build) when nothing is
+/// active. Called lazily on every touch — no background process.
+async function currentActive(env) {
   const actives = await sb(
     env,
-    `remedoo_pay_sessions?status=eq.ACTIVE&select=id,activated_at&order=activated_at.asc&limit=1`
+    `remedoo_pay_sessions?status=eq.ACTIVE&select=id,activated_at&order=activated_at.asc`
   );
   const now = Date.now();
-  if (actives && actives.length > 0) {
-    const a = actives[0];
+  let open = null;
+  for (const a of actives ?? []) {
     if (now - new Date(a.activated_at).getTime() <= ACTIVE_WINDOW_MS) {
-      return a.id; // still in its window
+      if (!open) open = a;
+    } else {
+      await patchSession(env, a.id, { status: 'EXPIRED' });
     }
-    await patchSession(env, a.id, { status: 'EXPIRED' });
   }
+  if (open) return open;
   const queued = await sb(
     env,
     `remedoo_pay_sessions?status=eq.QUEUED&select=id&order=created_at.asc&limit=1`
@@ -108,23 +115,12 @@ async function promote(env) {
       status: 'ACTIVE',
       activated_at: new Date().toISOString(),
     });
-    return id;
+    return { id };
   }
   return null;
 }
 
-async function queuePosition(env, session) {
-  if (session.status !== 'QUEUED') return 0;
-  const rows = await sb(
-    env,
-    `remedoo_pay_sessions?status=eq.QUEUED&created_at=lt.${encodeURIComponent(
-      session.created_at
-    )}&select=id`
-  );
-  return (rows?.length ?? 0) + 1;
-}
-
-function publicSession(session, origin, position = 0) {
+function publicSession(session, origin) {
   return {
     paymentId: session.id,
     orderId: session.order_id,
@@ -132,7 +128,7 @@ function publicSession(session, origin, position = 0) {
     amountPaise: String(session.amount_paise),
     currency: 'INR',
     status: session.status,
-    queuePosition: position,
+    queuePosition: 0,
     checkoutUrl: `${origin}/checkout/${session.id}`,
     ...(session.utr ? { utr: session.utr } : {}),
   };
@@ -157,14 +153,14 @@ function parseBankSms(text) {
 // ------------------------------------------------------------------
 // Checkout page
 // ------------------------------------------------------------------
-function checkoutPage(session, cfg, position) {
+function checkoutPage(session, cfg) {
   const rupees = (session.amount_paise / 100).toFixed(2);
   const upi =
     `upi://pay?pa=${encodeURIComponent(cfg.vpa)}` +
     `&pn=${encodeURIComponent(cfg.payeeName)}` +
     `&am=${rupees}&cu=INR` +
     `&tn=${encodeURIComponent('Remedoo ' + session.order_id)}`;
-  const isActive = session.status === 'ACTIVE';
+  const isActive = session.status === 'ACTIVE' || session.status === 'QUEUED';
   const isDone = session.status === 'SUCCESS';
   const isDead = ['EXPIRED', 'CANCELLED', 'FAILED'].includes(session.status);
   return `<!DOCTYPE html>
@@ -203,8 +199,8 @@ function checkoutPage(session, cfg, position) {
              </div>
              <p class="muted">Scan the QR with GPay / PhonePe / Paytm, or tap the button on your phone. Keep this page open — it confirms automatically when your payment lands.</p>
              <p class="status wait" id="st">Waiting for payment…</p>`
-          : `<p class="status wait">You are in queue (position ${position}).</p>
-             <p class="muted">Another payment is being completed first. This page updates automatically — please keep it open.</p>`
+          : `<p class="status wait">This payment session is no longer open.</p>
+             <p class="muted">Please go back to Remedoo and try booking again.</p>`
   }
 </div>
 <script>
@@ -267,32 +263,46 @@ export default {
             503
           );
         }
+        const busy = await currentActive(env);
+        if (busy) {
+          // "Pay New" escape hatch: the customer explicitly chose to
+          // drop the pending payment and start a fresh one.
+          if (body.forceNew === true) {
+            await patchSession(env, busy.id, { status: 'CANCELLED' });
+          } else {
+            return json(
+              {
+                error:
+                  'A payment is already in progress. It must be paid, cancelled, or expire (1 minute) before a new payment can start.',
+              },
+              409
+            );
+          }
+        }
         const rows = await sb(env, 'remedoo_pay_sessions', {
           method: 'POST',
           body: {
             order_id: String(body.orderId).slice(0, 64),
             amount_paise: Math.round(amount * 100),
-            status: 'QUEUED',
+            status: 'ACTIVE',
             customer: body.customer ?? null,
             description: body.description ?? null,
             return_url: body.returnUrl ?? null,
+            activated_at: new Date().toISOString(),
           },
         });
         const session = rows[0];
-        await promote(env);
         const fresh = await getSession(env, session.id);
-        const pos = await queuePosition(env, fresh);
-        return json(publicSession(fresh, url.origin, pos), 201);
+        return json(publicSession(fresh, url.origin), 201);
       }
 
       // ---- Payment status ----
       const statusMatch = path.match(/^\/api\/v1\/payments\/([\w-]+)$/);
       if (statusMatch && req.method === 'GET') {
-        await promote(env);
+        await currentActive(env);
         const session = await getSession(env, statusMatch[1]);
         if (!session) return json({ error: 'Payment session not found' }, 404);
-        const pos = await queuePosition(env, session);
-        return json(publicSession(session, url.origin, pos));
+        return json(publicSession(session, url.origin));
       }
 
       // ---- Cancel session ----
@@ -302,7 +312,6 @@ export default {
         if (!session) return json({ error: 'Payment session not found' }, 404);
         if (['QUEUED', 'ACTIVE'].includes(session.status)) {
           await patchSession(env, session.id, { status: 'CANCELLED' });
-          await promote(env);
         }
         return json({ success: true, status: 'CANCELLED' });
       }
@@ -310,14 +319,13 @@ export default {
       // ---- Hosted checkout page ----
       const checkoutMatch = path.match(/^\/checkout\/([\w-]+)$/);
       if (checkoutMatch && req.method === 'GET') {
-        await promote(env);
+        await currentActive(env);
         const session = await getSession(env, checkoutMatch[1]);
         if (!session) {
           return new Response('Payment session not found', { status: 404 });
         }
         const cfg = await getYoupiConfig(env);
-        const pos = await queuePosition(env, session);
-        return new Response(checkoutPage(session, cfg, pos), {
+        return new Response(checkoutPage(session, cfg), {
           headers: { 'Content-Type': 'text/html; charset=utf-8' },
         });
       }
@@ -339,7 +347,7 @@ export default {
         }
         const parsedSms = parseBankSms(text);
         if (!parsedSms) return json({ matched: false, reason: 'not a credit SMS' });
-        await promote(env);
+        await currentActive(env);
         const actives = await sb(
           env,
           `remedoo_pay_sessions?status=eq.ACTIVE&amount_paise=eq.${parsedSms.paise}&select=id&order=activated_at.asc&limit=1`
@@ -352,7 +360,6 @@ export default {
           utr: parsedSms.utr,
           paid_at: new Date().toISOString(),
         });
-        await promote(env);
         return json({ matched: true, paymentId: actives[0].id });
       }
 

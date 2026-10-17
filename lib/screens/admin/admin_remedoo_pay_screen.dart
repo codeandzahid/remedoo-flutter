@@ -392,47 +392,183 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
         : const <String, dynamic>{};
     final name = '${customer['name'] ?? ''}'.trim();
     final utr = '${s['utr'] ?? ''}'.trim();
+    final actions = _rowActions(s);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_rupees(paise),
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 2),
-                Text(
-                  [
-                    if (name.isNotEmpty) name,
-                    'Order ${s['order_id'] ?? ''}',
-                    _when(s['created_at']?.toString()),
-                  ].where((e) => e.isNotEmpty).join(' · '),
-                  style: TextStyle(
-                      fontSize: 12, color: scheme.onSurfaceVariant),
-                ),
-                if (utr.isNotEmpty)
-                  Text('UTR $utr',
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_rupees(paise),
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (name.isNotEmpty) name,
+                        'Order ${s['order_id'] ?? ''}',
+                        _when(s['created_at']?.toString()),
+                      ].where((e) => e.isNotEmpty).join(' · '),
                       style: TextStyle(
-                          fontSize: 11.5,
-                          color: scheme.onSurfaceVariant)),
-              ],
-            ),
+                          fontSize: 12, color: scheme.onSurfaceVariant),
+                    ),
+                    if (utr.isNotEmpty)
+                      Text('UTR $utr',
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              _statusChip(status),
+            ],
           ),
-          _statusChip(status),
+          if (actions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Wrap(spacing: 4, children: actions),
+            ),
         ],
       ),
     );
+  }
+
+  /// Manual controls per payment: Confirm / Cancel / Pending,
+  /// shown according to the payment's current status.
+  List<Widget> _rowActions(Map<String, dynamic> s) {
+    final status = '${s['status'] ?? ''}';
+    final btn = (
+      String label,
+      IconData icon,
+      Color color,
+      String newStatus,
+      Map<String, dynamic> patch,
+      String confirmTitle,
+      String confirmMsg,
+    ) =>
+        TextButton.icon(
+          onPressed: _saving
+              ? null
+              : () => _applyStatus(
+                  s, newStatus, patch, confirmTitle, confirmMsg, label),
+          icon: Icon(icon, size: 15, color: color),
+          label:
+              Text(label, style: TextStyle(fontSize: 12.5, color: color)),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        );
+    return switch (status) {
+      'ACTIVE' || 'QUEUED' => [
+          btn(
+              'Confirm Paid',
+              Icons.check_circle_outline,
+              RemedooTheme.success,
+              'SUCCESS',
+              {
+                'status': 'SUCCESS',
+                'paid_at': DateTime.now().toUtc().toIso8601String(),
+              },
+              'Mark this payment as PAID?',
+              'Use this only if the money is in your bank account. '
+                  'The customer will see the payment as confirmed.'),
+          btn(
+              'Cancel',
+              Icons.cancel_outlined,
+              RemedooTheme.emergency,
+              'CANCELLED',
+              {'status': 'CANCELLED'},
+              'Cancel this payment?',
+              'The payment page will stop and the customer cannot pay '
+                  'with this link anymore.'),
+        ],
+      'SUCCESS' => [
+          btn(
+              'Mark Pending',
+              Icons.hourglass_top,
+              RemedooTheme.warning,
+              'ACTIVE',
+              {'status': 'ACTIVE', 'paid_at': null},
+              'Re-open this payment as Pending?',
+              'It becomes the one open payment again (any other open '
+                  'payment is cancelled first) and can be paid or '
+                  'confirmed again.'),
+        ],
+      'EXPIRED' || 'CANCELLED' || 'FAILED' => [
+          btn(
+              'Mark Pending',
+              Icons.hourglass_top,
+              RemedooTheme.warning,
+              'ACTIVE',
+              {'status': 'ACTIVE', 'paid_at': null},
+              'Re-open this payment as Pending?',
+              'It becomes the one open payment again (any other open '
+                  'payment is cancelled first) and can be paid or '
+                  'confirmed again.'),
+        ],
+      _ => const [],
+    };
+  }
+
+  Future<void> _applyStatus(
+    Map<String, dynamic> session,
+    String newStatus,
+    Map<String, dynamic> patch,
+    String title,
+    String message,
+    String actionLabel,
+  ) async {
+    final ok = await confirmDialog(context,
+        title: title, message: message, confirmLabel: actionLabel);
+    if (!ok || !mounted) return;
+    setState(() => _saving = true);
+    var effectivePatch = patch;
+    if (newStatus == 'SUCCESS') {
+      effectivePatch = {
+        ...patch,
+        'paid_at': DateTime.now().toUtc().toIso8601String(),
+      };
+    }
+    final state = AppStateScope.of(context);
+    if (newStatus == 'ACTIVE') {
+      // No queue: only one open payment. Cancel any other open one,
+      // then re-open this one with a fresh 1-minute window.
+      for (final other in _sessions) {
+        if (other['id'] != session['id'] && other['status'] == 'ACTIVE') {
+          await state.supabaseRepository.updateRemedooPaySession(
+              '${other['id']}', {'status': 'CANCELLED'});
+        }
+      }
+      effectivePatch = {
+        ...patch,
+        'activated_at': DateTime.now().toUtc().toIso8601String(),
+      };
+    }
+    final done = await state.supabaseRepository
+        .updateRemedooPaySession('${session['id']}', effectivePatch);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    _snack(
+        context,
+        done
+            ? 'Payment updated: $newStatus'
+            : 'Could not update — please try again');
+    if (done) _loadSessions();
   }
 
   Widget _statusChip(String status) {
     final (label, color) = switch (status) {
       'SUCCESS' => ('Paid', RemedooTheme.success),
       'ACTIVE' => ('Waiting for payment', RemedooTheme.warning),
-      'QUEUED' => ('In queue', RemedooTheme.teal),
+      'QUEUED' => ('Pending', RemedooTheme.teal),
       'EXPIRED' => ('Expired', Colors.grey),
       'CANCELLED' => ('Cancelled', Colors.grey),
       'FAILED' => ('Failed', RemedooTheme.emergency),

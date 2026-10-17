@@ -25,6 +25,13 @@ class PaymentService {
   void Function(String paymentId)? onSuccess;
   void Function(String error)? onError;
 
+  /// Set by the payment UI before calling [pay]: invoked when the
+  /// gateway reports another payment is still pending (Remedoo Pay
+  /// allows only one open payment). Return true to drop the pending
+  /// payment and start this one ("Pay New"), false to abort and let
+  /// the user retry after it finishes/expires (max 1 minute).
+  Future<bool> Function()? onPaymentBusy;
+
   String _activeGateway = 'razorpay';
   String _keyId = '';
   String _baseUrl = '';
@@ -182,24 +189,38 @@ class PaymentService {
       final functionUrl =
           '${SupabaseConfig.url}/functions/v1/payment-create';
 
-      final res = await http
-          .post(
-            Uri.parse(functionUrl),
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': SupabaseConfig.anonKey,
-              'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
-            },
-            body: jsonEncode({
-              'amount': amount,
-              'description': description,
-              'customer_name': customerName,
-              'customer_contact': contact,
-              'customer_email': email,
-              'reference_id': orderId,
-            }),
-          )
-          .timeout(const Duration(seconds: 30));
+      Future<http.Response> createCheckout(bool forceNew) {
+        return http
+            .post(
+              Uri.parse(functionUrl),
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SupabaseConfig.anonKey,
+                'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+              },
+              body: jsonEncode({
+                'amount': amount,
+                'description': description,
+                'customer_name': customerName,
+                'customer_contact': contact,
+                'customer_email': email,
+                'reference_id': orderId,
+                'force_new': forceNew,
+              }),
+            )
+            .timeout(const Duration(seconds: 30));
+      }
+
+      var res = await createCheckout(false);
+
+      // Remedoo Pay single-payment rule: another payment is pending.
+      // Let the user choose "Pay New" (drop it, start this one) or wait.
+      if (res.statusCode == 409 && onPaymentBusy != null) {
+        final payNew = await onPaymentBusy!.call();
+        if (payNew) {
+          res = await createCheckout(true);
+        }
+      }
 
       if (res.statusCode != 200) {
         String msg = 'Failed to start payment';

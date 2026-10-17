@@ -7,9 +7,9 @@ run on Cloudflare Workers). Same product behaviour:
 - **0% fees** — customers pay straight to the merchant's own UPI ID.
 - **Hosted checkout page** — QR code + "Pay with any UPI app" button,
   auto-confirms when the payment lands.
-- **Single-active-payment FIFO queue** — one payment is active at a
-  time (5-minute window), so bank SMS credits can be matched to the
-  right session by amount, exactly like YouPI.
+- **One payment at a time — no queue** — a new payment cannot start
+  until the current one is paid, cancelled, or expires (1-minute
+  window), so bank SMS credits can be matched to the right session.
 - **Verification by bank-SMS observer** — a free SMS-forwarder app on
   the phone that receives the merchant's bank SMS POSTs every credit
   SMS to the Worker, which matches it to the active session.
@@ -41,7 +41,7 @@ Worker at `gateways.youpi.base_url` with the YouPI API shape
 ## Limits
 
 - Matching is by exact amount against the single ACTIVE session
-  (the queue makes this reliable).
+  (only one payment is ever open, so this is reliable).
 - If the phone/observer is off, a payment stays unverified until the
-  SMS is forwarded; the session expires after 5 minutes and the
+  SMS is forwarded; the session expires after 1 minute and the
   customer can retry.

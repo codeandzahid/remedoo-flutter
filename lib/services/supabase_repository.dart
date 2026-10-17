@@ -1030,6 +1030,20 @@ class SupabaseRepository {
     }
   }
 
+  /// Admin manual control of a Remedoo Pay session (confirm paid /
+  /// cancel / re-open as pending) from the management screen.
+  Future<bool> updateRemedooPaySession(
+      String id, Map<String, dynamic> patch) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('remedoo_pay_sessions').update(patch).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateRemedooPaySession failed: $e');
+      return false;
+    }
+  }
+
   /// Admin insert/update of a catalog row. Returns the row id.
   Future<String?> adminUpsert(
       String table, Map<String, dynamic> row) async {

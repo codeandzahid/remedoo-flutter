@@ -216,6 +216,7 @@ async function youpiCreate(supabase: any, gw: any, p: any) {
       amount: Number(p.amount).toFixed(2),
       currency: 'INR',
       description: p.description || 'Remedoo Payment',
+      forceNew: p.force_new === true,
       customer: {
         ...(p.customer_name ? { name: p.customer_name } : {}),
         ...(p.email ? { email: p.email } : {}),
@@ -226,6 +227,15 @@ async function youpiCreate(supabase: any, gw: any, p: any) {
   });
   const data = await res.json();
   if (!res.ok) {
+    if (res.status === 409) {
+      // Remedoo Pay: another payment is pending (single-payment rule).
+      // Surface as 409 + code so the app can offer "Pay New".
+      const e: any = new Error(
+        data?.error || 'A payment is already in progress');
+      e.status = 409;
+      e.code = 'PAYMENT_IN_PROGRESS';
+      throw e;
+    }
     throw new Error(data?.message || data?.error || 'Remedoo Pay payment failed to start');
   }
   if (!data.checkoutUrl || !data.paymentId) {
@@ -263,6 +273,7 @@ serve(async (req) => {
       contact: body.customer_contact,
       email: body.customer_email,
       reference_id: body.reference_id,
+      force_new: body.force_new === true,
     };
     if (!p.amount || p.amount <= 0) return json({ error: 'Invalid amount' }, 400);
 
@@ -279,6 +290,14 @@ serve(async (req) => {
     return json({ ...result, status: 'created' });
   } catch (e) {
     console.error('payment-create error:', e);
-    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    const err = e as any;
+    const status = typeof err?.status === 'number' ? err.status : 500;
+    return json(
+      {
+        error: e instanceof Error ? e.message : String(e),
+        ...(err?.code ? { code: err.code } : {}),
+      },
+      status,
+    );
   }
 });

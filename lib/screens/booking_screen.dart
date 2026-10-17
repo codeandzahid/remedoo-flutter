@@ -322,6 +322,37 @@ class _BookingScreenState extends State<BookingScreen> {
       );
     }
 
+    // Remedoo Pay allows only ONE open payment. If one is pending,
+    // ask the customer: wait (it auto-expires within 1 minute) or
+    // "Pay New" — cancel the pending one and start this payment now.
+    PaymentService.instance.onPaymentBusy = () async {
+      if (!mounted) return false;
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.hourglass_top, size: 36),
+          title: const Text('A payment is pending'),
+          content: const Text(
+            'Another payment is being completed right now. It will '
+            'finish, or auto-expire within 1 minute.\n\n'
+            'You can wait and try again — or tap Pay New to cancel '
+            'the pending payment and start yours now.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Wait'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Pay New'),
+            ),
+          ],
+        ),
+      );
+      return choice ?? false;
+    };
+
     PaymentService.instance.pay(
       amount: widget.fee,
       orderId: orderId,
