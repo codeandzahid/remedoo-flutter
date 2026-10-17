@@ -5,7 +5,7 @@ A Cloudflare-native version of the YouPI PG self-hosted UPI gateway
 run on Cloudflare Workers). Same product behaviour:
 
 - **0% fees** — customers pay straight to the merchant's own UPI ID.
-- **Hosted checkout page** — QR code + "Pay with any UPI app" button,
+- **Hosted checkout page** — "Pay with any UPI app" button (no QR, by owner choice),
   auto-confirms when the payment lands.
 - **One payment at a time — no queue** — a new payment cannot start
   until the current one is paid, cancelled, or expires (5-minute

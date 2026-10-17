@@ -1,7 +1,7 @@
 // Remedoo Pay — Cloudflare Worker (YouPI-style self-hosted UPI gateway)
 //
 // A Cloudflare-native re-implementation of the YouPI PG pattern:
-// hosted UPI checkout page (QR + app intent links), ONE payment at a
+// hosted UPI checkout page (Pay-with-UPI-app button), ONE payment at a
 // time (no queue — a new payment can start only after the current one
 // is paid, cancelled, or expires), and payment verification by a
 // bank-SMS observer
@@ -167,14 +167,12 @@ function checkoutPage(session, cfg) {
 <html lang="en"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Remedoo Pay — ₹${rupees}</title>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f6fb;margin:0;padding:16px;color:#122}
   .card{max-width:420px;margin:24px auto;background:#fff;border-radius:16px;padding:24px;box-shadow:0 8px 30px rgba(20,20,60,.08);text-align:center}
   .brand{font-weight:800;color:#7C3AED;letter-spacing:.4px}
   .amt{font-size:34px;font-weight:800;margin:6px 0}
   .muted{color:#667;font-size:14px}
-  #qr{display:flex;justify-content:center;margin:16px 0}
   .apps a{display:block;margin:8px 0;padding:13px;border-radius:12px;background:#7C3AED;color:#fff;text-decoration:none;font-weight:700}
   .apps a.alt{background:#eef;color:#223;border:1px solid #ccd}
   .status{font-weight:700;margin-top:10px}
@@ -193,19 +191,16 @@ function checkoutPage(session, cfg) {
         ? `<p class="status bad">This payment session is ${session.status.toLowerCase()}.</p>
            <p class="muted">Please go back to Remedoo and try booking again.</p>`
         : isActive
-          ? `<div id="qr"></div>
-             <div class="apps">
+          ? `<div class="apps">
                <a href="${upi}">Pay with any UPI app</a>
              </div>
-             <p class="muted">Scan the QR with GPay / PhonePe / Paytm, or tap the button on your phone. Keep this page open — it confirms automatically when your payment lands.</p>
+             <p class="muted">Tap the button — your UPI app (GPay / PhonePe / Paytm) opens with the amount ready. Keep this page open — it confirms automatically when your payment lands.</p>
              <p class="status wait" id="st">Waiting for payment…</p>`
           : `<p class="status wait">This payment session is no longer open.</p>
              <p class="muted">Please go back to Remedoo and try booking again.</p>`
   }
 </div>
 <script>
-  var qrEl = document.getElementById('qr');
-  if (qrEl) new QRCode(qrEl, { text: ${JSON.stringify(upi)}, width: 220, height: 220 });
   var done = ${isDone ? 'true' : 'false'};
   var returnUrl = ${JSON.stringify(session.return_url || 'https://remedoo-app.pages.dev/')};
   if (done) setTimeout(function(){ location.href = returnUrl; }, 2000);
