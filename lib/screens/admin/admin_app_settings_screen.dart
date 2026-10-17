@@ -52,7 +52,7 @@ class _AdminAppSettingsScreenState
   bool _payuTest = true;
   late final TextEditingController _payuKeyId;
   late final TextEditingController _payuSecret;
-  // YouPI (self-hosted UPI gateway — own server, 0% fees)
+  // Remedoo Pay (self-hosted UPI gateway — own server, 0% fees)
   bool _youpiEnabled = false;
   bool _youpiTest = true;
   late final TextEditingController _youpiKeyId;
@@ -277,7 +277,7 @@ class _AdminAppSettingsScreenState
     final activeName = _gwName(_activeGateway);
     final activeEnabled = _gwEnabled(_activeGateway);
     final activeHasKey = _gwHasKey(_activeGateway);
-    // YouPI's must-have is its server URL, not a key.
+    // Remedoo Pay's must-have is its server URL, not a key.
     final missingWhat = _activeGateway == 'youpi' ? 'server URL' : 'key';
     if (!activeEnabled || !activeHasKey) {
       final proceed = await showDialog<bool>(
@@ -392,7 +392,7 @@ class _AdminAppSettingsScreenState
         'cashfree' => 'Cashfree',
         'instamojo' => 'Instamojo',
         'payu' => 'PayU',
-        'youpi' => 'YouPI',
+        'youpi' => 'Remedoo Pay',
         _ => 'Razorpay',
       };
 
@@ -412,7 +412,7 @@ class _AdminAppSettingsScreenState
         _ => _razorpayTest,
       };
 
-  /// "Ready" check per gateway: most need a key; YouPI is
+  /// "Ready" check per gateway: most need a key; Remedoo Pay is
   /// self-hosted, so its server URL is what must be saved.
   bool _gwHasKey(String id) => switch (id) {
         'cashfree' => _cashfreeKeyId.text.trim().isNotEmpty,
@@ -960,7 +960,7 @@ class _AdminAppSettingsScreenState
               subtitle:
                   'Add keys for any gateway, pick the active one — '
                   'switch anytime. Payments open as a secure hosted '
-                  'page. YouPI is your own self-hosted UPI gateway '
+                  'page. Remedoo Pay is your own self-hosted UPI gateway '
                   '(0% fees, money straight to your bank).'),
           const SizedBox(height: 12),
           _gatewayStatusBanner(),
@@ -981,7 +981,7 @@ class _AdminAppSettingsScreenState
                       ('cashfree', 'Cashfree'),
                       ('instamojo', 'Instamojo'),
                       ('payu', 'PayU'),
-                      ('youpi', 'YouPI'),
+                      ('youpi', 'Remedoo Pay'),
                     ])
                       ChoiceChip(
                         label: Text(g.$2),
@@ -1076,16 +1076,16 @@ class _AdminAppSettingsScreenState
           ),
           _gatewayCard(
             id: 'youpi',
-            name: 'YouPI',
+            name: 'Remedoo Pay',
             tagline:
                 'Self-hosted UPI · 0% fees · Direct to your bank account',
             brandColor: const Color(0xFF7C3AED),
             isActive: _activeGateway == 'youpi',
             onSetActive: () => _setActiveGateway('youpi'),
             keyLabel: 'Merchant ID',
-            keyHint: 'From your YouPI server admin',
+            keyHint: 'From your Remedoo Pay server admin',
             secretLabel: 'Webhook Secret (optional)',
-            secretHint: 'From your YouPI server, stored securely',
+            secretHint: 'From your Remedoo Pay server, stored securely',
             enabled: _youpiEnabled,
             testMode: _youpiTest,
             keyController: _youpiKeyId,

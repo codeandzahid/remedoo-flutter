@@ -13,7 +13,7 @@ import 'supabase_config.dart';
 ///
 /// Gateways are configured in Admin > Settings > Payment Gateways and
 /// can be switched anytime. Supported: Razorpay, Cashfree, Instamojo,
-/// PayU, YouPI (self-hosted UPI). All use hosted checkout pages created
+/// PayU, Remedoo Pay (self-hosted UPI). All use hosted checkout pages created
 /// (Supabase Edge Function `payment-create`), so no fragile in-page
 /// JS SDK is needed. Payment completion is detected by polling
 /// `payment-status`.
@@ -32,7 +32,7 @@ class PaymentService {
 
   /// Configure from admin settings (call on app start and when
   /// settings change). [gateway] is the active gateway id. [baseUrl]
-  /// is only used by self-hosted gateways (YouPI).
+  /// is only used by self-hosted gateways (Remedoo Pay).
   void configure({
     required String keyId,
     required bool enabled,
@@ -67,7 +67,7 @@ class PaymentService {
       case 'payu':
         return 'PayU';
       case 'youpi':
-        return 'YouPI';
+        return 'Remedoo Pay';
       case 'razorpay':
       default:
         return 'Razorpay';
