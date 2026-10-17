@@ -37,6 +37,11 @@ class _AdminAppSettingsScreenState
 
   // Multi-gateway
   String _activeGateway = 'razorpay';
+
+  /// Other gateways are hidden for now (Remedoo Pay only, user
+  /// order 2026-10-17). Their saved keys/config are NOT deleted —
+  /// flip this to true to bring them all back.
+  static const bool _showOtherGateways = false;
   // Cashfree
   bool _cashfreeEnabled = false;
   bool _cashfreeTest = true;
@@ -983,11 +988,12 @@ class _AdminAppSettingsScreenState
                       ('payu', 'PayU'),
                       ('youpi', 'Remedoo Pay'),
                     ])
-                      ChoiceChip(
-                        label: Text(g.$2),
-                        selected: _activeGateway == g.$1,
-                        onSelected: (_) => _setActiveGateway(g.$1),
-                      ),
+                      if (_showOtherGateways || g.$1 == 'youpi')
+                        ChoiceChip(
+                          label: Text(g.$2),
+                          selected: _activeGateway == g.$1,
+                          onSelected: (_) => _setActiveGateway(g.$1),
+                        ),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -1001,7 +1007,8 @@ class _AdminAppSettingsScreenState
             ),
           ),
           const SizedBox(height: 12),
-          _gatewayCard(
+          if (_showOtherGateways)
+            _gatewayCard(
             id: 'razorpay',
             name: 'Razorpay',
             tagline: 'UPI · Cards · Netbanking · Wallets',
@@ -1020,7 +1027,8 @@ class _AdminAppSettingsScreenState
             onTestMode: (v) => setState(() => _razorpayTest = v),
             showWebhook: true,
           ),
-          _gatewayCard(
+          if (_showOtherGateways)
+            _gatewayCard(
             id: 'cashfree',
             name: 'Cashfree',
             tagline: 'UPI · Cards · Netbanking · Pay Later',
@@ -1038,7 +1046,8 @@ class _AdminAppSettingsScreenState
             onEnabled: (v) => setState(() => _cashfreeEnabled = v),
             onTestMode: (v) => setState(() => _cashfreeTest = v),
           ),
-          _gatewayCard(
+          if (_showOtherGateways)
+            _gatewayCard(
             id: 'instamojo',
             name: 'Instamojo',
             tagline: 'UPI · Cards · Payment Links — easy for individuals',
@@ -1056,7 +1065,8 @@ class _AdminAppSettingsScreenState
             onEnabled: (v) => setState(() => _instamojoEnabled = v),
             onTestMode: (v) => setState(() => _instamojoTest = v),
           ),
-          _gatewayCard(
+          if (_showOtherGateways)
+            _gatewayCard(
             id: 'payu',
             name: 'PayU',
             tagline: 'UPI · Cards · Netbanking · EMI',
