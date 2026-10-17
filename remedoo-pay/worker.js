@@ -155,10 +155,15 @@ function parseBankSms(text) {
 // ------------------------------------------------------------------
 function checkoutPage(session, cfg) {
   const rupees = (session.amount_paise / 100).toFixed(2);
+  // NPCI merchant-intent parameters: tid + tr (transaction reference,
+  // alphanumeric, <=35 chars) — UPI apps' risk engines expect them on
+  // gateway-style payment links; a bare pa/pn/am link gets flagged.
+  const txnRef = session.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 35);
   const upi =
     `upi://pay?pa=${encodeURIComponent(cfg.vpa)}` +
     `&pn=${encodeURIComponent(cfg.payeeName)}` +
     `&am=${rupees}&cu=INR` +
+    `&tid=${txnRef}&tr=${txnRef}` +
     `&tn=${encodeURIComponent('Remedoo ' + session.order_id)}`;
   const isActive = session.status === 'ACTIVE' || session.status === 'QUEUED';
   const isDone = session.status === 'SUCCESS';
