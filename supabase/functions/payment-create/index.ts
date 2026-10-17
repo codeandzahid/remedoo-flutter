@@ -194,6 +194,46 @@ async function payuFormPage(supabase: any, txnid: string) {
   return new Response(html, { headers: { 'Content-Type': 'text/html' } });
 }
 
+// ---------- YOUPI PG: Self-hosted UPI gateway (hosted checkout) ----------
+// The merchant runs their own YouPI PG server (0% fees, direct-to-bank
+// UPI). We create a payment session on that server and send the
+// customer to its hosted checkoutUrl; status is polled from the same
+// server. Config: gateways.youpi = { enabled, key_id: merchant id,
+// base_url: server base URL (payment API), test_mode: unused }.
+async function youpiCreate(supabase: any, gw: any, p: any) {
+  const base = String(gw.base_url ?? '').replace(/\/+$/, '');
+  if (!base) throw new Error('YouPI server URL not configured');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (gw.key_id) headers['X-Merchant-Id'] = gw.key_id;
+  const orderId = String(p.reference_id ?? `remedoo_${Date.now()}`).slice(0, 64);
+  const res = await fetch(`${base}/api/v1/payments`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      orderId,
+      amount: Number(p.amount).toFixed(2),
+      currency: 'INR',
+      description: p.description || 'Remedoo Payment',
+      customer: {
+        ...(p.customer_name ? { name: p.customer_name } : {}),
+        ...(p.email ? { email: p.email } : {}),
+        ...(p.contact ? { phoneNumber: p.contact } : {}),
+      },
+      returnUrl: 'https://remedoo-app.pages.dev/',
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.message || data?.error || 'YouPI payment failed to start');
+  }
+  if (!data.checkoutUrl || !data.paymentId) {
+    throw new Error('YouPI server returned an incomplete response');
+  }
+  return { gateway: 'youpi', payment_url: data.checkoutUrl, reference: data.paymentId };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -232,6 +272,7 @@ serve(async (req) => {
       case 'cashfree': result = await cashfreeCreate(supabase, gw, p); break;
       case 'instamojo': result = await instamojoCreate(supabase, gw, p); break;
       case 'payu': result = await payuCreate(supabase, gw, p); break;
+      case 'youpi': result = await youpiCreate(supabase, gw, p); break;
       default: return json({ error: `Unknown gateway '${active}'` }, 400);
     }
 

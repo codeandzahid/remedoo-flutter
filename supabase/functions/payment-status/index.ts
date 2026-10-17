@@ -110,6 +110,22 @@ async function payuStatus(supabase: any, gw: any, ref: string) {
   return { status, payment_id: txn.mihpayid ?? null };
 }
 
+// ---------- YOUPI PG: Self-hosted UPI gateway ----------
+async function youpiStatus(supabase: any, gw: any, ref: string) {
+  const base = String(gw.base_url ?? '').replace(/\/+$/, '');
+  if (!base) throw new Error('YouPI server URL not configured');
+  const headers: Record<string, string> = {};
+  if (gw.key_id) headers['X-Merchant-Id'] = gw.key_id;
+  const res = await fetch(`${base}/api/v1/payments/${ref}`, { headers });
+  const d = await res.json();
+  if (!res.ok) throw new Error('YouPI status failed');
+  const s = String(d.status ?? '').toUpperCase();
+  const status = s === 'SUCCESS' ? 'paid'
+    : (s === 'FAILED' || s === 'CANCELLED') ? 'failed'
+    : s === 'EXPIRED' ? 'expired' : 'pending';
+  return { status, payment_id: d.utr ?? d.paymentId ?? null };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -133,6 +149,7 @@ serve(async (req) => {
       case 'cashfree': result = await cashfreeStatus(supabase, gw, reference); break;
       case 'instamojo': result = await instamojoStatus(supabase, gw, reference); break;
       case 'payu': result = await payuStatus(supabase, gw, reference); break;
+      case 'youpi': result = await youpiStatus(supabase, gw, reference); break;
       default: return json({ error: `Unknown gateway '${gateway}'` }, 400);
     }
 

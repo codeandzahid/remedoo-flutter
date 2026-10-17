@@ -13,7 +13,7 @@ import 'supabase_config.dart';
 ///
 /// Gateways are configured in Admin > Settings > Payment Gateways and
 /// can be switched anytime. Supported: Razorpay, Cashfree, Instamojo,
-/// PayU. All use hosted checkout pages created by the backend
+/// PayU, YouPI (self-hosted UPI). All use hosted checkout pages created
 /// (Supabase Edge Function `payment-create`), so no fragile in-page
 /// JS SDK is needed. Payment completion is detected by polling
 /// `payment-status`.
@@ -27,18 +27,22 @@ class PaymentService {
 
   String _activeGateway = 'razorpay';
   String _keyId = '';
+  String _baseUrl = '';
   bool _enabled = false;
 
   /// Configure from admin settings (call on app start and when
-  /// settings change). [gateway] is the active gateway id.
+  /// settings change). [gateway] is the active gateway id. [baseUrl]
+  /// is only used by self-hosted gateways (YouPI).
   void configure({
     required String keyId,
     required bool enabled,
     String gateway = 'razorpay',
+    String baseUrl = '',
   }) {
     _keyId = keyId;
     _enabled = enabled;
     _activeGateway = gateway;
+    _baseUrl = baseUrl;
   }
 
   String get activeGateway => _activeGateway;
@@ -46,7 +50,9 @@ class PaymentService {
   /// True only when a gateway is ACTIVE and ready for customers:
   /// enabled in Admin AND a key is saved. When false, customers must
   /// only be offered offline options (Cash on Delivery / At Clinic).
-  bool get isConfigured => _enabled && _keyId.isNotEmpty;
+  bool get isConfigured => _activeGateway == 'youpi'
+      ? (_enabled && _baseUrl.isNotEmpty)
+      : (_enabled && _keyId.isNotEmpty);
 
   /// Alias used by checkout UIs deciding whether to show "Pay Online".
   bool get hasActiveGateway => isConfigured;
@@ -60,6 +66,8 @@ class PaymentService {
         return 'Instamojo';
       case 'payu':
         return 'PayU';
+      case 'youpi':
+        return 'YouPI';
       case 'razorpay':
       default:
         return 'Razorpay';

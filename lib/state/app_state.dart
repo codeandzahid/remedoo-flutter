@@ -1639,6 +1639,7 @@ class AppState extends ChangeNotifier {
           keyId: '${gw['key_id'] ?? ''}',
           enabled: gw['enabled'] == true,
           gateway: active,
+          baseUrl: '${gw['base_url'] ?? ''}',
         );
         configured = true;
       }

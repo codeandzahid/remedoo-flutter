@@ -52,6 +52,12 @@ class _AdminAppSettingsScreenState
   bool _payuTest = true;
   late final TextEditingController _payuKeyId;
   late final TextEditingController _payuSecret;
+  // YouPI (self-hosted UPI gateway — own server, 0% fees)
+  bool _youpiEnabled = false;
+  bool _youpiTest = true;
+  late final TextEditingController _youpiKeyId;
+  late final TextEditingController _youpiSecret;
+  late final TextEditingController _youpiBaseUrl;
 
   // Fees
   late final TextEditingController _deliveryFee;
@@ -85,6 +91,9 @@ class _AdminAppSettingsScreenState
     _instamojoSecret = TextEditingController();
     _payuKeyId = TextEditingController();
     _payuSecret = TextEditingController();
+    _youpiKeyId = TextEditingController();
+    _youpiSecret = TextEditingController();
+    _youpiBaseUrl = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -106,6 +115,9 @@ class _AdminAppSettingsScreenState
     _instamojoSecret.dispose();
     _payuKeyId.dispose();
     _payuSecret.dispose();
+    _youpiKeyId.dispose();
+    _youpiSecret.dispose();
+    _youpiBaseUrl.dispose();
     super.dispose();
   }
 
@@ -151,6 +163,11 @@ class _AdminAppSettingsScreenState
       _payuEnabled = puGw['enabled'] == true;
       _payuTest = puGw['test_mode'] != false;
       _payuKeyId.text = '${puGw['key_id'] ?? ''}';
+      final ypGw = gwOf('youpi');
+      _youpiEnabled = ypGw['enabled'] == true;
+      _youpiTest = ypGw['test_mode'] != false;
+      _youpiKeyId.text = '${ypGw['key_id'] ?? ''}';
+      _youpiBaseUrl.text = '${ypGw['base_url'] ?? ''}';
     });
     // Load secrets from secure_settings (admin-only)
     final secrets = await state.supabaseRepository.fetchSecureSettings([
@@ -159,6 +176,7 @@ class _AdminAppSettingsScreenState
       'cashfree_secret_key',
       'instamojo_auth_token',
       'payu_salt',
+      'youpi_webhook_secret',
     ]);
     if (mounted) {
       setState(() {
@@ -168,6 +186,7 @@ class _AdminAppSettingsScreenState
         _cashfreeSecret.text = secrets['cashfree_secret_key'] ?? '';
         _instamojoSecret.text = secrets['instamojo_auth_token'] ?? '';
         _payuSecret.text = secrets['payu_salt'] ?? '';
+        _youpiSecret.text = secrets['youpi_webhook_secret'] ?? '';
         _deliveryFee.text = '${fees['delivery_fee'] ?? 30}';
         _freeThreshold.text =
             '${fees['free_delivery_threshold'] ?? 499}';
@@ -258,6 +277,8 @@ class _AdminAppSettingsScreenState
     final activeName = _gwName(_activeGateway);
     final activeEnabled = _gwEnabled(_activeGateway);
     final activeHasKey = _gwHasKey(_activeGateway);
+    // YouPI's must-have is its server URL, not a key.
+    final missingWhat = _activeGateway == 'youpi' ? 'server URL' : 'key';
     if (!activeEnabled || !activeHasKey) {
       final proceed = await showDialog<bool>(
         context: context,
@@ -266,12 +287,12 @@ class _AdminAppSettingsScreenState
               size: 36, color: RemedooTheme.emergency),
           title: Text(!activeEnabled
               ? 'No payment gateway is active'
-              : '$activeName key is missing'),
+              : '$activeName $missingWhat is missing'),
           content: Text(!activeEnabled
               ? 'You are saving with no active payment gateway.\n\n'
                   'Customers will NOT see "Pay Online" — they will only '
                   'get Cash on Delivery / Pay at Clinic.\n\nSave anyway?'
-              : 'The active gateway ($activeName) has no key saved, so '
+              : 'The active gateway ($activeName) has no $missingWhat saved, so '
                   'online payments will fail.\n\nCustomers will only be '
                   'able to use Cash on Delivery / Pay at Clinic.\n\n'
                   'Save anyway?'),
@@ -316,6 +337,12 @@ class _AdminAppSettingsScreenState
           'key_id': _payuKeyId.text.trim(),
           'test_mode': _payuTest,
         },
+        'youpi': {
+          'enabled': _youpiEnabled,
+          'key_id': _youpiKeyId.text.trim(),
+          'base_url': _youpiBaseUrl.text.trim(),
+          'test_mode': _youpiTest,
+        },
       },
     };
     bool ok = await state.saveAppConfigValue('payment_gateways', config);
@@ -338,6 +365,7 @@ class _AdminAppSettingsScreenState
     await saveSecret('cashfree_secret_key', _cashfreeSecret.text);
     await saveSecret('instamojo_auth_token', _instamojoSecret.text);
     await saveSecret('payu_salt', _payuSecret.text);
+    await saveSecret('youpi_webhook_secret', _youpiSecret.text);
 
     if (!mounted) return;
     setState(() => _saving = false);
@@ -352,12 +380,19 @@ class _AdminAppSettingsScreenState
   }
 
   // ---- Gateway state helpers (used by the status banner + checks) ----
-  static const _gatewayIds = ['razorpay', 'cashfree', 'instamojo', 'payu'];
+  static const _gatewayIds = [
+    'razorpay',
+    'cashfree',
+    'instamojo',
+    'payu',
+    'youpi'
+  ];
 
   String _gwName(String id) => switch (id) {
         'cashfree' => 'Cashfree',
         'instamojo' => 'Instamojo',
         'payu' => 'PayU',
+        'youpi' => 'YouPI',
         _ => 'Razorpay',
       };
 
@@ -365,6 +400,7 @@ class _AdminAppSettingsScreenState
         'cashfree' => _cashfreeEnabled,
         'instamojo' => _instamojoEnabled,
         'payu' => _payuEnabled,
+        'youpi' => _youpiEnabled,
         _ => _razorpayEnabled,
       };
 
@@ -372,13 +408,17 @@ class _AdminAppSettingsScreenState
         'cashfree' => _cashfreeTest,
         'instamojo' => _instamojoTest,
         'payu' => _payuTest,
+        'youpi' => _youpiTest,
         _ => _razorpayTest,
       };
 
+  /// "Ready" check per gateway: most need a key; YouPI is
+  /// self-hosted, so its server URL is what must be saved.
   bool _gwHasKey(String id) => switch (id) {
         'cashfree' => _cashfreeKeyId.text.trim().isNotEmpty,
         'instamojo' => _instamojoKeyId.text.trim().isNotEmpty,
         'payu' => _payuKeyId.text.trim().isNotEmpty,
+        'youpi' => _youpiBaseUrl.text.trim().isNotEmpty,
         _ => _razorpayKeyId.text.trim().isNotEmpty,
       };
 
@@ -394,6 +434,8 @@ class _AdminAppSettingsScreenState
           _instamojoEnabled = true;
         case 'payu':
           _payuEnabled = true;
+        case 'youpi':
+          _youpiEnabled = true;
         default:
           _razorpayEnabled = true;
       }
@@ -484,6 +526,9 @@ class _AdminAppSettingsScreenState
     required ValueChanged<bool> onEnabled,
     required ValueChanged<bool> onTestMode,
     bool showWebhook = false,
+    TextEditingController? urlController,
+    String? urlLabel,
+    String? urlHint,
   }) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
@@ -593,6 +638,13 @@ class _AdminAppSettingsScreenState
               const SizedBox(height: 4),
               RTextField(
                   label: keyLabel, hint: keyHint, controller: keyController),
+              if (urlController != null) ...[
+                const SizedBox(height: 8),
+                RTextField(
+                    label: urlLabel ?? 'Server URL',
+                    hint: urlHint ?? '',
+                    controller: urlController),
+              ],
               const SizedBox(height: 8),
               RTextField(
                   label: secretLabel,
@@ -902,12 +954,14 @@ class _AdminAppSettingsScreenState
             ),
           ),
           const SizedBox(height: 24),
-          // ---- Payment Gateways (multi-gateway, switchable) ----
+          // ---- Payment System (multi-gateway, switchable) ----
           const RSectionHeader(
-              title: 'Payment Gateways',
+              title: 'Payment System',
               subtitle:
                   'Add keys for any gateway, pick the active one — '
-                  'switch anytime. Payments open as a secure hosted page.'),
+                  'switch anytime. Payments open as a secure hosted '
+                  'page. YouPI is your own self-hosted UPI gateway '
+                  '(0% fees, money straight to your bank).'),
           const SizedBox(height: 12),
           _gatewayStatusBanner(),
           const SizedBox(height: 12),
@@ -927,6 +981,7 @@ class _AdminAppSettingsScreenState
                       ('cashfree', 'Cashfree'),
                       ('instamojo', 'Instamojo'),
                       ('payu', 'PayU'),
+                      ('youpi', 'YouPI'),
                     ])
                       ChoiceChip(
                         label: Text(g.$2),
@@ -1018,6 +1073,28 @@ class _AdminAppSettingsScreenState
             secretController: _payuSecret,
             onEnabled: (v) => setState(() => _payuEnabled = v),
             onTestMode: (v) => setState(() => _payuTest = v),
+          ),
+          _gatewayCard(
+            id: 'youpi',
+            name: 'YouPI',
+            tagline:
+                'Self-hosted UPI · 0% fees · Direct to your bank account',
+            brandColor: const Color(0xFF7C3AED),
+            isActive: _activeGateway == 'youpi',
+            onSetActive: () => _setActiveGateway('youpi'),
+            keyLabel: 'Merchant ID',
+            keyHint: 'From your YouPI server admin',
+            secretLabel: 'Webhook Secret (optional)',
+            secretHint: 'From your YouPI server, stored securely',
+            enabled: _youpiEnabled,
+            testMode: _youpiTest,
+            keyController: _youpiKeyId,
+            secretController: _youpiSecret,
+            onEnabled: (v) => setState(() => _youpiEnabled = v),
+            onTestMode: (v) => setState(() => _youpiTest = v),
+            urlController: _youpiBaseUrl,
+            urlLabel: 'Server URL',
+            urlHint: 'e.g. https://pay.yourdomain.com',
           ),
           Container(
             padding: const EdgeInsets.all(12),
