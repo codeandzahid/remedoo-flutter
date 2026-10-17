@@ -25,7 +25,7 @@
 // Worker secrets (set in the Cloudflare dashboard, never in code):
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
-const ACTIVE_WINDOW_MS = 1 * 60 * 1000; // a payment gets 1 minute
+const ACTIVE_WINDOW_MS = 5 * 60 * 1000; // a payment gets 5 minutes
 
 // ------------------------------------------------------------------
 // Supabase REST helpers (service role; server-side only)
@@ -86,7 +86,7 @@ async function patchSession(env, id, patch) {
 }
 
 /// Single-payment rule (no queue): at most one ACTIVE session.
-/// Expires stale ACTIVE sessions (older than the 1-minute window)
+/// Expires stale ACTIVE sessions (older than the 5-minute window)
 /// and returns the still-open ACTIVE session, or null. Also rescues
 /// a legacy QUEUED row (from the old queue build) when nothing is
 /// active. Called lazily on every touch — no background process.
@@ -273,7 +273,7 @@ export default {
             return json(
               {
                 error:
-                  'A payment is already in progress. It must be paid, cancelled, or expire (1 minute) before a new payment can start.',
+                  'A payment is already in progress. It must be paid, cancelled, or expire (5 minutes) before a new payment can start.',
               },
               409
             );

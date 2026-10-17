@@ -8,7 +8,7 @@ run on Cloudflare Workers). Same product behaviour:
 - **Hosted checkout page** — QR code + "Pay with any UPI app" button,
   auto-confirms when the payment lands.
 - **One payment at a time — no queue** — a new payment cannot start
-  until the current one is paid, cancelled, or expires (1-minute
+  until the current one is paid, cancelled, or expires (5-minute
   window), so bank SMS credits can be matched to the right session.
 - **Verification by bank-SMS observer** — a free SMS-forwarder app on
   the phone that receives the merchant's bank SMS POSTs every credit
@@ -43,5 +43,5 @@ Worker at `gateways.youpi.base_url` with the YouPI API shape
 - Matching is by exact amount against the single ACTIVE session
   (only one payment is ever open, so this is reliable).
 - If the phone/observer is off, a payment stays unverified until the
-  SMS is forwarded; the session expires after 1 minute and the
+  SMS is forwarded; the session expires after 5 minutes and the
   customer can retry.

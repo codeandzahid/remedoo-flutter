@@ -334,7 +334,7 @@ class _BookingScreenState extends State<BookingScreen> {
           title: const Text('A payment is pending'),
           content: const Text(
             'Another payment is being completed right now. It will '
-            'finish, or auto-expire within 1 minute.\n\n'
+            'finish, or auto-expire within 5 minutes.\n\n'
             'You can wait and try again — or tap Pay New to cancel '
             'the pending payment and start yours now.',
           ),

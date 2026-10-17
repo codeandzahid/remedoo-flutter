@@ -29,7 +29,7 @@ class PaymentService {
   /// gateway reports another payment is still pending (Remedoo Pay
   /// allows only one open payment). Return true to drop the pending
   /// payment and start this one ("Pay New"), false to abort and let
-  /// the user retry after it finishes/expires (max 1 minute).
+  /// the user retry after it finishes/expires (max 5 minutes).
   Future<bool> Function()? onPaymentBusy;
 
   String _activeGateway = 'razorpay';

@@ -540,7 +540,7 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
     final state = AppStateScope.of(context);
     if (newStatus == 'ACTIVE') {
       // No queue: only one open payment. Cancel any other open one,
-      // then re-open this one with a fresh 1-minute window.
+      // then re-open this one with a fresh 5-minute window.
       for (final other in _sessions) {
         if (other['id'] != session['id'] && other['status'] == 'ACTIVE') {
           await state.supabaseRepository.updateRemedooPaySession(
