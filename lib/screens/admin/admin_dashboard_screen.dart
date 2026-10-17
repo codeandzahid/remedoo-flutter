@@ -241,6 +241,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _ManageCard(28, 'Users', 'View and manage user accounts.',
             Icons.people, RemedooTheme.teal),
       ]),
+      _ManageSection('Payments', 'Your own payment system', [
+        _ManageCard(29, 'Remedoo Pay',
+            'See all payments, totals, and payment settings (your UPI ID).',
+            Icons.qr_code_2, RemedooTheme.purple),
+      ]),
     ];
 
     return MaxWidthBox(

@@ -18,6 +18,7 @@ import 'admin_analytics_screen.dart';
 import 'admin_config_screens.dart';
 import 'admin_ops_screens.dart';
 import 'admin_payments_screen.dart';
+import 'admin_remedoo_pay_screen.dart';
 import 'admin_app_settings_screen.dart';
 import 'admin_users_screen.dart';
 
@@ -96,6 +97,10 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const AdminAnalyticsScreen()),
       _NavItem('Insights', 'Users', Icons.people,
           (_) => const AdminUsersScreen()),
+      // Payments — Remedoo Pay management (own section, appended last
+      // so existing section indexes used by the dashboard stay stable)
+      _NavItem('Payments', 'Remedoo Pay', Icons.qr_code_2,
+          (_) => const AdminRemedooPayScreen()),
     ];
 
 /// Admin console shell: light sidebar nav (desktop) / drawer (phone, tablet),

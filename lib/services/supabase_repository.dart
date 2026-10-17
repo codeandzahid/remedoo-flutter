@@ -1013,6 +1013,23 @@ class SupabaseRepository {
     }
   }
 
+  /// Remedoo Pay payment sessions, newest first (admin management screen).
+  Future<List<Map<String, dynamic>>> fetchRemedooPaySessions(
+      {int limit = 100}) async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('remedoo_pay_sessions')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchRemedooPaySessions failed: $e');
+      return const [];
+    }
+  }
+
   /// Admin insert/update of a catalog row. Returns the row id.
   Future<String?> adminUpsert(
       String table, Map<String, dynamic> row) async {
