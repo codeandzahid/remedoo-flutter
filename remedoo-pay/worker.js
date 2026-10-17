@@ -23,7 +23,7 @@
 // Worker secrets (set in the Cloudflare dashboard, never in code):
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
-const ACTIVE_WINDOW_MS = 10 * 60 * 1000; // a payment gets 10 minutes
+const ACTIVE_WINDOW_MS = 5 * 60 * 1000; // a payment gets 5 minutes
 
 // ------------------------------------------------------------------
 // Supabase REST helpers (service role; server-side only)
