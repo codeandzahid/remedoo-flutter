@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
@@ -63,6 +65,9 @@ class _AdminAppSettingsScreenState
   late final TextEditingController _youpiKeyId;
   late final TextEditingController _youpiSecret;
   late final TextEditingController _youpiBaseUrl;
+  late final TextEditingController _youpiVpa;
+  late final TextEditingController _youpiPayeeName;
+  String _youpiObserverToken = '';
 
   // Fees
   late final TextEditingController _deliveryFee;
@@ -99,6 +104,8 @@ class _AdminAppSettingsScreenState
     _youpiKeyId = TextEditingController();
     _youpiSecret = TextEditingController();
     _youpiBaseUrl = TextEditingController();
+    _youpiVpa = TextEditingController();
+    _youpiPayeeName = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -123,6 +130,8 @@ class _AdminAppSettingsScreenState
     _youpiKeyId.dispose();
     _youpiSecret.dispose();
     _youpiBaseUrl.dispose();
+    _youpiVpa.dispose();
+    _youpiPayeeName.dispose();
     super.dispose();
   }
 
@@ -173,6 +182,8 @@ class _AdminAppSettingsScreenState
       _youpiTest = ypGw['test_mode'] != false;
       _youpiKeyId.text = '${ypGw['key_id'] ?? ''}';
       _youpiBaseUrl.text = '${ypGw['base_url'] ?? ''}';
+      _youpiVpa.text = '${ypGw['vpa'] ?? ''}';
+      _youpiPayeeName.text = '${ypGw['payee_name'] ?? ''}';
     });
     // Load secrets from secure_settings (admin-only)
     final secrets = await state.supabaseRepository.fetchSecureSettings([
@@ -182,6 +193,7 @@ class _AdminAppSettingsScreenState
       'instamojo_auth_token',
       'payu_salt',
       'youpi_webhook_secret',
+      'remedoo_pay_observer_token',
     ]);
     if (mounted) {
       setState(() {
@@ -192,6 +204,8 @@ class _AdminAppSettingsScreenState
         _instamojoSecret.text = secrets['instamojo_auth_token'] ?? '';
         _payuSecret.text = secrets['payu_salt'] ?? '';
         _youpiSecret.text = secrets['youpi_webhook_secret'] ?? '';
+        _youpiObserverToken =
+            secrets['remedoo_pay_observer_token'] ?? '';
         _deliveryFee.text = '${fees['delivery_fee'] ?? 30}';
         _freeThreshold.text =
             '${fees['free_delivery_threshold'] ?? 499}';
@@ -346,6 +360,8 @@ class _AdminAppSettingsScreenState
           'enabled': _youpiEnabled,
           'key_id': _youpiKeyId.text.trim(),
           'base_url': _youpiBaseUrl.text.trim(),
+          'vpa': _youpiVpa.text.trim(),
+          'payee_name': _youpiPayeeName.text.trim(),
           'test_mode': _youpiTest,
         },
       },
@@ -371,6 +387,15 @@ class _AdminAppSettingsScreenState
     await saveSecret('instamojo_auth_token', _instamojoSecret.text);
     await saveSecret('payu_salt', _payuSecret.text);
     await saveSecret('youpi_webhook_secret', _youpiSecret.text);
+    // Remedoo Pay observer token: create once, then keep. The SMS
+    // forwarder app on the merchant phone sends it with every bank
+    // credit SMS so the server can verify the sender.
+    if (_youpiObserverToken.isEmpty) {
+      final r = Random.secure();
+      _youpiObserverToken =
+          List.generate(32, (_) => r.nextInt(16).toRadixString(16)).join();
+    }
+    await saveSecret('remedoo_pay_observer_token', _youpiObserverToken);
 
     if (!mounted) return;
     setState(() => _saving = false);
@@ -534,6 +559,7 @@ class _AdminAppSettingsScreenState
     TextEditingController? urlController,
     String? urlLabel,
     String? urlHint,
+    List<Widget>? extraChildren,
   }) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
@@ -677,6 +703,7 @@ class _AdminAppSettingsScreenState
                         fontSize: 12, color: scheme.onSurfaceVariant)),
                 contentPadding: EdgeInsets.zero,
               ),
+              if (extraChildren != null) ...extraChildren,
               if (!isActive)
                 Align(
                   alignment: Alignment.centerLeft,
@@ -1105,6 +1132,56 @@ class _AdminAppSettingsScreenState
             urlController: _youpiBaseUrl,
             urlLabel: 'Server URL',
             urlHint: 'e.g. https://pay.yourdomain.com',
+            extraChildren: [
+              const SizedBox(height: 8),
+              RTextField(
+                  label: 'Your UPI ID',
+                  hint: 'e.g. yourname@okhdfcbank — payments come here',
+                  controller: _youpiVpa),
+              const SizedBox(height: 8),
+              RTextField(
+                  label: 'Payee Name',
+                  hint: 'Name customers see on the payment page',
+                  controller: _youpiPayeeName),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest
+                      .withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Payment alerts (SMS observer)',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Text(
+                        'Install any free SMS-forwarder app on the phone '
+                        'that receives your bank SMS. Forward "credited" '
+                        'messages to:\n'
+                        '${_youpiBaseUrl.text.trim().isEmpty ? '<Server URL>' : _youpiBaseUrl.text.trim()}/api/v1/observer/sms\n'
+                        'with header  X-Observer-Token:',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant,
+                            height: 1.5)),
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      _youpiObserverToken.isEmpty
+                          ? '(created automatically when you Save)'
+                          : _youpiObserverToken,
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
           ),
           Container(
             padding: const EdgeInsets.all(12),
