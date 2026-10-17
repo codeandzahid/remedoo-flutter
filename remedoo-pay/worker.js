@@ -208,7 +208,8 @@ function checkoutPage(session, cfg, position) {
   }
 </div>
 <script>
-  new QRCode(document.getElementById('qr'), { text: ${JSON.stringify(upi)}, width: 220, height: 220 });
+  var qrEl = document.getElementById('qr');
+  if (qrEl) new QRCode(qrEl, { text: ${JSON.stringify(upi)}, width: 220, height: 220 });
   var done = ${isDone ? 'true' : 'false'};
   var returnUrl = ${JSON.stringify(session.return_url || 'https://remedoo-app.pages.dev/')};
   if (done) setTimeout(function(){ location.href = returnUrl; }, 2000);
