@@ -38,8 +38,8 @@ class Doctor {
     required this.about,
     this.active = true,
     this.upiId,
-    this.payInClinicEnabled = true,
-    this.upiEnabled = true,
+    this.payInClinicEnabled = false,
+    this.upiEnabled = false,
     this.consultationDuration = 30,
   });
 }
@@ -75,8 +75,8 @@ class Hospital {
     required this.verified,
     this.active = true,
     this.upiId,
-    this.payInClinicEnabled = true,
-    this.upiEnabled = true,
+    this.payInClinicEnabled = false,
+    this.upiEnabled = false,
   });
 }
 
@@ -111,8 +111,8 @@ class Lab {
     required this.distanceKm,
     this.active = true,
     this.upiId,
-    this.payInClinicEnabled = true,
-    this.upiEnabled = true,
+    this.payInClinicEnabled = false,
+    this.upiEnabled = false,
   });
 }
 
@@ -145,8 +145,8 @@ class Pharmacy {
     required this.distanceKm,
     this.active = true,
     this.upiId,
-    this.payInClinicEnabled = true,
-    this.upiEnabled = true,
+    this.payInClinicEnabled = false,
+    this.upiEnabled = false,
   });
 }
 

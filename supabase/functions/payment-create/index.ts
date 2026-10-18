@@ -208,6 +208,42 @@ async function youpiCreate(supabase: any, gw: any, p: any) {
   };
   if (gw.key_id) headers['X-Merchant-Id'] = gw.key_id;
   const orderId = String(p.reference_id ?? `remedoo_${Date.now()}`).slice(0, 64);
+  // Per-provider UPI: when the booking belongs to a provider who added
+  // their own UPI ID (panel > Payments), the payment goes straight to
+  // them instead of the central Remedoo UPI.
+  let provider: Record<string, string> = {};
+  const kindTables: Record<string, string> = {
+    doctor: 'doctors',
+    pharmacy: 'pharmacies',
+    lab: 'labs',
+    hospital: 'hospitals',
+  };
+  const table = kindTables[String(p.provider_kind ?? '')];
+  if (table && p.provider_id) {
+    const { data: rec } = await supabase
+      .from(table)
+      .select('upi_id, upi_enabled, upi_payee_name, name, user_id')
+      .eq('id', String(p.provider_id))
+      .maybeSingle();
+    if (rec && rec.upi_enabled === true && rec.upi_id) {
+      provider = {
+        vpa: String(rec.upi_id).trim(),
+        payeeName: String(rec.upi_payee_name || rec.name || 'Provider').trim(),
+        providerKind: String(p.provider_kind),
+        providerId: String(p.provider_id),
+        ...(rec.user_id ? { providerUserId: String(rec.user_id) } : {}),
+      };
+    } else {
+      // Owner's rule: a provider who has not activated their own UPI
+      // shows online payment as NOT AVAILABLE — never fall back to
+      // Remedoo's central UPI for a provider's booking.
+      const e: any = new Error(
+        'Online payment is not available for this provider.');
+      e.status = 422;
+      e.code = 'PROVIDER_PAYMENT_NOT_AVAILABLE';
+      throw e;
+    }
+  }
   const res = await fetch(`${base}/api/v1/payments`, {
     method: 'POST',
     headers,
@@ -217,6 +253,7 @@ async function youpiCreate(supabase: any, gw: any, p: any) {
       currency: 'INR',
       description: p.description || 'Remedoo Payment',
       forceNew: p.force_new === true,
+      ...provider,
       customer: {
         ...(p.customer_name ? { name: p.customer_name } : {}),
         ...(p.email ? { email: p.email } : {}),

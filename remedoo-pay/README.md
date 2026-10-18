@@ -7,9 +7,23 @@ run on Cloudflare Workers). Same product behaviour:
 - **0% fees** — customers pay straight to the merchant's own UPI ID.
 - **Hosted checkout page** — "Pay with any UPI app" button (no QR, by owner choice),
   auto-confirms when the payment lands.
-- **One payment at a time — no queue** — a new payment cannot start
-  until the current one is paid, cancelled, or expires (5-minute
-  window), so bank SMS credits can be matched to the right session.
+- **One payment at a time per receiving UPI — no queue** — a new payment
+  cannot start until the current one for that UPI is paid, cancelled,
+  or expires (5-minute window), so bank SMS credits can be matched to
+  the right session.
+- **Per-provider UPI (panelists)** — doctors / pharmacies / labs /
+  hospitals add their OWN UPI ID in their panel (Payments section).
+  Bookings for a provider who activated their UPI are paid straight to
+  them: `payment-create` looks up the provider record and passes
+  `vpa` / `payeeName` / `providerKind` / `providerId` /
+  `providerUserId`, stored on the session; the checkout page uses the
+  session's UPI. A provider who has NOT activated a UPI shows online
+  payment as **Not Available** (no fallback to the central UPI).
+  Payment options are OFF after registration — the provider activates
+  Pay Online and/or Pay at Clinic (COD) in their panel, and activation
+  (or changing the UPI ID) requires an email-OTP confirmation.
+  Providers see their own sessions in their panel and can Confirm Paid
+  (RLS: `provider_user_id = auth.uid()`).
 - **Verification by bank-SMS observer** — a free SMS-forwarder app on
   the phone that receives the merchant's bank SMS POSTs every credit
   SMS to the Worker, which matches it to the active session.

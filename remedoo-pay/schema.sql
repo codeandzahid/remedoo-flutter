@@ -10,6 +10,13 @@ create table if not exists public.remedoo_pay_sessions (
   description text,
   return_url text,
   utr text,
+  -- Per-provider UPI: which UPI this payment belongs to (null = the
+  -- central Remedoo UPI from app_config).
+  vpa text,
+  payee_name text,
+  provider_kind text,
+  provider_id text,
+  provider_user_id uuid,
   created_at timestamptz not null default now(),
   activated_at timestamptz,
   paid_at timestamptz

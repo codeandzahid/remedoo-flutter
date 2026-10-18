@@ -27,6 +27,11 @@
 
 const ACTIVE_WINDOW_MS = 5 * 60 * 1000; // a payment gets 5 minutes
 
+function clean(v, max = 200) {
+  if (v === null || v === undefined) return '';
+  return String(v).trim().slice(0, max);
+}
+
 // ------------------------------------------------------------------
 // Supabase REST helpers (service role; server-side only)
 // ------------------------------------------------------------------
@@ -90,21 +95,27 @@ async function patchSession(env, id, patch) {
 /// and returns the still-open ACTIVE session, or null. Also rescues
 /// a legacy QUEUED row (from the old queue build) when nothing is
 /// active. Called lazily on every touch — no background process.
-async function currentActive(env) {
+async function currentActive(env, targetVpa, centralVpa) {
   const actives = await sb(
     env,
-    `remedoo_pay_sessions?status=eq.ACTIVE&select=id,activated_at&order=activated_at.asc`
+    `remedoo_pay_sessions?status=eq.ACTIVE&select=id,activated_at,vpa&order=activated_at.asc`
   );
   const now = Date.now();
   let open = null;
   for (const a of actives ?? []) {
     if (now - new Date(a.activated_at).getTime() <= ACTIVE_WINDOW_MS) {
-      if (!open) open = a;
+      // One open payment PER receiving UPI ID: a payment to Dr. A must
+      // not block a payment to Dr. B. Rows without a vpa belong to the
+      // central Remedoo UPI.
+      const rowVpa = a.vpa || centralVpa;
+      if (!open && (!targetVpa || rowVpa === targetVpa)) open = a;
     } else {
       await patchSession(env, a.id, { status: 'EXPIRED' });
     }
   }
   if (open) return open;
+  // The legacy QUEUED rescue only applies to the central UPI.
+  if (targetVpa && centralVpa && targetVpa !== centralVpa) return null;
   const queued = await sb(
     env,
     `remedoo_pay_sessions?status=eq.QUEUED&select=id&order=created_at.asc&limit=1`
@@ -159,9 +170,13 @@ function checkoutPage(session, cfg) {
   // alphanumeric, <=35 chars) — UPI apps' risk engines expect them on
   // gateway-style payment links; a bare pa/pn/am link gets flagged.
   const txnRef = session.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 35);
+  // The receiving UPI for THIS payment: the provider's own when the
+  // session carries one, otherwise the central Remedoo UPI.
+  const effVpa = session.vpa || cfg.vpa;
+  const effPayee = session.payee_name || cfg.payeeName;
   const upi =
-    `upi://pay?pa=${encodeURIComponent(cfg.vpa)}` +
-    `&pn=${encodeURIComponent(cfg.payeeName)}` +
+    `upi://pay?pa=${encodeURIComponent(effVpa)}` +
+    `&pn=${encodeURIComponent(effPayee)}` +
     `&am=${rupees}&cu=INR` +
     `&tid=${txnRef}&tr=${txnRef}` +
     `&tn=${encodeURIComponent('Remedoo ' + session.order_id)}`;
@@ -187,7 +202,7 @@ function checkoutPage(session, cfg) {
 <div class="card">
   <div class="brand">REMEDOO PAY</div>
   <div class="amt">₹${rupees}</div>
-  <div class="muted">Pay to <b>${cfg.payeeName}</b> · <code>${cfg.vpa}</code></div>
+  <div class="muted">Pay to <b>${effPayee}</b> · <code>${effVpa}</code></div>
   ${
     isDone
       ? `<p class="status ok">✅ Payment received. Thank you!</p>
@@ -257,13 +272,17 @@ export default {
           return json({ error: 'orderId and a positive amount are required' }, 400);
         }
         const cfg = await getYoupiConfig(env);
-        if (!cfg.vpa) {
+        // Per-provider UPI: when the payment belongs to a provider who
+        // added their own UPI ID, the money goes straight to them.
+        const vpa = clean(body.vpa, 80) || cfg.vpa;
+        const payeeName = clean(body.payeeName, 80) || cfg.payeeName;
+        if (!vpa) {
           return json(
             { error: 'Remedoo Pay is not configured: set your UPI ID in Remedoo Admin > Payment System.' },
             503
           );
         }
-        const busy = await currentActive(env);
+        const busy = await currentActive(env, vpa, cfg.vpa);
         if (busy) {
           // "Pay New" escape hatch: the customer explicitly chose to
           // drop the pending payment and start a fresh one.
@@ -288,6 +307,11 @@ export default {
             customer: body.customer ?? null,
             description: body.description ?? null,
             return_url: body.returnUrl ?? null,
+            vpa,
+            payee_name: payeeName,
+            provider_kind: clean(body.providerKind, 20) || null,
+            provider_id: clean(body.providerId, 64) || null,
+            provider_user_id: clean(body.providerUserId, 64) || null,
             activated_at: new Date().toISOString(),
           },
         });

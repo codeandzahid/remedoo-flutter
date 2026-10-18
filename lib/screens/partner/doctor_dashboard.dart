@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/provider_payments.dart';
 import '../../widgets/widgets.dart';
 
 /// Dashboard for logged-in doctors.
@@ -704,6 +705,7 @@ class _PaymentsTab extends StatefulWidget {
 
 class _PaymentsTabState extends State<_PaymentsTab> {
   late final TextEditingController _upiId;
+  late final TextEditingController _upiName;
   late bool _upiEnabled;
   late bool _payInClinic;
   bool _saving = false;
@@ -715,13 +717,15 @@ class _PaymentsTabState extends State<_PaymentsTab> {
     super.initState();
     final p = widget.profile ?? {};
     _upiId = TextEditingController(text: '${p['upi_id'] ?? ''}');
+    _upiName = TextEditingController(text: '${p['upi_payee_name'] ?? ''}');
     _upiEnabled = p['upi_enabled'] == true;
-    _payInClinic = p['pay_in_clinic_enabled'] != false;
+    _payInClinic = p['pay_in_clinic_enabled'] == true;
   }
 
   @override
   void dispose() {
     _upiId.dispose();
+    _upiName.dispose();
     super.dispose();
   }
 
@@ -735,9 +739,31 @@ class _PaymentsTabState extends State<_PaymentsTab> {
       );
       return;
     }
+    // Owner's rule: activating a payment option (or changing the UPI
+    // ID) needs the email code first.
+    if (paymentChangeNeedsOtp(
+      profile: widget.profile,
+      upiEnabled: _upiEnabled,
+      payInClinic: _payInClinic,
+      upiId: id,
+    )) {
+      final verified = await requirePaymentOtp(context);
+      if (!verified) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content:
+                    Text('Not saved — email code was not verified.')),
+          );
+        }
+        return;
+      }
+    }
     setState(() => _saving = true);
     final ok = await widget.repo.updateOwnProviderRecord('doctors', {
       'upi_id': id.isEmpty ? null : id,
+      'upi_payee_name':
+          _upiName.text.trim().isEmpty ? null : _upiName.text.trim(),
       'upi_enabled': _upiEnabled,
       'pay_in_clinic_enabled': _payInClinic,
     });
@@ -769,6 +795,30 @@ class _PaymentsTabState extends State<_PaymentsTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (!_upiEnabled && !_payInClinic) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color:
+                        RemedooTheme.warning.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber,
+                          size: 18, color: RemedooTheme.warning),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'No payment option is ON. Turn on at least one below — patients cannot pay you until you activate one.',
+                          style: TextStyle(fontSize: 12.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               Text(
                 'Your UPI ID',
                 style: TextStyle(
@@ -789,6 +839,11 @@ class _PaymentsTabState extends State<_PaymentsTab> {
               RTextField(
                 controller: _upiId,
                 label: 'UPI ID',
+              ),
+              const SizedBox(height: 8),
+              RTextField(
+                controller: _upiName,
+                label: 'Name on your UPI account (optional)',
               ),
               const SizedBox(height: 8),
               SwitchListTile(
@@ -818,6 +873,8 @@ class _PaymentsTabState extends State<_PaymentsTab> {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        ProviderOnlinePayments(repo: widget.repo),
         const SizedBox(height: 16),
       ],
     );

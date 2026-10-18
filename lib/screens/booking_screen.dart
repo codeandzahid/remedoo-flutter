@@ -357,6 +357,8 @@ class _BookingScreenState extends State<BookingScreen> {
       amount: widget.fee,
       orderId: orderId,
       description: 'Appointment: ${widget.title}',
+      providerKind: widget.kind,
+      providerId: widget.refId,
       contact: state.phone.isNotEmpty ? state.phone : null,
       email: state.email.isNotEmpty ? state.email : null,
       customerName: state.userName.isNotEmpty ? state.userName : null,
@@ -527,15 +529,35 @@ class _BookingScreenState extends State<BookingScreen> {
     final slots = st.doctorSlotsFor(widget.refId, widget.title, _date);
     final isReschedule = widget.prefill != null;
     final prov = _provider(st);
-    final payInClinic = prov?.payInClinicEnabled ?? true;
+    final payInClinic = prov?.payInClinicEnabled ?? false;
 
-    // No active gateway: Pay Online is hidden, so never leave it
-    // selected — fall back to the offline option automatically.
-    if (!PaymentService.instance.hasActiveGateway &&
-        _payment == 'Pay Online') {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _payment = 'At Clinic');
-      });
+    // Remedoo Pay rule (owner's order): online payment goes straight to
+    // the provider's own UPI. A provider who has not added their UPI ID
+    // shows online payment as NOT AVAILABLE — no fallback to Remedoo.
+    final provUpiReady = prov != null &&
+        ((prov.upiId as String?)?.trim().isNotEmpty ?? false) &&
+        prov.upiEnabled == true;
+    final isYoupi = PaymentService.instance.activeGateway == 'youpi';
+    final onlineAvailable = PaymentService.instance.hasActiveGateway &&
+        (!isYoupi || provUpiReady);
+
+    // Keep the selection on a visible option: providers activate their
+    // payment options themselves (Pay Online and/or Pay at Clinic);
+    // until they do, neither is selected.
+    if (widget.prefill == null) {
+      final paymentOptions = <String>[
+        if (onlineAvailable) 'Pay Online',
+        if (payInClinic) 'At Clinic',
+      ];
+      if (!paymentOptions.contains(_payment)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() => _payment = paymentOptions.isNotEmpty
+                ? paymentOptions.first
+                : 'Not Available');
+          }
+        });
+      }
     }
 
     final sections = <Widget>[
@@ -566,7 +588,7 @@ class _BookingScreenState extends State<BookingScreen> {
       const SizedBox(height: 14),
       _sectionTitle(Icons.credit_card, 'Payment Method'),
       const SizedBox(height: 10),
-      if (PaymentService.instance.hasActiveGateway) ...[
+      if (onlineAvailable) ...[
         _payCard(
             'Pay Online',
             'UPI, Cards & Netbanking via '
@@ -588,10 +610,14 @@ class _BookingScreenState extends State<BookingScreen> {
               Icon(Icons.info_outline,
                   size: 18, color: RemedooTheme.warning),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
-                    'Online payment is not available right now — please pay at the clinic.',
-                    style: TextStyle(fontSize: 12.5)),
+                    !payInClinic
+                        ? 'No payment option is active for this ${widget.kind} yet — you can still book your visit.'
+                        : isYoupi && !provUpiReady
+                            ? 'Online payment is not available for this ${widget.kind} — please pay at the clinic.'
+                            : 'Online payment is not available right now — please pay at the clinic.',
+                    style: const TextStyle(fontSize: 12.5)),
               ),
             ],
           ),

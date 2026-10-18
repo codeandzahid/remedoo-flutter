@@ -112,6 +112,8 @@ class PaymentService {
     String? contact,
     String? email,
     String? customerName,
+    String? providerKind,
+    String? providerId,
     required void Function(String paymentId) onPaymentSuccess,
     required void Function(String error) onPaymentError,
   }) {
@@ -141,6 +143,8 @@ class PaymentService {
       contact: contact,
       email: email,
       customerName: customerName,
+      providerKind: providerKind,
+      providerId: providerId,
     );
   }
 
@@ -184,6 +188,8 @@ class PaymentService {
     String? contact,
     String? email,
     String? customerName,
+    String? providerKind,
+    String? providerId,
   }) async {
     try {
       final functionUrl =
@@ -205,6 +211,8 @@ class PaymentService {
                 'customer_contact': contact,
                 'customer_email': email,
                 'reference_id': orderId,
+                if (providerKind != null) 'provider_kind': providerKind,
+                if (providerId != null) 'provider_id': providerId,
                 'force_new': forceNew,
               }),
             )

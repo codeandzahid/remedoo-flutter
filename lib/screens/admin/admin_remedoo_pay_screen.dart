@@ -423,6 +423,13 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
                           style: TextStyle(
                               fontSize: 11.5,
                               color: scheme.onSurfaceVariant)),
+                    if (s['vpa'] != null &&
+                        '${s['vpa']}'.isNotEmpty)
+                      Text(
+                          'To: ${s['payee_name'] ?? ''} · ${s['vpa']}',
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              color: scheme.onSurfaceVariant)),
                   ],
                 ),
               ),

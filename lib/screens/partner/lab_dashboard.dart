@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/provider_payments.dart';
 import '../../widgets/widgets.dart';
 
 /// Dashboard for logged-in labs.
@@ -172,6 +173,15 @@ class _LabDashboardState extends State<LabDashboard> {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        ProviderUpiSettingsCard(
+          table: 'labs',
+          profile: _profile,
+          repo: _repo,
+          onSaved: _load,
+        ),
+        const SizedBox(height: 16),
+        ProviderOnlinePayments(repo: _repo),
         const SizedBox(height: 16),
         Row(
           children: [
