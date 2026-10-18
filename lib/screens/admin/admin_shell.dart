@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
-import '../../widgets/maximal.dart';
+import '../../widgets/spatial.dart';
 import '../../widgets/widgets.dart';
 import 'admin_crud_screen.dart';
 import 'admin_dashboard_screen.dart';
@@ -182,7 +182,7 @@ class _AdminShellState extends State<AdminShell> {
     _allItems = all;
     _visibleItems = items;
     if (items.isEmpty) {
-      return _maxWrap(
+      return _spatialWrap(
         Scaffold(
           appBar: _topBar('Admin Console', state),
           body: const Center(
@@ -206,48 +206,73 @@ class _AdminShellState extends State<AdminShell> {
     );
 
     if (context.isDesktop) {
-      return _maxWrap(
+      return _spatialWrap(
         Scaffold(
           appBar: _topBar(current.label, state),
-          body: Row(
-            children: [
-              _sideNav(state, items),
-              Expanded(child: page),
-            ],
+          body: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _sideNav(state, items),
+                const SizedBox(width: 16),
+                Expanded(child: _workspace(page)),
+              ],
+            ),
           ),
         ),
       );
     }
-    return _maxWrap(
+    return _spatialWrap(
       Scaffold(
         appBar: _topBar(current.label, state),
         drawer: Drawer(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          child: MaxPanel(
-            radius: 0,
-            child: SafeArea(
-              child: _navColumn(state, items, inDrawer: true),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: SpatialPanel(
+              radius: 26,
+              depth: 2,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: _navColumn(state, items, inDrawer: true),
+                ),
+              ),
             ),
           ),
         ),
-        body: page,
+        body: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+          child: _workspace(page),
+        ),
       ),
     );
   }
 
-  /// Maximalism wrapper (owner order 2026-10-18): the loud
-  /// saturated backdrop behind a transparent scaffold, a MaxScope
-  /// so shared widgets render their maximal variant, and a theme
-  /// whose surfaces turn warm-paper with chunky ink outlines.
-  Widget _maxWrap(Widget scaffold) {
-    return MaxScope(
+  /// The workspace slab: the page floats as one light surface in
+  /// front of the environment (depth 1), clipped to its corners.
+  Widget _workspace(Widget page) {
+    return Container(
+      decoration: spatialDecoration(radius: 28, depth: 1),
+      clipBehavior: Clip.antiAlias,
+      child: page,
+    );
+  }
+
+  /// Spatial wrapper (owner order 2026-10-18): the deep-space
+  /// environment behind a transparent scaffold, a SpatialScope so
+  /// shared widgets render floating, and a theme whose surfaces
+  /// are clean light slabs with soft depth.
+  Widget _spatialWrap(Widget scaffold) {
+    return SpatialScope(
       enabled: true,
       child: Theme(
-        data: _maxTheme(),
+        data: _spatialTheme(),
         child: Stack(
           children: [
-            const Positioned.fill(child: MaxBackdrop()),
+            const Positioned.fill(child: SpatialBackdrop()),
             scaffold,
           ],
         ),
@@ -255,17 +280,13 @@ class _AdminShellState extends State<AdminShell> {
     );
   }
 
-  ThemeData _maxTheme() {
+  ThemeData _spatialTheme() {
     final base = Theme.of(context);
+    final scheme = base.colorScheme;
     OutlineInputBorder fieldBorder(Color c, double w) =>
         OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: c, width: w),
-        );
-    RoundedRectangleBorder inkShape(double r) =>
-        RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(r),
-          side: const BorderSide(color: maxInk, width: 2),
         );
     return base.copyWith(
       scaffoldBackgroundColor: Colors.transparent,
@@ -273,59 +294,67 @@ class _AdminShellState extends State<AdminShell> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        foregroundColor: Colors.white,
+        foregroundColor: const Color(0xFF0F172A),
         surfaceTintColor: Colors.transparent,
         titleTextStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
+          color: Color(0xFF0F172A),
+          fontSize: 19,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.2,
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
       ),
       cardTheme: base.cardTheme.copyWith(
-        color: maxPaper,
-        elevation: 0,
+        color: Colors.white.withValues(alpha: 0.95),
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.18),
         surfaceTintColor: Colors.transparent,
-        shape: inkShape(20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.65)),
+        ),
       ),
       dialogTheme: base.dialogTheme.copyWith(
-        backgroundColor: maxPaper,
+        backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
-        shape: inkShape(24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(26),
+        ),
       ),
       bottomSheetTheme: base.bottomSheetTheme.copyWith(
-        backgroundColor: maxPaper,
+        backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: const RoundedRectangleBorder(
           borderRadius:
-              BorderRadius.vertical(top: Radius.circular(24)),
+              BorderRadius.vertical(top: Radius.circular(26)),
         ),
       ),
       popupMenuTheme: base.popupMenuTheme.copyWith(
-        color: maxPaper,
+        color: Colors.white,
         surfaceTintColor: Colors.transparent,
-        shape: inkShape(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        backgroundColor: maxAmber,
-        selectedColor: maxPink.withValues(alpha: 0.35),
-        side: const BorderSide(color: maxInk, width: 1.5),
+        backgroundColor: const Color(0xFFF1F5F9),
+        selectedColor: scheme.primary.withValues(alpha: 0.18),
+        side: BorderSide.none,
       ),
       dividerTheme: base.dividerTheme.copyWith(
-        color: maxInk.withValues(alpha: 0.35),
-        thickness: 1.2,
+        color: const Color(0xFF0F172A).withValues(alpha: 0.10),
+        thickness: 1,
       ),
       inputDecorationTheme: base.inputDecorationTheme.copyWith(
         filled: true,
-        fillColor: maxPaper,
-        border: fieldBorder(maxInk, 2),
-        enabledBorder: fieldBorder(maxInk, 2),
-        focusedBorder: fieldBorder(maxPink, 2.5),
+        fillColor: Colors.white.withValues(alpha: 0.92),
+        border: fieldBorder(const Color(0xFFCBD5E1), 1.2),
+        enabledBorder: fieldBorder(const Color(0xFFCBD5E1), 1.2),
+        focusedBorder: fieldBorder(scheme.primary, 1.8),
       ),
       dataTableTheme: base.dataTableTheme.copyWith(
         headingRowColor:
-            const WidgetStatePropertyAll(Color(0xFFDDD6FE)),
+            const WidgetStatePropertyAll(Color(0xFFF1F5F9)),
         dataRowColor: const WidgetStatePropertyAll(Colors.transparent),
         dividerThickness: 1,
       ),
@@ -338,16 +367,13 @@ class _AdminShellState extends State<AdminShell> {
 
   PreferredSizeWidget _topBar(String title, AppState state) {
     return AppBar(
+      toolbarHeight: 76,
       title: Text(title),
-      flexibleSpace: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [maxViolet, maxPink, maxOrange],
-          ),
+      flexibleSpace: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+        child: Container(
+          decoration: spatialDecoration(radius: 20, depth: 2),
         ),
-      ),
-      shape: const Border(
-        bottom: BorderSide(color: maxInk, width: 2),
       ),
       actions: [
         IconButton(
@@ -364,21 +390,7 @@ class _AdminShellState extends State<AdminShell> {
   Widget _sideNav(AppState state, List<_NavItem> items) {
     return Container(
       width: 288,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [maxPaper, Color(0xFFFFF1C9)],
-        ),
-        border: Border(right: BorderSide(color: maxInk, width: 2)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0xE6232038),
-            blurRadius: 0,
-            offset: Offset(6, 0),
-          ),
-        ],
-      ),
+      decoration: spatialDecoration(radius: 28, depth: 2),
       child: Column(
         children: [
           _brandHeader(),
@@ -400,15 +412,18 @@ class _AdminShellState extends State<AdminShell> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [maxPink, maxViolet, Color(0xFF2563EB)],
+            colors: [
+              Color(0xFFDB2777),
+              Color(0xFF7C3AED),
+              Color(0xFF2563EB),
+            ],
           ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: maxInk, width: 2),
-          boxShadow: const [
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
             BoxShadow(
-              color: Color(0xE6232038),
-              blurRadius: 0,
-              offset: Offset(4, 4),
+              color: const Color(0xFF7C3AED).withValues(alpha: 0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -507,9 +522,8 @@ class _AdminShellState extends State<AdminShell> {
             padding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: maxAmber,
+              color: const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: maxInk, width: 1.5),
             ),
             child: Text(
               state.isAdmin ? 'SUPER ADMIN' : 'STAFF ACCOUNT',

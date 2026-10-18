@@ -7,7 +7,7 @@ import '../../services/auth_service.dart';
 import '../../services/supabase_config.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
-import '../../widgets/maximal.dart';
+import '../../widgets/spatial.dart';
 import '../../widgets/widgets.dart';
 
 /// Admin sign-in backed by Supabase Auth + the `user_roles` table.
@@ -157,33 +157,34 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // Maximalism (same kit as the admin console): loud saturated
-    // backdrop + bold paper form card with ink outlines.
+    // Spatial (same kit as the admin console): deep-space
+    // environment + the form floating as a light slab.
     final base = Theme.of(context);
     OutlineInputBorder fieldBorder(Color c, double w) =>
         OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: c, width: w),
         );
-    final maxTheme = base.copyWith(
+    final spatialTheme = base.copyWith(
       scaffoldBackgroundColor: Colors.transparent,
+      iconTheme: const IconThemeData(color: Colors.white),
       inputDecorationTheme: base.inputDecorationTheme.copyWith(
         filled: true,
-        fillColor: maxPaper,
-        border: fieldBorder(maxInk, 2),
-        enabledBorder: fieldBorder(maxInk, 2),
-        focusedBorder: fieldBorder(maxPink, 2.5),
+        fillColor: Colors.white.withValues(alpha: 0.92),
+        border: fieldBorder(const Color(0xFFCBD5E1), 1.2),
+        enabledBorder: fieldBorder(const Color(0xFFCBD5E1), 1.2),
+        focusedBorder: fieldBorder(scheme.primary, 1.8),
       ),
     );
-    return MaxScope(
+    return SpatialScope(
       enabled: true,
       child: Theme(
-        data: maxTheme,
+        data: spatialTheme,
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Stack(
             children: [
-              const Positioned.fill(child: MaxBackdrop()),
+              const Positioned.fill(child: SpatialBackdrop()),
               SafeArea(
                 child: Center(
                   child: SingleChildScrollView(
@@ -198,15 +199,19 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       height: 64,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [maxPink, maxViolet, Color(0xFF2563EB)],
+                          colors: [
+                            Color(0xFFDB2777),
+                            Color(0xFF7C3AED),
+                            Color(0xFF2563EB),
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: maxInk, width: 2),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Color(0xE6232038),
-                            blurRadius: 0,
-                            offset: Offset(4, 4),
+                            color: const Color(0xFF7C3AED)
+                                .withValues(alpha: 0.40),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
                           ),
                         ],
                       ),
