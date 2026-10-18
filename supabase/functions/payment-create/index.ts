@@ -311,6 +311,8 @@ serve(async (req) => {
       email: body.customer_email,
       reference_id: body.reference_id,
       force_new: body.force_new === true,
+      provider_kind: body.provider_kind,
+      provider_id: body.provider_id,
     };
     if (!p.amount || p.amount <= 0) return json({ error: 'Invalid amount' }, 400);
 
