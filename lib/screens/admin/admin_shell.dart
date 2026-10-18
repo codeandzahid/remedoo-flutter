@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
-import '../../widgets/spatial.dart';
+import '../../widgets/admin_style.dart';
 import '../../widgets/widgets.dart';
+import 'admin_style_screen.dart';
 import 'admin_crud_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_approvals_screen.dart';
@@ -110,6 +111,10 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // Export Data — download project data (CSV / full backup JSON).
       _NavItem('Settings', 'Export Data', Icons.download,
           (_) => const AdminExportScreen()),
+      // Panel Style — switch the admin UI style (owner order
+      // 2026-10-18: try every style one by one, live).
+      _NavItem('Settings', 'Panel Style', Icons.style,
+          (s) => AdminStyleScreen(state: s)),
     ];
 
 /// Permission key per nav item, aligned with [_items] by index.
@@ -123,7 +128,7 @@ const _permKeys = [
   'ambulance', 'support', 'announcements', 'settings', 'branding',
   'commission', 'subscriptions', 'corporate', 'packages',
   'service_areas', 'featured', 'revenue', 'analytics', 'users',
-  'remedoo_pay', 'team', 'export_data',
+  'remedoo_pay', 'team', 'export_data', 'panel_style',
 ];
 
 /// Admin console shell: light sidebar nav (desktop) / drawer (phone, tablet),
@@ -182,9 +187,10 @@ class _AdminShellState extends State<AdminShell> {
     _allItems = all;
     _visibleItems = items;
     if (items.isEmpty) {
-      return _spatialWrap(
+      return _styleWrap(
+        state.adminStyle,
         Scaffold(
-          appBar: _topBar('Admin Console', state),
+          appBar: _topBar('Admin Console', state, state.adminStyle),
           body: const Center(
             child: Padding(
               padding: EdgeInsets.all(24),
@@ -204,36 +210,48 @@ class _AdminShellState extends State<AdminShell> {
       index: safeIndex,
       children: [for (final it in items) it.builder(state)],
     );
+    final style = state.adminStyle;
+    final floating = style.floating;
 
     if (context.isDesktop) {
-      return _spatialWrap(
+      return _styleWrap(
+        style,
         Scaffold(
-          appBar: _topBar(current.label, state),
-          body: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 2, 16, 16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _sideNav(state, items),
-                const SizedBox(width: 16),
-                Expanded(child: _workspace(page)),
-              ],
-            ),
-          ),
+          appBar: _topBar(current.label, state, style),
+          body: floating
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _sideNav(state, items, style),
+                      const SizedBox(width: 16),
+                      Expanded(child: _workspace(page, style)),
+                    ],
+                  ),
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _sideNav(state, items, style),
+                    Expanded(child: page),
+                  ],
+                ),
         ),
       );
     }
-    return _spatialWrap(
+    return _styleWrap(
+      style,
       Scaffold(
-        appBar: _topBar(current.label, state),
+        appBar: _topBar(current.label, state, style),
         drawer: Drawer(
           backgroundColor: Colors.transparent,
           elevation: 0,
           child: Padding(
             padding: const EdgeInsets.all(10),
-            child: SpatialPanel(
-              radius: 26,
-              depth: 2,
+            child: Container(
+              decoration:
+                  adminDecoration(context, style, radius: 26, depth: 2),
               child: SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.all(6),
@@ -243,138 +261,58 @@ class _AdminShellState extends State<AdminShell> {
             ),
           ),
         ),
-        body: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-          child: _workspace(page),
-        ),
+        body: floating
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+                child: _workspace(page, style),
+              )
+            : page,
       ),
     );
   }
 
-  /// The workspace slab: the page floats as one light surface in
-  /// front of the environment (depth 1), clipped to its corners.
-  Widget _workspace(Widget page) {
+  /// The workspace slab for floating styles: the page floats as
+  /// one surface in front of the environment (depth 1), clipped
+  /// to its corners.
+  Widget _workspace(Widget page, AdminStyle style) {
     return Container(
-      decoration: spatialDecoration(radius: 28, depth: 1),
+      decoration: adminDecoration(context, style, radius: 28, depth: 1),
       clipBehavior: Clip.antiAlias,
       child: page,
     );
   }
 
-  /// Spatial wrapper (owner order 2026-10-18): the deep-space
-  /// environment behind a transparent scaffold, a SpatialScope so
-  /// shared widgets render floating, and a theme whose surfaces
-  /// are clean light slabs with soft depth.
-  Widget _spatialWrap(Widget scaffold) {
-    return SpatialScope(
-      enabled: true,
+  /// Style wrapper: the style's backdrop behind a transparent
+  /// scaffold, an AdminScope so shared widgets render the style's
+  /// surfaces, and the style's component theme.
+  Widget _styleWrap(AdminStyle style, Widget scaffold) {
+    return AdminScope(
+      style: style,
       child: Theme(
-        data: _spatialTheme(),
+        data: adminTheme(context, style),
         child: Stack(
           children: [
-            const Positioned.fill(child: SpatialBackdrop()),
+            Positioned.fill(child: AdminBackdrop(style)),
             scaffold,
           ],
         ),
       ),
     );
   }
-
-  ThemeData _spatialTheme() {
-    final base = Theme.of(context);
-    final scheme = base.colorScheme;
-    OutlineInputBorder fieldBorder(Color c, double w) =>
-        OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: c, width: w),
-        );
-    return base.copyWith(
-      scaffoldBackgroundColor: Colors.transparent,
-      appBarTheme: base.appBarTheme.copyWith(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        foregroundColor: const Color(0xFF0F172A),
-        surfaceTintColor: Colors.transparent,
-        titleTextStyle: const TextStyle(
-          color: Color(0xFF0F172A),
-          fontSize: 19,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.2,
-        ),
-        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
-      ),
-      cardTheme: base.cardTheme.copyWith(
-        color: Colors.white.withValues(alpha: 0.95),
-        elevation: 8,
-        shadowColor: Colors.black.withValues(alpha: 0.18),
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.65)),
-        ),
-      ),
-      dialogTheme: base.dialogTheme.copyWith(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(26),
-        ),
-      ),
-      bottomSheetTheme: base.bottomSheetTheme.copyWith(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(26)),
-        ),
-      ),
-      popupMenuTheme: base.popupMenuTheme.copyWith(
-        color: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
-      ),
-      chipTheme: base.chipTheme.copyWith(
-        backgroundColor: const Color(0xFFF1F5F9),
-        selectedColor: scheme.primary.withValues(alpha: 0.18),
-        side: BorderSide.none,
-      ),
-      dividerTheme: base.dividerTheme.copyWith(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.10),
-        thickness: 1,
-      ),
-      inputDecorationTheme: base.inputDecorationTheme.copyWith(
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.92),
-        border: fieldBorder(const Color(0xFFCBD5E1), 1.2),
-        enabledBorder: fieldBorder(const Color(0xFFCBD5E1), 1.2),
-        focusedBorder: fieldBorder(scheme.primary, 1.8),
-      ),
-      dataTableTheme: base.dataTableTheme.copyWith(
-        headingRowColor:
-            const WidgetStatePropertyAll(Color(0xFFF1F5F9)),
-        dataRowColor: const WidgetStatePropertyAll(Colors.transparent),
-        dividerThickness: 1,
-      ),
-      expansionTileTheme: base.expansionTileTheme.copyWith(
-        backgroundColor: Colors.transparent,
-        collapsedBackgroundColor: Colors.transparent,
-      ),
-    );
-  }
-
-  PreferredSizeWidget _topBar(String title, AppState state) {
+  PreferredSizeWidget _topBar(
+      String title, AppState state, AdminStyle style) {
     return AppBar(
-      toolbarHeight: 76,
+      toolbarHeight: style.floating ? 76 : null,
       title: Text(title),
-      flexibleSpace: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-        child: Container(
-          decoration: spatialDecoration(radius: 20, depth: 2),
-        ),
-      ),
+      flexibleSpace: style.floating
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+              child: Container(
+                decoration:
+                    adminDecoration(context, style, radius: 20, depth: 2),
+              ),
+            )
+          : Container(decoration: adminBarDecoration(context, style)),
       actions: [
         IconButton(
           icon: const Icon(Icons.logout),
@@ -387,10 +325,12 @@ class _AdminShellState extends State<AdminShell> {
 
   /// Permanent light sidebar for desktop: gradient brand header, sectioned
   /// nav in the React sidebar's visual language, sign-out footer.
-  Widget _sideNav(AppState state, List<_NavItem> items) {
+  Widget _sideNav(AppState state, List<_NavItem> items, AdminStyle style) {
     return Container(
       width: 288,
-      decoration: spatialDecoration(radius: 28, depth: 2),
+      decoration: style.floating
+          ? adminDecoration(context, style, radius: 28, depth: 2)
+          : adminSidebarDecoration(context, style),
       child: Column(
         children: [
           _brandHeader(),

@@ -7,7 +7,7 @@ import '../../services/auth_service.dart';
 import '../../services/supabase_config.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
-import '../../widgets/spatial.dart';
+import '../../widgets/admin_style.dart';
 import '../../widgets/widgets.dart';
 
 /// Admin sign-in backed by Supabase Auth + the `user_roles` table.
@@ -157,34 +157,18 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // Spatial (same kit as the admin console): deep-space
-    // environment + the form floating as a light slab.
-    final base = Theme.of(context);
-    OutlineInputBorder fieldBorder(Color c, double w) =>
-        OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: c, width: w),
-        );
-    final spatialTheme = base.copyWith(
-      scaffoldBackgroundColor: Colors.transparent,
-      iconTheme: const IconThemeData(color: Colors.white),
-      inputDecorationTheme: base.inputDecorationTheme.copyWith(
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.92),
-        border: fieldBorder(const Color(0xFFCBD5E1), 1.2),
-        enabledBorder: fieldBorder(const Color(0xFFCBD5E1), 1.2),
-        focusedBorder: fieldBorder(scheme.primary, 1.8),
-      ),
-    );
-    return SpatialScope(
-      enabled: true,
+    // The login wears the same admin style as the console
+    // (Admin > Panel Style): its backdrop + component theme.
+    final style = AppStateScope.of(context).adminStyle;
+    return AdminScope(
+      style: style,
       child: Theme(
-        data: spatialTheme,
+        data: adminTheme(context, style),
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Stack(
             children: [
-              const Positioned.fill(child: SpatialBackdrop()),
+              Positioned.fill(child: AdminBackdrop(style)),
               SafeArea(
                 child: Center(
                   child: SingleChildScrollView(

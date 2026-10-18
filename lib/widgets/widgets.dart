@@ -6,7 +6,7 @@ import '../data/mock_data.dart';
 import '../state/app_state.dart';
 import '../app_navigator.dart';
 import '../screens/login_screen.dart';
-import 'spatial.dart';
+import 'admin_style.dart';
 import 'theme_backdrop.dart';
 
 // Shared building blocks for the Remedoo app.
@@ -1670,13 +1670,14 @@ class RCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final radius = RemedooTheme.cardRadius + 4;
-    // Inside the admin panel (SpatialScope) cards render as
-    // floating slabs; everywhere else they keep the standard look.
-    final spatial = SpatialScope.of(context);
+    // Inside the admin panel (AdminScope) cards render in the
+    // active admin style; everywhere else they keep the standard
+    // look.
+    final adminStyle = AdminScope.maybeOf(context);
     final card = Container(
       padding: padding,
-      decoration: spatial
-          ? spatialDecoration(radius: radius)
+      decoration: adminStyle != null
+          ? adminDecoration(context, adminStyle, radius: radius)
           : BoxDecoration(
               color: scheme.primary.withValues(alpha: 0.07),
               borderRadius: BorderRadius.circular(radius),

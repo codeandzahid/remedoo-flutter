@@ -12,6 +12,7 @@ import '../services/auth_service.dart';
 import '../services/supabase_repository.dart';
 import '../services/payment_service.dart';
 import '../theme.dart';
+import '../widgets/admin_style.dart';
 
 /// Inherited access to the single AppState for the whole app.
 class AppStateScope extends InheritedNotifier<AppState> {
@@ -196,6 +197,10 @@ class AppState extends ChangeNotifier {
           RemedooTheme.setPack(pack);
         }
       }
+      final adminStyleId = prefs.getString(_kAdminStyleKey);
+      if (adminStyleId != null) {
+        _adminStyle = AdminStyle.byId(adminStyleId);
+      }
     } catch (_) {
       // Storage unavailable (e.g. private browsing): keep in-memory default.
     }
@@ -212,8 +217,28 @@ class AppState extends ChangeNotifier {
   }
 
   static const _kThemePackKey = 'remedoo_theme_pack';
+  static const _kAdminStyleKey = 'remedoo_admin_style';
 
   ThemePack _themePack = ThemePack.skyPulse;
+
+  /// Admin panel visual style (Admin > Panel Style). Dark Command
+  /// Center is the default so the style parade the owner ordered on
+  /// 2026-10-18 starts on a fresh look; the pick persists on-device.
+  AdminStyle _adminStyle = AdminStyle.darkCommand;
+  AdminStyle get adminStyle => _adminStyle;
+
+  Future<void> setAdminStyle(AdminStyle style) async {
+    if (style == _adminStyle) return;
+    _adminStyle = style;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 3));
+      await prefs.setString(_kAdminStyleKey, style.id);
+    } catch (_) {
+      // Best-effort persistence only.
+    }
+  }
 
   /// Admin-controlled availability: pack id -> enabled. Fetched from
   /// Supabase at boot; defaults to all-enabled when offline.
