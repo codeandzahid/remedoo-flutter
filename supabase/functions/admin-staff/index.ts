@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Admin > Team: the SUPER ADMIN creates and removes staff (employee
-// admin) accounts. Staff get role 'staff' + a row in admin_permissions
+// admin) accounts. Staff get role 'staff' + a row in staff_permissions
 // listing the admin sections they may use — the database enforces it
 // via RLS, the app only shows those sections.
 //
@@ -89,7 +89,7 @@ serve(async (req) => {
       const uid = created.user.id;
       await admin.from('user_roles').insert({ user_id: uid, role: 'staff' });
       await admin
-        .from('admin_permissions')
+        .from('staff_permissions')
         .insert({ user_id: uid, sections });
       // Profile row so the person shows up with a name in the panel.
       try {
@@ -112,7 +112,7 @@ serve(async (req) => {
       if (delErr) {
         return json({ error: delErr.message }, 400);
       }
-      // user_roles + admin_permissions cascade on auth user delete;
+      // user_roles + staff_permissions cascade on auth user delete;
       // clean the profile row too if it lingers.
       try {
         await admin.from('profiles').delete().eq('id', uid);

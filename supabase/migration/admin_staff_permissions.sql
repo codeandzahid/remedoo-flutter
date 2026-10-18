@@ -8,22 +8,22 @@
 alter type public.app_role add value if not exists 'staff';
 
 -- 2) Per-staff section permissions
-create table if not exists public.admin_permissions (
+create table if not exists public.staff_permissions (
   user_id uuid primary key references auth.users(id) on delete cascade,
   sections jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-alter table public.admin_permissions enable row level security;
+alter table public.staff_permissions enable row level security;
 
-drop policy if exists "Admins manage staff permissions" on public.admin_permissions;
-create policy "Admins manage staff permissions" on public.admin_permissions
+drop policy if exists "Admins manage staff permissions" on public.staff_permissions;
+create policy "Admins manage staff permissions" on public.staff_permissions
   for all to authenticated
   using (exists (select 1 from public.user_roles ur where ur.user_id = auth.uid() and ur.role = 'admin'))
   with check (exists (select 1 from public.user_roles ur where ur.user_id = auth.uid() and ur.role = 'admin'));
 
-drop policy if exists "Staff read own permissions" on public.admin_permissions;
-create policy "Staff read own permissions" on public.admin_permissions
+drop policy if exists "Staff read own permissions" on public.staff_permissions;
+create policy "Staff read own permissions" on public.staff_permissions
   for select to authenticated using (user_id = auth.uid());
 
 -- 3) Helper: does the signed-in staff user hold a section?
@@ -35,7 +35,7 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from public.admin_permissions ap
+    select 1 from public.staff_permissions ap
     where ap.user_id = auth.uid() and ap.sections ? sec
   );
 $$;

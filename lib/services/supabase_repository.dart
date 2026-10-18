@@ -946,7 +946,7 @@ class SupabaseRepository {
           .limit(1);
       if (roles.isEmpty) return null;
       final perms = await _db
-          .from('admin_permissions')
+          .from('staff_permissions')
           .select('sections')
           .eq('user_id', uid)
           .limit(1);
@@ -984,7 +984,7 @@ class SupabaseRepository {
         List<String> sections = const [];
         try {
           final perms = await _db
-              .from('admin_permissions')
+              .from('staff_permissions')
               .select('sections')
               .eq('user_id', uid)
               .limit(1);
@@ -1015,7 +1015,7 @@ class SupabaseRepository {
       String userId, List<String> sections) async {
     if (!_ready) return false;
     try {
-      await _db.from('admin_permissions').upsert({
+      await _db.from('staff_permissions').upsert({
         'user_id': userId,
         'sections': sections,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
