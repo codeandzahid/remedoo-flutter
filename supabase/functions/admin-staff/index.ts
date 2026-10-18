@@ -91,11 +91,13 @@ serve(async (req) => {
       await admin
         .from('staff_permissions')
         .insert({ user_id: uid, sections });
-      // Profile row so the person shows up with a name in the panel.
+      // The auth trigger already created a profile row (keyed by
+      // user_id, display name in full_name) — put the name on it.
       try {
         await admin
           .from('profiles')
-          .insert({ id: uid, name, email });
+          .update({ full_name: name })
+          .eq('user_id', uid);
       } catch (_) {
         // best effort — the account works without it
       }
@@ -115,7 +117,7 @@ serve(async (req) => {
       // user_roles + staff_permissions cascade on auth user delete;
       // clean the profile row too if it lingers.
       try {
-        await admin.from('profiles').delete().eq('id', uid);
+        await admin.from('profiles').delete().eq('user_id', uid);
       } catch (_) {}
       return json({ ok: true });
     }

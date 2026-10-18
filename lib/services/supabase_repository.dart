@@ -976,8 +976,8 @@ class SupabaseRepository {
         try {
           final p = await _db
               .from('profiles')
-              .select('name, email, phone')
-              .eq('id', uid)
+              .select('full_name, email, phone')
+              .eq('user_id', uid)
               .limit(1);
           if (p.isNotEmpty) profile = Map<String, dynamic>.from(p.first);
         } catch (_) {}
@@ -996,7 +996,7 @@ class SupabaseRepository {
         } catch (_) {}
         out.add({
           'user_id': uid,
-          'name': profile['name'] ?? '',
+          'name': profile['full_name'] ?? '',
           'email': profile['email'] ?? '',
           'phone': profile['phone'] ?? '',
           'sections': sections,
