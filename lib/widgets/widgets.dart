@@ -6,7 +6,7 @@ import '../data/mock_data.dart';
 import '../state/app_state.dart';
 import '../app_navigator.dart';
 import '../screens/login_screen.dart';
-import 'glass.dart';
+import 'maximal.dart';
 import 'theme_backdrop.dart';
 
 // Shared building blocks for the Remedoo app.
@@ -1670,13 +1670,13 @@ class RCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final radius = RemedooTheme.cardRadius + 4;
-    // Inside the admin panel (GlassScope) cards render as frosted
-    // glass; everywhere else they keep the standard tinted look.
-    final glass = GlassScope.of(context);
+    // Inside the admin panel (MaxScope) cards render in the
+    // maximal style; everywhere else they keep the standard look.
+    final maximal = MaxScope.of(context);
     final card = Container(
       padding: padding,
-      decoration: glass
-          ? glassDecoration(radius: radius)
+      decoration: maximal
+          ? maxDecoration(radius: radius)
           : BoxDecoration(
               color: scheme.primary.withValues(alpha: 0.07),
               borderRadius: BorderRadius.circular(radius),

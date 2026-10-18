@@ -7,7 +7,7 @@ import '../../services/auth_service.dart';
 import '../../services/supabase_config.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
-import '../../widgets/glass.dart';
+import '../../widgets/maximal.dart';
 import '../../widgets/widgets.dart';
 
 /// Admin sign-in backed by Supabase Auth + the `user_roles` table.
@@ -157,39 +157,33 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // Glassmorphism (same kit as the admin console): aurora
-    // backdrop + frosted form card.
+    // Maximalism (same kit as the admin console): loud saturated
+    // backdrop + bold paper form card with ink outlines.
     final base = Theme.of(context);
-    final glassTheme = base.copyWith(
+    OutlineInputBorder fieldBorder(Color c, double w) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: c, width: w),
+        );
+    final maxTheme = base.copyWith(
       scaffoldBackgroundColor: Colors.transparent,
       inputDecorationTheme: base.inputDecorationTheme.copyWith(
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.45),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              BorderSide(color: Colors.white.withValues(alpha: 0.7)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              BorderSide(color: Colors.white.withValues(alpha: 0.7)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: scheme.primary, width: 1.6),
-        ),
+        fillColor: maxPaper,
+        border: fieldBorder(maxInk, 2),
+        enabledBorder: fieldBorder(maxInk, 2),
+        focusedBorder: fieldBorder(maxPink, 2.5),
       ),
     );
-    return GlassScope(
+    return MaxScope(
       enabled: true,
       child: Theme(
-        data: glassTheme,
+        data: maxTheme,
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Stack(
             children: [
-              const Positioned.fill(child: GlassBackdrop()),
+              const Positioned.fill(child: MaxBackdrop()),
               SafeArea(
                 child: Center(
                   child: SingleChildScrollView(
@@ -203,9 +197,18 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: scheme.primary,
+                        gradient: const LinearGradient(
+                          colors: [maxPink, maxViolet, Color(0xFF2563EB)],
+                        ),
                         borderRadius: BorderRadius.circular(18),
-                        boxShadow: RemedooTheme.softShadow,
+                        border: Border.all(color: maxInk, width: 2),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0xE6232038),
+                            blurRadius: 0,
+                            offset: Offset(4, 4),
+                          ),
+                        ],
                       ),
                       child: const Icon(Icons.shield_outlined,
                           color: Colors.white, size: 32),

@@ -1,11 +1,9 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
-import '../../widgets/glass.dart';
+import '../../widgets/maximal.dart';
 import '../../widgets/widgets.dart';
 import 'admin_crud_screen.dart';
 import 'admin_dashboard_screen.dart';
@@ -184,7 +182,7 @@ class _AdminShellState extends State<AdminShell> {
     _allItems = all;
     _visibleItems = items;
     if (items.isEmpty) {
-      return _glassWrap(
+      return _maxWrap(
         Scaffold(
           appBar: _topBar('Admin Console', state),
           body: const Center(
@@ -208,7 +206,7 @@ class _AdminShellState extends State<AdminShell> {
     );
 
     if (context.isDesktop) {
-      return _glassWrap(
+      return _maxWrap(
         Scaffold(
           appBar: _topBar(current.label, state),
           body: Row(
@@ -220,15 +218,14 @@ class _AdminShellState extends State<AdminShell> {
         ),
       );
     }
-    return _glassWrap(
+    return _maxWrap(
       Scaffold(
         appBar: _topBar(current.label, state),
         drawer: Drawer(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          child: GlassPanel(
+          child: MaxPanel(
             radius: 0,
-            blur: true,
             child: SafeArea(
               child: _navColumn(state, items, inDrawer: true),
             ),
@@ -239,18 +236,18 @@ class _AdminShellState extends State<AdminShell> {
     );
   }
 
-  /// Glassmorphism wrapper (owner order 2026-10-18): the aurora
-  /// backdrop behind a transparent scaffold, a GlassScope so shared
-  /// widgets render frosted, and a theme whose surfaces (cards,
-  /// chips, fields, tables, dividers) turn translucent white.
-  Widget _glassWrap(Widget scaffold) {
-    return GlassScope(
+  /// Maximalism wrapper (owner order 2026-10-18): the loud
+  /// saturated backdrop behind a transparent scaffold, a MaxScope
+  /// so shared widgets render their maximal variant, and a theme
+  /// whose surfaces turn warm-paper with chunky ink outlines.
+  Widget _maxWrap(Widget scaffold) {
+    return MaxScope(
       enabled: true,
       child: Theme(
-        data: _glassTheme(),
+        data: _maxTheme(),
         child: Stack(
           children: [
-            const Positioned.fill(child: GlassBackdrop()),
+            const Positioned.fill(child: MaxBackdrop()),
             scaffold,
           ],
         ),
@@ -258,14 +255,17 @@ class _AdminShellState extends State<AdminShell> {
     );
   }
 
-  ThemeData _glassTheme() {
+  ThemeData _maxTheme() {
     final base = Theme.of(context);
-    final scheme = base.colorScheme;
-    final white = Colors.white;
     OutlineInputBorder fieldBorder(Color c, double w) =>
         OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: c, width: w),
+        );
+    RoundedRectangleBorder inkShape(double r) =>
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(r),
+          side: const BorderSide(color: maxInk, width: 2),
         );
     return base.copyWith(
       scaffoldBackgroundColor: Colors.transparent,
@@ -273,27 +273,29 @@ class _AdminShellState extends State<AdminShell> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        foregroundColor: scheme.onSurface,
+        foregroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
+        titleTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       cardTheme: base.cardTheme.copyWith(
-        color: white.withValues(alpha: 0.55),
+        color: maxPaper,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: white.withValues(alpha: 0.65)),
-        ),
+        shape: inkShape(20),
       ),
       dialogTheme: base.dialogTheme.copyWith(
-        backgroundColor: white.withValues(alpha: 0.94),
+        backgroundColor: maxPaper,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: inkShape(24),
       ),
       bottomSheetTheme: base.bottomSheetTheme.copyWith(
-        backgroundColor: white.withValues(alpha: 0.96),
+        backgroundColor: maxPaper,
         surfaceTintColor: Colors.transparent,
         shape: const RoundedRectangleBorder(
           borderRadius:
@@ -301,32 +303,31 @@ class _AdminShellState extends State<AdminShell> {
         ),
       ),
       popupMenuTheme: base.popupMenuTheme.copyWith(
-        color: white.withValues(alpha: 0.95),
+        color: maxPaper,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: inkShape(16),
       ),
       chipTheme: base.chipTheme.copyWith(
-        backgroundColor: white.withValues(alpha: 0.45),
-        selectedColor: scheme.primary.withValues(alpha: 0.22),
-        side: BorderSide(color: white.withValues(alpha: 0.6)),
+        backgroundColor: maxAmber,
+        selectedColor: maxPink.withValues(alpha: 0.35),
+        side: const BorderSide(color: maxInk, width: 1.5),
       ),
       dividerTheme: base.dividerTheme.copyWith(
-        color: white.withValues(alpha: 0.55),
+        color: maxInk.withValues(alpha: 0.35),
+        thickness: 1.2,
       ),
       inputDecorationTheme: base.inputDecorationTheme.copyWith(
         filled: true,
-        fillColor: white.withValues(alpha: 0.45),
-        border: fieldBorder(white.withValues(alpha: 0.7), 1),
-        enabledBorder: fieldBorder(white.withValues(alpha: 0.7), 1),
-        focusedBorder: fieldBorder(scheme.primary, 1.6),
+        fillColor: maxPaper,
+        border: fieldBorder(maxInk, 2),
+        enabledBorder: fieldBorder(maxInk, 2),
+        focusedBorder: fieldBorder(maxPink, 2.5),
       ),
       dataTableTheme: base.dataTableTheme.copyWith(
         headingRowColor:
-            WidgetStatePropertyAll(white.withValues(alpha: 0.35)),
+            const WidgetStatePropertyAll(Color(0xFFDDD6FE)),
         dataRowColor: const WidgetStatePropertyAll(Colors.transparent),
-        dividerThickness: 0.6,
+        dividerThickness: 1,
       ),
       expansionTileTheme: base.expansionTileTheme.copyWith(
         backgroundColor: Colors.transparent,
@@ -338,14 +339,15 @@ class _AdminShellState extends State<AdminShell> {
   PreferredSizeWidget _topBar(String title, AppState state) {
     return AppBar(
       title: Text(title),
-      flexibleSpace: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(color: Colors.white.withValues(alpha: 0.42)),
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [maxViolet, maxPink, maxOrange],
+          ),
         ),
       ),
-      shape: Border(
-        bottom: BorderSide(color: Colors.white.withValues(alpha: 0.6)),
+      shape: const Border(
+        bottom: BorderSide(color: maxInk, width: 2),
       ),
       actions: [
         IconButton(
@@ -362,10 +364,20 @@ class _AdminShellState extends State<AdminShell> {
   Widget _sideNav(AppState state, List<_NavItem> items) {
     return Container(
       width: 288,
-      decoration: glassDecoration(
-        radius: 0,
-        topAlpha: 0.55,
-        bottomAlpha: 0.40,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [maxPaper, Color(0xFFFFF1C9)],
+        ),
+        border: Border(right: BorderSide(color: maxInk, width: 2)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0xE6232038),
+            blurRadius: 0,
+            offset: Offset(6, 0),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -382,21 +394,21 @@ class _AdminShellState extends State<AdminShell> {
   /// Gradient brand banner (rounded-2xl orange gradient, white text) —
   /// the admin counterpart of the React sidebar's gradient Close button.
   Widget _brandHeader() {
-    final p = Theme.of(context).colorScheme.primary;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [p, p.withValues(alpha: 0.7)],
+          gradient: const LinearGradient(
+            colors: [maxPink, maxViolet, Color(0xFF2563EB)],
           ),
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
+          border: Border.all(color: maxInk, width: 2),
+          boxShadow: const [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+              color: Color(0xE6232038),
+              blurRadius: 0,
+              offset: Offset(4, 4),
             ),
           ],
         ),
@@ -495,8 +507,9 @@ class _AdminShellState extends State<AdminShell> {
             padding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.08),
+              color: maxAmber,
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: maxInk, width: 1.5),
             ),
             child: Text(
               state.isAdmin ? 'SUPER ADMIN' : 'STAFF ACCOUNT',
