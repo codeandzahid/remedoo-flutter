@@ -225,7 +225,7 @@ class AppState extends ChangeNotifier {
   /// walking the styles one by one by number (2026-10-18); the
   /// current parade pick is the code default and persists on-device
   /// once chosen in the picker.
-  AdminStyle _adminStyle = AdminStyle.brutal;
+  AdminStyle _adminStyle = AdminStyle.clay;
   AdminStyle get adminStyle => _adminStyle;
 
   Future<void> setAdminStyle(AdminStyle style) async {
