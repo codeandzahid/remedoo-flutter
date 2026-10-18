@@ -21,6 +21,8 @@ import 'admin_payments_screen.dart';
 import 'admin_remedoo_pay_screen.dart';
 import 'admin_app_settings_screen.dart';
 import 'admin_users_screen.dart';
+import 'admin_team_screen.dart';
+import 'admin_export_screen.dart';
 
 class _NavItem {
   final String section;
@@ -101,7 +103,27 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // so existing section indexes used by the dashboard stay stable)
       _NavItem('Payments', 'Remedoo Pay', Icons.qr_code_2,
           (_) => const AdminRemedooPayScreen()),
+      // Team — staff (employee admin) management, super admin only.
+      _NavItem('Settings', 'Team', Icons.group,
+          (_) => const AdminTeamScreen()),
+      // Export Data — download project data (CSV / full backup JSON).
+      _NavItem('Settings', 'Export Data', Icons.download,
+          (_) => const AdminExportScreen()),
     ];
+
+/// Permission key per nav item, aligned with [_items] by index.
+/// The super admin (role 'admin') sees everything. Staff accounts see
+/// only the items whose key the super admin ticked for them in
+/// Admin > Team ('team' itself is never visible to staff).
+const _permKeys = [
+  'dashboard', 'doctors', 'hospitals', 'labs', 'lab_tests', 'pharmacies',
+  'medicines', 'inventory', 'applications', 'provider_payments',
+  'reviews', 'orders', 'appointments', 'refunds', 'emergencies',
+  'ambulance', 'support', 'announcements', 'settings', 'branding',
+  'commission', 'subscriptions', 'corporate', 'packages',
+  'service_areas', 'featured', 'revenue', 'analytics', 'users',
+  'remedoo_pay', 'team', 'export_data',
+];
 
 /// Admin console shell: light sidebar nav (desktop) / drawer (phone, tablet),
 /// top app bar with the current page title.
@@ -114,9 +136,19 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   int _index = 0;
+  List<_NavItem> _allItems = const [];
+  List<_NavItem> _visibleItems = const [];
 
   void _go(int i) {
     setState(() => _index = i);
+  }
+
+  /// Dashboard cards navigate by ABSOLUTE item index; translate to the
+  /// visible (permission-filtered) index. Hidden items do nothing.
+  void _goAbs(int abs) {
+    if (abs < 0 || abs >= _allItems.length) return;
+    final vi = _visibleItems.indexOf(_allItems[abs]);
+    if (vi >= 0) setState(() => _index = vi);
   }
 
   Future<void> _logout(AppState state) async {
@@ -136,10 +168,37 @@ class _AdminShellState extends State<AdminShell> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final items = _items(state, _go);
-    final current = items[_index];
+    final all = _items(state, _goAbs);
+    final items = state.isAdmin
+        ? all
+        : all
+            .where((it) {
+              final key = _permKeys[all.indexOf(it)];
+              if (key == 'team') return false;
+              return state.staffSections.contains(key);
+            })
+            .toList();
+    _allItems = all;
+    _visibleItems = items;
+    if (items.isEmpty) {
+      return Scaffold(
+        appBar: _topBar('Admin Console', state),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'No sections are assigned to your account yet.\n'
+              'Ask the super admin to give you access in Admin > Team.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+    final safeIndex = _index.clamp(0, items.length - 1);
+    final current = items[safeIndex];
     final page = IndexedStack(
-      index: _index,
+      index: safeIndex,
       children: [for (final it in items) it.builder(state)],
     );
 

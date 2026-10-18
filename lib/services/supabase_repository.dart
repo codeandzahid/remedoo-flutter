@@ -931,6 +931,143 @@ class SupabaseRepository {
     }
   }
 
+  /// The signed-in user's staff access: their assigned admin sections,
+  /// or null when they are not a staff (employee admin) account.
+  Future<List<String>?> fetchOwnStaffAccess() async {
+    if (!_ready) return null;
+    try {
+      final uid = _uid;
+      if (uid == null) return null;
+      final roles = await _db
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', uid)
+          .eq('role', 'staff')
+          .limit(1);
+      if (roles.isEmpty) return null;
+      final perms = await _db
+          .from('admin_permissions')
+          .select('sections')
+          .eq('user_id', uid)
+          .limit(1);
+      if (perms.isEmpty) return const [];
+      final raw = perms.first['sections'];
+      if (raw is List) return raw.map((e) => '$e').toList();
+      return const [];
+    } catch (e) {
+      debugPrint('fetchOwnStaffAccess failed: $e');
+      return null;
+    }
+  }
+
+  /// All staff accounts with their profile + assigned sections
+  /// (super-admin view for Admin > Team).
+  Future<List<Map<String, dynamic>>> fetchStaffMembers() async {
+    if (!_ready) return const [];
+    try {
+      final roleRows = await _db
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'staff');
+      final out = <Map<String, dynamic>>[];
+      for (final r in roleRows) {
+        final uid = '${r['user_id']}';
+        Map<String, dynamic> profile = {};
+        try {
+          final p = await _db
+              .from('profiles')
+              .select('name, email, phone')
+              .eq('id', uid)
+              .limit(1);
+          if (p.isNotEmpty) profile = Map<String, dynamic>.from(p.first);
+        } catch (_) {}
+        List<String> sections = const [];
+        try {
+          final perms = await _db
+              .from('admin_permissions')
+              .select('sections')
+              .eq('user_id', uid)
+              .limit(1);
+          if (perms.isNotEmpty && perms.first['sections'] is List) {
+            sections = (perms.first['sections'] as List)
+                .map((e) => '$e')
+                .toList();
+          }
+        } catch (_) {}
+        out.add({
+          'user_id': uid,
+          'name': profile['name'] ?? '',
+          'email': profile['email'] ?? '',
+          'phone': profile['phone'] ?? '',
+          'sections': sections,
+        });
+      }
+      return out;
+    } catch (e) {
+      debugPrint('fetchStaffMembers failed: $e');
+      return const [];
+    }
+  }
+
+  /// Replace a staff member's assigned sections (super admin only;
+  /// enforced by RLS).
+  Future<bool> updateStaffSections(
+      String userId, List<String> sections) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('admin_permissions').upsert({
+        'user_id': userId,
+        'sections': sections,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('updateStaffSections failed: $e');
+      return false;
+    }
+  }
+
+  /// Call the admin-staff Edge Function (create/delete staff accounts).
+  /// Returns null on success, or the error message.
+  Future<String?> invokeAdminStaff(Map<String, dynamic> payload) async {
+    if (!_ready) return 'Not ready.';
+    try {
+      final res = await _db.functions.invoke('admin-staff', body: payload);
+      final data = res.data;
+      if (data is Map && data['error'] != null) return '${data['error']}';
+      return null;
+    } on FunctionException catch (e) {
+      final details = e.details;
+      if (details is Map && details['error'] != null) {
+        return '${details['error']}';
+      }
+      return 'Request failed (${e.status}).';
+    } catch (e) {
+      debugPrint('invokeAdminStaff failed: $e');
+      return 'Request failed.';
+    }
+  }
+
+  /// Fetch an ENTIRE table in pages (Admin > Export Data). Runs under
+  /// the caller's RLS — you only export what your account may see.
+  Future<List<Map<String, dynamic>>> exportTable(String table) async {
+    if (!_ready) return const [];
+    final out = <Map<String, dynamic>>[];
+    const pageSize = 1000;
+    var from = 0;
+    while (true) {
+      final rows = await _db
+          .from(table)
+          .select()
+          .range(from, from + pageSize - 1);
+      out.addAll(rows.map((r) => Map<String, dynamic>.from(r)));
+      if (rows.length < pageSize) break;
+      from += pageSize;
+      if (from > 200000) break; // hard safety stop
+    }
+    return out;
+  }
+
   /// App-wide config key/value store (branding, fees, emergency numbers,
   /// maintenance mode...). Returns {key: valueMap}.
   Future<Map<String, Map<String, dynamic>>> fetchAppConfig() async {

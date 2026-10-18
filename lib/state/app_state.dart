@@ -455,6 +455,9 @@ class AppState extends ChangeNotifier {
     _name = 'Patient';
     _email = '';
     _providerRole = null;
+    _isAdmin = false;
+    _isStaff = false;
+    _staffSections = const [];
     _role = 'patient';
     appointments.clear();
     orders.clear();
@@ -1577,6 +1580,23 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _isStaff = false;
+  List<String> _staffSections = const [];
+
+  /// Staff (employee admin) account: sees only the admin sections the
+  /// super admin assigned in Admin > Team. Enforced by RLS as well.
+  bool get isStaff => _isStaff;
+  List<String> get staffSections => _staffSections;
+  bool staffCan(String section) =>
+      _isAdmin || _staffSections.contains(section);
+
+  Future<void> checkStaffRole() async {
+    final res = await _repo.fetchOwnStaffAccess();
+    _isStaff = res != null;
+    _staffSections = res ?? const [];
+    notifyListeners();
+  }
+
   String? _providerRole;
 
   /// The signed-in user's provider role (doctor/pharmacy/lab/hospital).
@@ -1596,6 +1616,11 @@ class AppState extends ChangeNotifier {
     await checkAdminRole();
     if (_isAdmin) {
       switchRole('admin');
+      return;
+    }
+    await checkStaffRole();
+    if (_isStaff) {
+      switchRole('staff');
       return;
     }
     await checkProviderRole();

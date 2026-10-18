@@ -119,7 +119,9 @@ class _RootGateState extends State<RootGate> {
     if (state.maintenanceMode) return const MaintenanceScreen();
     if (!_splashDone || !_authReady) return const SplashView();
     if (!state.seenOnboarding) return const OnboardingScreen();
-    if (state.role == 'admin') return const AdminShell();
+    if (state.role == 'admin' || state.role == 'staff') {
+      return const AdminShell();
+    }
     // Provider accounts land in their own dashboard, not the
     // patient app (same routing as the partner app).
     switch (state.role) {

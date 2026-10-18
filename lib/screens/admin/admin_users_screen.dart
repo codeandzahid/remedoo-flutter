@@ -169,7 +169,20 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                             ],
                           ),
                           trailing: InkWell(
-                            onTap: () => _showRoleDialog(u),
+                            onTap: () {
+                              // Roles belong to the super admin only;
+                              // staff (even with Users access) can't
+                              // change them — the database blocks it too.
+                              if (state.isStaff) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text(
+                                          'Only the super admin can change roles.')),
+                                );
+                                return;
+                              }
+                              _showRoleDialog(u);
+                            },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 6),
