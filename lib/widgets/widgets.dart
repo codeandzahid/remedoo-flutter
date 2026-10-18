@@ -6,6 +6,7 @@ import '../data/mock_data.dart';
 import '../state/app_state.dart';
 import '../app_navigator.dart';
 import '../screens/login_screen.dart';
+import 'glass.dart';
 import 'theme_backdrop.dart';
 
 // Shared building blocks for the Remedoo app.
@@ -1669,21 +1670,26 @@ class RCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final radius = RemedooTheme.cardRadius + 4;
+    // Inside the admin panel (GlassScope) cards render as frosted
+    // glass; everywhere else they keep the standard tinted look.
+    final glass = GlassScope.of(context);
     final card = Container(
       padding: padding,
-      decoration: BoxDecoration(
-        color: scheme.primary.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: _isDark(context)
-            ? null
-            : [
-                BoxShadow(
-                  color: scheme.primary.withValues(alpha: 0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-      ),
+      decoration: glass
+          ? glassDecoration(radius: radius)
+          : BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(radius),
+              boxShadow: _isDark(context)
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: scheme.primary.withValues(alpha: 0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+            ),
       child: Material(
         type: MaterialType.transparency,
         child: child,

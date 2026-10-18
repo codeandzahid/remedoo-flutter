@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../../services/supabase_config.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/glass.dart';
 import '../../widgets/widgets.dart';
 
 /// Admin sign-in backed by Supabase Auth + the `user_roles` table.
@@ -156,27 +157,48 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              scheme.primary.withValues(alpha: 0.08),
-              scheme.surface,
-            ],
-          ),
+    // Glassmorphism (same kit as the admin console): aurora
+    // backdrop + frosted form card.
+    final base = Theme.of(context);
+    final glassTheme = base.copyWith(
+      scaffoldBackgroundColor: Colors.transparent,
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.45),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide:
+              BorderSide(color: Colors.white.withValues(alpha: 0.7)),
         ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide:
+              BorderSide(color: Colors.white.withValues(alpha: 0.7)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: scheme.primary, width: 1.6),
+        ),
+      ),
+    );
+    return GlassScope(
+      enabled: true,
+      child: Theme(
+        data: glassTheme,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(
+            children: [
+              const Positioned.fill(child: GlassBackdrop()),
+              SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 400),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                     Container(
                       width: 64,
                       height: 64,
@@ -295,10 +317,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         style: TextStyle(
                             fontSize: 12,
                             color: scheme.onSurfaceVariant)),
-                  ],
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),

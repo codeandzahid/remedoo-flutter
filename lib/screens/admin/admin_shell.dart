@@ -1,8 +1,11 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/glass.dart';
 import '../../widgets/widgets.dart';
 import 'admin_crud_screen.dart';
 import 'admin_dashboard_screen.dart';
@@ -181,15 +184,17 @@ class _AdminShellState extends State<AdminShell> {
     _allItems = all;
     _visibleItems = items;
     if (items.isEmpty) {
-      return Scaffold(
-        appBar: _topBar('Admin Console', state),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'No sections are assigned to your account yet.\n'
-              'Ask the super admin to give you access in Admin > Team.',
-              textAlign: TextAlign.center,
+      return _glassWrap(
+        Scaffold(
+          appBar: _topBar('Admin Console', state),
+          body: const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'No sections are assigned to your account yet.\n'
+                'Ask the super admin to give you access in Admin > Team.',
+                textAlign: TextAlign.center,
+              ),
             ),
           ),
         ),
@@ -203,32 +208,145 @@ class _AdminShellState extends State<AdminShell> {
     );
 
     if (context.isDesktop) {
-      return Scaffold(
-        appBar: _topBar(current.label, state),
-        body: Row(
-          children: [
-            _sideNav(state, items),
-            const VerticalDivider(width: 1, thickness: 1),
-            Expanded(child: page),
-          ],
+      return _glassWrap(
+        Scaffold(
+          appBar: _topBar(current.label, state),
+          body: Row(
+            children: [
+              _sideNav(state, items),
+              Expanded(child: page),
+            ],
+          ),
         ),
       );
     }
-    return Scaffold(
-      appBar: _topBar(current.label, state),
-      drawer: Drawer(
-        backgroundColor: _sidebarBg(),
-        child: SafeArea(
-          child: _navColumn(state, items, inDrawer: true),
+    return _glassWrap(
+      Scaffold(
+        appBar: _topBar(current.label, state),
+        drawer: Drawer(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: GlassPanel(
+            radius: 0,
+            blur: true,
+            child: SafeArea(
+              child: _navColumn(state, items, inDrawer: true),
+            ),
+          ),
+        ),
+        body: page,
+      ),
+    );
+  }
+
+  /// Glassmorphism wrapper (owner order 2026-10-18): the aurora
+  /// backdrop behind a transparent scaffold, a GlassScope so shared
+  /// widgets render frosted, and a theme whose surfaces (cards,
+  /// chips, fields, tables, dividers) turn translucent white.
+  Widget _glassWrap(Widget scaffold) {
+    return GlassScope(
+      enabled: true,
+      child: Theme(
+        data: _glassTheme(),
+        child: Stack(
+          children: [
+            const Positioned.fill(child: GlassBackdrop()),
+            scaffold,
+          ],
         ),
       ),
-      body: page,
+    );
+  }
+
+  ThemeData _glassTheme() {
+    final base = Theme.of(context);
+    final scheme = base.colorScheme;
+    final white = Colors.white;
+    OutlineInputBorder fieldBorder(Color c, double w) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: c, width: w),
+        );
+    return base.copyWith(
+      scaffoldBackgroundColor: Colors.transparent,
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        foregroundColor: scheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      cardTheme: base.cardTheme.copyWith(
+        color: white.withValues(alpha: 0.55),
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: white.withValues(alpha: 0.65)),
+        ),
+      ),
+      dialogTheme: base.dialogTheme.copyWith(
+        backgroundColor: white.withValues(alpha: 0.94),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+      ),
+      bottomSheetTheme: base.bottomSheetTheme.copyWith(
+        backgroundColor: white.withValues(alpha: 0.96),
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+      ),
+      popupMenuTheme: base.popupMenuTheme.copyWith(
+        color: white.withValues(alpha: 0.95),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: white.withValues(alpha: 0.45),
+        selectedColor: scheme.primary.withValues(alpha: 0.22),
+        side: BorderSide(color: white.withValues(alpha: 0.6)),
+      ),
+      dividerTheme: base.dividerTheme.copyWith(
+        color: white.withValues(alpha: 0.55),
+      ),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        filled: true,
+        fillColor: white.withValues(alpha: 0.45),
+        border: fieldBorder(white.withValues(alpha: 0.7), 1),
+        enabledBorder: fieldBorder(white.withValues(alpha: 0.7), 1),
+        focusedBorder: fieldBorder(scheme.primary, 1.6),
+      ),
+      dataTableTheme: base.dataTableTheme.copyWith(
+        headingRowColor:
+            WidgetStatePropertyAll(white.withValues(alpha: 0.35)),
+        dataRowColor: const WidgetStatePropertyAll(Colors.transparent),
+        dividerThickness: 0.6,
+      ),
+      expansionTileTheme: base.expansionTileTheme.copyWith(
+        backgroundColor: Colors.transparent,
+        collapsedBackgroundColor: Colors.transparent,
+      ),
     );
   }
 
   PreferredSizeWidget _topBar(String title, AppState state) {
     return AppBar(
       title: Text(title),
+      flexibleSpace: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(color: Colors.white.withValues(alpha: 0.42)),
+        ),
+      ),
+      shape: Border(
+        bottom: BorderSide(color: Colors.white.withValues(alpha: 0.6)),
+      ),
       actions: [
         IconButton(
           icon: const Icon(Icons.logout),
@@ -244,7 +362,11 @@ class _AdminShellState extends State<AdminShell> {
   Widget _sideNav(AppState state, List<_NavItem> items) {
     return Container(
       width: 288,
-      color: _sidebarBg(),
+      decoration: glassDecoration(
+        radius: 0,
+        topAlpha: 0.55,
+        bottomAlpha: 0.40,
+      ),
       child: Column(
         children: [
           _brandHeader(),
@@ -255,11 +377,6 @@ class _AdminShellState extends State<AdminShell> {
         ],
       ),
     );
-  }
-
-  Color _sidebarBg() {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return dark ? RemedooTheme.darkCard : RemedooTheme.sidebarLight;
   }
 
   /// Gradient brand banner (rounded-2xl orange gradient, white text) —
@@ -317,7 +434,7 @@ class _AdminShellState extends State<AdminShell> {
   Widget _navColumn(AppState state, List<_NavItem> items,
       {bool inDrawer = false}) {
     return Container(
-      color: _sidebarBg(),
+      color: Colors.transparent,
       child: Column(
         children: [
           if (inDrawer) ...[
@@ -382,7 +499,7 @@ class _AdminShellState extends State<AdminShell> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              'SUPER ADMIN',
+              state.isAdmin ? 'SUPER ADMIN' : 'STAFF ACCOUNT',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
