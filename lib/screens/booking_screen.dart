@@ -386,6 +386,17 @@ class _BookingScreenState extends State<BookingScreen> {
 
   void _confirm(bool isReschedule) async {
     if (!checkLogin(context, 'Please login to book appointments')) return;
+    // Owner's rule: no active payment option on the panelist means
+    // no booking (the button is disabled too — this is the backstop).
+    if (!isReschedule && _payment == 'Not Available') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Booking is not available — this provider has not activated any payment option yet.'),
+        ),
+      );
+      return;
+    }
     final state = AppStateScope.of(context);
 
     // Pay at clinic: show warning with double confirmation
@@ -541,6 +552,15 @@ class _BookingScreenState extends State<BookingScreen> {
     final onlineAvailable = PaymentService.instance.hasActiveGateway &&
         (!isYoupi || provUpiReady);
 
+    // Owner's rule (2026-10-18): a panelist who has not activated ANY
+    // payment option — Pay Online (their own UPI) or Pay at Clinic —
+    // cannot be booked at all. Rescheduling an existing appointment
+    // is not a new booking and stays allowed. When the provider
+    // record isn't loaded we cannot prove they offer nothing, so
+    // booking is not blocked on missing data.
+    final bookingBlocked =
+        !isReschedule && prov != null && !payInClinic && !onlineAvailable;
+
     // Keep the selection on a visible option: providers activate their
     // payment options themselves (Pay Online and/or Pay at Clinic);
     // until they do, neither is selected.
@@ -613,7 +633,7 @@ class _BookingScreenState extends State<BookingScreen> {
               Expanded(
                 child: Text(
                     !payInClinic
-                        ? 'No payment option is active for this ${widget.kind} yet — you can still book your visit.'
+                        ? 'This ${widget.kind} has not activated any payment option yet — booking is not available.'
                         : isYoupi && !provUpiReady
                             ? 'Online payment is not available for this ${widget.kind} — please pay at the clinic.'
                             : 'Online payment is not available right now — please pay at the clinic.',
@@ -633,10 +653,12 @@ class _BookingScreenState extends State<BookingScreen> {
     // Orange pill via the theme's FilledButton style (kept as FilledButton:
     // widget tests tap this exact widget type).
     final confirm = FilledButton(
-      onPressed: () => _confirm(isReschedule),
-      child: Text(isReschedule
-          ? 'Confirm Reschedule'
-          : 'Confirm Booking • ${inr(widget.fee)}'),
+      onPressed: bookingBlocked ? null : () => _confirm(isReschedule),
+      child: Text(bookingBlocked
+          ? 'Booking Not Available'
+          : isReschedule
+              ? 'Confirm Reschedule'
+              : 'Confirm Booking • ${inr(widget.fee)}'),
     );
 
     return Scaffold(

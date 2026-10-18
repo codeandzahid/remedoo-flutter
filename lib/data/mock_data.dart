@@ -127,6 +127,9 @@ final List<Doctor> doctors = List.generate(41, (i) {
         distanceKm: 0.5 + ((i * 13) % 28) / 2,
         verified: i % 4 != 3,
         about: _aboutTemplates[i % _aboutTemplates.length],
+        // Demo panelists offer Pay at Clinic (production flags come
+        // from the backend; a panelist with no option can't be booked).
+        payInClinicEnabled: true,
       );
     });
 
@@ -144,6 +147,7 @@ final List<Hospital> hospitals = List.generate(48, (i) {
         waitMin: 5 + (i * 9) % 50,
         distanceKm: 0.8 + ((i * 17) % 30) / 2,
         verified: i % 5 != 4,
+        payInClinicEnabled: true,
       );
     });
 
@@ -161,6 +165,7 @@ final List<Lab> labs = List.generate(31, (i) {
         nabl: i % 3 != 2,
         verified: i % 4 != 3,
         distanceKm: 0.6 + ((i * 11) % 26) / 2,
+        payInClinicEnabled: true,
       );
     });
 
