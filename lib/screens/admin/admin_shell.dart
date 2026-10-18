@@ -213,6 +213,13 @@ class _AdminShellState extends State<AdminShell> {
     final style = state.adminStyle;
     final floating = style.floating;
 
+    if (style.topNav) {
+      return _styleWrap(
+        style,
+        _topNavScaffold(state, items, current, page),
+      );
+    }
+
     if (context.isDesktop) {
       return _styleWrap(
         style,
@@ -279,6 +286,279 @@ class _AdminShellState extends State<AdminShell> {
       decoration: adminDecoration(context, style, radius: 28, depth: 1),
       clipBehavior: Clip.antiAlias,
       child: page,
+    );
+  }
+
+  // ── Remidy (topNav) chrome — the Cognify layout the owner
+  // picked: NO sidebar; a white pill bar with a black logo tile,
+  // group tab pills (active = black), and a second pill row with
+  // the active group's pages. Mobile keeps a white drawer.
+
+  List<String> _sectionsOf(List<_NavItem> items) {
+    final out = <String>[];
+    for (final it in items) {
+      if (!out.contains(it.section)) out.add(it.section);
+    }
+    return out;
+  }
+
+  String _groupLabel(List<_NavItem> items, String section) {
+    final g = items.where((e) => e.section == section).toList();
+    if (g.length == 1) return g.first.label;
+    return section == 'Overview' ? 'Dashboard' : section;
+  }
+
+  Widget _topNavScaffold(
+    AppState state,
+    List<_NavItem> items,
+    _NavItem current,
+    Widget page,
+  ) {
+    final desktop = context.isDesktop;
+    final sections = _sectionsOf(items);
+    final groupItems =
+        items.where((it) => it.section == current.section).toList();
+    return Scaffold(
+      drawer: desktop
+          ? null
+          : Drawer(
+              backgroundColor: Colors.white,
+              child: SafeArea(
+                child: _navColumn(state, items, inDrawer: true),
+              ),
+            ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: desktop
+                  ? _navPillDesktop(state, items, sections, current)
+                  : _navPillMobile(state, current),
+            ),
+            if (desktop && groupItems.length > 1)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: _itemsPill(items, groupItems, current),
+              ),
+            Expanded(child: page),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _logoMark({bool small = false}) {
+    final s = small ? 34.0 : 38.0;
+    return Container(
+      width: s,
+      height: s,
+      decoration: BoxDecoration(
+        color: const Color(0xFF141414),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      alignment: Alignment.center,
+      child: const Text(
+        'R',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 19,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+
+  Widget _circleButton(IconData icon, String tooltip, VoidCallback onTap) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: const BoxDecoration(
+            color: Color(0xFFEEF0F2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 18, color: const Color(0xFF141414)),
+        ),
+      ),
+    );
+  }
+
+  Widget _navPillDesktop(
+    AppState state,
+    List<_NavItem> items,
+    List<String> sections,
+    _NavItem current,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration:
+          adminDecoration(context, AdminStyle.remedoo, radius: 28, depth: 2),
+      child: Row(
+        children: [
+          _logoMark(),
+          const SizedBox(width: 10),
+          const Text(
+            'Remedoo',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF141414),
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final s in sections) _groupPill(items, s, current),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          _circleButton(Icons.logout, 'Log out', () => _logout(state)),
+          const SizedBox(width: 8),
+          const CircleAvatar(
+            radius: 17,
+            backgroundColor: Color(0xFF141414),
+            child: Icon(Icons.person, size: 18, color: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _navPillMobile(AppState state, _NavItem current) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration:
+          adminDecoration(context, AdminStyle.remedoo, radius: 24, depth: 2),
+      child: Row(
+        children: [
+          _logoMark(small: true),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              current.label,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF141414),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Builder(
+            builder: (ctx) => _circleButton(
+              Icons.menu,
+              'Menu',
+              () => Scaffold.of(ctx).openDrawer(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _circleButton(Icons.logout, 'Log out', () => _logout(state)),
+        ],
+      ),
+    );
+  }
+
+  Widget _groupPill(
+      List<_NavItem> items, String section, _NavItem current) {
+    final active = section == current.section;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () {
+          final idx = items.indexWhere((it) => it.section == section);
+          if (idx >= 0) setState(() => _index = idx);
+        },
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          decoration: BoxDecoration(
+            color: active
+                ? const Color(0xFF141414)
+                : const Color(0xFFEEF0F2),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            _groupLabel(items, section),
+            style: TextStyle(
+              color: active ? Colors.white : const Color(0xFF141414),
+              fontWeight: FontWeight.w700,
+              fontSize: 13.5,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _itemsPill(
+    List<_NavItem> items,
+    List<_NavItem> groupItems,
+    _NavItem current,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration:
+          adminDecoration(context, AdminStyle.remedoo, radius: 24, depth: 1),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final it in groupItems)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: () =>
+                      setState(() => _index = items.indexOf(it)),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 13, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: it == current
+                          ? const Color(0xFF141414)
+                          : const Color(0xFFEEF0F2),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          it.icon,
+                          size: 15,
+                          color: it == current
+                              ? Colors.white
+                              : const Color(0xFF141414),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          it.label,
+                          style: TextStyle(
+                            color: it == current
+                                ? Colors.white
+                                : const Color(0xFF141414),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 

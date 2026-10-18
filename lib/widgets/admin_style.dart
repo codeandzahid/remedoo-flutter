@@ -28,7 +28,9 @@ enum AdminStyle {
   glass('glass', 'Glassmorphism',
       'Pastel aurora with frosted see-through panels.'),
   maximal('maximal', 'Maximalism',
-      'Loud saturated gradient, warm paper cards, chunky ink outlines and hard shadows.');
+      'Loud saturated gradient, warm paper cards, chunky ink outlines and hard shadows.'),
+  remedoo('remedoo', 'Remidy',
+      'Your Dribbble pick (Cognify): light-grey canvas, white pill top navigation, candy pink/blue/green accents.');
 
   final String id;
   final String label;
@@ -46,6 +48,10 @@ enum AdminStyle {
       this == AdminStyle.spatial ||
       this == AdminStyle.clay ||
       this == AdminStyle.bento;
+
+  /// Remidy replaces the sidebar with a top pill navigation bar
+  /// (the Cognify layout the owner picked on Dribbble).
+  bool get topNav => this == AdminStyle.remedoo;
 
   bool get isDark => this == AdminStyle.darkCommand;
 }
@@ -221,6 +227,16 @@ BoxDecoration adminDecoration(
           soft(const Color(0xFFA3B1C6).withValues(alpha: 0.5), 12, 6, 6),
         ],
       );
+    case AdminStyle.remedoo:
+      // Cognify surfaces: pure white, no border, whisper shadow.
+      return BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: [
+          soft(Colors.black.withValues(alpha: 0.05), 20, 0, 6),
+          soft(Colors.black.withValues(alpha: 0.03), 4, 0, 1),
+        ],
+      );
   }
 }
 
@@ -263,6 +279,8 @@ class AdminBackdrop extends StatelessWidget {
         return const ColoredBox(color: Color(0xFFF4F4F5));
       case AdminStyle.neu:
         return const ColoredBox(color: _neuBase);
+      case AdminStyle.remedoo:
+        return const ColoredBox(color: Color(0xFFF5F6F7));
     }
   }
 }
@@ -308,6 +326,7 @@ BoxDecoration adminBarDecoration(BuildContext context, AdminStyle style) {
     case AdminStyle.spatial:
     case AdminStyle.clay:
     case AdminStyle.bento:
+    case AdminStyle.remedoo:
       return const BoxDecoration(color: Colors.transparent);
   }
 }
@@ -358,6 +377,7 @@ BoxDecoration adminSidebarDecoration(
     case AdminStyle.spatial:
     case AdminStyle.clay:
     case AdminStyle.bento:
+    case AdminStyle.remedoo:
       return const BoxDecoration(color: Colors.transparent);
   }
 }
@@ -376,6 +396,7 @@ Color adminOnBackdropColor(AdminStyle style) {
     case AdminStyle.bento:
     case AdminStyle.neu:
     case AdminStyle.brutal:
+    case AdminStyle.remedoo:
       return const Color(0xFF1E293B);
   }
 }
@@ -987,6 +1008,87 @@ ThemeData adminTheme(BuildContext context, AdminStyle style) {
           dividerThickness: 1,
         ),
         expansionTileTheme: base.expansionTileTheme.copyWith(
+          backgroundColor: Colors.transparent,
+          collapsedBackgroundColor: Colors.transparent,
+        ),
+      );
+    case AdminStyle.remedoo:
+      // Cognify theme: near-black primary (black pill buttons),
+      // candy accents (blue focus, pink tertiary), white surfaces
+      // on the #F5F6F7 canvas, big radii, grey-filled inputs.
+      const black = Color(0xFF141414);
+      final rScheme = scheme.copyWith(
+        primary: black,
+        onPrimary: Colors.white,
+        secondary: const Color(0xFF0E3EFE),
+        tertiary: const Color(0xFFFD1A54),
+        surface: Colors.white,
+      );
+      final rBase = base.copyWith(colorScheme: rScheme);
+      return rBase.copyWith(
+        scaffoldBackgroundColor: Colors.transparent,
+        appBarTheme: rBase.appBarTheme.copyWith(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          foregroundColor: black,
+          surfaceTintColor: Colors.transparent,
+          titleTextStyle: const TextStyle(
+            color: black,
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+          ),
+          iconTheme: const IconThemeData(color: black),
+        ),
+        cardTheme: rBase.cardTheme.copyWith(
+          color: Colors.white,
+          elevation: 2,
+          shadowColor: Colors.black.withValues(alpha: 0.06),
+          surfaceTintColor: Colors.transparent,
+          shape: shape(22),
+        ),
+        dialogTheme: rBase.dialogTheme.copyWith(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: shape(24),
+        ),
+        bottomSheetTheme: rBase.bottomSheetTheme.copyWith(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+        ),
+        popupMenuTheme: rBase.popupMenuTheme.copyWith(
+          color: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: shape(16),
+        ),
+        chipTheme: rBase.chipTheme.copyWith(
+          backgroundColor: const Color(0xFFEEF0F2),
+          selectedColor: black,
+          side: BorderSide.none,
+          labelStyle: const TextStyle(color: black),
+          secondaryLabelStyle: const TextStyle(color: Colors.white),
+        ),
+        dividerTheme: rBase.dividerTheme.copyWith(
+          color: const Color(0xFFE5E7EB),
+          thickness: 1,
+        ),
+        inputDecorationTheme: rBase.inputDecorationTheme.copyWith(
+          filled: true,
+          fillColor: const Color(0xFFF5F6F7),
+          border: fb(Colors.transparent, 0, 14),
+          enabledBorder: fb(Colors.transparent, 0, 14),
+          focusedBorder: fb(const Color(0xFF0E3EFE), 1.6, 14),
+        ),
+        dataTableTheme: rBase.dataTableTheme.copyWith(
+          headingRowColor:
+              const WidgetStatePropertyAll(Color(0xFFF5F6F7)),
+          dataRowColor: const WidgetStatePropertyAll(Colors.transparent),
+          dividerThickness: 1,
+        ),
+        expansionTileTheme: rBase.expansionTileTheme.copyWith(
           backgroundColor: Colors.transparent,
           collapsedBackgroundColor: Colors.transparent,
         ),
