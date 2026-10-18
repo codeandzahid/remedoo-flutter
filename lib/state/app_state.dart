@@ -221,10 +221,11 @@ class AppState extends ChangeNotifier {
 
   ThemePack _themePack = ThemePack.skyPulse;
 
-  /// Admin panel visual style (Admin > Panel Style). Dark Command
-  /// Center is the default so the style parade the owner ordered on
-  /// 2026-10-18 starts on a fresh look; the pick persists on-device.
-  AdminStyle _adminStyle = AdminStyle.darkCommand;
+  /// Admin panel visual style (Admin > Panel Style). The owner is
+  /// walking the styles one by one by number (2026-10-18); the
+  /// current parade pick is the code default and persists on-device
+  /// once chosen in the picker.
+  AdminStyle _adminStyle = AdminStyle.materialYou;
   AdminStyle get adminStyle => _adminStyle;
 
   Future<void> setAdminStyle(AdminStyle style) async {
