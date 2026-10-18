@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../responsive/responsive.dart';
+import '../services/auth_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -62,7 +63,20 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _busy = false);
     if (!result.ok) {
       setState(() => _error = result.error);
-    } else if (Navigator.of(context).canPop()) {
+      return;
+    }
+    // Separate logins (owner's rule): this entrance is for patients
+    // only. An email registered as another account type is signed
+    // back out and told exactly what it is registered as.
+    final accountRole = await AuthService.instance.currentAccountRole();
+    if (!mounted) return;
+    if (accountRole != null && accountRole != 'user') {
+      await AuthService.instance.signOut();
+      if (!mounted) return;
+      setState(() => _error = wrongEntranceMessage(accountRole));
+      return;
+    }
+    if (Navigator.of(context).canPop()) {
       // Opened on top of the app (gated action): reveal the signed-in app.
       Navigator.of(context).popUntil((r) => r.isFirst);
     }

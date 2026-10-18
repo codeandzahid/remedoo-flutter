@@ -98,18 +98,22 @@ class _PartnerLoginScreenState extends State<PartnerLoginScreen> {
       });
       return;
     }
-    // Signed in — check for a provider role.
-    final role = await AuthService.instance.currentUserRole();
+    // Signed in — check for a provider role. Logins are separate
+    // (owner's rule): a non-provider email is signed back out and
+    // told exactly what it IS registered as.
+    final accountRole = await AuthService.instance.currentAccountRole();
     if (!mounted) return;
-    if (role == null || !_providerRoles.contains(role)) {
+    if (accountRole == null || !_providerRoles.contains(accountRole)) {
       await AuthService.instance.signOut();
       setState(() {
         _busy = false;
-        _error =
-            'This account is not registered as a provider. Contact Remedoo to get provider access.';
+        _error = accountRole != null
+            ? wrongEntranceMessage(accountRole)
+            : 'This account is not registered as a provider. Contact Remedoo to get provider access.';
       });
       return;
     }
+    final role = accountRole;
     final state = AppStateScope.of(context);
     await state.checkProviderRole();
     state.switchRole(role);

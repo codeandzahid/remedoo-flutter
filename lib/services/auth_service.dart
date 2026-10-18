@@ -326,6 +326,28 @@ class AuthService {
     }
   }
 
+  /// The account's single backend role of ANY kind (admin, staff,
+  /// doctor, pharmacy, lab, hospital, driver, user), or null when
+  /// the account has no role row. The separate login entrances use
+  /// this to tell the user when an email belongs to another type.
+  Future<String?> currentAccountRole() async {
+    if (!_initialized) return null;
+    try {
+      final uid = _client.auth.currentUser?.id;
+      if (uid == null) return null;
+      final rows = await _client
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', uid)
+          .limit(1);
+      if (rows.isEmpty) return null;
+      return '${rows.first['role']}';
+    } catch (e) {
+      debugPrint('currentAccountRole failed: $e');
+      return null;
+    }
+  }
+
   /// Maps Supabase/auth errors to short, user-friendly messages.
   /// Never includes raw tokens or sensitive data.
   String _friendlyMessage(Object e) {
@@ -377,5 +399,36 @@ class AuthService {
       return raw.trim();
     }
     return 'Something went wrong. Please try again.';
+  }
+}
+
+/// Message shown when someone signs in at the WRONG entrance
+/// (owner's rule: Admin, Panel and User logins are separate). It
+/// names the account type the email is actually registered as and
+/// points to the right login.
+String wrongEntranceMessage(String role) {
+  switch (role) {
+    case 'admin':
+    case 'staff':
+      return 'This email is already registered as an Admin account. '
+          'Please use the Admin login.';
+    case 'doctor':
+      return 'This email is already registered as a Doctor. '
+          'Please use the Panel login.';
+    case 'pharmacy':
+      return 'This email is already registered as a Pharmacy. '
+          'Please use the Panel login.';
+    case 'lab':
+      return 'This email is already registered as a Lab. '
+          'Please use the Panel login.';
+    case 'hospital':
+      return 'This email is already registered as a Hospital. '
+          'Please use the Panel login.';
+    case 'driver':
+      return 'This email is already registered as a Driver. '
+          'Please use the Driver app.';
+    default:
+      return 'This email is already registered as a Patient account. '
+          'Please use the User login.';
   }
 }

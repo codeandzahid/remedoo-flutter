@@ -103,18 +103,39 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       });
       return;
     }
-    // Signed in — now verify the admin role.
+    // Signed in — now verify the admin-side role. This entrance is
+    // for the super admin AND staff (employee admin) accounts.
     final state = AppStateScope.of(context);
     final isAdmin =
         await AuthService.instance.isCurrentUserAdmin();
     if (!mounted) return;
     if (!isAdmin) {
+      // Staff account? They belong to this entrance too and land in
+      // the filtered admin panel.
+      final staffSections =
+          await state.supabaseRepository.fetchOwnStaffAccess();
+      if (!mounted) return;
+      if (staffSections != null) {
+        await state.checkStaffRole();
+        state.switchRole('staff');
+        if (!mounted) return;
+        setState(() => _busy = false);
+        if (widget.isRoot) return;
+        Navigator.of(context).popUntil((r) => r.isFirst);
+        return;
+      }
+      // Wrong entrance (owner's rule: logins are separate) — sign
+      // back out and name what the email IS registered as.
+      final accountRole =
+          await AuthService.instance.currentAccountRole();
       await AuthService.instance.signOut();
       state.checkAdminRole();
+      if (!mounted) return;
       setState(() {
         _busy = false;
-        _error =
-            'This account does not have admin access. Contact the app owner to grant the admin role.';
+        _error = accountRole != null
+            ? wrongEntranceMessage(accountRole)
+            : 'This account does not have admin access. Contact the app owner to grant the admin role.';
       });
       return;
     }
