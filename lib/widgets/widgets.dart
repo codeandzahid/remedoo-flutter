@@ -1167,8 +1167,12 @@ class RAvatarCircle extends StatelessWidget {
   final double size;
   final IconData? icon;
 
+  /// Optional profile photo (2026-10-19): shown instead of initials
+  /// when the user has uploaded one.
+  final String? imageUrl;
+
   const RAvatarCircle(
-      {super.key, required this.name, this.size = 60, this.icon});
+      {super.key, required this.name, this.size = 60, this.icon, this.imageUrl});
 
   /// "Dr. Meera Rao" -> "MR".
   static String initialsOf(String name) {
@@ -1181,6 +1185,37 @@ class RAvatarCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: RemedooTheme.primary.withValues(alpha: 0.30),
+            width: 2,
+          ),
+        ),
+        child: ClipOval(
+          child: Image.network(
+            imageUrl!,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Center(
+              child: Text(
+                initialsOf(name),
+                style: TextStyle(
+                  fontSize: size * 0.32,
+                  fontWeight: FontWeight.w800,
+                  color: RemedooTheme.primary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Container(
       width: size,
       height: size,

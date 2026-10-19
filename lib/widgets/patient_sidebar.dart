@@ -82,7 +82,10 @@ class RSidebarProfileHeader extends StatelessWidget {
         ),
         child: Row(
           children: [
-            RAvatarCircle(name: name, size: 52),
+            RAvatarCircle(
+                name: name,
+                size: 52,
+                imageUrl: signedIn ? state.avatarUrl : null),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

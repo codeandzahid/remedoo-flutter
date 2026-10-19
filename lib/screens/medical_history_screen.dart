@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
@@ -63,6 +64,7 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
     ('appointment', 'Appointments'),
     ('prescription', 'Prescriptions'),
     ('lab_report', 'Lab Reports'),
+    ('health_fact', 'Health Facts'),
   ];
 
   List<_TimelineItem> _timeline(AppState state) {
@@ -97,6 +99,17 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
         subtitle: 'Prescription • PDF',
         status: 'completed',
         date: DateTime(2000),
+      ));
+    }
+    for (final e in state.historyEntries) {
+      items.add(_TimelineItem(
+        id: 'fact-${e.id}',
+        type: 'health_fact',
+        title: e.title,
+        subtitle: e.kind,
+        status: 'Added by you',
+        date: e.date,
+        details: e.notes,
       ));
     }
     items.sort((a, b) => b.date.compareTo(a.date));
@@ -134,6 +147,32 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.w800)),
+                    const Spacer(),
+                    Material(
+                      color: Colors.white,
+                      shape: const StadiumBorder(),
+                      child: InkWell(
+                        onTap: () => _addEntry(state),
+                        customBorder: const StadiumBorder(),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add,
+                                  size: 16, color: RemedooTheme.primary),
+                              const SizedBox(width: 4),
+                              Text('Add',
+                                  style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: RemedooTheme.primary)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -155,12 +194,14 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
           ),
           Expanded(
             child: items.isEmpty
-                ? const MaxWidthBox(
+                ? MaxWidthBox(
                     child: REmptyState(
                       icon: Icons.history,
                       title: 'No medical history yet',
                       subtitle:
-                          'Your visits, prescriptions and reports will build your history here.',
+                          'Your visits, prescriptions and reports will build your history here. You can also add your own health facts.',
+                      actionLabel: 'Add Health Fact',
+                      onAction: () => _addEntry(state),
                     ),
                   )
                 : MaxWidthBox(
@@ -204,6 +245,82 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
     );
   }
 
+  /// Add a health fact (2026-10-19): allergy, condition, surgery,
+  /// medication or anything else a doctor should know.
+  Future<void> _addEntry(AppState state) async {
+    final titleCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    var kind = 'Allergy';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Add Health Fact'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: kind,
+                  decoration: const InputDecoration(labelText: 'Type'),
+                  items: const [
+                    'Allergy',
+                    'Condition',
+                    'Surgery',
+                    'Medication',
+                    'Other',
+                  ]
+                      .map((k) =>
+                          DropdownMenuItem(value: k, child: Text(k)))
+                      .toList(),
+                  onChanged: (v) => setD(() => kind = v ?? 'Other'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Title',
+                      hintText: 'e.g. Allergic to penicillin'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: notesCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                      labelText: 'Notes (optional)'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    final title = titleCtrl.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a title.')));
+      return;
+    }
+    state.addHistoryEntry(HistoryEntry(
+      id: 'H${DateTime.now().millisecondsSinceEpoch}',
+      kind: kind,
+      title: title,
+      date: DateTime.now(),
+      notes: notesCtrl.text.trim(),
+    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Added to your medical history.')));
+  }
+
   Widget _card(_TimelineItem t) {
     final scheme = Theme.of(context).colorScheme;
     final Color tileBg;
@@ -222,6 +339,12 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
         tileFg = RemedooTheme.success;
         icon = Icons.medication_outlined;
         typeLabel = 'Prescription';
+      case 'health_fact':
+        tileBg =
+            RemedooTheme.emergency.withValues(alpha: 0.12);
+        tileFg = RemedooTheme.emergency;
+        icon = Icons.favorite_outline;
+        typeLabel = 'Health Fact';
       default:
         tileBg =
             RemedooTheme.warning.withValues(alpha: 0.14);
@@ -355,6 +478,20 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
                       fontSize: 13,
                       color: scheme.onSurfaceVariant,
                       height: 1.5)),
+            ],
+            if (expanded && t.type == 'health_fact') ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => AppStateScope.of(context)
+                      .removeHistoryEntry(t.id.replaceFirst('fact-', '')),
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: const Text('Delete entry'),
+                  style: TextButton.styleFrom(
+                      foregroundColor: RemedooTheme.destructive),
+                ),
+              ),
             ],
           ],
         ),

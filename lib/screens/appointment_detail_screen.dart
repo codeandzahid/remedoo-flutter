@@ -6,6 +6,7 @@ import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
 import '../app_navigator.dart';
@@ -92,6 +93,15 @@ class AppointmentDetailScreen extends StatelessWidget {
                   children: [
                     _quickSummaryCard(context, a),
                     const SizedBox(height: 12),
+                    RButton(
+                      label: 'Directions',
+                      icon: Icons.directions,
+                      variant: RButtonVariant.outline,
+                      fullWidth: true,
+                      onPressed: () => openDirections(context,
+                          name: a.place, address: a.place),
+                    ),
+                    const SizedBox(height: 10),
                     if (isUpcoming) ...[
                       RButton(
                         label: 'Reschedule',

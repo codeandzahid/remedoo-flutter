@@ -159,6 +159,12 @@ class DoctorDetailScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              TextButton.icon(
+                onPressed: () => openDirections(context,
+                    name: '${d.name}, ${d.hospital}', address: ''),
+                icon: const Icon(Icons.directions, size: 18),
+                label: const Text('Directions'),
+              ),
             ],
           ),
         ],

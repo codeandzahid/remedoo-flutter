@@ -573,6 +573,43 @@ class SupabaseRepository {
     return uploadPrescriptionData(null, localPath, fileName);
   }
 
+  /// Uploads a profile photo to the public `avatars` bucket and
+  /// returns its public URL (2026-10-19).
+  Future<String?> uploadAvatar(Uint8List bytes, String fileName) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return null;
+    try {
+      final ext = fileName.split('.').last.toLowerCase();
+      final safeExt = ['jpg', 'jpeg', 'png', 'webp'].contains(ext) ? ext : 'jpg';
+      final path =
+          '$uid/avatar_${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+      await _db.storage.from('avatars').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+                contentType: 'image/${safeExt == 'jpg' ? 'jpeg' : safeExt}',
+                upsert: true),
+          );
+      return _db.storage.from('avatars').getPublicUrl(path);
+    } catch (e) {
+      debugPrint('uploadAvatar failed: $e');
+      return null;
+    }
+  }
+
+  /// Permanently deletes the signed-in user's account and their rows
+  /// (SECURITY DEFINER function delete_my_account, 2026-10-19).
+  Future<bool> deleteMyAccount() async {
+    if (!_ready || _uid == null) return false;
+    try {
+      await _db.rpc('delete_my_account');
+      return true;
+    } catch (e) {
+      debugPrint('deleteMyAccount failed: $e');
+      return false;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> fetchUserTickets() async {
     final uid = _uid;
     if (!_ready || uid == null) return const [];

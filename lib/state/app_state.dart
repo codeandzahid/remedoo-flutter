@@ -237,6 +237,22 @@ class AppState extends ChangeNotifier {
           ..addAll(decoded.map((e) =>
               VitalReading.fromJson(e as Map<String, dynamic>)));
       }
+      final historyJson = prefs.getString(_kHistoryKey);
+      if (historyJson != null) {
+        final decoded = jsonDecode(historyJson) as List<dynamic>;
+        historyEntries
+          ..clear()
+          ..addAll(decoded.map((e) =>
+              HistoryEntry.fromJson(e as Map<String, dynamic>)));
+      }
+      final addrJson = prefs.getString(_kAddressesKey);
+      if (addrJson != null) {
+        final decoded = jsonDecode(addrJson) as List<dynamic>;
+        savedAddresses
+          ..clear()
+          ..addAll(decoded.map((e) =>
+              SavedAddress.fromJson(e as Map<String, dynamic>)));
+      }
     } catch (_) {
       // Storage unavailable (e.g. private browsing): keep in-memory default.
     }
@@ -535,6 +551,9 @@ class AppState extends ChangeNotifier {
     _favorites.clear();
     reports.clear();
     vitals.clear();
+    historyEntries.clear();
+    savedAddresses.clear();
+    _avatarUrl = null;
     tickets.clear();
     // Uploaded reports + vitals persist on-device: wipe the stored
     // copies too so the next account on this device never sees them.
@@ -544,6 +563,8 @@ class AppState extends ChangeNotifier {
             .timeout(const Duration(seconds: 3));
         await prefs.remove(_kMyReportsKey);
         await prefs.remove(_kVitalsKey);
+        await prefs.remove(_kHistoryKey);
+        await prefs.remove(_kAddressesKey);
       } catch (_) {}
     }());
     if (notify) notifyListeners();
@@ -683,6 +704,8 @@ class AppState extends ChangeNotifier {
       final p = '${prof['phone'] ?? ''}';
       if (n.isNotEmpty) _name = n;
       if (p.isNotEmpty) _phone = p;
+      final av = '${prof['avatar_url'] ?? ''}';
+      if (av.isNotEmpty) _avatarUrl = av;
     }
     final nrows = await _repo.fetchNotifications();
     notifications
@@ -1206,8 +1229,7 @@ class AppState extends ChangeNotifier {
 
   /// Order Again (2026-10-19): refills the cart with a past order's
   /// items from the same pharmacy. Returns how many lines were added.
-  int reorder(MedOrder order) {
-    clearCart();
+  int reorder(MedOrder order) {    clearCart();
     var added = 0;
     for (final line in order.items) {
       final ok = addToCart(
@@ -1224,6 +1246,15 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
     return added;
+  }
+
+  /// Cancels a medicine order before dispatch (2026-10-19) and syncs
+  /// the status to the backend so the pharmacy sees it too.
+  void cancelOrder(MedOrder order) {
+    if (!order.isCancellable) return;
+    order.status = 'cancelled';
+    notifyListeners();
+    unawaited(_repo.updateOrderStatus(order.id, 'cancelled'));
   }
 
   MedOrder placeOrder({required String address, required String payment}) {
@@ -2272,6 +2303,84 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       // Best-effort persistence only.
     }
+  }
+
+  // ---------- Medical history entries (patient-added) ----------
+
+  static const _kHistoryKey = 'remedoo_history_v1';
+
+  final List<HistoryEntry> historyEntries = [];
+
+  void addHistoryEntry(HistoryEntry entry) {
+    historyEntries.insert(0, entry);
+    notifyListeners();
+    unawaited(_persistHistory());
+  }
+
+  void removeHistoryEntry(String id) {
+    historyEntries.removeWhere((e) => e.id == id);
+    notifyListeners();
+    unawaited(_persistHistory());
+  }
+
+  Future<void> _persistHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 3));
+      await prefs.setString(_kHistoryKey,
+          jsonEncode(historyEntries.map((e) => e.toJson()).toList()));
+    } catch (_) {
+      // Best-effort persistence only.
+    }
+  }
+
+  // ---------- Saved addresses (address book) ----------
+
+  static const _kAddressesKey = 'remedoo_addresses_v1';
+
+  final List<SavedAddress> savedAddresses = [];
+
+  void addSavedAddress(SavedAddress address) {
+    savedAddresses.add(address);
+    notifyListeners();
+    unawaited(_persistAddresses());
+  }
+
+  void removeSavedAddress(String id) {
+    savedAddresses.removeWhere((a) => a.id == id);
+    notifyListeners();
+    unawaited(_persistAddresses());
+  }
+
+  Future<void> _persistAddresses() async {
+    try {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 3));
+      await prefs.setString(_kAddressesKey,
+          jsonEncode(savedAddresses.map((a) => a.toJson()).toList()));
+    } catch (_) {
+      // Best-effort persistence only.
+    }
+  }
+
+  // ---------- Profile photo + account deletion ----------
+
+  String? _avatarUrl;
+  String? get avatarUrl => _avatarUrl;
+
+  /// Saves a new profile photo URL locally + to profiles.avatar_url.
+  Future<void> setAvatarUrl(String url) async {
+    _avatarUrl = url;
+    notifyListeners();
+    await _repo.saveProfile({'avatar_url': url});
+  }
+
+  /// Permanently deletes the account (backend function removes the
+  /// user's rows + the auth user), then signs out locally.
+  Future<bool> deleteMyAccount() async {
+    final ok = await _repo.deleteMyAccount();
+    if (ok) logout();
+    return ok;
   }
 
   // ---------- Provider applications ----------

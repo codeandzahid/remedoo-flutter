@@ -1,6 +1,10 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../models.dart';
 import '../responsive/responsive.dart';
+import '../theme.dart';
 import '../state/app_state.dart';
 import '../app_navigator.dart';
 import '../utils/device_actions.dart';
@@ -32,6 +36,87 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _phone.dispose();
     _address.dispose();
     super.dispose();
+  }
+
+  /// Picks and uploads a profile photo (2026-10-19): stored in the
+  /// public avatars bucket; URL saved to profiles.avatar_url.
+  Future<void> _pickAvatar(AppState state) async {
+    final files = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+    );
+    if (files.isEmpty || !mounted) return;
+    final file = files.single;
+    Uint8List? bytes;
+    try {
+      bytes = await file.readAsBytes();
+    } catch (_) {}
+    if (bytes == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Uploading photo...')));
+    final url =
+        await state.supabaseRepository.uploadAvatar(bytes, file.name);
+    if (!mounted) return;
+    if (url == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Photo upload failed. Try again.')));
+      return;
+    }
+    await state.setAvatarUrl(url);
+    if (mounted) setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile photo updated.')));
+  }
+
+  /// Adds one address to the address book (2026-10-19).
+  Future<void> _addAddress(AppState state) async {
+    final labelCtrl = TextEditingController(text: 'Home');
+    final addrCtrl = TextEditingController();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Address'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: labelCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Label', hintText: 'Home, Office…'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: addrCtrl,
+              maxLines: 3,
+              decoration:
+                  const InputDecoration(labelText: 'Full address'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    if (saved != true || !mounted) return;
+    final addr = addrCtrl.text.trim();
+    if (addr.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter the address.')));
+      return;
+    }
+    state.addSavedAddress(SavedAddress(
+      id: 'A${DateTime.now().millisecondsSinceEpoch}',
+      label: labelCtrl.text.trim().isEmpty
+          ? 'Home'
+          : labelCtrl.text.trim(),
+      address: addr,
+    ));
   }
 
   @override
@@ -100,7 +185,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Column(
                       children: [
                         const SizedBox(height: 16),
-                        Stack(
+                        GestureDetector(
+                          onTap: () => _pickAvatar(state),
+                          child: Stack(
                           clipBehavior: Clip.none,
                           children: [
                             Container(
@@ -114,9 +201,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   width: 3,
                                 ),
                               ),
-                              child: Icon(Icons.person,
-                                  size: 52,
-                                  color: scheme.onSurfaceVariant),
+                              child: state.avatarUrl != null
+                                  ? ClipOval(
+                                      child: Image.network(
+                                        state.avatarUrl!,
+                                        width: 96,
+                                        height: 96,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Icon(
+                                            Icons.person,
+                                            size: 52,
+                                            color:
+                                                scheme.onSurfaceVariant),
+                                      ),
+                                    )
+                                  : Icon(Icons.person,
+                                      size: 52,
+                                      color: scheme.onSurfaceVariant),
                             ),
                             Positioned(
                               right: -2,
@@ -146,6 +247,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ],
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Text(
@@ -306,6 +408,96 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    // Address book (2026-10-19): more than one saved
+                    // address, pickable at checkout.
+                    RCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.book_outlined,
+                                  size: 14, color: scheme.primary),
+                              const SizedBox(width: 6),
+                              const Expanded(
+                                child: Text('My Addresses',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600)),
+                              ),
+                              RButton(
+                                label: 'Add',
+                                icon: Icons.add,
+                                small: true,
+                                variant: RButtonVariant.outline,
+                                onPressed: () => _addAddress(state),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          if (state.savedAddresses.isEmpty)
+                            Text(
+                              'No saved addresses yet. Add Home, Office or any place you get medicines delivered.',
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: scheme.onSurfaceVariant),
+                            )
+                          else
+                            for (final a in state.savedAddresses)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: scheme.primary
+                                            .withValues(alpha: 0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(6),
+                                      ),
+                                      child: Text(a.label,
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: scheme.primary)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: InkWell(
+                                        onTap: () {
+                                          _address.text = a.address;
+                                          setState(() {});
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(SnackBar(
+                                                  content: Text(
+                                                      '"${a.label}" set as your main address. Tap Save Changes to keep it.')));
+                                        },
+                                        child: Text(a.address,
+                                            style: const TextStyle(
+                                                fontSize: 13)),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: () =>
+                                          state.removeSavedAddress(a.id),
+                                      icon: Icon(Icons.delete_outline,
+                                          size: 18,
+                                          color:
+                                              scheme.onSurfaceVariant),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 20),
                     RButton(
                       label: 'Save Changes',
@@ -425,6 +617,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    // Danger zone: delete account (2026-10-19).
+                    RCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.warning_amber_outlined,
+                                  size: 14,
+                                  color: RemedooTheme.destructive),
+                              const SizedBox(width: 6),
+                              Text('Danger Zone',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: RemedooTheme.destructive)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Deleting your account permanently removes your profile and personal data from Remedoo. This cannot be undone.',
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                color: scheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 12),
+                          RButton(
+                            label: 'Delete My Account',
+                            icon: Icons.delete_forever_outlined,
+                            variant: RButtonVariant.danger,
+                            fullWidth: true,
+                            onPressed: () => _deleteAccount(state),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -433,6 +663,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  /// Delete account flow (2026-10-19): two confirmations, then the
+  /// backend removes the user and the app returns to guest browsing.
+  Future<void> _deleteAccount(AppState state) async {
+    final first = await confirmDialog(
+      context,
+      title: 'Delete your account?',
+      message:
+          'Your profile and personal data will be permanently removed. Past bookings and orders stay in the providers\' records without your name.',
+      confirmLabel: 'Continue',
+    );
+    if (first != true || !mounted) return;
+    final second = await confirmDialog(
+      context,
+      title: 'Are you fully sure?',
+      message: 'This is permanent and cannot be undone.',
+      confirmLabel: 'Delete my account',
+    );
+    if (second != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await state.deleteMyAccount();
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(
+        content: Text(ok
+            ? 'Your account has been deleted.'
+            : 'Could not delete the account. Please try again or contact support.')));
   }
 
   /// Radio circle + small avatar + label, like the React gender picker.

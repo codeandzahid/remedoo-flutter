@@ -370,6 +370,7 @@ class _MainShellState extends State<MainShell> {
                 child: RAvatarCircle(
                   name: state.isSignedIn ? state.userName : 'Guest',
                   size: 38,
+                  imageUrl: state.isSignedIn ? state.avatarUrl : null,
                 ),
               ),
             ],

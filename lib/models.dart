@@ -212,7 +212,10 @@ class MedOrder {
     this.status = 'placed',
   });
 
-  bool get isActive => status != 'delivered';
+  bool get isActive => status != 'delivered' && status != 'cancelled';
+
+  /// The patient may cancel only before dispatch (2026-10-19).
+  bool get isCancellable => status == 'placed' || status == 'confirmed';
 
   List<CartLine> get lines => items;
   String get eta => '35-45 min';
@@ -372,6 +375,63 @@ class LabReport {
   });
 
   bool get isUploaded => fileUrl != null;
+}
+
+/// A health fact the patient adds to their Medical History
+/// themselves (2026-10-19): allergy, condition, surgery, medication…
+class HistoryEntry {
+  final String id;
+  final String kind; // Allergy, Condition, Surgery, Medication, Other
+  final String title;
+  final DateTime date;
+  final String notes;
+
+  const HistoryEntry({
+    required this.id,
+    required this.kind,
+    required this.title,
+    required this.date,
+    this.notes = '',
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'kind': kind,
+        'title': title,
+        'date': date.toIso8601String(),
+        'notes': notes,
+      };
+
+  factory HistoryEntry.fromJson(Map<String, dynamic> j) => HistoryEntry(
+        id: j['id'] as String,
+        kind: j['kind'] as String? ?? 'Other',
+        title: j['title'] as String? ?? '',
+        date: DateTime.parse(j['date'] as String),
+        notes: j['notes'] as String? ?? '',
+      );
+}
+
+/// One saved delivery address in the patient's address book
+/// (2026-10-19): a label (Home, Office…) plus the full address.
+class SavedAddress {
+  final String id;
+  final String label;
+  final String address;
+
+  const SavedAddress({
+    required this.id,
+    required this.label,
+    required this.address,
+  });
+
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'label': label, 'address': address};
+
+  factory SavedAddress.fromJson(Map<String, dynamic> j) => SavedAddress(
+        id: j['id'] as String,
+        label: j['label'] as String? ?? 'Home',
+        address: j['address'] as String? ?? '',
+      );
 }
 
 /// One health-number reading logged by the patient (2026-10-19):

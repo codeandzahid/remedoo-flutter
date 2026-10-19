@@ -147,6 +147,7 @@ class SettingsScreen extends StatelessWidget {
                           context,
                           icon: Icons.notifications_outlined,
                           label: 'Push Notifications',
+                          last: true,
                           trailing: Switch(
                             value: state.pushNotif,
                             activeThumbColor: scheme.primary,
@@ -154,30 +155,10 @@ class SettingsScreen extends StatelessWidget {
                                 state.togglePushNotif(),
                           ),
                         ),
-                        _prefRow(
-                          context,
-                          icon: Icons.language,
-                          label: 'Language',
-                          last: true,
-                          trailing: DropdownButton<String>(
-                            value: state.language,
-                            underline: const SizedBox.shrink(),
-                            style: TextStyle(
-                                color: scheme.onSurface,
-                                fontSize: 14),
-                            items: const [
-                              'English',
-                              'Hindi',
-                              'Urdu'
-                            ]
-                                .map((l) => DropdownMenuItem(
-                                    value: l,
-                                    child: Text(l)))
-                                .toList(),
-                            onChanged: (v) =>
-                                state.setLanguage(v ?? 'English'),
-                          ),
-                        ),
+                        // Language picker REMOVED 2026-10-19: it saved
+                        // a choice but no translation exists, so the
+                        // option was fake. It returns when real
+                        // Hindi/Urdu translation is built.
                       ],
                     ),
                   ),

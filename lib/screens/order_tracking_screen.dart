@@ -121,7 +121,24 @@ class OrderTrackingScreen extends StatelessWidget {
                 padding:
                     const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 children: [
-                  _timelineCard(context, done),
+                  if (o.status == 'cancelled')
+                    RCard(
+                      child: Row(
+                        children: [
+                          Icon(Icons.cancel_outlined,
+                              color: RemedooTheme.destructive, size: 22),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text('This order was cancelled.',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    _timelineCard(context, done),
                   const SizedBox(height: 12),
                   _pharmacyCard(context),
                   const SizedBox(height: 12),
@@ -130,6 +147,33 @@ class OrderTrackingScreen extends StatelessWidget {
                   _itemsBillCard(context),
                   const SizedBox(height: 12),
                   _paymentCard(context),
+                  if (o.isCancellable) ...[
+                    const SizedBox(height: 16),
+                    RButton(
+                      label: 'Cancel Order',
+                      icon: Icons.cancel_outlined,
+                      variant: RButtonVariant.danger,
+                      fullWidth: true,
+                      onPressed: () async {
+                        final state = AppStateScope.of(context);
+                        final ok = await confirmDialog(
+                          context,
+                          title: 'Cancel this order?',
+                          message:
+                              'The pharmacy will be told not to pack or deliver it. This cannot be undone.',
+                          confirmLabel: 'Yes, cancel order',
+                        );
+                        if (ok && context.mounted) {
+                          state.cancelOrder(o);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Order cancelled.')),
+                          );
+                          goBack(context);
+                        }
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 16),
                 ],
               ),
