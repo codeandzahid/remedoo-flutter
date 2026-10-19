@@ -2237,44 +2237,49 @@ class RBottomNav extends StatelessWidget {
           child: Row(
             children: List.generate(_items.length, (i) {
               final active = i == currentIndex;
-              return Expanded(
-                child: InkWell(
-                  onTap: () => onTap(i),
-                  borderRadius: BorderRadius.circular(999),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 7),
-                    decoration: BoxDecoration(
-                      color: active
-                          ? scheme.primary
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(999),
+              if (!active) {
+                // Inactive tabs: plain icon, no fill — the black
+                // pill belongs to the active tab only.
+                return Expanded(
+                  child: InkWell(
+                    onTap: () => onTap(i),
+                    borderRadius: BorderRadius.circular(999),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Icon(_items[i].$2,
+                          size: 22, color: scheme.onSurfaceVariant),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(active ? _items[i].$3 : _items[i].$2,
-                            size: 21,
-                            color: active
-                                ? Colors.white
-                                : scheme.onSurfaceVariant),
-                        const SizedBox(height: 2),
-                        Text(
-                          _items[i].$1,
-                          style: TextStyle(
-                            fontFamily: RemedooTheme.fontFamily,
-                            fontSize: 10.5,
-                            fontWeight: active
-                                ? FontWeight.w800
-                                : FontWeight.w500,
-                            color: active
-                                ? Colors.white
-                                : scheme.onSurfaceVariant,
-                          ),
+                  ),
+                );
+              }
+              // Active tab: a content-hugging black pill with the
+              // icon and label SIDE BY SIDE (Cognify tab style) —
+              // not a filled block stacked in a narrow cell.
+              return InkWell(
+                onTap: () => onTap(i),
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: scheme.primary,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_items[i].$3, size: 20, color: Colors.white),
+                      const SizedBox(width: 7),
+                      Text(
+                        _items[i].$1,
+                        style: TextStyle(
+                          fontFamily: RemedooTheme.fontFamily,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               );
