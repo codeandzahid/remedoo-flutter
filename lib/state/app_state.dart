@@ -253,6 +253,32 @@ class AppState extends ChangeNotifier {
           ..addAll(decoded.map((e) =>
               SavedAddress.fromJson(e as Map<String, dynamic>)));
       }
+      final cartJson = prefs.getString(_kCartKey);
+      if (cartJson != null) {
+        final j = jsonDecode(cartJson) as Map<String, dynamic>;
+        cartPharmacyId = j['pharmacyId'] as String?;
+        cartPharmacyName = j['pharmacyName'] as String?;
+        final lines = (j['lines'] as List<dynamic>? ?? []);
+        cart
+          ..clear()
+          ..addAll(lines.map((e) {
+            final m = e as Map<String, dynamic>;
+            return CartLine(
+              medicine: Medicine(
+                id: m['id'] as String,
+                pharmacyId: m['pharmacyId'] as String? ?? '',
+                name: m['name'] as String? ?? '',
+                pack: m['pack'] as String? ?? '',
+                brand: m['brand'] as String? ?? '',
+                price: (m['price'] as num?)?.toDouble() ?? 0,
+                mrp: (m['mrp'] as num?)?.toDouble() ?? 0,
+                rxRequired: m['rxRequired'] as bool? ?? false,
+                category: m['category'] as String? ?? '',
+              ),
+              qty: (m['qty'] as num?)?.toInt() ?? 1,
+            );
+          }));
+      }
     } catch (_) {
       // Storage unavailable (e.g. private browsing): keep in-memory default.
     }
@@ -565,6 +591,7 @@ class AppState extends ChangeNotifier {
         await prefs.remove(_kVitalsKey);
         await prefs.remove(_kHistoryKey);
         await prefs.remove(_kAddressesKey);
+        await prefs.remove(_kCartKey);
       } catch (_) {}
     }());
     if (notify) notifyListeners();
@@ -1262,6 +1289,7 @@ class AppState extends ChangeNotifier {
     } else {
       cart.add(CartLine(medicine: m));
     }
+    _persistCart();
     notifyListeners();
     return true;
   }
@@ -1275,6 +1303,7 @@ class AppState extends ChangeNotifier {
       cartPharmacyId = null;
       cartPharmacyName = null;
     }
+    _persistCart();
     notifyListeners();
   }
 
@@ -1282,7 +1311,48 @@ class AppState extends ChangeNotifier {
     cart.clear();
     cartPharmacyId = null;
     cartPharmacyName = null;
+    _persistCart();
     notifyListeners();
+  }
+
+  static const _kCartKey = 'remedoo_cart_v1';
+
+  /// Persists the cart on-device (2026-10-19) so a page reload does
+  /// not empty it; wiped at logout with the rest of the local data.
+  void _persistCart() {
+    unawaited(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance()
+            .timeout(const Duration(seconds: 3));
+        if (cart.isEmpty) {
+          await prefs.remove(_kCartKey);
+          return;
+        }
+        await prefs.setString(
+          _kCartKey,
+          jsonEncode({
+            'pharmacyId': cartPharmacyId,
+            'pharmacyName': cartPharmacyName,
+            'lines': cart
+                .map((l) => {
+                      'id': l.medicine.id,
+                      'pharmacyId': l.medicine.pharmacyId,
+                      'name': l.medicine.name,
+                      'pack': l.medicine.pack,
+                      'brand': l.medicine.brand,
+                      'price': l.medicine.price,
+                      'mrp': l.medicine.mrp,
+                      'rxRequired': l.medicine.rxRequired,
+                      'category': l.medicine.category,
+                      'qty': l.qty,
+                    })
+                .toList(),
+          }),
+        );
+      } catch (_) {
+        // Best-effort persistence only.
+      }
+    }());
   }
 
   /// Order Again (2026-10-19): refills the cart with a past order's
@@ -1302,6 +1372,7 @@ class AppState extends ChangeNotifier {
         added++;
       }
     }
+    _persistCart();
     notifyListeners();
     return added;
   }
@@ -1363,6 +1434,7 @@ class AppState extends ChangeNotifier {
     cart.clear();
     cartPharmacyId = null;
     cartPharmacyName = null;
+    _persistCart();
     _syncPlaceOrder(order, pharmacyId);
     addNotification(
       title: 'Order placed',
