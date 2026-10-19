@@ -618,6 +618,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    // Log out — reachable at every width (2026-10-19):
+                    // the Settings screen's logout sits behind the
+                    // compact-only drawer, so desktop users had no
+                    // sign-out at all. Same pill as Settings.
+                    Material(
+                      color: RemedooTheme.destructive.withValues(alpha: 0.06),
+                      shape: StadiumBorder(
+                        side: BorderSide(
+                            color: RemedooTheme.destructive
+                                .withValues(alpha: 0.35)),
+                      ),
+                      child: InkWell(
+                        onTap: () async {
+                          final ok = await confirmDialog(
+                            context,
+                            title: 'Log out?',
+                            message: 'You will be signed out of Remedoo.',
+                            confirmLabel: 'Log Out',
+                          );
+                          if (ok) state.logout();
+                        },
+                        customBorder: const StadiumBorder(),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.logout,
+                                  size: 18,
+                                  color: RemedooTheme.destructive),
+                              SizedBox(width: 8),
+                              Text('Log Out',
+                                  style: TextStyle(
+                                      color: RemedooTheme.destructive,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                     // Danger zone: delete account (2026-10-19).
                     RCard(
                       padding: const EdgeInsets.all(20),
