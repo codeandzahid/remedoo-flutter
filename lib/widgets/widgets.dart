@@ -2221,73 +2221,65 @@ class RBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final bg = scheme.primary.withValues(alpha: 0.08);
+    // Remidy style: a floating WHITE pill capsule with a soft shadow;
+    // the active tab is a filled primary pill inside it.
     return SafeArea(
       top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        decoration: BoxDecoration(
-          color: bg,
-          border: Border(
-            top: BorderSide(
-                color: scheme.primary.withValues(alpha: 0.18)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: RemedooTheme.softShadow,
           ),
-        ),
-        child: Row(
-          children: List.generate(_items.length, (i) {
-            final active = i == currentIndex;
-            return Expanded(
-              child: InkWell(
-                onTap: () => onTap(i),
-                borderRadius: BorderRadius.circular(16),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: active
-                        ? scheme.primary
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: active
-                        ? [
-                            BoxShadow(
-                              color: scheme.primary
-                                  .withValues(alpha: 0.35),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(active ? _items[i].$3 : _items[i].$2,
-                          size: 22,
-                          color: active
-                              ? Colors.white
-                              : scheme.onSurfaceVariant),
-                      const SizedBox(height: 2),
-                      Text(
-                        _items[i].$1,
-                        style: TextStyle(
-                          fontFamily: RemedooTheme.fontFamily,
-                          fontSize: 10.5,
-                          fontWeight: active
-                              ? FontWeight.w800
-                              : FontWeight.w500,
-                          color: active
-                              ? Colors.white
-                              : scheme.onSurfaceVariant,
+          child: Row(
+            children: List.generate(_items.length, (i) {
+              final active = i == currentIndex;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => onTap(i),
+                  borderRadius: BorderRadius.circular(999),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 7),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? scheme.primary
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(active ? _items[i].$3 : _items[i].$2,
+                            size: 21,
+                            color: active
+                                ? Colors.white
+                                : scheme.onSurfaceVariant),
+                        const SizedBox(height: 2),
+                        Text(
+                          _items[i].$1,
+                          style: TextStyle(
+                            fontFamily: RemedooTheme.fontFamily,
+                            fontSize: 10.5,
+                            fontWeight: active
+                                ? FontWeight.w800
+                                : FontWeight.w500,
+                            color: active
+                                ? Colors.white
+                                : scheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            }),
+          ),
         ),
       ),
     );
