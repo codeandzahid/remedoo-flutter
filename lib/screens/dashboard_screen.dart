@@ -240,27 +240,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Row(
                 children: [
-                  if (context.isCompact) ...[
-                    Builder(
-                      builder: (drawerContext) => Container(
-                        decoration: BoxDecoration(
-                          color: scheme.surface,
-                          shape: BoxShape.circle,
-                          boxShadow: RemedooTheme.softShadow,
-                        ),
-                        child: IconButton(
-                          icon: Icon(Icons.menu, color: scheme.onSurface),
-                          tooltip: 'Menu',
-                          // NOTE: must use the Builder's context (inside
-                          // this screen's own Scaffold) — the outer
-                          // context resolves to a shell with no drawer.
-                          onPressed: () =>
-                              Scaffold.of(drawerContext).openDrawer(),
-                        ),
+                  // Menu button at EVERY width: the drawer holds Settings
+                  // and Log Out, which must stay reachable on desktop too
+                  // (live QA 2026-10-19: desktop patients could not log
+                  // out at all when this was compact-only).
+                  Builder(
+                    builder: (drawerContext) => Container(
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        shape: BoxShape.circle,
+                        boxShadow: RemedooTheme.softShadow,
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.menu, color: scheme.onSurface),
+                        tooltip: 'Menu',
+                        // NOTE: must use the Builder's context (inside
+                        // this screen's own Scaffold) — the outer
+                        // context resolves to a shell with no drawer.
+                        onPressed: () =>
+                            Scaffold.of(drawerContext).openDrawer(),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                  ],
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
