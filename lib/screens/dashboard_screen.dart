@@ -189,87 +189,111 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Slim gradient header: menu, compact greeting + name, upcoming pill,
-  /// bell, then a compact search bar. Rounded bottom via RGradientHeader.
+  /// Light Remidy header: (phone) white-circle menu button, greeting +
+  /// name in dark ink, upcoming pill, white-circle bell, then a white
+  /// pill search bar — no colour slab.
   Widget _heroHeader(AppState state) {
-    return RGradientHeader(
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      bottom: false,
       child: MaxWidthBox(
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Builder(
-                  builder: (drawerContext) => IconButton(
-                    icon: const Icon(Icons.menu, color: Colors.white),
-                    tooltip: 'Menu',
-                    // NOTE: must use the Builder's context (inside this
-                    // screen's own Scaffold) — the State's context resolves
-                    // to the outer ResponsiveScaffold, which has no drawer.
-                    onPressed: () =>
-                        Scaffold.of(drawerContext).openDrawer(),
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _greeting(),
-                        style: TextStyle(
-                          color:
-                              Colors.white.withValues(alpha: 0.75),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  if (context.isCompact) ...[
+                    Builder(
+                      builder: (drawerContext) => Container(
+                        decoration: BoxDecoration(
+                          color: scheme.surface,
+                          shape: BoxShape.circle,
+                          boxShadow: RemedooTheme.softShadow,
+                        ),
+                        child: IconButton(
+                          icon: Icon(Icons.menu, color: scheme.onSurface),
+                          tooltip: 'Menu',
+                          // NOTE: must use the Builder's context (inside
+                          // this screen's own Scaffold) — the outer
+                          // context resolves to a shell with no drawer.
+                          onPressed: () =>
+                              Scaffold.of(drawerContext).openDrawer(),
                         ),
                       ),
-                      Text(
-                        '${state.displayName} 👋',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _greeting(),
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
+                        Text(
+                          '${state.displayName} 👋',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: scheme.onSurface,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _upcomingPill(state),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: scheme.surface,
+                      shape: BoxShape.circle,
+                      boxShadow: RemedooTheme.softShadow,
+                    ),
+                    child: IconButton(
+                      icon: Badge(
+                        isLabelVisible: state.unreadNotifications > 0,
+                        label: Text('${state.unreadNotifications}'),
+                        child: Icon(Icons.notifications_outlined,
+                            color: scheme.onSurface),
                       ),
-                    ],
+                      tooltip: 'Notifications',
+                      onPressed: () => _go(const NotificationsScreen()),
+                    ),
                   ),
-                ),
-                _upcomingPill(state),
-                IconButton(
-                  icon: Badge(
-                    isLabelVisible: state.unreadNotifications > 0,
-                    label: Text('${state.unreadNotifications}'),
-                    child: const Icon(Icons.notifications_outlined,
-                        color: Colors.white),
-                  ),
-                  tooltip: 'Notifications',
-                  onPressed: () => _go(const NotificationsScreen()),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _translucentSearch(),
-          ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              _searchPill(),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  /// Translucent white rounded-full search bar (read-only, opens search).
-  Widget _translucentSearch() {
+  /// White pill search bar (read-only, opens search).
+  Widget _searchPill() {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => _go(const DoctorsScreen()),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(30),
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: RemedooTheme.softShadow,
         ),
         child: Row(
           children: [
-            Icon(Icons.search,
-                color: Colors.white.withValues(alpha: 0.9), size: 20),
+            Icon(Icons.search, color: scheme.onSurfaceVariant, size: 20),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -277,7 +301,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
+                  color: scheme.onSurfaceVariant,
                   fontSize: 14,
                 ),
               ),
@@ -635,16 +659,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final n =
         state.appointments.where((a) => a.status == 'upcoming').length;
     if (n == 0) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => _goGated(const AppointmentsScreen()),
       child: Container(
         padding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.20),
+          color: scheme.primary,
           borderRadius: BorderRadius.circular(999),
-          border:
-              Border.all(color: Colors.white.withValues(alpha: 0.30)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

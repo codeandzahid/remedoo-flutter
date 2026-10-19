@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
@@ -11,8 +12,10 @@ import 'doctors_screen.dart';
 import 'favorites_screen.dart';
 import 'hospitals_screen.dart';
 import 'labs_screen.dart';
+import 'login_screen.dart';
 import 'orders_screen.dart';
 import 'pharmacies_screen.dart';
+import 'profile_screen.dart';
 import 'support_tickets_screen.dart';
 
 /// Adaptive shell: floating white bottom bar on phones (6 tabs:
@@ -260,67 +263,178 @@ class _MainShellState extends State<MainShell> {
       );
     }
 
-    // Tablets (rail) and desktop/TV (permanent side drawer, styled like the
-    // React sidebar: quick-actions grid on top, React-style nav rows).
-    return ResponsiveScaffold(
-      selectedIndex: _index,
-      onDestinationSelected: (i) => _switchTab(i),
-      sections: [NavSection('', _destinations(state))],
-      pages: _pages,
-      drawerHeader: _drawerHeader(context),
+    // Tablets and desktop/TV: the Remidy interface — a white pill
+    // top bar (logo, nav pills, support, avatar) and NO sidebar.
+    return Scaffold(
+      body: Column(
+        children: [
+          _pillTopBar(context, state),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: IndexedStack(
+                key: ValueKey<int>(_index),
+                index: _index,
+                children: _pages,
+              ),
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: _supportFab(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
-  Widget _drawerHeader(BuildContext context) {
+  /// White pill navigation bar for the main website (tablet/desktop):
+  /// primary logo tile + 'Remedoo', the seven sections as pills
+  /// (active = filled primary pill), support button and avatar.
+  Widget _pillTopBar(BuildContext context, AppState state) {
+    final dests = _destinations(state);
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [scheme.primary, RemedooTheme.primaryDark],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.primary.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+        child: Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: RemedooTheme.softShadow,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: RemedooLogo(size: 32),
-          ),
-          const SizedBox(width: 12),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
             children: [
-              Text('Remedoo',
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white)),
-              Text('Care, on demand',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white70)),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: scheme.primary,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Center(
+                  child: Text('R',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800)),
+                ),
+              ),
+              const SizedBox(width: 9),
+              const Text('Remedoo',
+                  style:
+                      TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < dests.length; i++)
+                        _navPill(context, dests[i], i),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              IconButton(
+                tooltip: 'Support',
+                icon: Badge(
+                  isLabelVisible: state.supportUnreadCount > 0,
+                  label: Text('${state.supportUnreadCount}'),
+                  child: Icon(Icons.support_agent,
+                      color: scheme.onSurface),
+                ),
+                onPressed: () {
+                  if (!checkLogin(
+                      context, 'Please login to access support')) {
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const SupportTicketsScreen()),
+                  );
+                },
+              ),
+              const SizedBox(width: 2),
+              GestureDetector(
+                onTap: () {
+                  if (state.isSignedIn) {
+                    pushPage(context, const ProfileScreen());
+                  } else {
+                    pushPage(context, const LoginScreen());
+                  }
+                },
+                child: RAvatarCircle(
+                  name: state.isSignedIn ? state.userName : 'Guest',
+                  size: 38,
+                ),
+              ),
             ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navPill(BuildContext context, NavDestinationItem d, int i) {
+    final active = i == _index;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () => _switchTab(i),
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+          decoration: BoxDecoration(
+            color:
+                active ? scheme.primary : scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                active ? (d.selectedIcon ?? d.icon) : d.icon,
+                size: 17,
+                color: active ? Colors.white : scheme.onSurface,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                d.label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: active ? Colors.white : scheme.onSurface,
+                ),
+              ),
+              if (d.badgeLabel != null) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 1),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFD1A54),
+                    borderRadius:
+                        BorderRadius.all(Radius.circular(999)),
+                  ),
+                  child: Text(
+                    d.badgeLabel!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
-import '../theme.dart';
 import 'widgets.dart';
 import '../screens/appointments_screen.dart';
 import '../screens/emergency_screen.dart';
@@ -80,18 +79,8 @@ class RSidebarProfileHeader extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              scheme.primary.withValues(alpha: 0.15),
-              scheme.primary.withValues(alpha: 0.05),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: scheme.primary.withValues(alpha: 0.2),
-          ),
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
           children: [
@@ -167,9 +156,9 @@ class RPatientSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      color: dark ? RemedooTheme.darkCard : RemedooTheme.sidebarLight,
+      color: scheme.surface,
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 20),
@@ -183,13 +172,14 @@ class RPatientSidebar extends StatelessWidget {
               onPush: onPush,
             ),
             const SizedBox(height: 24),
-            const RSidebarGroupLabel('🧭 NAVIGATE'),
+            const RSidebarGroupLabel('NAVIGATE'),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Column(
                 children: [
                   for (final item in _patientNav())
-                    RSidebarNavTile(
+                    _pillTile(
+                      context,
                       icon: item.icon,
                       label: item.title,
                       active: activeRoute == item.route,
@@ -211,6 +201,54 @@ class RPatientSidebar extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Remidy drawer row: a full-width pill — active page filled with
+  /// the primary colour, the rest light grey.
+  Widget _pillTile(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final fg = active ? Colors.white : scheme.onSurface;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: active
+                ? scheme.primary
+                : scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: fg),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: fg,
+                  ),
+                ),
+              ),
+              if (active)
+                const Icon(Icons.check, size: 15, color: Colors.white),
+            ],
+          ),
         ),
       ),
     );
