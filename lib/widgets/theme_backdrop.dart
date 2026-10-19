@@ -44,6 +44,9 @@ class _BackdropPainter extends CustomPainter {
       case ThemeBackdrop.leaves:
         _leaves(canvas, size);
         break;
+      case ThemeBackdrop.plain:
+        // Remidy: no backdrop artwork — flat canvas.
+        break;
     }
   }
 

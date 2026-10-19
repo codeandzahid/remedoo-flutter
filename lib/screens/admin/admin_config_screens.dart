@@ -541,7 +541,7 @@ class _ThemePackAdminCardState extends State<_ThemePackAdminCard> {
                   'id': p.id,
                   'name': p.name,
                   'enabled': true,
-                  'is_primary': p.id == 'sky_pulse',
+                  'is_primary': p.id == 'remidy',
                 }
             ]
           : rows;

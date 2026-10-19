@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 /// follow the selected theme with no per-screen changes.
 /// Decorative header artwork style, one per theme. Each theme paints its
 /// own subtle motif behind gradient headers (see ThemeBackdrop).
-enum ThemeBackdrop { clouds, wash, mist, petals, glow, leaves }
+enum ThemeBackdrop { clouds, wash, mist, petals, glow, leaves, plain }
 
 class ThemePack {
   final String id;
@@ -198,7 +198,33 @@ class ThemePack {
     backdrop: ThemeBackdrop.leaves,
   );
 
+  /// Remidy: the Cognify-style design the whole product now wears —
+  /// light-grey canvas, pure-white cards, near-black primary with
+  /// pill buttons, electric-blue accent. No backdrop artwork.
+  static const remidy = ThemePack(
+    id: 'remidy',
+    name: 'Remidy',
+    primary: Color(0xFF141414),
+    primaryDark: Color(0xFF000000),
+    background: Color(0xFFF5F6F7),
+    card: Color(0xFFFFFFFF),
+    ink: Color(0xFF141414),
+    mutedText: Color(0xFF6E737C),
+    border: Color(0xFFE7E9EC),
+    secondary: Color(0xFFEEF0F2),
+    mutedSurface: Color(0xFFE9EBEE),
+    accent: Color(0xFFE8ECFF),
+    accentForeground: Color(0xFF0E3EFE),
+    shadowTint: Color(0xFF141414),
+    cardRadius: 22,
+    pillButtons: true,
+    shadowBlur: 18,
+    shadowOpacity: 0.05,
+    backdrop: ThemeBackdrop.plain,
+  );
+
   static const List<ThemePack> all = [
+    remidy,
     skyPulse,
     oceanSand,
     lavenderMist,
@@ -224,7 +250,7 @@ class RemedooTheme {
   // ------------------------------------------------------------------
   // Active theme pack (switched at runtime via [setPack]).
   // ------------------------------------------------------------------
-  static ThemePack _pack = ThemePack.skyPulse;
+  static ThemePack _pack = ThemePack.remidy;
 
   /// The currently active theme pack.
   static ThemePack get pack => _pack;

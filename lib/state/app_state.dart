@@ -216,10 +216,10 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  static const _kThemePackKey = 'remedoo_theme_pack';
+  static const _kThemePackKey = 'remedoo_theme_pack_v2';
   static const _kAdminStyleKey = 'remedoo_admin_style_v2';
 
-  ThemePack _themePack = ThemePack.skyPulse;
+  ThemePack _themePack = ThemePack.remidy;
 
   /// Admin panel visual style (Admin > Panel Style). The owner is
   /// walking the styles one by one by number (2026-10-18); the
@@ -272,9 +272,9 @@ class AppState extends ChangeNotifier {
         _packEnabled[id] = r['enabled'] == true;
       }
       // Primary theme can never be off.
-      _packEnabled['sky_pulse'] = true;
+      _packEnabled['remidy'] = true;
       if (_packEnabled[_themePack.id] == false) {
-        unawaited(_applyPack(ThemePack.skyPulse, persist: true));
+        unawaited(_applyPack(ThemePack.remidy, persist: true));
       }
       notifyListeners();
     } catch (_) {
@@ -346,14 +346,14 @@ class AppState extends ChangeNotifier {
   }
 
   /// Admin: enable/disable a theme pack project-wide. The primary theme
-  /// (Sky Pulse) cannot be disabled.
+  /// (Remidy) cannot be disabled.
   Future<bool> setThemePackEnabled(String id, bool enabled) async {
-    if (id == 'sky_pulse' && !enabled) return false;
+    if (id == 'remidy' && !enabled) return false;
     final ok = await _repo.setThemePackEnabled(id, enabled);
     if (ok) {
       _packEnabled[id] = enabled;
       if (!enabled && _themePack.id == id) {
-        unawaited(_applyPack(ThemePack.skyPulse, persist: true));
+        unawaited(_applyPack(ThemePack.remidy, persist: true));
       }
       notifyListeners();
     }

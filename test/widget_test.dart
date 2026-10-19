@@ -265,8 +265,8 @@ void main() {
   testWidgets('switching theme pack updates the theme', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final state = AppState();
-    expect(state.themePack.id, 'sky_pulse');
-    expect(RemedooTheme.primary, ThemePack.skyPulse.primary);
+    expect(state.themePack.id, 'remidy');
+    expect(RemedooTheme.primary, ThemePack.remidy.primary);
     await state.setThemePack(ThemePack.oceanSand);
     expect(state.themePack.id, 'ocean_sand');
     expect(RemedooTheme.primary, ThemePack.oceanSand.primary);
@@ -276,11 +276,11 @@ void main() {
     expect(RemedooTheme.primary, ThemePack.skyPulse.primary);
   });
 
-  testWidgets('all six theme packs are defined', (tester) async {
-    expect(ThemePack.all.length, 6);
+  testWidgets('all seven theme packs are defined', (tester) async {
+    expect(ThemePack.all.length, 7);
     expect(
         ThemePack.all.map((p) => p.id).toSet(),
-        {'sky_pulse', 'ocean_sand', 'lavender_mist', 'blush_rose',
+        {'remidy', 'sky_pulse', 'ocean_sand', 'lavender_mist', 'blush_rose',
          'honey_glow', 'emerald_heal'});
     for (final pack in ThemePack.all) {
       expect(ThemePack.byId(pack.id), pack);
@@ -295,9 +295,9 @@ void main() {
     expect(radii.length, greaterThan(1),
         reason: 'themes should not all share one card radius');
     final backdrops = ThemePack.all.map((p) => p.backdrop).toSet();
-    expect(backdrops.length, 6,
+    expect(backdrops.length, 7,
         reason: 'each theme needs its own header artwork');
-    // Sky Pulse is the puffy claymorphism primary theme.
+    // Sky Pulse is the puffy claymorphism theme.
     expect(ThemePack.skyPulse.pillButtons, isTrue);
     expect(ThemePack.skyPulse.cardRadius, 28);
     expect(ThemePack.skyPulse.backdrop, ThemeBackdrop.clouds);
