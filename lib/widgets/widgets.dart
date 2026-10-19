@@ -1097,7 +1097,11 @@ class RButton extends StatelessWidget {
         ),
       ],
     );
-    final shape = RemedooTheme.pillButtons
+    // Inside the admin panel, buttons follow the active admin
+    // style: pill shape and a FLAT primary (no violet gradient).
+    final inAdmin = AdminScope.maybeOf(context) != null;
+    final pill = RemedooTheme.pillButtons || inAdmin;
+    final shape = pill
         ? StadiumBorder(side: side ?? BorderSide.none)
         : RoundedRectangleBorder(
             side: side ?? BorderSide.none,
@@ -1110,11 +1114,13 @@ class RButton extends StatelessWidget {
             ? LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [scheme.primary, RemedooTheme.primaryDark],
+                colors: inAdmin
+                    ? [scheme.primary, scheme.primary]
+                    : [scheme.primary, RemedooTheme.primaryDark],
               )
             : null,
         color: variant == RButtonVariant.primary ? null : bg,
-        borderRadius: RemedooTheme.pillButtons
+        borderRadius: pill
             ? BorderRadius.circular(999)
             : BorderRadius.circular(RemedooTheme.buttonRadius),
         border: side != null
@@ -1775,6 +1781,9 @@ class RSectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // Admin panel headers use the Cognify type scale (bigger,
+    // bolder) under an AdminScope.
+    final inAdmin = AdminScope.maybeOf(context) != null;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1795,8 +1804,9 @@ class RSectionHeader extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                    fontSize: inAdmin ? 18 : 16,
+                    fontWeight: FontWeight.w800),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),

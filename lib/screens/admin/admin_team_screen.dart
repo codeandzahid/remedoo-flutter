@@ -167,13 +167,13 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: RemedooTheme.primary.withValues(alpha: 0.07),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.07),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
               Icon(Icons.shield_outlined,
-                  size: 18, color: RemedooTheme.primary),
+                  size: 18, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -209,7 +209,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                       children: [
                         CircleAvatar(
                           backgroundColor:
-                              RemedooTheme.primary.withValues(alpha: 0.12),
+                              Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
                           child: Text(
                             ('${m['name']}'.isNotEmpty
                                     ? '${m['name']}'
@@ -218,7 +218,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                                 .first
                                 .toUpperCase(),
                             style: TextStyle(
-                              color: RemedooTheme.primary,
+                              color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w800,
                             ),
                           ),

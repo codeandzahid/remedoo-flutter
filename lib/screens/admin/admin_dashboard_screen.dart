@@ -58,7 +58,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final scheme = Theme.of(context).colorScheme;
     if (_loading) {
       return const RLoading();
     }
@@ -374,89 +373,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
     );
 
-    // Management cards: every admin section with a plain-language description.
-    // Indices match the _items() order in admin_shell.dart.
-    final manageSections = [
-      _ManageSection('Catalog', 'What users see in the app', [
-        _ManageCard(1, 'Doctors', 'Add, edit, or remove doctors from the app.',
-            Icons.person_search, RemedooTheme.teal),
-        _ManageCard(2, 'Hospitals', 'Manage hospital listings and details.',
-            Icons.local_hospital, RemedooTheme.primary),
-        _ManageCard(3, 'Labs', 'Manage diagnostic labs and services.',
-            Icons.science, RemedooTheme.purple),
-        _ManageCard(4, 'Lab Tests', 'Add or edit lab tests and prices.',
-            Icons.biotech, RemedooTheme.warning),
-        _ManageCard(5, 'Pharmacies', 'Manage pharmacy stores.',
-            Icons.storefront, RemedooTheme.success),
-        _ManageCard(6, 'Medicines', 'Add or edit medicines in the catalog.',
-            Icons.medication, RemedooTheme.emergency),
-        _ManageCard(7, 'Inventory', 'Track medicine stock levels.',
-            Icons.inventory, RemedooTheme.teal),
-      ]),
-      _ManageSection('Providers', 'People who offer services', [
-        _ManageCard(8, 'Applications',
-            'Approve or reject provider sign-up requests.',
-            Icons.approval, RemedooTheme.warning),
-        _ManageCard(9, 'Payments (UPI)', 'View provider UPI payment details.',
-            Icons.qr_code, RemedooTheme.primary),
-        _ManageCard(10, 'Reviews', 'See and manage user reviews.',
-            Icons.star, RemedooTheme.purple),
-      ]),
-      _ManageSection('Orders & Care', 'Day-to-day operations', [
-        _ManageCard(11, 'Orders', 'View medicine orders. Update status.',
-            Icons.shopping_bag, RemedooTheme.teal),
-        _ManageCard(12, 'Appointments', 'View and manage appointments.',
-            Icons.calendar_month, RemedooTheme.primary),
-        _ManageCard(13, 'Refunds', 'Process refund requests.',
-            Icons.replay, RemedooTheme.warning),
-        _ManageCard(14, 'Emergencies', 'Handle emergency SOS requests.',
-            Icons.sos, RemedooTheme.emergency),
-        _ManageCard(15, 'Ambulance', 'Manage ambulance requests.',
-            Icons.emergency, RemedooTheme.purple),
-        _ManageCard(16, 'Support Tickets', 'Reply to user support messages.',
-            Icons.support_agent, RemedooTheme.success),
-      ]),
-      _ManageSection('Content', 'What users see', [
-        _ManageCard(17, 'Announcements', 'Send messages to all app users.',
-            Icons.campaign, RemedooTheme.primary),
-      ]),
-      _ManageSection('Settings', 'Configure the app', [
-        _ManageCard(18, 'App Settings', 'Fees, charges, and general settings.',
-            Icons.settings, RemedooTheme.teal),
-        _ManageCard(19, 'Branding', 'App themes, colors, and appearance.',
-            Icons.palette, RemedooTheme.purple),
-        _ManageCard(20, 'Commission', 'Set commission rates for providers.',
-            Icons.percent, RemedooTheme.warning),
-        _ManageCard(21, 'Subscriptions', 'Manage subscription plans.',
-            Icons.card_membership, RemedooTheme.primary),
-        _ManageCard(22, 'Corporate Plans', 'Manage corporate health plans.',
-            Icons.business, RemedooTheme.teal),
-        _ManageCard(
-            23,
-            'Healthcare Packages',
-            'Create bundled health packages.',
-            Icons.health_and_safety,
-            RemedooTheme.emergency),
-        _ManageCard(24, 'Service Areas', 'Define service coverage areas.',
-            Icons.map, RemedooTheme.teal),
-        _ManageCard(25, 'Featured', 'Choose featured doctors and hospitals.',
-            Icons.star_border, RemedooTheme.warning),
-      ]),
-      _ManageSection('Insights', 'Reports and data', [
-        _ManageCard(26, 'Revenue', 'Earnings and financial reports.',
-            Icons.trending_up, RemedooTheme.success),
-        _ManageCard(27, 'Analytics', 'App usage statistics and trends.',
-            Icons.analytics, scheme.primary),
-        _ManageCard(28, 'Users', 'View and manage user accounts.',
-            Icons.people, RemedooTheme.teal),
-      ]),
-      _ManageSection('Payments', 'Your own payment system', [
-        _ManageCard(29, 'Remedoo Pay',
-            'See all payments, totals, and payment settings (your UPI ID).',
-            Icons.qr_code_2, RemedooTheme.purple),
-      ]),
-    ];
-
     final chartsRow = LayoutBuilder(
       builder: (ctx, c) {
         if (c.maxWidth >= 1150) {
@@ -548,101 +464,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           const SizedBox(height: 16),
           activityRow,
           const SizedBox(height: 24),
-          // Management: every admin section explained in plain language.
-          if (widget.onNavigate != null) ...[
-            const RSectionHeader(
-                title: 'Manage',
-                subtitle: 'Tap a card to open that section'),
-            const SizedBox(height: 12),
-            for (final section in manageSections) ...[
-              Padding(
-                padding: const EdgeInsets.only(top: 16, bottom: 8),
-                child: Text(
-                  section.title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: scheme.primary,
-                  ),
-                ),
-              ),
-              Text(
-                section.subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ResponsiveGrid(
-                compactCols: 1,
-                mediumCols: 2,
-                expandedCols: 3,
-                wideCols: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 3.2,
-                itemCount: section.cards.length,
-                itemBuilder: (_, i) {
-                  final card = section.cards[i];
-                  return RCard(
-                    padding: const EdgeInsets.all(12),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => widget.onNavigate!(card.index),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: card.color.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(card.icon,
-                                color: card.color, size: 24),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              mainAxisAlignment:
-                                  MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  card.title,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  card.description,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.chevron_right,
-                              color: scheme.onSurfaceVariant),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-            const SizedBox(height: 24),
-          ],
         ],
       ),
     );
@@ -1096,25 +917,4 @@ class _LinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-/// A group of management cards on the dashboard.
-class _ManageSection {
-  final String title;
-  final String subtitle;
-  final List<_ManageCard> cards;
-
-  const _ManageSection(this.title, this.subtitle, this.cards);
-}
-
-/// One tappable card explaining an admin section in plain language.
-class _ManageCard {
-  final int index;
-  final String title;
-  final String description;
-  final IconData icon;
-  final Color color;
-
-  const _ManageCard(
-      this.index, this.title, this.description, this.icon, this.color);
 }

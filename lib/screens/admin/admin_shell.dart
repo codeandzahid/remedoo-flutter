@@ -674,18 +674,23 @@ class _AdminShellState extends State<AdminShell> {
   /// Gradient brand banner (rounded-2xl orange gradient, white text) —
   /// the admin counterpart of the React sidebar's gradient Close button.
   Widget _brandHeader() {
+    // In Remidy the brand block matches the pill bar: solid black.
+    final remedoo = AdminScope.of(context) == AdminStyle.remedoo;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFFDB2777),
-              Color(0xFF7C3AED),
-              Color(0xFF2563EB),
-            ],
-          ),
+          color: remedoo ? const Color(0xFF141414) : null,
+          gradient: remedoo
+              ? null
+              : const LinearGradient(
+                  colors: [
+                    Color(0xFFDB2777),
+                    Color(0xFF7C3AED),
+                    Color(0xFF2563EB),
+                  ],
+                ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(

@@ -51,7 +51,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       ('Hospitals', state.adminTable('hospitals').length,
           Icons.local_hospital, RemedooTheme.teal),
       ('Labs', state.adminTable('labs').length, Icons.science,
-          RemedooTheme.purple),
+          Theme.of(context).colorScheme.tertiary),
       ('Pharmacies', state.adminTable('pharmacies').length,
           Icons.storefront, RemedooTheme.warning),
       ('Medicines', state.adminTable('medicines').length,

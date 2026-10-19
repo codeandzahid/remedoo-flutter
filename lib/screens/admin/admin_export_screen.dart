@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
-import '../../theme.dart';
 import '../../utils/file_download.dart';
 import '../../widgets/widgets.dart';
 
@@ -139,7 +138,7 @@ class _AdminExportScreenState extends State<AdminExportScreen> {
               Row(
                 children: [
                   Icon(Icons.backup_outlined,
-                      color: RemedooTheme.primary),
+                      color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -190,7 +189,7 @@ class _AdminExportScreenState extends State<AdminExportScreen> {
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Row(
                 children: [
-                  Icon(d.$3, color: RemedooTheme.primary),
+                  Icon(d.$3, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(

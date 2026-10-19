@@ -57,7 +57,7 @@ class _AdminRevenueScreenState extends State<AdminRevenueScreen> {
                 scheme.primary),
             const SizedBox(width: 10),
             _card(context, 'Transactions', '${orders.length}',
-                Icons.list_alt, RemedooTheme.purple),
+                Icons.list_alt, Theme.of(context).colorScheme.tertiary),
           ],
         ),
         const SizedBox(height: 24),
