@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
@@ -200,6 +201,41 @@ class AppState extends ChangeNotifier {
       final adminStyleId = prefs.getString(_kAdminStyleKey);
       if (adminStyleId != null) {
         _adminStyle = AdminStyle.byId(adminStyleId);
+      }
+      final reportsJson = prefs.getString(_kMyReportsKey);
+      if (reportsJson != null) {
+        final decoded = jsonDecode(reportsJson) as List<dynamic>;
+        reports
+          ..clear()
+          ..addAll(decoded.map((e) {
+            final j = e as Map<String, dynamic>;
+            return LabReport(
+              id: j['id'] as String,
+              patientName: j['patientName'] as String? ?? '',
+              labName: j['labName'] as String? ?? 'My Upload',
+              date: DateTime.parse(j['date'] as String),
+              status: 'Completed',
+              tests: [
+                {
+                  'name': (j['fileName'] as String?) ?? 'Uploaded Report',
+                  'result': 'Uploaded file',
+                  'unit': '-',
+                  'range': '-',
+                  'flag': 'Normal',
+                }
+              ],
+              fileUrl: j['fileUrl'] as String?,
+              fileName: j['fileName'] as String?,
+            );
+          }));
+      }
+      final vitalsJson = prefs.getString(_kVitalsKey);
+      if (vitalsJson != null) {
+        final decoded = jsonDecode(vitalsJson) as List<dynamic>;
+        vitals
+          ..clear()
+          ..addAll(decoded.map((e) =>
+              VitalReading.fromJson(e as Map<String, dynamic>)));
       }
     } catch (_) {
       // Storage unavailable (e.g. private browsing): keep in-memory default.
@@ -498,7 +534,18 @@ class AppState extends ChangeNotifier {
     reminders.clear();
     _favorites.clear();
     reports.clear();
+    vitals.clear();
     tickets.clear();
+    // Uploaded reports + vitals persist on-device: wipe the stored
+    // copies too so the next account on this device never sees them.
+    unawaited(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance()
+            .timeout(const Duration(seconds: 3));
+        await prefs.remove(_kMyReportsKey);
+        await prefs.remove(_kVitalsKey);
+      } catch (_) {}
+    }());
     if (notify) notifyListeners();
   }
 
@@ -1155,6 +1202,28 @@ class AppState extends ChangeNotifier {
     cartPharmacyId = null;
     cartPharmacyName = null;
     notifyListeners();
+  }
+
+  /// Order Again (2026-10-19): refills the cart with a past order's
+  /// items from the same pharmacy. Returns how many lines were added.
+  int reorder(MedOrder order) {
+    clearCart();
+    var added = 0;
+    for (final line in order.items) {
+      final ok = addToCart(
+        line.medicine,
+        pharmacyId: line.medicine.pharmacyId,
+        pharmacyName: order.pharmacyName,
+      );
+      if (ok) {
+        final cartLine =
+            cart.where((l) => l.medicine.id == line.medicine.id).firstOrNull;
+        if (cartLine != null) cartLine.qty = line.qty;
+        added++;
+      }
+    }
+    notifyListeners();
+    return added;
   }
 
   MedOrder placeOrder({required String address, required String payment}) {
@@ -2142,6 +2211,68 @@ class AppState extends ChangeNotifier {
   // ---------- Lab reports ----------
 
   final List<LabReport> reports = [];
+
+  static const _kMyReportsKey = 'remedoo_my_reports_v1';
+  static const _kVitalsKey = 'remedoo_vitals_v1';
+
+  /// Adds a patient-uploaded report (2026-10-19) and persists the
+  /// uploaded set on-device; the file itself lives in Supabase storage.
+  void addUploadedReport(LabReport report) {
+    reports.insert(0, report);
+    notifyListeners();
+    unawaited(_persistMyReports());
+  }
+
+  Future<void> _persistMyReports() async {
+    try {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 3));
+      final uploaded = reports.where((r) => r.isUploaded).map((r) => {
+            'id': r.id,
+            'patientName': r.patientName,
+            'labName': r.labName,
+            'date': r.date.toIso8601String(),
+            'fileUrl': r.fileUrl,
+            'fileName': r.fileName,
+          }).toList();
+      await prefs.setString(_kMyReportsKey, jsonEncode(uploaded));
+    } catch (_) {
+      // Best-effort persistence only.
+    }
+  }
+
+  // ---------- Health numbers (vitals) ----------
+
+  final List<VitalReading> vitals = [];
+
+  void addVital(VitalReading reading) {
+    vitals.insert(0, reading);
+    notifyListeners();
+    unawaited(_persistVitals());
+  }
+
+  void removeVital(String id) {
+    vitals.removeWhere((v) => v.id == id);
+    notifyListeners();
+    unawaited(_persistVitals());
+  }
+
+  VitalReading? latestVital(String type) =>
+      vitals.where((v) => v.type == type).firstOrNull;
+
+  VitalReading? previousVital(String type) =>
+      vitals.where((v) => v.type == type).skip(1).firstOrNull;
+
+  Future<void> _persistVitals() async {
+    try {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 3));
+      await prefs.setString(
+          _kVitalsKey, jsonEncode(vitals.map((v) => v.toJson()).toList()));
+    } catch (_) {
+      // Best-effort persistence only.
+    }
+  }
 
   // ---------- Provider applications ----------
 

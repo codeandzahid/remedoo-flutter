@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
 import '../responsive/responsive.dart';
@@ -56,6 +57,10 @@ class LabReportDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _testInfoCard(context, r),
+                    if (r.isUploaded) ...[
+                      const SizedBox(height: 12),
+                      _fileCard(context, r),
+                    ],
                     const SizedBox(height: 12),
                     _labCard(context, r),
                     const SizedBox(height: 12),
@@ -237,6 +242,57 @@ class LabReportDetailScreen extends StatelessWidget {
                         color: scheme.onSurfaceVariant)),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Uploaded-file card (2026-10-19): opens the patient's own uploaded
+  /// report file (PDF/image) in the browser/viewer.
+  Widget _fileCard(BuildContext context, LabReport r) {
+    final scheme = Theme.of(context).colorScheme;
+    final isPdf =
+        (r.fileName ?? '').toLowerCase().endsWith('.pdf') ||
+            (r.fileUrl ?? '').toLowerCase().contains('.pdf');
+    return RCard(
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(
+              isPdf ? Icons.picture_as_pdf : Icons.image,
+              color: scheme.primary,
+              size: 23,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(r.fileName ?? 'Uploaded Report',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 14)),
+                const SizedBox(height: 2),
+                Text('Uploaded by you',
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: () => launchUrl(Uri.parse(r.fileUrl!),
+                mode: LaunchMode.externalApplication),
+            child: const Text('Open'),
           ),
         ],
       ),

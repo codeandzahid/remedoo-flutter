@@ -1,4 +1,6 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../responsive/animations.dart';
@@ -76,6 +78,33 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.w800)),
+                    const Spacer(),
+                    Material(
+                      color: Colors.white,
+                      shape: const StadiumBorder(),
+                      child: InkWell(
+                        onTap: () => _uploadReport(state),
+                        customBorder: const StadiumBorder(),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.upload_file,
+                                  size: 16,
+                                  color: RemedooTheme.primary),
+                              const SizedBox(width: 5),
+                              Text('Upload',
+                                  style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: RemedooTheme.primary)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -124,7 +153,9 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
                           ? 'No completed reports'
                           : 'No lab reports found',
                       subtitle:
-                          'Your test reports will appear here once ready.',
+                          'Your test reports will appear here once ready. You can also upload a report from any lab.',
+                      actionLabel: 'Upload a Report',
+                      onAction: () => _uploadReport(state),
                     )
                   : RefreshIndicator(
                       onRefresh: () async {
@@ -147,6 +178,92 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
         ],
       ),
     );
+  }
+
+  /// Upload own report (2026-10-19): pick a PDF/image from any lab or
+  /// doctor, name it, store the file, and list it with the reports.
+  Future<void> _uploadReport(AppState state) async {
+    final files = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+    );
+    if (files.isEmpty || !mounted) return;
+    final file = files.single;
+    Uint8List? bytes;
+    try {
+      bytes = await file.readAsBytes();
+    } catch (_) {}
+    if (!mounted) return;
+    final nameCtrl = TextEditingController(
+        text: file.name.replaceAll(RegExp(r'\.[A-Za-z0-9]+$'), ''));
+    final sourceCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Upload Report'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration:
+                  const InputDecoration(labelText: 'Report name'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: sourceCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Lab / doctor (optional)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Upload')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Uploading report...')));
+    final url = await state.supabaseRepository
+        .uploadPrescriptionData(bytes, file.path, file.name);
+    if (!mounted) return;
+    if (url == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Upload failed. Check your connection and try again.')));
+      return;
+    }
+    state.addUploadedReport(LabReport(
+      id: 'U${DateTime.now().millisecondsSinceEpoch}',
+      patientName: state.userName,
+      labName: sourceCtrl.text.trim().isEmpty
+          ? 'My Upload'
+          : sourceCtrl.text.trim(),
+      date: DateTime.now(),
+      status: 'Completed',
+      tests: [
+        {
+          'name': nameCtrl.text.trim().isEmpty
+              ? 'Uploaded Report'
+              : nameCtrl.text.trim(),
+          'result': 'Uploaded file',
+          'unit': '-',
+          'range': '-',
+          'flag': 'Normal',
+        }
+      ],
+      fileUrl: url,
+      fileName:
+          nameCtrl.text.trim().isEmpty ? file.name : nameCtrl.text.trim(),
+    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Report uploaded.')));
   }
 
   Widget _headerPill(String label) {
@@ -248,11 +365,13 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
                               CrossAxisAlignment.start,
                           children: [
                             Text(
-                              r.tests.isNotEmpty
-                                  ? r.tests
-                                      .map((t) => t['name'] ?? '')
-                                      .join(', ')
-                                  : 'Lab Report',
+                              r.isUploaded
+                                  ? (r.fileName ?? 'Uploaded Report')
+                                  : r.tests.isNotEmpty
+                                      ? r.tests
+                                          .map((t) => t['name'] ?? '')
+                                          .join(', ')
+                                      : 'Lab Report',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(

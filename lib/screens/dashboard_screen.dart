@@ -27,6 +27,8 @@ import 'care_match_screen.dart';
 import 'remedoo_pharmacy_screen.dart';
 import 'medical_history_screen.dart';
 import 'reminders_screen.dart';
+import 'search_screen.dart';
+import 'vitals_screen.dart';
 
 /// Home tab: orange hero header (menu / Remedoo / bell, greeting, translucent
 /// search), dense service grid, compact promo carousel,
@@ -149,6 +151,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           StaggerItem(index: 4, child: _weekStrip(state)),
                           _alertsStack(state),
                           const SizedBox(height: 14),
+                          if (state.isSignedIn) ...[
+                            _healthNumbersCard(state),
+                            const SizedBox(height: 14),
+                          ],
                           StaggerItem(
                             index: 5,
                             child: RSectionHeader(
@@ -346,7 +352,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _searchPill() {
     final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
-      onTap: () => _go(const DoctorsScreen()),
+      onTap: () => _go(const SearchScreen()),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         decoration: BoxDecoration(
@@ -360,7 +366,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Search doctors...',
+                'Search doctors, medicines, tests...',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -1313,6 +1319,98 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   /// Profile completion progress (signed-in users, until 100%).
+  /// Health Numbers card (2026-10-19): latest BP / sugar / weight
+  /// with a small trend arrow vs the previous reading; opens the
+  /// full log where readings are added.
+  Widget _healthNumbersCard(AppState state) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget cell(String type, String label, IconData icon, Color color) {
+      final latest = state.latestVital(type);
+      final prev = state.previousVital(type);
+      IconData? trend;
+      if (latest != null && prev != null) {
+        trend = latest.value > prev.value
+            ? Icons.arrow_upward
+            : latest.value < prev.value
+                ? Icons.arrow_downward
+                : Icons.remove;
+      }
+      return Expanded(
+        child: Column(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: Colors.white, size: 19),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(latest?.label ?? '—',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 13.5)),
+                if (trend != null) ...[
+                  const SizedBox(width: 2),
+                  Icon(trend, size: 13, color: scheme.onSurfaceVariant),
+                ],
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11, color: scheme.onSurfaceVariant)),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RSectionHeader(
+          title: 'Your Health Numbers',
+          onSeeAll: () => _go(const VitalsScreen()),
+        ),
+        const SizedBox(height: 8),
+        RCard(
+          onTap: () => _go(const VitalsScreen()),
+          child: state.vitals.isEmpty
+              ? Row(
+                  children: [
+                    Icon(Icons.monitor_heart,
+                        color: scheme.primary, size: 22),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                          'Track your BP, sugar and weight here',
+                          style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    Icon(Icons.add_circle,
+                        color: scheme.primary, size: 22),
+                  ],
+                )
+              : Row(
+                  children: [
+                    cell('bp', 'BP', Icons.favorite,
+                        RemedooTheme.emergency),
+                    cell('sugar', 'Sugar', Icons.water_drop,
+                        RemedooTheme.warning),
+                    cell('weight', 'Weight', Icons.monitor_weight,
+                        RemedooTheme.success),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
   Widget _profileCompletion(AppState state) {
     if (!state.isSignedIn) return const SizedBox.shrink();
     final checks = <(bool, String)>[

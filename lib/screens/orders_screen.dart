@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'order_tracking_screen.dart';
 import 'remedoo_pharmacy_screen.dart';
+import 'cart_screen.dart';
 import '../app_navigator.dart';
 
 const _months = [
@@ -176,7 +177,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
       onTap: () => pushPage(context, OrderTrackingScreen(order: o)),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Row(
+        child: Column(
+          children: [
+            Row(
           children: [
             Container(
               width: 48,
@@ -232,6 +235,56 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ],
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: _orderAgainButton(o),
+        ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Order Again (2026-10-19): refills the cart with this order's
+  /// items from the same pharmacy and opens the cart.
+  Widget _orderAgainButton(MedOrder o) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.primary.withValues(alpha: 0.08),
+      shape: const StadiumBorder(),
+      child: InkWell(
+        onTap: () {
+          final state = AppStateScope.of(context);
+          final added = state.reorder(o);
+          if (added == 0) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content:
+                    Text('These medicines are not available right now.')));
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                  '$added item${added == 1 ? '' : 's'} added to your cart.')));
+          pushPage(context, const CartScreen());
+        },
+        customBorder: const StadiumBorder(),
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.refresh, size: 15, color: scheme.primary),
+              const SizedBox(width: 5),
+              Text('Order Again',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.primary)),
+            ],
+          ),
         ),
       ),
     );

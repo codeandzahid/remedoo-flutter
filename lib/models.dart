@@ -355,6 +355,11 @@ class LabReport {
   final String status; // In Progress, Completed
   final List<Map<String, String>> tests;
 
+  /// Set when the patient uploaded this report file themselves
+  /// (owner feature 2026-10-19): a signed URL to the stored file.
+  final String? fileUrl;
+  final String? fileName;
+
   const LabReport({
     required this.id,
     required this.patientName,
@@ -362,7 +367,51 @@ class LabReport {
     required this.date,
     required this.status,
     required this.tests,
+    this.fileUrl,
+    this.fileName,
   });
+
+  bool get isUploaded => fileUrl != null;
+}
+
+/// One health-number reading logged by the patient (2026-10-19):
+/// BP (systolic/diastolic mmHg), sugar (mg/dL) or weight (kg).
+class VitalReading {
+  final String id;
+  final String type; // bp, sugar, weight
+  final double value; // sugar mg/dL, weight kg, BP systolic
+  final double? value2; // BP diastolic
+  final DateTime date;
+
+  const VitalReading({
+    required this.id,
+    required this.type,
+    required this.value,
+    this.value2,
+    required this.date,
+  });
+
+  String get label => switch (type) {
+        'bp' => '${value.round()}/${(value2 ?? 0).round()}',
+        'sugar' => '${value.round()} mg/dL',
+        _ => '${value.toStringAsFixed(1)} kg',
+      };
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'type': type,
+        'value': value,
+        'value2': value2,
+        'date': date.toIso8601String(),
+      };
+
+  factory VitalReading.fromJson(Map<String, dynamic> j) => VitalReading(
+        id: j['id'] as String,
+        type: j['type'] as String,
+        value: (j['value'] as num).toDouble(),
+        value2: (j['value2'] as num?)?.toDouble(),
+        date: DateTime.parse(j['date'] as String),
+      );
 }
 
 class SupportTicket {
