@@ -253,6 +253,8 @@ class SupabaseRepository {
     required String timeLabel, // 'HH:MM'
     String? notes,
     String? prescriptionUrl,
+    String? paymentRef,
+    String? customerUpi,
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
@@ -276,11 +278,169 @@ class SupabaseRepository {
         if (prescriptionUrl != null && prescriptionUrl.isNotEmpty)
           'prescription_url': prescriptionUrl,
       }).select('id');
-      if (row.isNotEmpty) return '${row.first['id']}';
+      if (row.isNotEmpty) {
+        final id = '${row.first['id']}';
+        await _patchPaymentInfo('appointments', id,
+            paymentRef: paymentRef, customerUpi: customerUpi);
+        return id;
+      }
       return null;
     } catch (e) {
       debugPrint('bookAppointment failed: $e');
       return null;
+    }
+  }
+
+  /// Best-effort write of the payment reference / customer UPI onto
+  /// an orders or appointments row. Kept as a separate patch so the
+  /// app keeps working before the cancel_otp_refunds migration is
+  /// applied — a missing column just logs and moves on.
+  Future<void> _patchPaymentInfo(
+    String table,
+    String id, {
+    String? paymentRef,
+    String? customerUpi,
+  }) async {
+    final patch = <String, dynamic>{
+      if (paymentRef != null && paymentRef.isNotEmpty)
+        'payment_ref': paymentRef,
+      if (customerUpi != null && customerUpi.isNotEmpty)
+        'customer_upi': customerUpi,
+    };
+    if (patch.isEmpty) return;
+    try {
+      await _db.from(table).update(patch).eq('id', id);
+    } catch (e) {
+      debugPrint('_patchPaymentInfo($table) failed: $e');
+    }
+  }
+
+  /// Records a refund state on an orders row (patient cancel sets
+  /// 'requested' + refund_requested_at; the panelist sets 'refunded'
+  /// with the refund UTR after paying back).
+  Future<bool> updateOrderRefund({
+    required String id,
+    required String refundStatus,
+    double? refundAmount,
+    String? refundUtr,
+  }) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('orders').update({
+        'refund_status': refundStatus,
+        if (refundAmount != null) 'refund_amount': refundAmount,
+        if (refundStatus == 'requested')
+          'refund_requested_at': DateTime.now().toUtc().toIso8601String(),
+        if (refundStatus == 'refunded') ...{
+          'refund_at': DateTime.now().toUtc().toIso8601String(),
+          if (refundUtr != null && refundUtr.isNotEmpty)
+            'refund_utr': refundUtr,
+        },
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateOrderRefund failed: $e');
+      return false;
+    }
+  }
+
+  /// Same as [updateOrderRefund] for an appointments row.
+  Future<bool> updateAppointmentRefund({
+    required String id,
+    required String refundStatus,
+    double? refundAmount,
+    String? refundUtr,
+  }) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('appointments').update({
+        'refund_status': refundStatus,
+        if (refundAmount != null) 'refund_amount': refundAmount,
+        if (refundStatus == 'requested')
+          'refund_requested_at': DateTime.now().toUtc().toIso8601String(),
+        if (refundStatus == 'refunded') ...{
+          'refund_at': DateTime.now().toUtc().toIso8601String(),
+          if (refundUtr != null && refundUtr.isNotEmpty)
+            'refund_utr': refundUtr,
+        },
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateAppointmentRefund failed: $e');
+      return false;
+    }
+  }
+
+  /// Panelist side: mark the refund on whichever order row carries
+  /// this checkout reference (payment_ref == the session's order_id).
+  Future<bool> updateOrderRefundByPaymentRef(
+      String paymentRef, String refundStatus,
+      {String? refundUtr}) async {
+    if (!_ready || paymentRef.isEmpty) return false;
+    try {
+      await _db.from('orders').update({
+        'refund_status': refundStatus,
+        if (refundStatus == 'requested')
+          'refund_requested_at': DateTime.now().toUtc().toIso8601String(),
+        if (refundStatus == 'refunded') ...{
+          'refund_at': DateTime.now().toUtc().toIso8601String(),
+          if (refundUtr != null && refundUtr.isNotEmpty)
+            'refund_utr': refundUtr,
+        },
+      }).eq('payment_ref', paymentRef);
+      return true;
+    } catch (e) {
+      debugPrint('updateOrderRefundByPaymentRef failed: $e');
+      return false;
+    }
+  }
+
+  /// Panelist side: same join for an appointments row.
+  Future<bool> updateAppointmentRefundByPaymentRef(
+      String paymentRef, String refundStatus,
+      {String? refundUtr}) async {
+    if (!_ready || paymentRef.isEmpty) return false;
+    try {
+      await _db.from('appointments').update({
+        'refund_status': refundStatus,
+        if (refundStatus == 'requested')
+          'refund_requested_at': DateTime.now().toUtc().toIso8601String(),
+        if (refundStatus == 'refunded') ...{
+          'refund_at': DateTime.now().toUtc().toIso8601String(),
+          if (refundUtr != null && refundUtr.isNotEmpty)
+            'refund_utr': refundUtr,
+        },
+      }).eq('payment_ref', paymentRef);
+      return true;
+    } catch (e) {
+      debugPrint('updateAppointmentRefundByPaymentRef failed: $e');
+      return false;
+    }
+  }
+
+  /// Best-effort refund flag on the Remedoo Pay session whose
+  /// order_id is this checkout reference. Patients have no write
+  /// access to sessions (RLS), so from the patient side this usually
+  /// no-ops — the order/appointment row stays the source of truth.
+  Future<bool> updateSessionRefundByRef(
+      String paymentRef, String refundStatus,
+      {String? refundUtr}) async {
+    if (!_ready || paymentRef.isEmpty) return false;
+    try {
+      await _db.from('remedoo_pay_sessions').update({
+        'refund_status': refundStatus,
+        if (refundStatus == 'requested')
+          'refund_requested_at': DateTime.now().toUtc().toIso8601String(),
+        if (refundStatus == 'refunded') ...{
+          'refund_at': DateTime.now().toUtc().toIso8601String(),
+          if (refundUtr != null && refundUtr.isNotEmpty)
+            'refund_utr': refundUtr,
+        },
+      }).eq('order_id', paymentRef);
+      return true;
+    } catch (e) {
+      debugPrint('updateSessionRefundByRef failed: $e');
+      return false;
     }
   }
 
@@ -638,6 +798,8 @@ class SupabaseRepository {
     required String address,
     required String payment, // e.g. 'cod' | 'online'
     String? notes,
+    String? paymentRef,
+    String? customerUpi,
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
@@ -656,6 +818,8 @@ class SupabaseRepository {
       }).select('id');
       if (order.isEmpty) return null;
       final orderId = '${order.first['id']}';
+      await _patchPaymentInfo('orders', orderId,
+          paymentRef: paymentRef, customerUpi: customerUpi);
       if (lines.isNotEmpty) {
         await _db.from('order_items').insert([
           for (final l in lines)

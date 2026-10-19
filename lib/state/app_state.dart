@@ -777,7 +777,29 @@ class AppState extends ChangeNotifier {
       refId: refId,
       notes: '${r['notes'] ?? ''}',
       status: st == 'cancelled' ? 'cancelled' : 'upcoming',
+      remoteStatus: st,
+      paymentRef: _strOrNull(r['payment_ref']),
+      customerUpi: _strOrNull(r['customer_upi']),
+      refundStatus: _strOrNull(r['refund_status']),
+      refundAmount: (r['refund_amount'] as num?)?.toDouble(),
+      refundAt: _dateOrNull(r['refund_at']),
+      refundUtr: _strOrNull(r['refund_utr']),
+      refundRequestedAt: _dateOrNull(r['refund_requested_at']),
     );
+  }
+
+  static String? _strOrNull(dynamic v) {
+    final s = '${v ?? ''}'.trim();
+    return s.isEmpty || s == 'null' ? null : s;
+  }
+
+  static DateTime? _dateOrNull(dynamic v) {
+    if (v == null) return null;
+    try {
+      return DateTime.parse('$v');
+    } catch (_) {
+      return null;
+    }
   }
 
   MedOrder _orderFromRow(Map<String, dynamic> r) {
@@ -823,6 +845,15 @@ class AppState extends ChangeNotifier {
       payment: '${r['payment_method'] ?? 'cod'}',
       placedAt: placed,
       status: '${r['status'] ?? 'placed'}',
+      paymentMethod: _strOrNull(r['payment_method']),
+      paymentStatus: _strOrNull(r['payment_status']),
+      paymentRef: _strOrNull(r['payment_ref']),
+      customerUpi: _strOrNull(r['customer_upi']),
+      refundStatus: _strOrNull(r['refund_status']),
+      refundAmount: (r['refund_amount'] as num?)?.toDouble(),
+      refundAt: _dateOrNull(r['refund_at']),
+      refundUtr: _strOrNull(r['refund_utr']),
+      refundRequestedAt: _dateOrNull(r['refund_requested_at']),
     );
   }
 
@@ -865,6 +896,8 @@ class AppState extends ChangeNotifier {
       prescriptionUrl: (appt.prescriptionPath ?? '').startsWith('http')
           ? appt.prescriptionPath
           : null,
+      paymentRef: appt.paymentRef,
+      customerUpi: appt.customerUpi,
     )
         .then((remoteId) {
       if (remoteId != null) _remoteAppointmentIds[appt.id] = remoteId;
@@ -888,6 +921,8 @@ class AppState extends ChangeNotifier {
       address: order.address,
       payment: order.payment,
       notes: null,
+      paymentRef: order.paymentRef,
+      customerUpi: order.customerUpi,
     )
         .then((remoteId) {
       if (remoteId != null) _remoteOrderIds[order.id] = remoteId;
@@ -1021,6 +1056,8 @@ class AppState extends ChangeNotifier {
     String? bookingForName,
     String? prescriptionPath,
     String? prescriptionName,
+    String? paymentRef,
+    String? customerUpi,
   }) {
     final appt = Appointment(
       id: 'A${DateTime.now().millisecondsSinceEpoch}',
@@ -1039,6 +1076,8 @@ class AppState extends ChangeNotifier {
       bookingForName: bookingForName,
       prescriptionPath: prescriptionPath,
       prescriptionName: prescriptionName,
+      paymentRef: paymentRef,
+      customerUpi: customerUpi,
     );
     appointments.add(appt);
     _takenSlots.add(_slotKey(title, date, timeLabel));
@@ -1088,6 +1127,25 @@ class AppState extends ChangeNotifier {
     if (appt == null) return;
     appt.status = 'cancelled';
     _syncCancelAppointment(id);
+    // Paid online: cancelling raises a refund request the panelist
+    // acts on (owner order 2026-10-19).
+    if (appt.isPaidOnline) {
+      appt.refundStatus = 'requested';
+      appt.refundAmount = appt.fee;
+      appt.refundRequestedAt = DateTime.now();
+      if (_supaUser != null) {
+        final remoteId = _remoteAppointmentIds[id] ?? id;
+        unawaited(_repo.updateAppointmentRefund(
+          id: remoteId,
+          refundStatus: 'requested',
+          refundAmount: appt.fee,
+        ));
+        final ref = appt.paymentRef;
+        if (ref != null && ref.isNotEmpty) {
+          unawaited(_repo.updateSessionRefundByRef(ref, 'requested'));
+        }
+      }
+    }
     addNotification(
       title: 'Appointment cancelled',
       message: '${appt.doctorName} on ${appt.date.day}/${appt.date.month}',
@@ -1249,15 +1307,38 @@ class AppState extends ChangeNotifier {
   }
 
   /// Cancels a medicine order before dispatch (2026-10-19) and syncs
-  /// the status to the backend so the pharmacy sees it too.
+  /// the status to the backend so the pharmacy sees it too. A paid
+  /// online order also raises a refund request (owner order
+  /// 2026-10-19): refund_status 'requested' with the order total.
   void cancelOrder(MedOrder order) {
     if (!order.isCancellable) return;
     order.status = 'cancelled';
     notifyListeners();
     unawaited(_repo.updateOrderStatus(order.id, 'cancelled'));
+    if (order.isPaidOnline) {
+      order.refundStatus = 'requested';
+      order.refundAmount = order.total;
+      order.refundRequestedAt = DateTime.now();
+      final remoteId = _remoteOrderIds[order.id] ?? order.id;
+      unawaited(_repo.updateOrderRefund(
+        id: remoteId,
+        refundStatus: 'requested',
+        refundAmount: order.total,
+      ));
+      final ref = order.paymentRef;
+      if (ref != null && ref.isNotEmpty) {
+        unawaited(_repo.updateSessionRefundByRef(ref, 'requested'));
+      }
+      notifyListeners();
+    }
   }
 
-  MedOrder placeOrder({required String address, required String payment}) {
+  MedOrder placeOrder({
+    required String address,
+    required String payment,
+    String? paymentRef,
+    String? customerUpi,
+  }) {
     final subtotal = cartSubtotal;
     final deliveryFee = subtotal >= 499 ? 0.0 : 30.0;
     final pharmacyId = cartPharmacyId;
@@ -1271,6 +1352,12 @@ class AppState extends ChangeNotifier {
       address: address,
       payment: payment,
       placedAt: DateTime.now(),
+      paymentMethod:
+          payment.toLowerCase().contains('online') ? 'online' : 'cod',
+      paymentStatus:
+          payment.toLowerCase().contains('online') ? 'paid' : 'pending',
+      paymentRef: paymentRef,
+      customerUpi: customerUpi,
     );
     orders.insert(0, order);
     cart.clear();

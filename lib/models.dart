@@ -199,6 +199,26 @@ class MedOrder {
   final DateTime placedAt;
   String status; // placed, confirmed, out_for_delivery, delivered
 
+  /// Backend payment fields (orders table): 'online'/'cod' and the
+  /// payment status ('pending', 'paid'…). Null for demo/local rows
+  /// that never carried them.
+  final String? paymentMethod;
+  final String? paymentStatus;
+
+  /// Checkout reference (ORD…/APT…) linking this order to its
+  /// Remedoo Pay session, and the customer's own UPI ID captured at
+  /// checkout so the provider can refund to it.
+  final String? paymentRef;
+  final String? customerUpi;
+
+  /// Refund tracking after a paid-online order is cancelled:
+  /// refundStatus 'requested' | 'refunded' (null = no refund).
+  String? refundStatus;
+  double? refundAmount;
+  DateTime? refundAt;
+  String? refundUtr;
+  DateTime? refundRequestedAt;
+
   MedOrder({
     required this.id,
     required this.pharmacyName,
@@ -210,12 +230,30 @@ class MedOrder {
     required this.payment,
     required this.placedAt,
     this.status = 'placed',
+    this.paymentMethod,
+    this.paymentStatus,
+    this.paymentRef,
+    this.customerUpi,
+    this.refundStatus,
+    this.refundAmount,
+    this.refundAt,
+    this.refundUtr,
+    this.refundRequestedAt,
   });
 
   bool get isActive => status != 'delivered' && status != 'cancelled';
 
   /// The patient may cancel only before dispatch (2026-10-19).
   bool get isCancellable => status == 'placed' || status == 'confirmed';
+
+  /// True when this order was paid online: explicit backend fields
+  /// first, the legacy display text ('Pay Online', 'online') as the
+  /// fallback for older rows.
+  bool get isPaidOnline {
+    if (paymentMethod != null) return paymentMethod == 'online';
+    final p = payment.toLowerCase();
+    return p.contains('online') || p.contains('upi');
+  }
 
   List<CartLine> get lines => items;
   String get eta => '35-45 min';
@@ -240,6 +278,25 @@ class Appointment {
   final String? prescriptionPath;
   final String? prescriptionName;
 
+  /// Raw backend status from the appointments table ('pending',
+  /// 'confirmed', 'cancelled'…). The local [status] collapses
+  /// everything non-cancelled to 'upcoming', so the confirmed-cancel
+  /// OTP gate reads this field instead.
+  final String? remoteStatus;
+
+  /// Checkout reference (APT…) linking this appointment to its
+  /// Remedoo Pay session, and the customer's own UPI ID captured at
+  /// booking so the provider can refund to it.
+  final String? paymentRef;
+  final String? customerUpi;
+
+  /// Refund tracking after a paid-online appointment is cancelled.
+  String? refundStatus;
+  double? refundAmount;
+  DateTime? refundAt;
+  String? refundUtr;
+  DateTime? refundRequestedAt;
+
   Appointment({
     required this.id,
     required this.doctorName,
@@ -258,7 +315,21 @@ class Appointment {
     this.bookingForName,
     this.prescriptionPath,
     this.prescriptionName,
+    this.remoteStatus,
+    this.paymentRef,
+    this.customerUpi,
+    this.refundStatus,
+    this.refundAmount,
+    this.refundAt,
+    this.refundUtr,
+    this.refundRequestedAt,
   });
+
+  /// True when the fee was paid online (the payment label says so).
+  bool get isPaidOnline {
+    final p = payment.toLowerCase();
+    return p.contains('online') || p.contains('upi');
+  }
 
   String get dateLabel => '${date.day}/${date.month}/${date.year}';
 }

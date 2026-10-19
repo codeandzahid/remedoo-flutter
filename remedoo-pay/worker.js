@@ -158,7 +158,26 @@ function parseBankSms(text) {
   const utrMatch =
     t.match(/(?:UTR|Ref(?:erence)?\s*(?:No|Number)?|Txn(?:\s*Id)?|UPI Ref)[:.\s]*([0-9]{9,22})/i) ||
     t.match(/\b(\d{12})\b/);
-  return { paise, utr: utrMatch ? utrMatch[1] : null };
+  // Who paid: a payer UPI handle in the SMS ("from name@bank",
+  // "VPA name@bank") and, when present, a payer name after "from".
+  const vpaMatch = t.match(/[a-zA-Z0-9._\-]{2,}@[a-zA-Z]{2,}/);
+  let payerName = null;
+  const nameMatch = t.match(
+    /\bfrom\s+([A-Za-z][A-Za-z .']{2,40}?)(?:\s+(?:on|via|through|Ref|UTR)\b|[.,]|$)/i
+  );
+  if (nameMatch) {
+    const n = nameMatch[1].trim();
+    // Skip captures that are just the VPA itself or a bank word.
+    if (n && !n.includes('@') && !/^(upi|a\/c|account)$/i.test(n)) {
+      payerName = n;
+    }
+  }
+  return {
+    paise,
+    utr: utrMatch ? utrMatch[1] : null,
+    payerVpa: vpaMatch ? vpaMatch[0] : null,
+    payerName,
+  };
 }
 
 // ------------------------------------------------------------------
@@ -214,7 +233,7 @@ function checkoutPage(session, cfg) {
           ? `<div class="apps">
                <a href="${upi}">Pay with any UPI app</a>
              </div>
-             <p class="muted">Tap the button — your UPI app (GPay / PhonePe / Paytm) opens with the amount ready. Keep this page open — it confirms automatically when your payment lands.</p>
+             <p class="muted">Tap the button — your UPI app (GPay / PhonePe / Paytm) opens with the amount ready. Payment confirms automatically when your payment lands — keep this page open.</p>
              <p class="status wait" id="st">Waiting for payment…</p>`
           : `<p class="status wait">This payment session is no longer open.</p>
              <p class="muted">Please go back to Remedoo and try booking again.</p>`
@@ -309,6 +328,16 @@ export default {
             return_url: body.returnUrl ?? null,
             vpa,
             payee_name: payeeName,
+            // Who is paying (customer side), when the checkout
+            // captured it — shown to the panelist, used for refunds.
+            payer_vpa:
+              clean(body.payer_vpa, 80) ||
+              clean(body.customer?.upi, 80) ||
+              null,
+            payer_name:
+              clean(body.payer_name, 80) ||
+              clean(body.customer?.name, 80) ||
+              null,
             provider_kind: clean(body.providerKind, 20) || null,
             provider_id: clean(body.providerId, 64) || null,
             provider_user_id: clean(body.providerUserId, 64) || null,
@@ -379,11 +408,16 @@ export default {
         if (!actives || actives.length === 0) {
           return json({ matched: false, reason: 'no active session for amount' });
         }
-        await patchSession(env, actives[0].id, {
+        const successPatch = {
           status: 'SUCCESS',
           utr: parsedSms.utr,
           paid_at: new Date().toISOString(),
-        });
+          // Only write payer details the SMS actually carried —
+          // never overwrite a captured value with null.
+          ...(parsedSms.payerVpa ? { payer_vpa: parsedSms.payerVpa } : {}),
+          ...(parsedSms.payerName ? { payer_name: parsedSms.payerName } : {}),
+        };
+        await patchSession(env, actives[0].id, successPatch);
         return json({ matched: true, paymentId: actives[0].id });
       }
 

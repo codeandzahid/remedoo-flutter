@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../models.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_repository.dart';
 import '../theme.dart';
+import '../utils/refunds.dart';
 import 'widgets.dart';
 
-/// Email-OTP gate for payment activation (owner's rule): switching a
-/// payment option ON — or changing the UPI ID money goes to — requires
-/// a 6-digit code sent to the provider's own account email. Returns
-/// true only when the correct code was entered.
-Future<bool> requirePaymentOtp(BuildContext context) async {
+/// Shared email-OTP gate: sends a 6-digit code to the signed-in
+/// user's own account email and returns true only when the correct
+/// code was entered. Used for payment activation (provider panels)
+/// and for cancelling a CONFIRMED order/appointment (patients).
+Future<bool> requireEmailOtp(
+  BuildContext context, {
+  required String title,
+  required String message,
+}) async {
   final email = AuthService.instance.currentUser?.email ?? '';
   if (email.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -33,13 +40,12 @@ Future<bool> requirePaymentOtp(BuildContext context) async {
     context: context,
     barrierDismissible: false,
     builder: (ctx) => AlertDialog(
-      title: const Text('Confirm with email code'),
+      title: Text(title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
           children: [
           Text(
-            'We sent a 6-digit code to $email. Enter it here to '
-            'activate this payment option.',
+            'We sent a 6-digit code to $email. $message',
             style: const TextStyle(fontSize: 13.5),
           ),
           const SizedBox(height: 14),
@@ -77,6 +83,177 @@ Future<bool> requirePaymentOtp(BuildContext context) async {
     );
   }
   return res.ok;
+}
+
+/// Email-OTP gate for payment activation (owner's rule): switching a
+/// payment option ON — or changing the UPI ID money goes to — requires
+/// a 6-digit code sent to the provider's own account email. Returns
+/// true only when the correct code was entered.
+Future<bool> requirePaymentOtp(BuildContext context) async {
+  return requireEmailOtp(
+    context,
+    title: 'Confirm with email code',
+    message: 'Enter it here to activate this payment option.',
+  );
+}
+
+/// Patient gate for cancelling an appointment (owner order
+/// 2026-10-19): the confirm dialog always runs; a CONFIRMED
+/// appointment (backend status) additionally needs the email code,
+/// and a paid-online appointment shows that the payment is already
+/// made and will be refunded in 48 hours or 3 working days.
+/// Returns true only when the cancel may proceed.
+Future<bool> confirmAppointmentCancel(
+  BuildContext context, {
+  required Appointment appt,
+}) async {
+  final paidOnline = appt.isPaidOnline;
+  final ok = await confirmDialog(
+    context,
+    title: 'Cancel appointment?',
+    message: 'This slot will be released. This cannot be undone.'
+        '${paidOnline ? '\n\nPayment of ${inr(appt.fee)} is already made. $kRefundTimingLine' : ''}',
+    confirmLabel: 'Yes, cancel',
+  );
+  if (!ok || !context.mounted) return false;
+  if (appt.remoteStatus == 'confirmed') {
+    final verified = await requireEmailOtp(
+      context,
+      title: 'Confirm cancellation',
+      message: 'Enter it here to cancel this confirmed appointment.'
+          '${paidOnline ? ' Payment of ${inr(appt.fee)} is already made — if you cancel, the provider will refund it in 48 hours or 3 working days.' : ''}',
+    );
+    if (!verified) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Appointment not cancelled — email code was not verified.')),
+        );
+      }
+      return false;
+    }
+  }
+  return context.mounted;
+}
+
+/// Panelist refund dialog (owner order 2026-10-19): shows the
+/// amount and the customer's UPI, offers a "Refund now with UPI
+/// app" deep link, and only allows "Mark refunded" after the
+/// panelist enters the refund UTR / UPI reference number
+/// (9–22 digits) — the UTR is shown to the patient as proof.
+/// Returns the UTR when the refund is marked, null otherwise.
+Future<String?> showRefundDialog(
+  BuildContext context, {
+  required double amount,
+  required String? customerUpi,
+  required String customerName,
+  required String ref,
+}) async {
+  final upi = (customerUpi ?? '').trim();
+  final hasUpi = upi.isNotEmpty;
+  final ctrl = TextEditingController();
+  final utr = await showDialog<String>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) {
+      var valid = false;
+      return StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text('Refund ${inr(amount)}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Refund to customer UPI: '
+                  '${hasUpi ? upi : 'not captured — ask the customer'}',
+                  style: const TextStyle(fontSize: 13.5),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Send the money back from your UPI app to the '
+                  'customer\'s UPI. Then enter the refund UTR / UPI '
+                  'reference number from that payment and tap '
+                  '"Mark refunded".',
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                RButton(
+                  label: 'Refund now with UPI app',
+                  icon: Icons.open_in_new,
+                  fullWidth: true,
+                  onPressed: hasUpi
+                      ? () async {
+                          final link = refundUpiLink(
+                            customerUpi: upi,
+                            customerName: customerName,
+                            amount: amount,
+                            ref: ref,
+                          );
+                          try {
+                            await launchUrl(Uri.parse(link),
+                                mode: LaunchMode.externalApplication);
+                          } catch (_) {
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Could not open UPI app. Please pay manually to the UPI ID shown.')),
+                              );
+                            }
+                          }
+                        }
+                      : null,
+                ),
+                if (!hasUpi) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Customer UPI not captured — refund manually from your UPI app.',
+                    style: TextStyle(fontSize: 12.5),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                TextField(
+                  controller: ctrl,
+                  keyboardType: TextInputType.number,
+                  maxLength: 22,
+                  decoration: const InputDecoration(
+                    labelText: 'Refund UTR / UPI reference number',
+                    border: OutlineInputBorder(),
+                    counterText: '',
+                  ),
+                  onChanged: (v) =>
+                      setLocal(() => valid = isValidRefundUtr(v)),
+                ),
+                if (!valid)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Enter the 9–22 digit UTR to enable Mark refunded.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed:
+                  valid ? () => Navigator.of(ctx).pop(ctrl.text.trim()) : null,
+              child: const Text('Mark refunded'),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+  return (utr != null && isValidRefundUtr(utr)) ? utr : null;
 }
 
 /// Whether saving [profile] changes requires the email-OTP gate:
@@ -307,6 +484,10 @@ class ProviderOnlinePayments extends StatefulWidget {
 
 class _ProviderOnlinePaymentsState extends State<ProviderOnlinePayments> {
   List<Map<String, dynamic>> _sessions = [];
+
+  /// Pharmacy orders of this provider keyed by payment_ref, so a
+  /// refund requested on the order row also surfaces on its session.
+  Map<String, Map<String, dynamic>> _ordersByRef = {};
   bool _loading = true;
   String? _busyId;
 
@@ -318,11 +499,78 @@ class _ProviderOnlinePaymentsState extends State<ProviderOnlinePayments> {
 
   Future<void> _load() async {
     final rows = await widget.repo.fetchRemedooPaySessions(limit: 30);
+    final orders = await widget.repo.fetchPharmacyOrders();
     if (!mounted) return;
     setState(() {
       _sessions = rows;
+      _ordersByRef = {
+        for (final o in orders)
+          if ('${o['payment_ref'] ?? ''}'.isNotEmpty)
+            '${o['payment_ref']}': o,
+      };
       _loading = false;
     });
+  }
+
+  /// A refund is owed on this session when its own flag says so, or
+  /// when the cancelled order carrying this payment ref requested one.
+  bool _refundNeeded(Map<String, dynamic> s) {
+    if ('${s['refund_status'] ?? ''}' == 'requested') return true;
+    final o = _ordersByRef['${s['order_id'] ?? ''}'];
+    return o != null && '${o['refund_status'] ?? ''}' == 'requested';
+  }
+
+  Future<void> _doRefund(Map<String, dynamic> s) async {
+    final paise = (s['amount_paise'] as num?)?.toInt() ?? 0;
+    final orderRow = _ordersByRef['${s['order_id'] ?? ''}'];
+    final amount = (orderRow?['refund_amount'] as num?)?.toDouble() ??
+        (orderRow?['total'] as num?)?.toDouble() ??
+        paise / 100;
+    final cust = s['customer'];
+    final custName = cust is Map ? '${cust['name'] ?? ''}' : '';
+    final customerUpi = sessionCustomerUpi(s) ??
+        ((orderRow?['customer_upi'] ?? '').toString().trim().isEmpty
+            ? null
+            : '${orderRow!['customer_upi']}');
+    final utr = await showRefundDialog(
+      context,
+      amount: amount,
+      customerUpi: customerUpi,
+      customerName: custName,
+      ref: '${s['order_id'] ?? ''}',
+    );
+    if (utr == null || !mounted) return;
+    setState(() => _busyId = '${s['id']}');
+    final sessionOk = await widget.repo.updateRemedooPaySession(
+      '${s['id']}',
+      {
+        'refund_status': 'refunded',
+        'refund_at': DateTime.now().toUtc().toIso8601String(),
+        'refund_utr': utr,
+      },
+    );
+    var rowOk = true;
+    if (sessionOk) {
+      final ref = '${s['order_id'] ?? ''}';
+      final orderOk = await widget.repo
+          .updateOrderRefundByPaymentRef(ref, 'refunded', refundUtr: utr);
+      final apptOk = await widget.repo.updateAppointmentRefundByPaymentRef(
+          ref, 'refunded',
+          refundUtr: utr);
+      rowOk = orderOk && apptOk;
+    }
+    if (!mounted) return;
+    setState(() => _busyId = null);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(sessionOk
+            ? (rowOk
+                ? 'Refund marked as done.'
+                : 'Refund marked on the payment. The booking record could not be updated — check it in your orders.')
+            : 'Could not update. Try again.'),
+      ),
+    );
+    if (sessionOk) _load();
   }
 
   Future<void> _act(Map<String, dynamic> s, Map<String, dynamic> patch,
@@ -387,6 +635,40 @@ class _ProviderOnlinePaymentsState extends State<ProviderOnlinePayments> {
               color: scheme.onSurfaceVariant,
             ),
           ),
+          if (!_loading && _sessions.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: RemedooTheme.success.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.account_balance_wallet,
+                      size: 20, color: RemedooTheme.success),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Payment received: '
+                      '${inr(totalReceivedPaise(_sessions) / 100)}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${receivedCount(_sessions)} payments',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           if (_loading)
             const Padding(
@@ -473,6 +755,49 @@ class _ProviderOnlinePaymentsState extends State<ProviderOnlinePayments> {
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Paid to UPI: '
+                      '${('${s['vpa'] ?? ''}'.trim().isEmpty) ? 'Remedoo central UPI' : s['vpa']}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      'Customer: '
+                      '${custName.isNotEmpty ? '$custName · ' : ''}'
+                      '${sessionCustomerUpi(s) ?? 'UPI not captured'}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if ('${s['refund_status'] ?? ''}' == 'refunded')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Refunded'
+                          '${('${s['refund_utr'] ?? ''}'.trim().isNotEmpty) ? ' · UTR ${s['refund_utr']}' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: RemedooTheme.success,
+                          ),
+                        ),
+                      ),
+                    if (_refundNeeded(s)) ...[
+                      const SizedBox(height: 8),
+                      RButton(
+                        label: busy
+                            ? 'Working…'
+                            : 'Refund ${inr(paise / 100)}',
+                        icon: Icons.currency_rupee,
+                        small: true,
+                        variant: RButtonVariant.danger,
+                        onPressed: busy ? null : () => _doRefund(s),
+                      ),
+                    ],
                     if (st == 'ACTIVE') ...[
                       const SizedBox(height: 8),
                       Row(

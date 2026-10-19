@@ -69,6 +69,7 @@ class _BookingScreenState extends State<BookingScreen> {
   late String _time;
   late String _payment;
   final _notes = TextEditingController();
+  final _payerUpi = TextEditingController();
   late List<DateTime> _days;
   String? _bookingForMemberId; // null = for self
 
@@ -287,6 +288,7 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   void dispose() {
     _notes.dispose();
+    _payerUpi.dispose();
     super.dispose();
   }
 
@@ -359,6 +361,9 @@ class _BookingScreenState extends State<BookingScreen> {
       description: 'Appointment: ${widget.title}',
       providerKind: widget.kind,
       providerId: widget.refId,
+      payerUpi: _payerUpi.text.trim().isEmpty
+          ? null
+          : _payerUpi.text.trim(),
       contact: state.phone.isNotEmpty ? state.phone : null,
       email: state.email.isNotEmpty ? state.email : null,
       customerName: state.userName.isNotEmpty ? state.userName : null,
@@ -467,9 +472,11 @@ class _BookingScreenState extends State<BookingScreen> {
     } else {
       // "Pay Online" uses in-app Razorpay (UPI/cards/netbanking).
       // The appointment is only booked after payment succeeds.
+      String? paymentRef;
       if (_payment == 'Pay Online') {
         final orderId =
             'APT${DateTime.now().millisecondsSinceEpoch}';
+        paymentRef = orderId;
         if (!PaymentService.instance.isConfigured) {
           // No gateway active: popup explains and switches the
           // customer to the offline option instead of booking online.
@@ -522,6 +529,10 @@ class _BookingScreenState extends State<BookingScreen> {
                 ?.name,
         prescriptionPath: prescriptionUrl ?? _prescriptionPath,
         prescriptionName: _prescriptionName,
+        paymentRef: paymentRef,
+        customerUpi: _payerUpi.text.trim().isEmpty
+            ? null
+            : _payerUpi.text.trim(),
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Appointment booked successfully!')),
@@ -615,6 +626,14 @@ class _BookingScreenState extends State<BookingScreen> {
                 '${PaymentService.instance.gatewayDisplayName}',
             Icons.credit_card,
             badge: 'Secure'),
+        if (_payment == 'Pay Online') ...[
+          const SizedBox(height: 10),
+          RTextField(
+            label: 'Your UPI ID (for refunds, optional)',
+            hint: 'yourname@okhdfcbank',
+            controller: _payerUpi,
+          ),
+        ],
         if (payInClinic) const SizedBox(height: 10),
       ] else ...[
         Container(

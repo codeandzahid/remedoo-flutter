@@ -5,6 +5,7 @@ import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../widgets/provider_payments.dart';
 import '../widgets/widgets.dart';
 import 'appointment_detail_screen.dart';
 import 'appointment_receipt_screen.dart';
@@ -248,13 +249,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
                       variant: RButtonVariant.danger,
                       small: true,
                       onPressed: () async {
-                        final ok = await confirmDialog(
-                          context,
-                          title: 'Cancel appointment?',
-                          message:
-                              'This slot will be released. This cannot be undone.',
-                          confirmLabel: 'Yes, cancel',
-                        );
+                        final ok = await confirmAppointmentCancel(context,
+                            appt: a);
                         if (ok) {
                           state.cancelAppointment(a.id);
                           if (mounted) {

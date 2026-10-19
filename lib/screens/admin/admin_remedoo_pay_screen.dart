@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../utils/refunds.dart';
 import '../../widgets/widgets.dart';
 
 void _snack(BuildContext context, String msg) {
@@ -430,10 +431,54 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
                           style: TextStyle(
                               fontSize: 11.5,
                               color: scheme.onSurfaceVariant)),
+                    if (sessionCustomerUpi(s) != null)
+                      Text(
+                          'Customer UPI: ${sessionCustomerUpi(s)}',
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              color: scheme.onSurfaceVariant)),
+                    if ('${s['refund_status'] ?? ''}'.isNotEmpty)
+                      Text(
+                          'Refund: ${s['refund_status']}'
+                          '${('${s['refund_utr'] ?? ''}'.trim().isNotEmpty) ? ' · UTR ${s['refund_utr']}' : ''}',
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: scheme.onSurfaceVariant)),
                   ],
                 ),
               ),
-              _statusChip(status),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _statusChip(status),
+                  if (isRefundOverdue(
+                    refundStatus: '${s['refund_status'] ?? ''}',
+                    requestedAt: DateTime.tryParse(
+                        '${s['refund_requested_at'] ?? ''}'),
+                    createdAt:
+                        DateTime.tryParse('${s['created_at'] ?? ''}'),
+                  )) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Overdue refund',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
           if (actions.isNotEmpty)

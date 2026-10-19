@@ -19,6 +19,11 @@ class OnlinePaymentScreen extends StatefulWidget {
   final String orderId;
   final String orderLabel;
 
+  /// Reports the customer's own UPI ID as they type it (used for
+  /// refunds if the order is later cancelled). Optional — existing
+  /// callers keep working with the plain bool result.
+  final ValueChanged<String?>? onPayerUpi;
+
   const OnlinePaymentScreen({
     super.key,
     required this.amount,
@@ -26,6 +31,7 @@ class OnlinePaymentScreen extends StatefulWidget {
     required this.recipientUpiId,
     required this.orderId,
     this.orderLabel = 'Order',
+    this.onPayerUpi,
   });
 
   @override
@@ -34,6 +40,13 @@ class OnlinePaymentScreen extends StatefulWidget {
 
 class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
   bool _upiLaunched = false;
+  final TextEditingController _payerUpi = TextEditingController();
+
+  @override
+  void dispose() {
+    _payerUpi.dispose();
+    super.dispose();
+  }
 
   String get _upiLink {
     final params = {
@@ -215,6 +228,18 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
                               ),
                             ],
                           ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: _payerUpi,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            labelText: 'Your UPI ID (for refunds, optional)',
+                            hintText: 'yourname@okhdfcbank',
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (v) => widget.onPayerUpi
+                              ?.call(v.trim().isEmpty ? null : v.trim()),
                         ),
                         const SizedBox(height: 14),
                         RButton(

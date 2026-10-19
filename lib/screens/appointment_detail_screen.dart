@@ -7,6 +7,8 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../utils/device_actions.dart';
+import '../utils/refunds.dart';
+import '../widgets/provider_payments.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
 import '../app_navigator.dart';
@@ -78,6 +80,38 @@ class AppointmentDetailScreen extends StatelessWidget {
                     _scheduleCard(context, a),
                     const SizedBox(height: 12),
                     _paymentCard(context, a),
+                    if (refundStatusMessage(
+                          refundStatus: a.refundStatus,
+                          amount: a.refundAmount ?? a.fee,
+                          refundAt: a.refundAt,
+                          refundUtr: a.refundUtr,
+                        ) !=
+                        null) ...[
+                      const SizedBox(height: 12),
+                      RCard(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.currency_rupee,
+                                color: RemedooTheme.warning, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                refundStatusMessage(
+                                  refundStatus: a.refundStatus,
+                                  amount: a.refundAmount ?? a.fee,
+                                  refundAt: a.refundAt,
+                                  refundUtr: a.refundUtr,
+                                )!,
+                                style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (a.notes.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       _notesCard(context, a),
@@ -126,12 +160,9 @@ class AppointmentDetailScreen extends StatelessWidget {
                         variant: RButtonVariant.danger,
                         fullWidth: true,
                         onPressed: () async {
-                          final ok = await confirmDialog(
-                            context,
-                            title: 'Cancel appointment?',
-                            message: 'This slot will be released.',
-                            confirmLabel: 'Yes, cancel',
-                          );
+                          final ok = await confirmAppointmentCancel(
+                              context,
+                              appt: a);
                           if (ok && context.mounted) {
                             state.cancelAppointment(a.id);
                             Navigator.pop(context);

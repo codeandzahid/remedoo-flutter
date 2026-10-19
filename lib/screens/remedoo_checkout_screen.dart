@@ -26,6 +26,9 @@ class _RemedooCheckoutScreenState
   final _address = TextEditingController();
   final _notes = TextEditingController();
   String _payment = 'Cash on Delivery';
+
+  /// Customer's own UPI ID reported by the payment page (refunds).
+  String? _customerUpi;
   String? _rxFileName;
   bool _locating = false;
 
@@ -138,6 +141,7 @@ class _RemedooCheckoutScreenState
     }
     // "Pay Online" opens the payment page first — the order is only
     // placed after the user completes payment there.
+    String? paymentRef;
     if (_payment == 'Pay Online') {
       final pharmacies = state.activePharmacies
           .where((p) => p.id == state.cartPharmacyId);
@@ -145,6 +149,7 @@ class _RemedooCheckoutScreenState
           pharmacies.isNotEmpty ? pharmacies.first : null;
       final total = state.cartTotal + state.deliveryFee;
       final orderId = 'ORD${DateTime.now().millisecondsSinceEpoch}';
+      paymentRef = orderId;
       final paid = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
@@ -154,6 +159,7 @@ class _RemedooCheckoutScreenState
             recipientUpiId: pharmacy?.upiId,
             orderId: orderId,
             orderLabel: 'Order Total',
+            onPayerUpi: (v) => _customerUpi = v,
           ),
         ),
       );
@@ -163,6 +169,8 @@ class _RemedooCheckoutScreenState
     state.placeOrder(
       address: _address.text.trim(),
       payment: _payment,
+      paymentRef: paymentRef,
+      customerUpi: _customerUpi,
     );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Order placed successfully!')),

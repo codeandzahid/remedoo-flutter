@@ -5,6 +5,8 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../utils/device_actions.dart';
+import '../utils/refunds.dart';
+import '../widgets/provider_payments.dart';
 import '../widgets/widgets.dart';
 import '../app_navigator.dart';
 
@@ -147,6 +149,38 @@ class OrderTrackingScreen extends StatelessWidget {
                   _itemsBillCard(context),
                   const SizedBox(height: 12),
                   _paymentCard(context),
+                  if (refundStatusMessage(
+                        refundStatus: o.refundStatus,
+                        amount: o.refundAmount ?? o.total,
+                        refundAt: o.refundAt,
+                        refundUtr: o.refundUtr,
+                      ) !=
+                      null) ...[
+                    const SizedBox(height: 12),
+                    RCard(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.currency_rupee,
+                              color: RemedooTheme.warning, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              refundStatusMessage(
+                                refundStatus: o.refundStatus,
+                                amount: o.refundAmount ?? o.total,
+                                refundAt: o.refundAt,
+                                refundUtr: o.refundUtr,
+                              )!,
+                              style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (o.isCancellable) ...[
                     const SizedBox(height: 16),
                     RButton(
@@ -156,21 +190,44 @@ class OrderTrackingScreen extends StatelessWidget {
                       fullWidth: true,
                       onPressed: () async {
                         final state = AppStateScope.of(context);
+                        final paidOnline = o.isPaidOnline;
                         final ok = await confirmDialog(
                           context,
                           title: 'Cancel this order?',
-                          message:
-                              'The pharmacy will be told not to pack or deliver it. This cannot be undone.',
+                          message: 'The pharmacy will be told not to '
+                              'pack or deliver it. This cannot be undone.'
+                              '${paidOnline ? '\n\nPayment of ${inr(o.total)} is already made. $kRefundTimingLine' : ''}',
                           confirmLabel: 'Yes, cancel order',
                         );
-                        if (ok && context.mounted) {
-                          state.cancelOrder(o);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Order cancelled.')),
+                        if (!ok || !context.mounted) return;
+                        // Owner's rule: cancelling a CONFIRMED order
+                        // needs the email code first.
+                        if (o.status == 'confirmed') {
+                          final verified = await requireEmailOtp(
+                            context,
+                            title: 'Confirm cancellation',
+                            message: 'Enter it here to cancel this '
+                                'confirmed order.'
+                                '${paidOnline ? ' Payment of ${inr(o.total)} is already made — if you cancel, the provider will refund it in 48 hours or 3 working days.' : ''}',
                           );
-                          goBack(context);
+                          if (!verified) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Order not cancelled — email code was not verified.')),
+                              );
+                            }
+                            return;
+                          }
+                          if (!context.mounted) return;
                         }
+                        state.cancelOrder(o);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Order cancelled.')),
+                        );
+                        goBack(context);
                       },
                     ),
                   ],
@@ -486,7 +543,7 @@ class OrderTrackingScreen extends StatelessWidget {
                     style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13.5)),
-                Text('Status: pending',
+                Text('Status: ${order.paymentStatus ?? 'pending'}',
                     style: TextStyle(
                         fontSize: 12,
                         color: scheme.onSurfaceVariant)),

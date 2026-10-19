@@ -86,6 +86,55 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
     }
   }
 
+  /// Panelist refund for a cancelled paid-online order (owner
+  /// order 2026-10-19): opens the shared refund dialog (UPI deep
+  /// link + mandatory refund UTR) and marks the order refunded.
+  Future<void> _refundOrder(Map<String, dynamic> o) async {
+    final amount = (o['refund_amount'] as num?)?.toDouble() ??
+        (o['total'] as num?)?.toDouble() ??
+        0;
+    final ref = '${o['payment_ref'] ?? ''}'.trim();
+    final utr = await showRefundDialog(
+      context,
+      amount: amount,
+      customerUpi: '${o['customer_upi'] ?? ''}'.trim().isEmpty
+          ? null
+          : '${o['customer_upi']}',
+      customerName: '',
+      ref: ref.isNotEmpty ? ref : '${o['id'] ?? ''}',
+    );
+    if (utr == null || !mounted) return;
+    final ok = await _repo.updateOrderRefund(
+      id: '${o['id']}',
+      refundStatus: 'refunded',
+      refundUtr: utr,
+    );
+    if (ref.isNotEmpty) {
+      await _repo.updateSessionRefundByRef(ref, 'refunded',
+          refundUtr: utr);
+    }
+    if (!mounted) return;
+    if (ok) {
+      setState(() {
+        final i = _orders.indexWhere((x) => '${x['id']}' == '${o['id']}');
+        if (i >= 0) {
+          _orders[i] = {
+            ..._orders[i],
+            'refund_status': 'refunded',
+            'refund_utr': utr,
+          };
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Refund marked as done.')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update. Try again.')),
+      );
+    }
+  }
+
   /// Plain-language label for each order status.
   String _label(String status) {
     switch (status) {
@@ -442,6 +491,41 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
                     _setStatus(o, 'delivered'),
               ),
             ],
+            // Cancelled paid-online order with a refund owed: the
+            // customer cancelled, the pharmacy refunds from here.
+            if (status == 'cancelled' &&
+                '${o['payment_method'] ?? ''}' == 'online' &&
+                '${o['refund_status'] ?? ''}' == 'requested') ...[
+              const SizedBox(height: 10),
+              Text(
+                'Refund requested by customer — payment already made.',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.error),
+              ),
+              const SizedBox(height: 8),
+              RButton(
+                label:
+                    'Refund ${inr((o['refund_amount'] as num?)?.toDouble() ?? (o['total'] as num?)?.toDouble() ?? 0)}',
+                icon: Icons.currency_rupee,
+                small: true,
+                variant: RButtonVariant.danger,
+                onPressed: () => _refundOrder(o),
+              ),
+            ],
+            if ('${o['refund_status'] ?? ''}' == 'refunded')
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Refunded'
+                  '${('${o['refund_utr'] ?? ''}'.trim().isNotEmpty) ? ' · UTR ${o['refund_utr']}' : ''}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: RemedooTheme.success),
+                ),
+              ),
           ],
         ),
       ),

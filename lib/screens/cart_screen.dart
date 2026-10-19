@@ -27,6 +27,7 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   final _address = TextEditingController();
   final _instructions = TextEditingController();
+  final _payerUpi = TextEditingController();
   String _payment = 'Cash on Delivery';
   String? _rxFileName;
   bool _locating = false;
@@ -35,6 +36,7 @@ class _CartScreenState extends State<CartScreen> {
   void dispose() {
     _address.dispose();
     _instructions.dispose();
+    _payerUpi.dispose();
     super.dispose();
   }
 
@@ -161,13 +163,19 @@ class _CartScreenState extends State<CartScreen> {
     // Pay Online really pays now: run the gateway checkout first
     // (money goes to the cart pharmacy's own UPI, like bookings)
     // and only place the order when the payment succeeds.
+    String? paymentRef;
     if (_payment == 'Pay Online') {
-      final paid = await _payOnline(state, total);
+      paymentRef = 'ORD${DateTime.now().millisecondsSinceEpoch}';
+      final paid = await _payOnline(state, total, paymentRef);
       if (!paid || !mounted) return;
     }
     state.placeOrder(
       address: _address.text.trim(),
       payment: _payment,
+      paymentRef: paymentRef,
+      customerUpi: _payerUpi.text.trim().isEmpty
+          ? null
+          : _payerUpi.text.trim(),
     );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Order placed successfully!')),
@@ -177,7 +185,7 @@ class _CartScreenState extends State<CartScreen> {
 
   /// Runs the hosted payment for a medicine order. Returns true
   /// only when the payment succeeds.
-  Future<bool> _payOnline(AppState state, double total) async {
+  Future<bool> _payOnline(AppState state, double total, String orderRef) async {
     final completer = Completer<bool>();
     PaymentService.instance.onPaymentBusy = () async {
       if (!mounted) return false;
@@ -208,11 +216,14 @@ class _CartScreenState extends State<CartScreen> {
     };
     PaymentService.instance.pay(
       amount: total,
-      orderId: 'ORD${DateTime.now().millisecondsSinceEpoch}',
+      orderId: orderRef,
       description:
           'Medicine order: ${state.cartPharmacyName ?? 'Pharmacy'}',
       providerKind: 'pharmacy',
       providerId: state.cartPharmacyId,
+      payerUpi: _payerUpi.text.trim().isEmpty
+          ? null
+          : _payerUpi.text.trim(),
       contact: state.phone.isNotEmpty ? state.phone : null,
       email: state.email.isNotEmpty ? state.email : null,
       customerName: state.userName.isNotEmpty ? state.userName : null,
@@ -634,6 +645,14 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ],
             ),
+          if (_payment == 'Pay Online') ...[
+            const SizedBox(height: 6),
+            RTextField(
+              controller: _payerUpi,
+              label: 'Your UPI ID (for refunds, optional)',
+              hint: 'yourname@okhdfcbank',
+            ),
+          ],
         ],
       ),
     );

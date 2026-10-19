@@ -258,7 +258,9 @@ async function youpiCreate(supabase: any, gw: any, p: any) {
         ...(p.customer_name ? { name: p.customer_name } : {}),
         ...(p.email ? { email: p.email } : {}),
         ...(p.contact ? { phoneNumber: p.contact } : {}),
+        ...(p.payer_upi ? { upi: p.payer_upi } : {}),
       },
+      ...(p.payer_upi ? { payer_vpa: p.payer_upi } : {}),
       returnUrl: 'https://remedoo-app.pages.dev/',
     }),
   });
@@ -313,6 +315,7 @@ serve(async (req) => {
       force_new: body.force_new === true,
       provider_kind: body.provider_kind,
       provider_id: body.provider_id,
+      payer_upi: body.payer_upi,
     };
     if (!p.amount || p.amount <= 0) return json({ error: 'Invalid amount' }, 400);
 
