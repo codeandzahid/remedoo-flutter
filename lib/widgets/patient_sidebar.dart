@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../state/app_state.dart';
 import 'widgets.dart';
 import '../screens/appointments_screen.dart';
-import '../screens/emergency_screen.dart';
 import '../screens/family_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/login_screen.dart';
@@ -26,8 +25,9 @@ class _NavDef {
 }
 
 /// The React sidebar's Navigate section, mapped to the Flutter screens.
+/// (Owner cleanup 2026-10-19: Home removed — it only closed the drawer;
+/// Emergency removed — it already has a dashboard tile.)
 List<_NavDef> _patientNav() => const [
-      _NavDef('Home', Icons.home_outlined, 'home', null),
       _NavDef('Appointments', Icons.calendar_month_outlined,
           'appointments', AppointmentsScreen.new,
           requiresLogin: true),
@@ -37,8 +37,6 @@ List<_NavDef> _patientNav() => const [
       _NavDef('Health Reminders', Icons.notifications_outlined,
           'reminders', RemindersScreen.new,
           requiresLogin: true),
-      _NavDef('Emergency', Icons.pin_drop_outlined, 'emergency',
-          EmergencyScreen.new),
       _NavDef('Profile', Icons.person_outline, 'profile',
           ProfileScreen.new,
           requiresLogin: true),

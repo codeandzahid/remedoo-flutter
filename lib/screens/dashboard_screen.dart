@@ -14,7 +14,6 @@ import 'doctors_screen.dart';
 import 'doctor_detail_screen.dart';
 import 'hospitals_screen.dart';
 import 'labs_screen.dart';
-import 'pharmacies_screen.dart';
 import 'orders_screen.dart';
 import 'appointments_screen.dart';
 import 'cart_screen.dart';
@@ -27,7 +26,6 @@ import 'profile_screen.dart';
 import 'care_match_screen.dart';
 import 'remedoo_pharmacy_screen.dart';
 import 'medical_history_screen.dart';
-import 'support_tickets_screen.dart';
 import 'reminders_screen.dart';
 
 /// Home tab: orange hero header (menu / Remedoo / bell, greeting, translucent
@@ -419,27 +417,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Dense service grid: 15 compact tiles in 5 columns so many options
-  /// fit on one screen.
+  /// Dense service grid: 9 tiles — only what isn't already covered
+  /// by the nav bars, the stat cards, or the sections on this page
+  /// (owner cleanup 2026-10-19: Doctors/Orders/Appointments/Family/
+  /// Pharmacy/Support tiles removed as duplicates).
   Widget _categories() {
     final tiles = RemedooTheme.serviceTileColors;
     final items = [
-      ('Doctors', Icons.medical_services, 0, () => _go(const DoctorsScreen())),
       ('Hospitals', Icons.local_hospital, 1,
           () => _go(const HospitalsScreen())),
       ('Labs', Icons.science, 2, () => _go(const LabsScreen())),
-      ('Pharmacy', Icons.storefront, 3,
-          () => _go(const PharmaciesScreen())),
       ('Medicines', Icons.medication, 4,
           () => _go(const RemedooPharmacyScreen())),
       ('Emergency', Icons.sos, 5, () => _go(const EmergencyScreen())),
       ('Smart Care', Icons.auto_awesome, 6,
           () => _go(const CareMatchScreen())),
-      ('Appointments', Icons.calendar_month, 7,
-          () => _goGated(const AppointmentsScreen())),
-      ('Orders', Icons.shopping_bag, 8,
-          () => _goGated(const OrdersScreen())),
-      ('Family', Icons.people, 9, () => _goGated(const FamilyScreen())),
       ('Reminders', Icons.notifications, 10,
           () => _goGated(const RemindersScreen())),
       ('Favorites', Icons.favorite, 11,
@@ -448,9 +440,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           () => _goGated(const LabReportsScreen())),
       ('History', Icons.history, 13,
           () => _goGated(const MedicalHistoryScreen())),
-      ('Support', Icons.headset_mic, 14,
-          () => _goGated(const SupportTicketsScreen(),
-              'Please login to access support')),
     ];
     // Responsive column count + fixed row height (mainAxisExtent): the
     // tile content is 50px icon + label (~71px total), so rows stay tight
