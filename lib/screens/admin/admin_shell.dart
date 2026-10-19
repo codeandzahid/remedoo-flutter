@@ -422,6 +422,11 @@ class _AdminShellState extends State<AdminShell> {
             ),
           ),
           const SizedBox(width: 10),
+          _circleButton(Icons.settings_outlined, 'App Settings',
+              () => _jumpTo(items, 'App Settings')),
+          const SizedBox(width: 8),
+          _bellButton(state, items),
+          const SizedBox(width: 8),
           _circleButton(Icons.logout, 'Log out', () => _logout(state)),
           const SizedBox(width: 8),
           const CircleAvatar(
@@ -431,6 +436,49 @@ class _AdminShellState extends State<AdminShell> {
           ),
         ],
       ),
+    );
+  }
+
+  void _jumpTo(List<_NavItem> items, String label) {
+    final i = items.indexWhere((it) => it.label == label);
+    if (i >= 0) setState(() => _index = i);
+  }
+
+  /// Cognify's bell: opens Support Tickets, with a pink count
+  /// badge while queries are waiting.
+  Widget _bellButton(AppState state, List<_NavItem> items) {
+    final pending = state.supportTickets.where((t) {
+      final s = '${t['status'] ?? 'open'}';
+      return s == 'open' || s == 'opened';
+    }).length;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _circleButton(Icons.notifications_none, 'Support Tickets',
+            () => _jumpTo(items, 'Support Tickets')),
+        if (pending > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 5, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFD1A54),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: Colors.white, width: 1.4),
+              ),
+              child: Text(
+                '$pending',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
