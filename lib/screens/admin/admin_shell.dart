@@ -324,7 +324,7 @@ class _AdminShellState extends State<AdminShell> {
           : Drawer(
               backgroundColor: Colors.white,
               child: SafeArea(
-                child: _navColumn(state, items, inDrawer: true),
+                child: _remidyDrawerNav(state, items, current),
               ),
             ),
       body: SafeArea(
@@ -513,6 +513,145 @@ class _AdminShellState extends State<AdminShell> {
           _circleButton(Icons.logout, 'Log out', () => _logout(state)),
         ],
       ),
+    );
+  }
+
+  /// Remidy phone drawer: the new design instead of the old
+  /// sidebar list — white panel, black logo header, and every
+  /// option as a pill (active = black pill, like the top tabs).
+  Widget _remidyDrawerNav(
+      AppState state, List<_NavItem> items, _NavItem current) {
+    final sections = _sectionsOf(items);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 8, 6),
+          child: Row(
+            children: [
+              _logoMark(small: true),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Remedoo',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF141414))),
+                  Text(
+                    state.isAdmin ? 'SUPER ADMIN' : 'STAFF ACCOUNT',
+                    style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                        color: Color(0xFF8A8F98)),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Builder(
+                builder: (ctx) => IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 12),
+            children: [
+              for (final section in sections) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 7),
+                  child: Text(
+                    section.toUpperCase(),
+                    style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1,
+                        color: Color(0xFF8A8F98)),
+                  ),
+                ),
+                for (final it
+                    in items.where((e) => e.section == section))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 3),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(999),
+                      onTap: () {
+                        setState(() => _index = items.indexOf(it));
+                        Navigator.of(context).pop();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 11),
+                        decoration: BoxDecoration(
+                          color: it == current
+                              ? const Color(0xFF141414)
+                              : const Color(0xFFEEF0F2),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(it.icon,
+                                size: 17,
+                                color: it == current
+                                    ? Colors.white
+                                    : const Color(0xFF141414)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(it.label,
+                                  style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: it == current
+                                          ? Colors.white
+                                          : const Color(0xFF141414))),
+                            ),
+                            if (it == current)
+                              const Icon(Icons.check,
+                                  size: 15, color: Colors.white),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () => _logout(state),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF0F2),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.logout,
+                      size: 17, color: Color(0xFF141414)),
+                  SizedBox(width: 8),
+                  Text('Log out',
+                      style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF141414))),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

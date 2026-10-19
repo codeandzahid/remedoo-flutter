@@ -217,7 +217,7 @@ class AppState extends ChangeNotifier {
   }
 
   static const _kThemePackKey = 'remedoo_theme_pack';
-  static const _kAdminStyleKey = 'remedoo_admin_style';
+  static const _kAdminStyleKey = 'remedoo_admin_style_v2';
 
   ThemePack _themePack = ThemePack.skyPulse;
 
