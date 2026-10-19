@@ -14,7 +14,20 @@
 //   POST /api/v1/checkout/:id/cancel -> { success, status: 'CANCELLED' }
 //   GET  /checkout/:id               -> hosted checkout page (HTML)
 //   POST /api/v1/observer/sms        -> bank SMS webhook (token protected)
+//   GET  /api/v1/gmail/connect       -> start Gmail OAuth (bank email alerts)
+//   GET  /api/v1/gmail/callback      -> Gmail OAuth callback
+//   POST /api/v1/gmail/test          -> Gmail connection check (token protected)
+//   POST /api/v1/gmail/poll          -> check Gmail now (token protected)
+//   POST /api/v1/gmail/disconnect    -> disconnect Gmail (token protected)
 //   GET  /                           -> health
+//
+// Gmail automation: when the merchant connects the Gmail account
+// that receives the bank's credit-alert emails, a 1-minute cron
+// (scheduled handler) polls it and feeds each credit email through
+// the SAME parser/matching as the SMS observer — payments on the
+// central UPI confirm themselves with zero action by anyone.
+// OAuth client id/secret + refresh token live in secure_settings
+// (keys gmail_*), set from Remedoo Admin > Remedoo Pay.
 //
 // Storage + config live in the merchant's existing Supabase project:
 //   table  remedoo_pay_sessions           (payment sessions)
@@ -69,6 +82,34 @@ async function getObserverToken(env) {
     `secure_settings?key=eq.remedoo_pay_observer_token&select=value`
   );
   return rows?.[0]?.value ?? '';
+}
+
+// Generic secure_settings access (Gmail config + state live here).
+async function getSecureSetting(env, key) {
+  const rows = await sb(
+    env,
+    `secure_settings?key=eq.${encodeURIComponent(key)}&select=value`
+  );
+  return rows?.[0]?.value ?? '';
+}
+
+async function setSecureSetting(env, key, value) {
+  await sb(env, 'secure_settings?on_conflict=key', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates,return=representation',
+    body: { key, value: String(value ?? ''), updated_at: new Date().toISOString() },
+  });
+}
+
+/// Reads several secure_settings keys in one query -> { key: value }.
+async function getSecureSettings(env, keys) {
+  const rows = await sb(
+    env,
+    `secure_settings?key=in.(${keys.join(',')})&select=key,value`
+  );
+  const out = {};
+  for (const r of rows ?? []) out[r.key] = r.value ?? '';
+  return out;
 }
 
 // ------------------------------------------------------------------
@@ -180,6 +221,225 @@ function parseBankSms(text) {
   };
 }
 
+/// The SUCCESS patch for a matched credit — ONE shape shared by the
+/// SMS observer and the Gmail poller so both confirm identically.
+/// Only writes payer details the message actually carried — never
+/// overwrites a captured value with null.
+function creditSuccessPatch(parsed) {
+  return {
+    status: 'SUCCESS',
+    utr: parsed.utr,
+    paid_at: new Date().toISOString(),
+    ...(parsed.payerVpa ? { payer_vpa: parsed.payerVpa } : {}),
+    ...(parsed.payerName ? { payer_name: parsed.payerName } : {}),
+  };
+}
+
+// ------------------------------------------------------------------
+// Gmail automation (bank credit-alert emails -> same confirmation
+// as the SMS observer). One Gmail account, connected once by the
+// merchant via OAuth; its refresh token lives in secure_settings.
+// Covers payments received on the CENTRAL UPI only (panelists'
+// own-UPI alerts go to their own email accounts).
+// ------------------------------------------------------------------
+const GMAIL_SETTING_KEYS = [
+  'gmail_client_id',
+  'gmail_client_secret',
+  'gmail_refresh_token',
+  'gmail_connected_email',
+  'gmail_oauth_state',
+  'gmail_last_poll_at',
+  'gmail_seen',
+  'gmail_last_result',
+];
+const GMAIL_SEEN_CAP = 300;
+
+function decodeB64Url(data) {
+  const b64 = String(data || '').replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64);
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+}
+
+function findMimePart(payload, mime) {
+  if (!payload) return null;
+  if (payload.mimeType === mime && payload.body && payload.body.data) {
+    return payload.body.data;
+  }
+  for (const part of payload.parts ?? []) {
+    const hit = findMimePart(part, mime);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function stripHtml(html) {
+  return String(html || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&#39;|&rsquo;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+/g, ' ');
+}
+
+/// Plain-text body of a Gmail API message (format=full): text/plain
+/// part when present, else the text/html part with tags stripped,
+/// else the snippet.
+function gmailMessageText(msg) {
+  const plain = findMimePart(msg?.payload, 'text/plain');
+  if (plain) return decodeB64Url(plain);
+  const html = findMimePart(msg?.payload, 'text/html');
+  if (html) return stripHtml(decodeB64Url(html));
+  return msg?.snippet || '';
+}
+
+async function gmailTokenExchange(env, params) {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(params).toString(),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) {
+    throw new Error(
+      `Google token exchange failed (${res.status}): ${data.error_description || data.error || 'unknown error'}`
+    );
+  }
+  return data;
+}
+
+async function gmailApi(accessToken, path) {
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      `Gmail API ${res.status}: ${data?.error?.message || 'request failed'}`
+    );
+  }
+  return data;
+}
+
+/// A payer "VPA" whose domain part contains a dot is an email
+/// address (e.g. a bank care address in the footer), not a UPI
+/// handle — UPI bank handles never contain a dot. Drop those so a
+/// refund is never aimed at an email address.
+function sanitizeEmailPayer(parsed) {
+  if (!parsed) return parsed;
+  const vpa = parsed.payerVpa;
+  if (vpa && vpa.includes('@') && vpa.split('@')[1].includes('.')) {
+    return { ...parsed, payerVpa: null };
+  }
+  return parsed;
+}
+
+/// One Gmail poll: read recent credit-alert emails, feed each new
+/// one through parseBankSms (the SMS observer's parser) and confirm
+/// the matching ACTIVE central-UPI session. Every listed message id
+/// is recorded in gmail_seen (parsed or not) so mail is read once.
+async function gmailPoll(env) {
+  const s = await getSecureSettings(env, GMAIL_SETTING_KEYS);
+  const refreshToken = (s.gmail_refresh_token || '').trim();
+  if (!refreshToken) return { ok: false, reason: 'not_connected' };
+  const clientId = (s.gmail_client_id || '').trim();
+  const clientSecret = (s.gmail_client_secret || '').trim();
+  if (!clientId || !clientSecret) {
+    return { ok: false, reason: 'credentials_missing' };
+  }
+  try {
+    const tokens = await gmailTokenExchange(env, {
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    });
+    const access = tokens.access_token;
+    const query = encodeURIComponent(
+      'newer_than:2d (credited OR "credit alert" OR "UPI Ref" OR "amount credited" OR received)'
+    );
+    const list = await gmailApi(access, `messages?maxResults=25&q=${query}`);
+    const messages = list.messages ?? [];
+    let seen = [];
+    try {
+      const parsedSeen = JSON.parse(s.gmail_seen || '[]');
+      if (Array.isArray(parsedSeen)) seen = parsedSeen.map(String);
+    } catch (_) {
+      seen = [];
+    }
+    const seenSet = new Set(seen);
+    const cfg = await getYoupiConfig(env);
+    await currentActive(env); // expire stale sessions before matching
+    let checked = 0;
+    let matched = 0;
+    for (const m of messages) {
+      if (!m?.id || seenSet.has(m.id)) continue;
+      const full = await gmailApi(access, `messages/${encodeURIComponent(m.id)}?format=full`);
+      checked += 1;
+      const parsed = sanitizeEmailPayer(parseBankSms(gmailMessageText(full)));
+      if (parsed && cfg.vpa) {
+        const actives = await sb(
+          env,
+          `remedoo_pay_sessions?status=eq.ACTIVE&amount_paise=eq.${parsed.paise}&select=id,vpa&order=activated_at.asc`
+        );
+        // Central UPI only: rows without a vpa belong to the central
+        // UPI (same convention as currentActive).
+        const hit = (actives ?? []).find(
+          (a) => (a.vpa || cfg.vpa) === cfg.vpa
+        );
+        if (hit) {
+          await patchSession(env, hit.id, creditSuccessPatch(parsed));
+          matched += 1;
+        }
+      }
+      seen.push(m.id);
+      seenSet.add(m.id);
+    }
+    const result =
+      `checked ${checked} email${checked === 1 ? '' : 's'}, ` +
+      `matched ${matched} payment${matched === 1 ? '' : 's'}`;
+    await setSecureSetting(env, 'gmail_seen', JSON.stringify(seen.slice(-GMAIL_SEEN_CAP)));
+    await setSecureSetting(env, 'gmail_last_poll_at', new Date().toISOString());
+    await setSecureSetting(env, 'gmail_last_result', result);
+    return { ok: true, checked, matched, result };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    try {
+      await setSecureSetting(env, 'gmail_last_poll_at', new Date().toISOString());
+      await setSecureSetting(env, 'gmail_last_result', `error: ${msg.slice(0, 120)}`);
+    } catch (_) {
+      // Status write is best-effort; the summary below is the result.
+    }
+    return { ok: false, reason: 'poll_failed', error: msg };
+  }
+}
+
+function htmlPage(title, message, status = 200) {
+  return new Response(
+    `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>${title} — Remedoo Pay</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f6fb;margin:0;padding:16px;color:#122}
+  .card{max-width:420px;margin:40px auto;background:#fff;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(20,20,60,.08);text-align:center}
+  .brand{font-weight:800;color:#7C3AED;letter-spacing:.4px}
+  h1{font-size:20px;margin:12px 0 8px}
+  p{color:#556;font-size:14px;line-height:1.55}
+</style></head><body>
+<div class="card">
+  <div class="brand">REMEDOO PAY</div>
+  <h1>${title}</h1>
+  <p>${message}</p>
+</div>
+</body></html>`,
+    { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+  );
+}
+
 // ------------------------------------------------------------------
 // Checkout page
 // ------------------------------------------------------------------
@@ -280,7 +540,7 @@ export default {
       if (req.method === 'OPTIONS') return json({}, 204);
 
       if (path === '/' && req.method === 'GET') {
-        return json({ ok: true, service: 'Remedoo Pay', version: 'cloud-1' });
+        return json({ ok: true, service: 'Remedoo Pay', version: 'cloud-2' });
       }
 
       // ---- Create payment session ----
@@ -408,22 +668,157 @@ export default {
         if (!actives || actives.length === 0) {
           return json({ matched: false, reason: 'no active session for amount' });
         }
-        const successPatch = {
-          status: 'SUCCESS',
-          utr: parsedSms.utr,
-          paid_at: new Date().toISOString(),
-          // Only write payer details the SMS actually carried —
-          // never overwrite a captured value with null.
-          ...(parsedSms.payerVpa ? { payer_vpa: parsedSms.payerVpa } : {}),
-          ...(parsedSms.payerName ? { payer_name: parsedSms.payerName } : {}),
-        };
-        await patchSession(env, actives[0].id, successPatch);
+        await patchSession(env, actives[0].id, creditSuccessPatch(parsedSms));
         return json({ matched: true, paymentId: actives[0].id });
+      }
+
+      // ---- Gmail automation ----
+      // OAuth connect/callback are browser flows (no token header);
+      // the other gmail endpoints use the observer token, same as SMS.
+      const gmailAuthed = async () => {
+        const token = await getObserverToken(env);
+        const given =
+          req.headers.get('x-observer-token') || url.searchParams.get('token') || '';
+        return !!token && given === token;
+      };
+
+      if (path === '/api/v1/gmail/connect' && req.method === 'GET') {
+        const s = await getSecureSettings(env, GMAIL_SETTING_KEYS);
+        const clientId = (s.gmail_client_id || '').trim();
+        const clientSecret = (s.gmail_client_secret || '').trim();
+        if (!clientId || !clientSecret) {
+          return htmlPage(
+            'Almost there',
+            'Set the Client ID and Secret in Admin first — Remedoo Admin &gt; Payments &gt; Remedoo Pay &gt; Gmail Automation — then tap Connect Gmail again.',
+            400
+          );
+        }
+        const state = crypto.randomUUID();
+        await setSecureSetting(env, 'gmail_oauth_state', state);
+        const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+        authUrl.searchParams.set('client_id', clientId);
+        authUrl.searchParams.set(
+          'redirect_uri',
+          `${url.origin}/api/v1/gmail/callback`
+        );
+        authUrl.searchParams.set('response_type', 'code');
+        authUrl.searchParams.set(
+          'scope',
+          'https://www.googleapis.com/auth/gmail.readonly'
+        );
+        authUrl.searchParams.set('access_type', 'offline');
+        authUrl.searchParams.set('prompt', 'consent');
+        authUrl.searchParams.set('state', state);
+        return Response.redirect(authUrl.toString(), 302);
+      }
+
+      if (path === '/api/v1/gmail/callback' && req.method === 'GET') {
+        const s = await getSecureSettings(env, GMAIL_SETTING_KEYS);
+        const storedState = (s.gmail_oauth_state || '').trim();
+        const givenState = url.searchParams.get('state') || '';
+        const code = url.searchParams.get('code') || '';
+        if (!code || !storedState || givenState !== storedState) {
+          return htmlPage(
+            'Connection failed',
+            'This sign-in link is no longer valid. Go back to Remedoo Admin and tap Connect Gmail again.',
+            400
+          );
+        }
+        const tokens = await gmailTokenExchange(env, {
+          code,
+          client_id: (s.gmail_client_id || '').trim(),
+          client_secret: (s.gmail_client_secret || '').trim(),
+          redirect_uri: `${url.origin}/api/v1/gmail/callback`,
+          grant_type: 'authorization_code',
+        });
+        if (!tokens.refresh_token) {
+          return htmlPage(
+            'One more step needed',
+            'Google did not return a long-term token for this account. Remove Remedoo Pay under your Google Account &gt; Security &gt; Third-party access, then reconnect — the connect flow uses prompt=consent so Google issues a fresh refresh token.',
+            400
+          );
+        }
+        await setSecureSetting(env, 'gmail_refresh_token', tokens.refresh_token);
+        let email = '';
+        try {
+          const profile = await gmailApi(tokens.access_token, 'profile');
+          email = (profile.emailAddress || '').trim();
+        } catch (_) {
+          // The connection still works without the profile email.
+        }
+        await setSecureSetting(env, 'gmail_connected_email', email);
+        await setSecureSetting(env, 'gmail_oauth_state', '');
+        return htmlPage(
+          'Gmail connected ✅',
+          `Bank credit alerts${email ? ` to <b>${email}</b>` : ''} will now confirm Remedoo Pay payments automatically. You can close this tab.`
+        );
+      }
+
+      if (path === '/api/v1/gmail/test' && req.method === 'POST') {
+        if (!(await gmailAuthed())) {
+          return json({ error: 'Invalid observer token' }, 401);
+        }
+        const s = await getSecureSettings(env, GMAIL_SETTING_KEYS);
+        const refreshToken = (s.gmail_refresh_token || '').trim();
+        if (!refreshToken) {
+          return json({ ok: false, error: 'Gmail is not connected yet. Tap Connect Gmail in Remedoo Admin first.' });
+        }
+        const clientId = (s.gmail_client_id || '').trim();
+        const clientSecret = (s.gmail_client_secret || '').trim();
+        if (!clientId || !clientSecret) {
+          return json({ ok: false, error: 'Google Client ID and Secret are not saved yet. Add them in Remedoo Admin first.' });
+        }
+        const tokens = await gmailTokenExchange(env, {
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token',
+        });
+        const profile = await gmailApi(tokens.access_token, 'profile');
+        return json({
+          ok: true,
+          email: profile.emailAddress || s.gmail_connected_email || '',
+          messagesTotal: profile.messagesTotal ?? null,
+        });
+      }
+
+      if (path === '/api/v1/gmail/poll' && req.method === 'POST') {
+        if (!(await gmailAuthed())) {
+          return json({ error: 'Invalid observer token' }, 401);
+        }
+        return json(await gmailPoll(env));
+      }
+
+      if (path === '/api/v1/gmail/disconnect' && req.method === 'POST') {
+        if (!(await gmailAuthed())) {
+          return json({ error: 'Invalid observer token' }, 401);
+        }
+        await setSecureSetting(env, 'gmail_refresh_token', '');
+        await setSecureSetting(env, 'gmail_connected_email', '');
+        await setSecureSetting(env, 'gmail_seen', '');
+        await setSecureSetting(env, 'gmail_oauth_state', '');
+        return json({ ok: true });
       }
 
       return json({ error: 'Not found' }, 404);
     } catch (e) {
       return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    }
+  },
+
+  // Cron Trigger (set to every 1 minute in the Cloudflare dashboard):
+  // poll Gmail for bank credit alerts and confirm waiting payments.
+  // A failed poll must never crash the Worker — gmailPoll already
+  // reports its own errors; this catch is belt and braces.
+  async scheduled(event, env, ctx) {
+    try {
+      const summary = await gmailPoll(env);
+      console.log('gmail scheduled poll:', JSON.stringify(summary));
+    } catch (e) {
+      console.log(
+        'gmail scheduled poll failed:',
+        e instanceof Error ? e.message : String(e)
+      );
     }
   },
 };

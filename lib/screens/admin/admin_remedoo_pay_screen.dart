@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../state/app_state.dart';
 import '../../theme.dart';
@@ -15,7 +18,9 @@ void _snack(BuildContext context, String msg) {
 
 /// Remedoo Pay — manage the whole payment system in one place:
 /// live payments list with totals, plus the gateway settings
-/// (UPI ID, payee name, server URL, SMS-observer token).
+/// (UPI ID, payee name, server URL, SMS-observer token) and the
+/// Gmail automation card (bank credit-alert emails confirm payments
+/// automatically via the Worker's Gmail poller).
 ///
 /// Sessions live in `remedoo_pay_sessions` (written by the Remedoo
 /// Pay Cloudflare Worker); settings live in app_config
@@ -43,6 +48,14 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
   String _observerToken = '';
   Timer? _refreshTimer;
 
+  // Gmail automation (bank credit-alert emails confirm payments).
+  final _gmailClientId = TextEditingController();
+  final _gmailClientSecret = TextEditingController();
+  String _gmailConnectedEmail = '';
+  String _gmailLastPollAt = '';
+  String _gmailLastResult = '';
+  bool _gmailBusy = false;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +70,8 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
     _serverUrl.dispose();
     _vpa.dispose();
     _payeeName.dispose();
+    _gmailClientId.dispose();
+    _gmailClientSecret.dispose();
     super.dispose();
   }
 
@@ -71,8 +86,14 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
     final yp = gateways['youpi'] is Map
         ? Map<String, dynamic>.from(gateways['youpi'])
         : <String, dynamic>{};
-    final secrets =
-        await repo.fetchSecureSettings(['remedoo_pay_observer_token']);
+    final secrets = await repo.fetchSecureSettings([
+      'remedoo_pay_observer_token',
+      'gmail_client_id',
+      'gmail_client_secret',
+      'gmail_connected_email',
+      'gmail_last_poll_at',
+      'gmail_last_result',
+    ]);
     final sessions = await repo.fetchRemedooPaySessions();
     if (!mounted) return;
     setState(() {
@@ -83,6 +104,11 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
       _vpa.text = '${yp['vpa'] ?? ''}';
       _payeeName.text = '${yp['payee_name'] ?? ''}';
       _observerToken = secrets['remedoo_pay_observer_token'] ?? '';
+      _gmailClientId.text = secrets['gmail_client_id'] ?? '';
+      _gmailClientSecret.text = secrets['gmail_client_secret'] ?? '';
+      _gmailConnectedEmail = secrets['gmail_connected_email'] ?? '';
+      _gmailLastPollAt = secrets['gmail_last_poll_at'] ?? '';
+      _gmailLastResult = secrets['gmail_last_result'] ?? '';
       _sessions = sessions;
       _loading = false;
     });
@@ -141,6 +167,150 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
                 ? 'Remedoo Pay is now the ACTIVE payment system'
                 : 'Remedoo Pay settings saved')
             : 'Save failed — please try again');
+  }
+
+  // ----- Gmail automation -----
+
+  String get _workerBase =>
+      _serverUrl.text.trim().replaceAll(RegExp(r'/+$'), '');
+
+  bool get _gmailConnected => _gmailConnectedEmail.isNotEmpty;
+
+  /// Refresh only the Gmail status lines (never the text fields, so
+  /// an admin mid-typing is not disturbed).
+  Future<void> _loadGmailStatus() async {
+    final state = AppStateScope.of(context);
+    final secrets =
+        await state.supabaseRepository.fetchSecureSettings(const [
+      'gmail_connected_email',
+      'gmail_last_poll_at',
+      'gmail_last_result',
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _gmailConnectedEmail = secrets['gmail_connected_email'] ?? '';
+      _gmailLastPollAt = secrets['gmail_last_poll_at'] ?? '';
+      _gmailLastResult = secrets['gmail_last_result'] ?? '';
+    });
+  }
+
+  Future<void> _saveGmailCredentials() async {
+    final state = AppStateScope.of(context);
+    final repo = state.supabaseRepository;
+    setState(() => _gmailBusy = true);
+    var ok = await repo.saveSecureSetting(
+        'gmail_client_id', _gmailClientId.text.trim());
+    ok = await repo.saveSecureSetting(
+            'gmail_client_secret', _gmailClientSecret.text.trim()) &&
+        ok;
+    if (!mounted) return;
+    setState(() => _gmailBusy = false);
+    _snack(
+        context,
+        ok
+            ? 'Gmail settings saved — now tap Connect Gmail'
+            : 'Save failed — please try again');
+  }
+
+  Future<void> _connectGmail() async {
+    final base = _workerBase;
+    if (base.isEmpty) {
+      _snack(context, 'Set the Server URL above and Save first');
+      return;
+    }
+    final ok = await launchUrl(Uri.parse('$base/api/v1/gmail/connect'),
+        mode: LaunchMode.externalApplication);
+    if (!mounted) return;
+    if (!ok) _snack(context, 'Could not open the Google sign-in page');
+  }
+
+  /// POST to a token-protected Gmail endpoint on the Worker (the
+  /// observer token is the shared credential, same as the SMS
+  /// forwarder). Returns the decoded JSON body, or null after
+  /// showing why it failed.
+  Future<Map<String, dynamic>?> _gmailCall(String path) async {
+    final base = _workerBase;
+    if (base.isEmpty) {
+      _snack(context, 'Set the Server URL above and Save first');
+      return null;
+    }
+    if (_observerToken.isEmpty) {
+      _snack(context,
+          'Save the Remedoo Pay settings first — that creates the security token');
+      return null;
+    }
+    try {
+      final res = await http.post(
+        Uri.parse('$base$path'),
+        headers: {'x-observer-token': _observerToken},
+      ).timeout(const Duration(seconds: 30));
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (mounted) _snack(context, 'Unexpected reply from the server');
+      return null;
+    } catch (_) {
+      if (mounted) _snack(context, 'Could not reach the Remedoo Pay server');
+      return null;
+    }
+  }
+
+  Future<void> _testGmail() async {
+    setState(() => _gmailBusy = true);
+    final r = await _gmailCall('/api/v1/gmail/test');
+    if (!mounted) return;
+    setState(() => _gmailBusy = false);
+    if (r == null) return;
+    if (r['ok'] == true) {
+      _snack(context,
+          'Gmail connected: ${r['email']} · ${r['messagesTotal']} emails in the inbox');
+    } else {
+      _snack(context, '${r['error'] ?? 'Gmail test failed'}');
+    }
+    _loadGmailStatus();
+  }
+
+  Future<void> _pollGmail() async {
+    setState(() => _gmailBusy = true);
+    final r = await _gmailCall('/api/v1/gmail/poll');
+    if (!mounted) return;
+    setState(() => _gmailBusy = false);
+    if (r == null) return;
+    if (r['ok'] == true) {
+      _snack(context, 'Gmail check done — ${r['result']}');
+    } else if (r['reason'] == 'not_connected') {
+      _snack(context, 'Gmail is not connected yet — tap Connect Gmail');
+    } else {
+      _snack(context,
+          'Gmail check failed: ${r['error'] ?? r['reason'] ?? 'unknown error'}');
+    }
+    _loadGmailStatus();
+    _loadSessions();
+  }
+
+  Future<void> _disconnectGmail() async {
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Disconnect Gmail?',
+      message: 'Automatic email confirmation stops. Payments then '
+          'need the SMS app or a manual Confirm Paid tap until Gmail '
+          'is reconnected.',
+      confirmLabel: 'Disconnect',
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _gmailBusy = true);
+    final r = await _gmailCall('/api/v1/gmail/disconnect');
+    if (!mounted) return;
+    setState(() => _gmailBusy = false);
+    if (r != null && r['ok'] == true) {
+      setState(() {
+        _gmailConnectedEmail = '';
+        _gmailLastPollAt = '';
+        _gmailLastResult = '';
+      });
+      _snack(context, 'Gmail disconnected');
+    } else if (r != null) {
+      _snack(context, 'Disconnect failed — please try again');
+    }
   }
 
   // ----- derived stats -----
@@ -313,6 +483,149 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
                         label: const Text('Set as Active'),
                       ),
                   ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        // ---------- gmail automation ----------
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.mark_email_read_outlined, size: 19),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                          'Gmail Automation — automatic payment confirmation',
+                          style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                    'Connect the Gmail account that receives your '
+                    'bank\'s credit-alert emails. When a customer pays, '
+                    'the alert email confirms the payment by itself — '
+                    'no phone app needed, no taps by anyone. Remedoo '
+                    'checks the inbox every minute.',
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        color: scheme.onSurfaceVariant,
+                        height: 1.5)),
+                const SizedBox(height: 12),
+                RTextField(
+                    label: 'Google Client ID',
+                    hint: '…apps.googleusercontent.com',
+                    controller: _gmailClientId),
+                const SizedBox(height: 10),
+                RTextField(
+                    label: 'Google Client Secret',
+                    hint: 'From the same Google Cloud OAuth client',
+                    controller: _gmailClientSecret,
+                    obscureText: true),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _gmailBusy ? null : _saveGmailCredentials,
+                  icon: const Icon(Icons.save, size: 17),
+                  label: Text(_gmailBusy ? 'Working…' : 'Save Gmail Settings'),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _gmailConnected
+                                ? Icons.check_circle
+                                : Icons.info_outline,
+                            size: 16,
+                            color: _gmailConnected
+                                ? RemedooTheme.success
+                                : RemedooTheme.warning,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _gmailConnected
+                                  ? 'Connected as $_gmailConnectedEmail'
+                                  : 'Not connected',
+                              style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_gmailConnected) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Last check ${_when(_gmailLastPollAt).isEmpty ? '—' : _when(_gmailLastPollAt)}'
+                          '${_gmailLastResult.isEmpty ? '' : ' · $_gmailLastResult'}',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _gmailBusy ? null : _connectGmail,
+                      icon: const Icon(Icons.link, size: 16),
+                      label: const Text('Connect Gmail'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _gmailBusy ? null : _testGmail,
+                      icon: const Icon(Icons.wifi_tethering, size: 16),
+                      label: const Text('Test connection'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _gmailBusy ? null : _pollGmail,
+                      icon: const Icon(Icons.sync, size: 16),
+                      label: const Text('Check now'),
+                    ),
+                    if (_gmailConnected)
+                      TextButton.icon(
+                        onPressed: _gmailBusy ? null : _disconnectGmail,
+                        icon: Icon(Icons.link_off,
+                            size: 16, color: RemedooTheme.emergency),
+                        label: Text('Disconnect',
+                            style:
+                                TextStyle(color: RemedooTheme.emergency)),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Covers payments received on the Remedoo central UPI. '
+                  'Payments to panelists\' own UPIs still confirm by '
+                  'SMS app or their Confirm Paid tap.',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: scheme.onSurfaceVariant),
                 ),
               ],
             ),

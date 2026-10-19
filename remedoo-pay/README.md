@@ -59,3 +59,28 @@ Worker at `gateways.youpi.base_url` with the YouPI API shape
 - If the phone/observer is off, a payment stays unverified until the
   SMS is forwarded; the session expires after 5 minutes and the
   customer can retry.
+
+## Gmail automation (no phone app)
+
+As an alternative (or backup) to the SMS forwarder, the merchant can
+connect the Gmail account that receives the bank's credit-alert
+emails. A Cloudflare Cron Trigger fires the Worker's `scheduled`
+handler every minute; it polls Gmail and feeds each credit email
+through the SAME parser + amount matching as the SMS observer, so a
+payment confirms itself with zero action by customer or panelist.
+
+- Covers payments received on the **central UPI only** — panelists'
+  own-UPI alerts go to their own email accounts and still confirm
+  via their SMS app or Confirm Paid tap.
+- Setup: create a Google Cloud OAuth client (Web application) with
+  redirect URI `<worker-url>/api/v1/gmail/callback`, paste the
+  Client ID + Secret in Remedoo Admin → Payments → Remedoo Pay →
+  Gmail Automation, then tap **Connect Gmail** and sign in once.
+  The refresh token is stored server-side in `secure_settings`
+  (keys `gmail_*`); the app never sees it.
+- Endpoints: `GET /api/v1/gmail/connect`, `GET /api/v1/gmail/callback`,
+  `POST /api/v1/gmail/test`, `POST /api/v1/gmail/poll`,
+  `POST /api/v1/gmail/disconnect` (test/poll/disconnect use the
+  observer token, same as the SMS webhook).
+- Parser fixtures (SMS + email bodies, Gmail message shapes):
+  `node remedoo-pay/test-parse.mjs`.
