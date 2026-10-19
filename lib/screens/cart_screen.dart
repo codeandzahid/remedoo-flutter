@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -156,6 +158,13 @@ class _CartScreenState extends State<CartScreen> {
       );
       return;
     }
+    // Pay Online really pays now: run the gateway checkout first
+    // (money goes to the cart pharmacy's own UPI, like bookings)
+    // and only place the order when the payment succeeds.
+    if (_payment == 'Pay Online') {
+      final paid = await _payOnline(state, total);
+      if (!paid || !mounted) return;
+    }
     state.placeOrder(
       address: _address.text.trim(),
       payment: _payment,
@@ -164,6 +173,67 @@ class _CartScreenState extends State<CartScreen> {
       const SnackBar(content: Text('Order placed successfully!')),
     );
     Navigator.popUntil(context, (r) => r.isFirst);
+  }
+
+  /// Runs the hosted payment for a medicine order. Returns true
+  /// only when the payment succeeds.
+  Future<bool> _payOnline(AppState state, double total) async {
+    final completer = Completer<bool>();
+    PaymentService.instance.onPaymentBusy = () async {
+      if (!mounted) return false;
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.hourglass_top, size: 36),
+          title: const Text('A payment is pending'),
+          content: const Text(
+            'Another payment is being completed right now. It will '
+            'finish, or auto-expire within 5 minutes.\n\n'
+            'You can wait and try again — or tap Pay New to cancel '
+            'the pending payment and start yours now.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Wait'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Pay New'),
+            ),
+          ],
+        ),
+      );
+      return choice ?? false;
+    };
+    PaymentService.instance.pay(
+      amount: total,
+      orderId: 'ORD${DateTime.now().millisecondsSinceEpoch}',
+      description:
+          'Medicine order: ${state.cartPharmacyName ?? 'Pharmacy'}',
+      providerKind: 'pharmacy',
+      providerId: state.cartPharmacyId,
+      contact: state.phone.isNotEmpty ? state.phone : null,
+      email: state.email.isNotEmpty ? state.email : null,
+      customerName: state.userName.isNotEmpty ? state.userName : null,
+      onPaymentSuccess: (paymentId) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment successful: $paymentId')),
+          );
+        }
+        if (!completer.isCompleted) completer.complete(true);
+      },
+      onPaymentError: (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment failed: $error')),
+          );
+        }
+        if (!completer.isCompleted) completer.complete(false);
+      },
+    );
+    return completer.future;
   }
 
   Widget _itemsCard(AppState state) {

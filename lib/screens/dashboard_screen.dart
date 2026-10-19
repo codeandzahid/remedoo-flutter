@@ -17,11 +17,13 @@ import 'labs_screen.dart';
 import 'pharmacies_screen.dart';
 import 'orders_screen.dart';
 import 'appointments_screen.dart';
+import 'cart_screen.dart';
 import 'emergency_screen.dart';
 import 'favorites_screen.dart';
 import 'lab_reports_screen.dart';
 import 'family_screen.dart';
 import 'notifications_screen.dart';
+import 'profile_screen.dart';
 import 'care_match_screen.dart';
 import 'remedoo_pharmacy_screen.dart';
 import 'medical_history_screen.dart';
@@ -97,8 +99,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final upcoming =
-        state.appointments.where((a) => a.status == 'upcoming').take(2).toList();
+    final upcoming = state.appointments
+        .where((a) => a.status == 'upcoming')
+        .take(3)
+        .toList();
+    final nextAppt = upcoming.firstOrNull;
     final popularDoctors = state.activeDoctors.take(8).toList();
 
     return Scaffold(
@@ -130,12 +135,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           if (state.latestAnnouncements.isNotEmpty)
                             const SizedBox(height: 14),
-                          StaggerItem(index: 0, child: _categories()),
+                          if (nextAppt != null) ...[
+                            StaggerItem(
+                                index: 1,
+                                child: _nextAppointmentCard(nextAppt)),
+                            const SizedBox(height: 14),
+                          ],
+                          StaggerItem(index: 1, child: _statRow(state)),
                           const SizedBox(height: 14),
-                          StaggerItem(index: 1, child: _illustratedBanner()),
+                          StaggerItem(index: 2, child: _categories()),
+                          const SizedBox(height: 14),
+                          StaggerItem(index: 3, child: _illustratedBanner()),
+                          _profileCompletion(state),
+                          const SizedBox(height: 14),
+                          StaggerItem(index: 4, child: _weekStrip(state)),
+                          _alertsStack(state),
                           const SizedBox(height: 14),
                           StaggerItem(
-                            index: 2,
+                            index: 5,
                             child: RSectionHeader(
                               title: 'Doctors near you',
                               onSeeAll: () => _go(const DoctorsScreen()),
@@ -143,11 +160,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                           const SizedBox(height: 8),
                           StaggerItem(
-                              index: 3, child: _doctorRows(popularDoctors)),
+                              index: 6, child: _doctorRows(popularDoctors)),
                           if (state.isSignedIn) ...[
                             const SizedBox(height: 14),
                             StaggerItem(
-                              index: 4,
+                              index: 7,
                               child: RSectionHeader(
                                 title: 'Family Health',
                                 onSeeAll: () =>
@@ -155,28 +172,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            StaggerItem(index: 5, child: _familyRow(state)),
+                            StaggerItem(index: 8, child: _familyRow(state)),
                           ],
-                          const SizedBox(height: 14),
-                          StaggerItem(
-                            index: 6,
-                            child: RSectionHeader(
-                              title: 'Upcoming Appointments',
-                              onSeeAll: upcoming.isNotEmpty
-                                  ? () => _go(const AppointmentsScreen())
-                                  : null,
+                          // The next appointment already has its own
+                          // card at the top; this section lists the rest,
+                          // or the empty state when there are none.
+                          if (upcoming.length > 1) ...[
+                            const SizedBox(height: 14),
+                            StaggerItem(
+                              index: 9,
+                              child: RSectionHeader(
+                                title: 'Upcoming Appointments',
+                                onSeeAll: () =>
+                                    _go(const AppointmentsScreen()),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          StaggerItem(
-                            index: 7,
-                            child: upcoming.isEmpty
-                                ? _emptyAppointments()
-                                : Column(
-                                    children:
-                                        upcoming.map(_appointmentCard).toList(),
-                                  ),
-                          ),
+                            const SizedBox(height: 8),
+                            StaggerItem(
+                              index: 10,
+                              child: Column(
+                                children: upcoming
+                                    .skip(1)
+                                    .map(_appointmentCard)
+                                    .toList(),
+                              ),
+                            ),
+                          ] else if (upcoming.isEmpty) ...[
+                            const SizedBox(height: 14),
+                            StaggerItem(
+                              index: 9,
+                              child: const RSectionHeader(
+                                title: 'Upcoming Appointments',
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            StaggerItem(
+                                index: 10, child: _emptyAppointments()),
+                          ],
+                          _recentUpdates(state),
                         ],
                       ),
                     ),
@@ -246,10 +279,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
+                        const SizedBox(height: 1),
+                        Text(
+                          _dateLine(),
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  _upcomingPill(state),
+                  // Primary header action (Cognify's black pill).
+                  GestureDetector(
+                    onTap: () => _goGated(const DoctorsScreen()),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 13, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add, color: Colors.white, size: 16),
+                          SizedBox(width: 4),
+                          Text('Book',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   Container(
                     decoration: BoxDecoration(
@@ -670,40 +735,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return 'Good evening,';
   }
 
-  /// Pill showing the upcoming-appointments count (taps through to
-  /// appointments, login-gated like the mockup's streak pill).
-  Widget _upcomingPill(AppState state) {
-    final n =
-        state.appointments.where((a) => a.status == 'upcoming').length;
-    if (n == 0) return const SizedBox.shrink();
-    final scheme = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: () => _goGated(const AppointmentsScreen()),
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: scheme.primary,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.calendar_month,
-                color: Colors.white, size: 16),
-            const SizedBox(width: 6),
-            Text(
-              '$n Upcoming',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  /// Full date line for the header ("Monday, October 19, 2026").
+  String _dateLine() {
+    const days = [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+      'Saturday', 'Sunday'
+    ];
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June', 'July',
+      'August', 'September', 'October', 'November', 'December'
+    ];
+    final n = DateTime.now();
+    return '${days[n.weekday - 1]}, ${months[n.month - 1]} ${n.day}, ${n.year}';
   }
 
   /// Initials for avatar circles ("Dr. Meera Rao" -> "MR").
@@ -833,6 +876,589 @@ class _DashboardScreenState extends State<DashboardScreen> {
             () => _goGated(const FamilyScreen()),
           );
         },
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Patient dashboard additions (Cognify pieces, real account data)
+  // ------------------------------------------------------------------
+
+  static const _cBlue = Color(0xFF0E3EFE);
+  static const _cGreen = Color(0xFF5D8E5E);
+  static const _cPink = Color(0xFFFD1A54);
+  static const _cLav = Color(0xFF8A7CA8);
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  /// Next appointment, front and centre.
+  Widget _nextAppointmentCard(Appointment a) {
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      padding: const EdgeInsets.all(16),
+      onTap: () => _goGated(const AppointmentsScreen()),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('NEXT APPOINTMENT',
+                    style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                        color: Color(0xFF8A8F98))),
+                const SizedBox(height: 6),
+                Text(a.doctorName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 15.5, fontWeight: FontWeight.w800)),
+                Text(a.specialty,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12.5, color: scheme.onSurfaceVariant)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_month,
+                        size: 14, color: scheme.primary),
+                    const SizedBox(width: 5),
+                    Text('${a.dateLabel} • ${a.timeLabel}',
+                        style: const TextStyle(
+                            fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text('View',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Your numbers at a glance: visits, orders, reports, cart.
+  Widget _statRow(AppState state) {
+    final reportsReady =
+        state.reports.where((r) => r.status == 'Completed').length;
+    final items = <(IconData, Color, String, String, VoidCallback)>[
+      (
+        Icons.calendar_month,
+        _cBlue,
+        '${state.upcoming.length}',
+        'Visits',
+        () => _goGated(const AppointmentsScreen()),
+      ),
+      (
+        Icons.shopping_bag,
+        _cPink,
+        '${state.activeOrders.length}',
+        'Orders',
+        () => _goGated(const OrdersScreen()),
+      ),
+      (
+        Icons.description,
+        _cGreen,
+        '$reportsReady',
+        'Reports',
+        () => _goGated(const LabReportsScreen()),
+      ),
+      (
+        Icons.shopping_cart,
+        _cLav,
+        '${state.cartCount}',
+        'Cart',
+        () => _go(const CartScreen()),
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = constraints.maxWidth < 560 ? 2 : 4;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            mainAxisExtent: 60,
+          ),
+          itemCount: items.length,
+          itemBuilder: (_, i) {
+            final (icon, color, value, label, onTap) = items[i];
+            final scheme = Theme.of(context).colorScheme;
+            return InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: scheme.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: RemedooTheme.softShadow,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                          color: color, shape: BoxShape.circle),
+                      child:
+                          Icon(icon, size: 18, color: Colors.white),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(value,
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800)),
+                        Text(label,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: scheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Mon–Sun strip of the current week; days with appointments fill
+  /// black, today gets a ring.
+  Widget _weekStrip(AppState state) {
+    final scheme = Theme.of(context).colorScheme;
+    final now = DateTime.now();
+    final monday = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+    const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    return RCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Your Week',
+                  style: TextStyle(
+                      fontSize: 14.5, fontWeight: FontWeight.w800)),
+              const Spacer(),
+              Text('appointments',
+                  style: TextStyle(
+                      fontSize: 11, color: scheme.onSurfaceVariant)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: List.generate(7, (i) {
+              final day = monday.add(Duration(days: i));
+              final has = state.appointments.any((a) =>
+                  a.status != 'cancelled' && _sameDay(a.date, day));
+              final today = _sameDay(day, now);
+              return Expanded(
+                child: Column(
+                  children: [
+                    Text(letters[i],
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: has
+                            ? scheme.primary
+                            : Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: today && !has
+                            ? Border.all(
+                                color: scheme.primary, width: 1.6)
+                            : null,
+                      ),
+                      child: Center(
+                        child: Text('${day.day}',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: has
+                                    ? Colors.white
+                                    : scheme.onSurface)),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Stack of live alert cards: reminders due today, active order,
+  /// reports ready, cart waiting. Each appears only when it applies.
+  Widget _alertsStack(AppState state) {
+    final scheme = Theme.of(context).colorScheme;
+    final cards = <Widget>[];
+
+    final now = DateTime.now();
+    final due = state.reminders
+        .where((r) =>
+            !r.done &&
+            (r.repeat == 'Daily' || _sameDay(r.date, now)))
+        .toList();
+    if (due.isNotEmpty) {
+      cards.add(RCard(
+        padding: const EdgeInsets.all(14),
+        onTap: () => _goGated(const RemindersScreen()),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: const BoxDecoration(
+                      color: _cPink, shape: BoxShape.circle),
+                  child: const Icon(Icons.notifications_active,
+                      size: 17, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                const Text('Due today',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w800)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text('${due.length}',
+                      style: const TextStyle(
+                          fontSize: 11.5, fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
+            for (final r in due.take(2)) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const SizedBox(width: 44),
+                  Expanded(
+                    child: Text(r.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                  ),
+                  Text(r.timeLabel,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant)),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ));
+    }
+
+    if (state.activeOrders.isNotEmpty) {
+      final o = [...state.activeOrders]
+        ..sort((a, b) => b.placedAt.compareTo(a.placedAt));
+      final latest = o.first;
+      final statusText = switch (latest.status) {
+        'placed' => 'Order placed',
+        'confirmed' => 'Being prepared',
+        'out_for_delivery' => 'Out for delivery',
+        _ => latest.status,
+      };
+      cards.add(RCard(
+        padding: const EdgeInsets.all(14),
+        onTap: () => _goGated(const OrdersScreen()),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                  color: _cBlue, shape: BoxShape.circle),
+              child: const Icon(Icons.shopping_bag,
+                  size: 19, color: Colors.white),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Order • ${inr(latest.total)}',
+                      style: const TextStyle(
+                          fontSize: 13.5, fontWeight: FontWeight.w800)),
+                  Text('${latest.pharmacyName} — $statusText',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 20),
+          ],
+        ),
+      ));
+    }
+
+    final reportsReady =
+        state.reports.where((r) => r.status == 'Completed').length;
+    if (reportsReady > 0) {
+      cards.add(RCard(
+        padding: const EdgeInsets.all(14),
+        onTap: () => _goGated(const LabReportsScreen()),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                  color: _cGreen, shape: BoxShape.circle),
+              child: const Icon(Icons.description,
+                  size: 19, color: Colors.white),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Text(
+                  reportsReady == 1
+                      ? '1 lab report is ready'
+                      : '$reportsReady lab reports are ready',
+                  style: const TextStyle(
+                      fontSize: 13.5, fontWeight: FontWeight.w700)),
+            ),
+            const Icon(Icons.chevron_right, size: 20),
+          ],
+        ),
+      ));
+    }
+
+    if (state.cartCount > 0) {
+      cards.add(RCard(
+        padding: const EdgeInsets.all(14),
+        onTap: () => _go(const CartScreen()),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                  color: _cLav, shape: BoxShape.circle),
+              child: const Icon(Icons.shopping_cart,
+                  size: 19, color: Colors.white),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Text(
+                  '${state.cartCount} item${state.cartCount == 1 ? '' : 's'} in your cart • ${inr(state.cartTotal)}',
+                  style: const TextStyle(
+                      fontSize: 13.5, fontWeight: FontWeight.w700)),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text('Checkout',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+      ));
+    }
+
+    if (cards.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        children: [
+          for (var i = 0; i < cards.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            cards[i],
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Profile completion progress (signed-in users, until 100%).
+  Widget _profileCompletion(AppState state) {
+    if (!state.isSignedIn) return const SizedBox.shrink();
+    final checks = <(bool, String)>[
+      (state.userName.trim().isNotEmpty, 'Add your name'),
+      (state.phone.trim().isNotEmpty, 'Add your phone number'),
+      (state.email.trim().isNotEmpty, 'Add your email'),
+      (state.family.isNotEmpty, 'Add a family member'),
+    ];
+    final done = checks.where((c) => c.$1).length;
+    final pct = (done * 100 / checks.length).round();
+    if (pct >= 100) return const SizedBox.shrink();
+    final hint = checks.firstWhere((c) => !c.$1).$2;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: RCard(
+        padding: const EdgeInsets.all(14),
+        onTap: () => _go(const ProfileScreen()),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('Complete your profile',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w800)),
+                ),
+                Text('$pct%',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: scheme.primary)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(hint,
+                style: TextStyle(
+                    fontSize: 12, color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: pct / 100,
+                minHeight: 8,
+                backgroundColor: scheme.surfaceContainerHighest,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(scheme.primary),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _ago(DateTime t) {
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 1) return 'now';
+    if (d.inMinutes < 60) return '${d.inMinutes}m';
+    if (d.inHours < 24) return '${d.inHours}h';
+    return '${d.inDays}d';
+  }
+
+  /// Recent updates feed (latest notifications, no bell-hunting).
+  Widget _recentUpdates(AppState state) {
+    if (state.notifications.isEmpty) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    final items = [...state.notifications]
+      ..sort((a, b) => b.time.compareTo(a.time));
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RSectionHeader(
+            title: 'Recent Updates',
+            onSeeAll: () => _go(const NotificationsScreen()),
+          ),
+          const SizedBox(height: 8),
+          RCard(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            onTap: () => _go(const NotificationsScreen()),
+            child: Column(
+              children: [
+                for (final n in items.take(4))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 9),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: scheme.surfaceContainerHighest,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(n.icon,
+                              size: 17, color: scheme.onSurface),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(n.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700)),
+                              Text(n.message,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color:
+                                          scheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(_ago(n.time),
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: scheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

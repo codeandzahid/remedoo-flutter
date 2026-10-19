@@ -790,6 +790,11 @@ class AppState extends ChangeNotifier {
       date: appt.date,
       timeLabel: appt.timeLabel,
       notes: appt.notes.isEmpty ? null : appt.notes,
+      // Only a real uploaded URL goes to the backend — a local
+      // device path is meaningless to the provider's panel.
+      prescriptionUrl: (appt.prescriptionPath ?? '').startsWith('http')
+          ? appt.prescriptionPath
+          : null,
     )
         .then((remoteId) {
       if (remoteId != null) _remoteAppointmentIds[appt.id] = remoteId;

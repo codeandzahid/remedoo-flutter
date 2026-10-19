@@ -252,6 +252,7 @@ class SupabaseRepository {
     required DateTime date,
     required String timeLabel, // 'HH:MM'
     String? notes,
+    String? prescriptionUrl,
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
@@ -270,6 +271,10 @@ class SupabaseRepository {
             : timeLabel,
         'status': 'pending',
         'notes': notes,
+        // So the provider panel can open the patient's uploaded
+        // prescription (the column exists; it was never written).
+        if (prescriptionUrl != null && prescriptionUrl.isNotEmpty)
+          'prescription_url': prescriptionUrl,
       }).select('id');
       if (row.isNotEmpty) return '${row.first['id']}';
       return null;
