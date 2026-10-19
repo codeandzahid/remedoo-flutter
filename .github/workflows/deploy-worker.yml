@@ -1,0 +1,22 @@
+name: Deploy Remedoo Pay Worker
+
+# Manual only: run from the Actions tab ("Run workflow") whenever
+# remedoo-pay/worker.js changes. Uses the same Cloudflare token as
+# the web deploy (Workers/Pages: Edit). The Worker also gets the
+# every-minute cron trigger from remedoo-pay/wrangler.toml.
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: remedoo-pay

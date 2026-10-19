@@ -1,0 +1,13 @@
+# Remedoo Pay Worker — deployed by .github/workflows/deploy-worker.yml
+# (manual "Run workflow"). Dashboard-set secrets (SUPABASE_URL,
+# SUPABASE_SERVICE_ROLE_KEY) are NOT in this file and are preserved
+# across deploys.
+name = "remedoo-pay"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+# Gmail automation: poll the connected Gmail every minute for bank
+# credit alerts and confirm waiting payments (scheduled handler).
+[triggers]
+crons = ["* * * * *"]
