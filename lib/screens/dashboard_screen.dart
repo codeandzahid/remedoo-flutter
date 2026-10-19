@@ -419,7 +419,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Compact service tile for the dense grid.
+  /// Compact service tile for the dense grid. Remidy style: the
+  /// icon sits in a SOLID candy-coloured circle with a white glyph
+  /// (the tile's strong colour becomes the circle).
   Widget _denseTile({
     required IconData icon,
     required String label,
@@ -429,18 +431,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(999),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: tileColor,
-              borderRadius: BorderRadius.circular(15),
+              color: iconColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: iconColor.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: Icon(icon, size: 24, color: iconColor),
+            child: Icon(icon, size: 24, color: Colors.white),
           ),
           const SizedBox(height: 5),
           Text(
@@ -456,7 +465,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   /// Promo banners tinted by the active theme (like the mockup artwork).
-  List<({String title, String subtitle, Gradient gradient, String emoji})>
+  List<({String title, String subtitle, Gradient gradient, IconData icon})>
       get _promos {
     Gradient g(List<Color> c, AlignmentGeometry b, AlignmentGeometry e) =>
         LinearGradient(begin: b, end: e, colors: c);
@@ -467,25 +476,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: 'Flat 30% OFF',
         subtitle: 'on first doctor consultation',
         gradient: g([p, pd], Alignment.centerLeft, Alignment.centerRight),
-        emoji: '🩺',
+        icon: Icons.medical_services,
       ),
       (
         title: 'Free Delivery',
         subtitle: 'on medicine orders above ₹199',
         gradient: g([pd, p], Alignment.topLeft, Alignment.bottomRight),
-        emoji: '💊',
+        icon: Icons.medication,
       ),
       (
         title: 'Health Packages',
         subtitle: 'starting at ₹299 only',
         gradient: g([p, pd], Alignment.topCenter, Alignment.bottomCenter),
-        emoji: '🧪',
+        icon: Icons.science,
       ),
       (
         title: 'Emergency SOS',
         subtitle: 'ambulance in under 10 mins',
         gradient: g([pd, p], Alignment.centerRight, Alignment.centerLeft),
-        emoji: '🚑',
+        icon: Icons.sos,
       ),
     ];
   }
@@ -504,11 +513,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
+              color: scheme.primary,
+              shape: BoxShape.circle,
             ),
-            child: Icon(Icons.campaign_outlined,
-                color: scheme.primary, size: 20),
+            child: const Icon(Icons.campaign_outlined,
+                color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -613,8 +622,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ],
                         ),
                       ),
-                      Text(p.emoji,
-                          style: const TextStyle(fontSize: 42)),
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(p.icon,
+                            color: Colors.white, size: 32),
+                      ),
                     ],
                   ),
                 ),
@@ -724,11 +741,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: RemedooTheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
+                color: RemedooTheme.primary,
+                shape: BoxShape.circle,
               ),
-              child: Icon(Icons.medical_services,
-                  color: RemedooTheme.primary, size: 24),
+              child: const Icon(Icons.medical_services,
+                  color: Colors.white, size: 24),
             ),
             const SizedBox(width: 12),
             Expanded(
