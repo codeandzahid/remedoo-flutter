@@ -83,7 +83,7 @@ class _RootGateState extends State<RootGate> {
     Future(() async {
       await AuthService.instance.init();
       await state.loadPersistedState();
-      state.attachAuthListener();
+      await state.attachAuthListener();
       // No forced login screen: anyone without a session enters as a guest
       // and lands straight on the dashboard. The login screen only appears
       // when a gated action requires it.

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../utils/auth_url.dart';
 import 'supabase_config.dart';
 
 /// Result of an auth attempt: either a signed-in user or a friendly error.
@@ -65,6 +66,15 @@ class AuthService {
         authOptions: FlutterAuthClientOptions(
           authFlowType: AuthFlowType.pkce,
           autoRefreshToken: !disableAutoRefresh,
+          // Do NOT let supabase_flutter exchange the auth code from the
+          // page URL during initialize(): it emits signedIn /
+          // passwordRecovery on a broadcast stream at that moment —
+          // before AppState has subscribed — so a password-recovery
+          // return was silently consumed as a normal sign-in and the
+          // new-password screen never appeared. The app exchanges the
+          // URL itself in [handleAuthCallbackFromUrl], which
+          // AppState.attachAuthListener calls AFTER subscribing.
+          detectSessionInUri: false,
         ),
       ).timeout(initTimeout);
       _initialized = true;
@@ -79,6 +89,53 @@ class AuthService {
 
   Stream<AuthState> get authStateChanges =>
       _client.auth.onAuthStateChange;
+
+  /// True when [uri] carries Supabase auth-callback parameters: a PKCE
+  /// `code`, implicit-flow tokens (`access_token` / `token_hash`), or an
+  /// auth `error` — in the query string or the fragment. Plain app URLs
+  /// (no query, or unrelated parameters) return false.
+  static bool isAuthCallbackUri(Uri uri) {
+    bool hasAuthKey(Map<String, String> params) =>
+        params.containsKey('code') ||
+        params.containsKey('access_token') ||
+        params.containsKey('token_hash') ||
+        params.containsKey('error') ||
+        params.containsKey('error_description');
+    if (hasAuthKey(uri.queryParameters)) return true;
+    if (uri.fragment.isNotEmpty) {
+      try {
+        return hasAuthKey(Uri.splitQueryString(uri.fragment));
+      } catch (_) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /// Exchanges the auth callback in the current page URL (web) for a
+  /// session: password-recovery, email-confirmation and magic-link
+  /// returns all arrive this way (a `?code=` in the URL).
+  ///
+  /// MUST be called only after the app has subscribed to
+  /// [authStateChanges] — the exchange is what emits the signedIn /
+  /// passwordRecovery events, and the stream does not replay them
+  /// (see [init] for why supabase_flutter's automatic handling is
+  /// disabled). Returns true when a session was established. Never
+  /// throws: an expired or already-used link just returns false and
+  /// boot continues with whatever session (if any) was restored.
+  Future<bool> handleAuthCallbackFromUrl() async {
+    if (!_initialized || !kIsWeb) return false;
+    final uri = Uri.base;
+    if (!isAuthCallbackUri(uri)) return false;
+    try {
+      await _client.auth.getSessionFromUrl(uri);
+      clearAuthUrlParameters();
+      return true;
+    } catch (e) {
+      debugPrint('Auth callback handling failed: $e');
+      return false;
+    }
+  }
 
   Session? get currentSession =>
       _initialized ? _client.auth.currentSession : null;

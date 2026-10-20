@@ -62,7 +62,7 @@ class _PartnerRootGateState extends State<PartnerRootGate> {
     final state = AppStateScope.of(context);
     await AuthService.instance.init();
     await state.loadPersistedState();
-    state.attachAuthListener();
+    await state.attachAuthListener();
     await state.checkProviderRole();
     if (state.providerRole != null) {
       state.switchRole(state.providerRole!);

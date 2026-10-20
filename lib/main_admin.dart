@@ -61,7 +61,7 @@ class _AdminRootGateState extends State<AdminRootGate> {
     await AuthService.instance.init();
     await state.loadPersistedState();
     // Listen for sign-in/sign-out so _supaUser stays in sync.
-    state.attachAuthListener();
+    await state.attachAuthListener();
     await state.checkAdminRole();
     if (mounted) setState(() => _ready = true);
   }

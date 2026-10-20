@@ -59,9 +59,15 @@ class AppState extends ChangeNotifier {
 
   bool _authAttached = false;
 
-  /// Called by RootGate after Supabase init. Restores any persisted session
-  /// and subscribes to auth changes (sign-out, expiry, recovery links).
-  void attachAuthListener() {
+  /// Called by the root gates after Supabase init. Restores any persisted
+  /// session, subscribes to auth changes (sign-out, expiry, recovery
+  /// links), then processes an auth callback in the page URL. Await it:
+  /// the URL exchange happens only after the subscription below is in
+  /// place, so a password-recovery return emits its passwordRecovery
+  /// event into a live listener instead of being lost (it used to fire
+  /// inside Supabase.initialize, before anything subscribed, and the
+  /// recovery was silently treated as a normal sign-in).
+  Future<void> attachAuthListener() async {
     if (_authAttached) return;
     _authAttached = true;
     // Offline / init failed (e.g. widget tests): stay in mock/guest mode.
@@ -117,6 +123,10 @@ class AppState extends ChangeNotifier {
         }
       }
     });
+    // Subscribed — now it is safe to exchange any auth code in the URL.
+    // For a recovery return this emits passwordRecovery into the
+    // listener above, which routes to the new-password screen.
+    await AuthService.instance.handleAuthCallbackFromUrl();
   }
 
   /// Fired when a password-recovery link is opened (RootGate navigates to

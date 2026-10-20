@@ -51,12 +51,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       setState(() => _error = result.error);
       return;
     }
+    // Keep the recovery session — the user just proved account
+    // ownership through the emailed link, so a fresh password means
+    // they are done, not signed out. Resolve the backend role so
+    // RootGate (under this pushed screen) routes into the right shell
+    // (patient / provider / admin), then pop back to it.
+    await AppStateScope.of(context).resolveBackendRole();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Password updated! Please sign in again.')),
+      const SnackBar(content: Text('Password updated!')),
     );
-    // Drop the recovery session and return to the login screen.
-    AppStateScope.of(context).logout();
     Navigator.popUntil(context, (r) => r.isFirst);
   }
 
