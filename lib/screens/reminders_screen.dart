@@ -222,6 +222,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
             const SizedBox(width: 4),
             GestureDetector(
               behavior: HitTestBehavior.opaque,
+              onTap: () => _addDialog(context, state, existing: r),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.edit_outlined,
+                    size: 20, color: Colors.grey),
+              ),
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () => state.deleteReminder(r.id),
               child: const Padding(
                 padding: EdgeInsets.all(8),
@@ -266,15 +275,45 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
   }
 
-  void _addDialog(BuildContext context, AppState state) {
-    final title = TextEditingController();
-    final time = TextEditingController(text: '09:00');
-    String repeat = 'Daily';
+  /// Add dialog, or edit dialog when [existing] is passed. The
+  /// chosen Repeat is stored as the reminder's repeat (it used to
+  /// be stuffed into the notes field, so every reminder displayed
+  /// "Daily" — audit fix 2026-10-19), and the date is pickable
+  /// instead of silently always being today.
+  void _addDialog(BuildContext context, AppState state,
+      {Reminder? existing}) {
+    final title = TextEditingController(text: existing?.title ?? '');
+    final time =
+        TextEditingController(text: existing?.timeLabel ?? '09:00');
+    String repeat = existing?.repeat ?? 'Daily';
+    DateTime date = existing?.date ?? DateTime.now();
+    void save() {
+      if (title.text.trim().isEmpty) return;
+      if (existing != null) {
+        state.updateReminder(
+          existing.id,
+          title: title.text.trim(),
+          date: date,
+          timeLabel: time.text.trim(),
+          repeat: repeat,
+        );
+      } else {
+        state.addReminder(
+          title: title.text.trim(),
+          date: date,
+          timeLabel: time.text.trim(),
+          notes: '',
+          repeat: repeat,
+        );
+      }
+      Navigator.pop(context);
+    }
+
     showResponsiveDialog(
       context,
       (_) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
-          title: const Text('Add Reminder'),
+          title: Text(existing == null ? 'Add Reminder' : 'Edit Reminder'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -288,6 +327,26 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   hint: '09:00',
                   controller: time),
               const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.calendar_month_outlined,
+                      size: 18),
+                  label: Text(
+                      'Date: ${date.day}/${date.month}/${date.year}'),
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: date,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now()
+                          .add(const Duration(days: 365 * 5)),
+                    );
+                    if (picked != null) setD(() => date = picked);
+                  },
+                ),
+              ),
+              const SizedBox(height: 4),
               DropdownButtonFormField<String>(
                 initialValue: repeat,
                 decoration: const InputDecoration(
@@ -308,29 +367,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
             ),
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () {
-                if (title.text.trim().isEmpty) return;
-                state.addReminder(
-                  title: title.text.trim(),
-                  date: DateTime.now(),
-                  timeLabel: time.text.trim(),
-                  notes: repeat,
-                );
-                Navigator.pop(context);
-              },
+              onTap: save,
               child: RButton(
-                label: 'Add',
+                label: existing == null ? 'Add' : 'Save',
                 small: true,
-                onPressed: () {
-                  if (title.text.trim().isEmpty) return;
-                  state.addReminder(
-                    title: title.text.trim(),
-                    date: DateTime.now(),
-                    timeLabel: time.text.trim(),
-                    notes: repeat,
-                  );
-                  Navigator.pop(context);
-                },
+                onPressed: save,
               ),
             ),
           ],

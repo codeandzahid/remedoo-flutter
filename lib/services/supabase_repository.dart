@@ -921,6 +921,35 @@ class SupabaseRepository {
     }
   }
 
+  /// Deletes one of the signed-in user's notifications (the
+  /// "Users can delete own notifications" RLS policy permits it).
+  /// A no-op for ids that are not backend rows (e.g. locally
+  /// generated notification ids simply match nothing).
+  Future<void> deleteNotification(String id) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return;
+    try {
+      await _db
+          .from('notifications')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', uid);
+    } catch (e) {
+      debugPrint('deleteNotification failed: $e');
+    }
+  }
+
+  /// Deletes all of the signed-in user's notifications.
+  Future<void> deleteAllNotifications() async {
+    final uid = _uid;
+    if (!_ready || uid == null) return;
+    try {
+      await _db.from('notifications').delete().eq('user_id', uid);
+    } catch (e) {
+      debugPrint('deleteAllNotifications failed: $e');
+    }
+  }
+
   /// Send a notification to a specific user (e.g. doctor approving → patient)
   Future<bool> sendNotificationToUser({
     required String userId,
@@ -1057,6 +1086,24 @@ class SupabaseRepository {
       return true;
     } catch (e) {
       debugPrint('deleteFamilyMember failed: $e');
+      return false;
+    }
+  }
+
+  /// Updates a family member row owned by the signed-in user.
+  Future<bool> updateFamilyMember(
+      String id, Map<String, dynamic> fields) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return false;
+    try {
+      await _db
+          .from('family_members')
+          .update(fields)
+          .eq('id', id)
+          .eq('user_id', uid);
+      return true;
+    } catch (e) {
+      debugPrint('updateFamilyMember failed: $e');
       return false;
     }
   }

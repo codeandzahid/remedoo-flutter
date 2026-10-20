@@ -50,7 +50,11 @@ class HospitalsScreen extends StatefulWidget {
 class _HospitalsScreenState extends State<HospitalsScreen> {
   final _search = TextEditingController();
   String _sort = _sortOptions.first;
-  String _filter = _filters.first;
+  // Default to Relevance like the labs/pharmacies lists — the
+  // hospitals list previously opened on "Favorites", which showed
+  // an empty list to anyone who had not favourited a hospital yet
+  // (audit fix 2026-10-19). Favorites stays available as a chip.
+  String _filter = 'Relevance';
   bool _loading = true;
   int _bannerIdx = 0;
   Timer? _bannerTimer;

@@ -87,7 +87,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     ],
                   ),
                 ),
-                if (state.notifications.isNotEmpty)
+                if (state.notifications.isNotEmpty) ...[
                   TextButton.icon(
                     onPressed: state.markAllNotificationsRead,
                     icon: const Icon(Icons.check,
@@ -102,6 +102,32 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                           horizontal: 8),
                     ),
                   ),
+                  // Clear all (audit fix 2026-10-19 — notifications
+                  // previously could not be removed at all).
+                  TextButton.icon(
+                    onPressed: () async {
+                      final ok = await confirmDialog(
+                        context,
+                        title: 'Clear all notifications?',
+                        message:
+                            'Every notification in your list will be deleted.',
+                        confirmLabel: 'Clear all',
+                      );
+                      if (ok) state.clearNotifications();
+                    },
+                    icon: const Icon(Icons.delete_sweep_outlined,
+                        size: 16, color: Colors.white),
+                    label: const Text('Clear',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -318,6 +344,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Delete notification',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () =>
+                      AppStateScope.of(context).removeNotification(n.id),
+                  icon: Icon(Icons.delete_outline,
+                      size: 18, color: scheme.onSurfaceVariant),
                 ),
               ],
             ),

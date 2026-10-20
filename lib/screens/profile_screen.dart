@@ -68,14 +68,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SnackBar(content: Text('Profile photo updated.')));
   }
 
-  /// Adds one address to the address book (2026-10-19).
-  Future<void> _addAddress(AppState state) async {
-    final labelCtrl = TextEditingController(text: 'Home');
-    final addrCtrl = TextEditingController();
+  /// Adds an address to the address book, or edits [existing]
+  /// when one is passed (2026-10-19; edit support added by the
+  /// patient-panel audit fix the same day).
+  Future<void> _addAddress(AppState state, {SavedAddress? existing}) async {
+    final labelCtrl =
+        TextEditingController(text: existing?.label ?? 'Home');
+    final addrCtrl = TextEditingController(text: existing?.address ?? '');
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add Address'),
+        title: Text(existing == null ? 'Add Address' : 'Edit Address'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -110,13 +113,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SnackBar(content: Text('Please enter the address.')));
       return;
     }
-    state.addSavedAddress(SavedAddress(
-      id: 'A${DateTime.now().millisecondsSinceEpoch}',
-      label: labelCtrl.text.trim().isEmpty
-          ? 'Home'
-          : labelCtrl.text.trim(),
-      address: addr,
-    ));
+    final label =
+        labelCtrl.text.trim().isEmpty ? 'Home' : labelCtrl.text.trim();
+    if (existing != null) {
+      state.updateSavedAddress(SavedAddress(
+        id: existing.id,
+        label: label,
+        address: addr,
+      ));
+    } else {
+      state.addSavedAddress(SavedAddress(
+        id: 'A${DateTime.now().millisecondsSinceEpoch}',
+        label: label,
+        address: addr,
+      ));
+    }
   }
 
   @override
@@ -485,6 +496,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ),
                                     IconButton(
+                                      tooltip: 'Edit address',
+                                      onPressed: () => _addAddress(state,
+                                          existing: a),
+                                      icon: Icon(Icons.edit_outlined,
+                                          size: 18,
+                                          color:
+                                              scheme.onSurfaceVariant),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Delete address',
                                       onPressed: () =>
                                           state.removeSavedAddress(a.id),
                                       icon: Icon(Icons.delete_outline,
@@ -510,6 +531,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           name: _name.text.trim(),
                           phone: _phone.text.trim(),
                           address: _address.text.trim(),
+                          gender: _gender,
                         );
                         if (!context.mounted) return;
                         setState(() {});

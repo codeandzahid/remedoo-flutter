@@ -55,6 +55,74 @@ class _VitalsScreenState extends State<VitalsScreen> {
         _ => 'Weight',
       };
 
+  /// Edits an existing reading's values in place (audit fix
+  /// 2026-10-19 — readings previously could only be added or
+  /// deleted, so a typo meant delete + re-enter).
+  Future<void> _editReading(AppState state, VitalReading v) async {
+    final v1 = TextEditingController(text: _numText(v.value));
+    final v2 = TextEditingController(
+        text: v.value2 == null ? '' : _numText(v.value2!));
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Edit ${_typeName(v.type)}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: v1,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                  labelText: v.type == 'bp'
+                      ? 'Systolic (top)'
+                      : v.type == 'sugar'
+                          ? 'Sugar (mg/dL)'
+                          : 'Weight (kg)'),
+            ),
+            if (v.type == 'bp') ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: v2,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'Diastolic (bottom)'),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    if (saved != true || !mounted) return;
+    final a = double.tryParse(v1.text.trim());
+    final b = v.type == 'bp' ? double.tryParse(v2.text.trim()) : null;
+    if (a == null || a <= 0 || (v.type == 'bp' && (b == null || b <= 0))) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please enter valid values.')));
+      return;
+    }
+    state.updateVital(VitalReading(
+      id: v.id,
+      type: v.type,
+      value: a,
+      value2: b,
+      date: v.date,
+    ));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Reading updated.')));
+  }
+
+  static String _numText(double d) =>
+      d == d.roundToDouble() ? '${d.toInt()}' : '$d';
+
   void _save(AppState state) {
     final a = double.tryParse(_v1.text.trim());
     if (a == null || a <= 0) {
@@ -241,6 +309,13 @@ class _VitalsScreenState extends State<VitalsScreen> {
                                                 scheme.onSurfaceVariant)),
                                   ],
                                 ),
+                              ),
+                              IconButton(
+                                tooltip: 'Edit reading',
+                                onPressed: () => _editReading(state, v),
+                                icon: Icon(Icons.edit_outlined,
+                                    size: 20,
+                                    color: scheme.onSurfaceVariant),
                               ),
                               IconButton(
                                 onPressed: () => state.removeVital(v.id),

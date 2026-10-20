@@ -246,16 +246,18 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
   }
 
   /// Add a health fact (2026-10-19): allergy, condition, surgery,
-  /// medication or anything else a doctor should know.
-  Future<void> _addEntry(AppState state) async {
-    final titleCtrl = TextEditingController();
-    final notesCtrl = TextEditingController();
-    var kind = 'Allergy';
+  /// medication or anything else a doctor should know. Passing
+  /// [existing] turns the dialog into an edit (audit fix
+  /// 2026-10-19 — entries previously could only be added/deleted).
+  Future<void> _addEntry(AppState state, {HistoryEntry? existing}) async {
+    final titleCtrl = TextEditingController(text: existing?.title ?? '');
+    final notesCtrl = TextEditingController(text: existing?.notes ?? '');
+    var kind = existing?.kind ?? 'Allergy';
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
-          title: const Text('Add Health Fact'),
+          title: Text(existing == null ? 'Add Health Fact' : 'Edit Health Fact'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -310,15 +312,27 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
           const SnackBar(content: Text('Please enter a title.')));
       return;
     }
-    state.addHistoryEntry(HistoryEntry(
-      id: 'H${DateTime.now().millisecondsSinceEpoch}',
-      kind: kind,
-      title: title,
-      date: DateTime.now(),
-      notes: notesCtrl.text.trim(),
-    ));
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Added to your medical history.')));
+    if (existing != null) {
+      state.updateHistoryEntry(HistoryEntry(
+        id: existing.id,
+        kind: kind,
+        title: title,
+        date: existing.date,
+        notes: notesCtrl.text.trim(),
+      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Health fact updated.')));
+    } else {
+      state.addHistoryEntry(HistoryEntry(
+        id: 'H${DateTime.now().millisecondsSinceEpoch}',
+        kind: kind,
+        title: title,
+        date: DateTime.now(),
+        notes: notesCtrl.text.trim(),
+      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Added to your medical history.')));
+    }
   }
 
   Widget _card(_TimelineItem t) {
@@ -481,16 +495,32 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
             ],
             if (expanded && t.type == 'health_fact') ...[
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => AppStateScope.of(context)
-                      .removeHistoryEntry(t.id.replaceFirst('fact-', '')),
-                  icon: const Icon(Icons.delete_outline, size: 16),
-                  label: const Text('Delete entry'),
-                  style: TextButton.styleFrom(
-                      foregroundColor: RemedooTheme.destructive),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed: () {
+                      final st = AppStateScope.of(context);
+                      final entry = st.historyEntries
+                          .where((e) =>
+                              e.id == t.id.replaceFirst('fact-', ''))
+                          .firstOrNull;
+                      if (entry != null) {
+                        _addEntry(st, existing: entry);
+                      }
+                    },
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: const Text('Edit entry'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => AppStateScope.of(context)
+                        .removeHistoryEntry(t.id.replaceFirst('fact-', '')),
+                    icon: const Icon(Icons.delete_outline, size: 16),
+                    label: const Text('Delete entry'),
+                    style: TextButton.styleFrom(
+                        foregroundColor: RemedooTheme.destructive),
+                  ),
+                ],
               ),
             ],
           ],

@@ -24,6 +24,7 @@ import 'family_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'care_match_screen.dart';
+import 'remedoo_checkout_screen.dart';
 import 'remedoo_pharmacy_screen.dart';
 import 'medical_history_screen.dart';
 import 'reminders_screen.dart';
@@ -1288,18 +1289,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   style: const TextStyle(
                       fontSize: 13.5, fontWeight: FontWeight.w700)),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: scheme.primary,
-                borderRadius: BorderRadius.circular(999),
+            // The Checkout pill is its own tap target into the
+            // real checkout flow (audit fix 2026-10-19 — it was a
+            // decorative container before): Remedoo's own store
+            // carts go straight to their checkout; pharmacy carts
+            // go to the cart screen where their checkout lives.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                if (state.cartPharmacyId == 'remedoo') {
+                  _go(const RemedooCheckoutScreen());
+                } else {
+                  _go(const CartScreen());
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: scheme.primary,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text('Checkout',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800)),
               ),
-              child: const Text('Checkout',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800)),
             ),
           ],
         ),

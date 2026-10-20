@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
 import '../responsive/responsive.dart';
+import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import '../app_navigator.dart';
@@ -289,10 +290,38 @@ class LabReportDetailScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          FilledButton(
-            onPressed: () => launchUrl(Uri.parse(r.fileUrl!),
-                mode: LaunchMode.externalApplication),
-            child: const Text('Open'),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FilledButton(
+                onPressed: () => launchUrl(Uri.parse(r.fileUrl!),
+                    mode: LaunchMode.externalApplication),
+                child: const Text('Open'),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  final st = AppStateScope.of(context);
+                  final nav = Navigator.of(context);
+                  final ok = await confirmDialog(
+                    context,
+                    title: 'Delete this report?',
+                    message:
+                        'It will be removed from your reports list on this device.',
+                    confirmLabel: 'Delete',
+                  );
+                  if (!ok) return;
+                  st.removeUploadedReport(r.id);
+                  nav.pop();
+                },
+                icon: const Icon(Icons.delete_outline, size: 15),
+                label: const Text('Delete'),
+                style: TextButton.styleFrom(
+                    foregroundColor: RemedooTheme.destructive,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    minimumSize: const Size(0, 30),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+              ),
+            ],
           ),
         ],
       ),

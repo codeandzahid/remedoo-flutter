@@ -159,8 +159,11 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
                     )
                   : RefreshIndicator(
                       onRefresh: () async {
-                        await Future.delayed(
-                            const Duration(milliseconds: 500));
+                        // Reload the on-device datasets from
+                        // storage for real — this previously just
+                        // waited 500ms and repainted the same list
+                        // (audit fix 2026-10-19).
+                        await state.loadPersistedState();
                         if (mounted) setState(() {});
                       },
                       child: ListView.builder(
@@ -427,13 +430,41 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
                   ),
                   if (completed) ...[
                     const SizedBox(height: 10),
-                    RButton(
-                      label: 'Download Report',
-                      icon: Icons.download_outlined,
-                      small: true,
-                      variant: RButtonVariant.outline,
-                      onPressed: () =>
-                          _downloadReport(context, r),
+                    Row(
+                      children: [
+                        RButton(
+                          label: 'Download Report',
+                          icon: Icons.download_outlined,
+                          small: true,
+                          variant: RButtonVariant.outline,
+                          onPressed: () =>
+                              _downloadReport(context, r),
+                        ),
+                        const Spacer(),
+                        // Uploaded reports can be removed from
+                        // the device list (audit fix 2026-10-19 —
+                        // there was no delete at all before).
+                        if (r.isUploaded)
+                          TextButton.icon(
+                            onPressed: () async {
+                              final st = AppStateScope.of(context);
+                              final ok = await confirmDialog(
+                                context,
+                                title: 'Delete this report?',
+                                message:
+                                    'It will be removed from your reports list on this device.',
+                                confirmLabel: 'Delete',
+                              );
+                              if (ok) st.removeUploadedReport(r.id);
+                            },
+                            icon: const Icon(Icons.delete_outline,
+                                size: 16),
+                            label: const Text('Delete'),
+                            style: TextButton.styleFrom(
+                                foregroundColor:
+                                    RemedooTheme.destructive),
+                          ),
+                      ],
                     ),
                   ],
                 ],

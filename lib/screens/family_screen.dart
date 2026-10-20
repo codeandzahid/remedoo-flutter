@@ -155,6 +155,23 @@ class FamilyScreen extends StatelessWidget {
               height: 34,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                color: scheme.primary.withValues(alpha: 0.1),
+              ),
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                tooltip: 'Edit member',
+                icon: Icon(Icons.edit_outlined,
+                    size: 17, color: scheme.primary),
+                onPressed: () =>
+                    _addDialog(context, state, existing: m),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
                 color: RemedooTheme.destructive
                     .withValues(alpha: 0.1),
               ),
@@ -196,14 +213,20 @@ class FamilyScreen extends StatelessWidget {
     );
   }
 
-  void _addDialog(BuildContext context, AppState state) {
-    final name = TextEditingController();
-    final relation = TextEditingController();
-    final age = TextEditingController();
+  /// Add dialog, or edit dialog when [existing] is passed (edit
+  /// support added by the patient-panel audit fix, 2026-10-19).
+  void _addDialog(BuildContext context, AppState state,
+      {FamilyMember? existing}) {
+    final name = TextEditingController(text: existing?.name ?? '');
+    final relation =
+        TextEditingController(text: existing?.relation ?? '');
+    final age = TextEditingController(
+        text: existing == null ? '' : '${existing.age}');
     showResponsiveDialog(
       context,
       (_) => AlertDialog(
-        title: const Text('Add Family Member'),
+        title: Text(
+            existing == null ? 'Add Family Member' : 'Edit Family Member'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -230,17 +253,28 @@ class FamilyScreen extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           RButton(
-            label: 'Add',
+            label: existing == null ? 'Add' : 'Save',
             small: true,
             onPressed: () {
               if (name.text.trim().isEmpty) return;
-              state.addFamilyMember(
-                name: name.text.trim(),
-                relation: relation.text.trim().isEmpty
-                    ? 'Family'
-                    : relation.text.trim(),
-                age: int.tryParse(age.text) ?? 30,
-              );
+              final rel = relation.text.trim().isEmpty
+                  ? 'Family'
+                  : relation.text.trim();
+              final yrs = int.tryParse(age.text) ?? 30;
+              if (existing != null) {
+                state.updateFamilyMember(
+                  id: existing.id,
+                  name: name.text.trim(),
+                  relation: rel,
+                  age: yrs,
+                );
+              } else {
+                state.addFamilyMember(
+                  name: name.text.trim(),
+                  relation: rel,
+                  age: yrs,
+                );
+              }
               Navigator.pop(context);
             },
           ),

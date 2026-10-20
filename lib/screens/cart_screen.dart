@@ -277,9 +277,39 @@ class _CartScreenState extends State<CartScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Items (${state.cartLines.length})',
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: 14)),
+          Row(
+            children: [
+              Expanded(
+                child: Text('Items (${state.cartLines.length})',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 14)),
+              ),
+              // Clear Cart (audit fix 2026-10-19 — emptying the
+              // cart previously meant removing every line by hand).
+              TextButton.icon(
+                onPressed: () async {
+                  final ok = await confirmDialog(
+                    context,
+                    title: 'Clear cart?',
+                    message: 'All items will be removed from your cart.',
+                    confirmLabel: 'Clear cart',
+                  );
+                  if (ok) state.clearCart();
+                },
+                icon: Icon(Icons.delete_sweep_outlined,
+                    size: 16, color: scheme.onSurfaceVariant),
+                label: Text('Clear',
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        color: scheme.onSurfaceVariant)),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 4),
           ...state.cartLines.map((l) {
             final price = state.priceOf(l.medicine);

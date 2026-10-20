@@ -429,6 +429,26 @@ class Reminder {
 
   bool get completed => done;
   String get time => timeLabel;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'date': date.toIso8601String(),
+        'timeLabel': timeLabel,
+        'notes': notes,
+        'repeat': repeat,
+        'done': done,
+      };
+
+  factory Reminder.fromJson(Map<String, dynamic> j) => Reminder(
+        id: j['id'] as String,
+        title: j['title'] as String? ?? '',
+        date: DateTime.tryParse('${j['date']}') ?? DateTime.now(),
+        timeLabel: j['timeLabel'] as String? ?? '',
+        notes: j['notes'] as String? ?? '',
+        repeat: j['repeat'] as String? ?? 'Daily',
+        done: j['done'] as bool? ?? false,
+      );
 }
 
 class LabTest {

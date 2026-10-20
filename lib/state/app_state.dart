@@ -253,6 +253,14 @@ class AppState extends ChangeNotifier {
           ..addAll(decoded.map((e) =>
               SavedAddress.fromJson(e as Map<String, dynamic>)));
       }
+      final remindersJson = prefs.getString(_kRemindersKey);
+      if (remindersJson != null) {
+        final decoded = jsonDecode(remindersJson) as List<dynamic>;
+        reminders
+          ..clear()
+          ..addAll(decoded.map((e) =>
+              Reminder.fromJson(e as Map<String, dynamic>)));
+      }
       final cartJson = prefs.getString(_kCartKey);
       if (cartJson != null) {
         final j = jsonDecode(cartJson) as Map<String, dynamic>;
@@ -591,6 +599,7 @@ class AppState extends ChangeNotifier {
         await prefs.remove(_kVitalsKey);
         await prefs.remove(_kHistoryKey);
         await prefs.remove(_kAddressesKey);
+        await prefs.remove(_kRemindersKey);
         await prefs.remove(_kCartKey);
       } catch (_) {}
     }());
@@ -731,6 +740,8 @@ class AppState extends ChangeNotifier {
       final p = '${prof['phone'] ?? ''}';
       if (n.isNotEmpty) _name = n;
       if (p.isNotEmpty) _phone = p;
+      final g = '${prof['gender'] ?? ''}';
+      if (g.isNotEmpty) _gender = g;
       final av = '${prof['avatar_url'] ?? ''}';
       if (av.isNotEmpty) _avatarUrl = av;
     }
@@ -1488,6 +1499,11 @@ class AppState extends ChangeNotifier {
 
   final List<AppNotification> notifications = [];
 
+  /// Sequence suffix so two notifications created inside the
+  /// same millisecond still get distinct ids (deleting one must
+  /// never take another with it).
+  static int _notificationSeq = 0;
+
   int get unreadCount => notifications.where((n) => !n.read).length;
 
   void addNotification({
@@ -1498,7 +1514,7 @@ class AppState extends ChangeNotifier {
     notifications.insert(
       0,
       AppNotification(
-        id: 'N${DateTime.now().millisecondsSinceEpoch}',
+        id: 'N${DateTime.now().millisecondsSinceEpoch}-${_notificationSeq++}',
         title: title,
         message: message,
         time: DateTime.now(),
@@ -1521,6 +1537,23 @@ class AppState extends ChangeNotifier {
       if (n.id == id) n.read = true;
     }
     unawaited(_repo.markNotificationRead(id));
+    notifyListeners();
+  }
+
+  /// Deletes a single notification (audit fix 2026-10-19 — the
+  /// list previously offered no way to remove anything). Local
+  /// rows are removed in place; backend rows are deleted through
+  /// the repository (RLS allows deleting your own).
+  void removeNotification(String id) {
+    notifications.removeWhere((n) => n.id == id);
+    unawaited(_repo.deleteNotification(id));
+    notifyListeners();
+  }
+
+  /// Clears the whole notification list.
+  void clearNotifications() {
+    notifications.clear();
+    unawaited(_repo.deleteAllNotifications());
     notifyListeners();
   }
 
@@ -1559,7 +1592,37 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Edits a family member in place (audit fix 2026-10-19 — the
+  /// list previously offered add/delete only). Age is a local-only
+  /// field, matching how add works (the backend row stores name +
+  /// relationship).
+  void updateFamilyMember({
+    required String id,
+    required String name,
+    required String relation,
+    required int age,
+  }) {
+    final i = family.indexWhere((f) => f.id == id);
+    if (i < 0) return;
+    family[i] = FamilyMember(
+      id: id,
+      name: name,
+      relation: relation,
+      age: age,
+      reason: family[i].reason,
+    );
+    if (_supaUser != null) {
+      unawaited(_repo.updateFamilyMember(_remoteFamilyIds[id] ?? id, {
+        'name': name,
+        'relationship': relation,
+      }));
+    }
+    notifyListeners();
+  }
+
   // ---------- Reminders ----------
+
+  static const _kRemindersKey = 'remedoo_reminders_v1';
 
   final List<Reminder> reminders = [];
 
@@ -1568,11 +1631,18 @@ class AppState extends ChangeNotifier {
   List<Reminder> get completedReminders =>
       reminders.where((r) => r.done).toList();
 
+  /// Adds a reminder. Reminders persist on-device like the other
+  /// patient datasets (audit fix 2026-10-19) — they previously
+  /// vanished on reload, and the chosen [repeat] was discarded by
+  /// callers stuffing it into notes. There is no push-notification
+  /// scheduler in the stack, so reminders surface in-app (list +
+  /// due-today section) only; nothing here claims otherwise.
   void addReminder({
     required String title,
     required DateTime date,
     required String timeLabel,
     required String notes,
+    String repeat = 'Daily',
   }) {
     reminders.add(Reminder(
       id: 'R${DateTime.now().millisecondsSinceEpoch}',
@@ -1580,8 +1650,34 @@ class AppState extends ChangeNotifier {
       date: date,
       timeLabel: timeLabel,
       notes: notes,
+      repeat: repeat,
     ));
     notifyListeners();
+    unawaited(_persistReminders());
+  }
+
+  void updateReminder(
+    String id, {
+    String? title,
+    DateTime? date,
+    String? timeLabel,
+    String? notes,
+    String? repeat,
+  }) {
+    final i = reminders.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    final old = reminders[i];
+    reminders[i] = Reminder(
+      id: old.id,
+      title: title ?? old.title,
+      date: date ?? old.date,
+      timeLabel: timeLabel ?? old.timeLabel,
+      notes: notes ?? old.notes,
+      repeat: repeat ?? old.repeat,
+      done: old.done,
+    );
+    notifyListeners();
+    unawaited(_persistReminders());
   }
 
   void toggleReminder(String id) {
@@ -1589,11 +1685,24 @@ class AppState extends ChangeNotifier {
     if (r == null) return;
     r.done = !r.done;
     notifyListeners();
+    unawaited(_persistReminders());
   }
 
   void deleteReminder(String id) {
     reminders.removeWhere((r) => r.id == id);
     notifyListeners();
+    unawaited(_persistReminders());
+  }
+
+  Future<void> _persistReminders() async {
+    try {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 3));
+      await prefs.setString(_kRemindersKey,
+          jsonEncode(reminders.map((r) => r.toJson()).toList()));
+    } catch (_) {
+      // Best-effort persistence only.
+    }
   }
 
   // ---------- Support tickets ----------
@@ -2378,15 +2487,20 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> updateProfile(
-      {String? name, String? phone, String? address}) async {
+      {String? name, String? phone, String? address, String? gender}) async {
     if (name != null) _name = name;
     if (phone != null) _phone = phone;
     if (address != null) _address = address;
+    // Gender used to be selectable in the UI but never saved
+    // (audit fix 2026-10-19); profiles.gender exists in the
+    // backend, so it now round-trips like the other fields.
+    if (gender != null && gender.isNotEmpty) _gender = gender;
     // Persist to Supabase so the name/phone survive reloads.
     bool saved = true;
     final fields = <String, dynamic>{};
     if (name != null) fields['full_name'] = name;
     if (phone != null) fields['phone'] = phone;
+    if (gender != null && gender.isNotEmpty) fields['gender'] = gender;
     if (fields.isNotEmpty) {
       saved = await _repo.saveProfile(fields);
     }
@@ -2414,6 +2528,17 @@ class AppState extends ChangeNotifier {
   /// uploaded set on-device; the file itself lives in Supabase storage.
   void addUploadedReport(LabReport report) {
     reports.insert(0, report);
+    notifyListeners();
+    unawaited(_persistMyReports());
+  }
+
+  /// Removes a patient-uploaded report from the device list and
+  /// its persisted copy (audit fix 2026-10-19 — uploads previously
+  /// could not be deleted at all). Only uploaded reports live in
+  /// this local list; the stored file itself is left untouched in
+  /// storage, this removes the patient's on-device entry.
+  void removeUploadedReport(String id) {
+    reports.removeWhere((r) => r.id == id && r.isUploaded);
     notifyListeners();
     unawaited(_persistMyReports());
   }
@@ -2448,6 +2573,16 @@ class AppState extends ChangeNotifier {
 
   void removeVital(String id) {
     vitals.removeWhere((v) => v.id == id);
+    notifyListeners();
+    unawaited(_persistVitals());
+  }
+
+  /// Replaces a reading in place (edit support, audit fix
+  /// 2026-10-19).
+  void updateVital(VitalReading updated) {
+    final i = vitals.indexWhere((v) => v.id == updated.id);
+    if (i < 0) return;
+    vitals[i] = updated;
     notifyListeners();
     unawaited(_persistVitals());
   }
@@ -2487,6 +2622,16 @@ class AppState extends ChangeNotifier {
     unawaited(_persistHistory());
   }
 
+  /// Replaces an entry in place (edit support, audit fix
+  /// 2026-10-19).
+  void updateHistoryEntry(HistoryEntry updated) {
+    final i = historyEntries.indexWhere((e) => e.id == updated.id);
+    if (i < 0) return;
+    historyEntries[i] = updated;
+    notifyListeners();
+    unawaited(_persistHistory());
+  }
+
   Future<void> _persistHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance()
@@ -2512,6 +2657,17 @@ class AppState extends ChangeNotifier {
 
   void removeSavedAddress(String id) {
     savedAddresses.removeWhere((a) => a.id == id);
+    notifyListeners();
+    unawaited(_persistAddresses());
+  }
+
+  /// Replaces an address in place (edit support, audit fix
+  /// 2026-10-19 — the address book previously offered add/delete
+  /// only).
+  void updateSavedAddress(SavedAddress updated) {
+    final i = savedAddresses.indexWhere((a) => a.id == updated.id);
+    if (i < 0) return;
+    savedAddresses[i] = updated;
     notifyListeners();
     unawaited(_persistAddresses());
   }

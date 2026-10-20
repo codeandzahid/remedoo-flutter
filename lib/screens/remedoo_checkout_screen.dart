@@ -440,6 +440,28 @@ class _RemedooCheckoutScreenState
               style: TextStyle(
                   fontWeight: FontWeight.w800, fontSize: 14)),
           const SizedBox(height: 10),
+          // Saved-address chips, same as the pharmacy cart
+          // checkout (audit fix 2026-10-19 — this checkout
+          // previously made patients retype a saved address).
+          if (AppStateScope.of(context).savedAddresses.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final a
+                    in AppStateScope.of(context).savedAddresses)
+                  ActionChip(
+                    avatar: const Icon(Icons.location_on, size: 15),
+                    label: Text(a.label),
+                    onPressed: () {
+                      _address.text = a.address;
+                      setState(() {});
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
           RTextField(
             hint: 'Enter your full address',
             controller: _address,
