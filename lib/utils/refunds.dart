@@ -47,8 +47,8 @@ bool isValidRefundUtr(String value) =>
     RegExp(r'^\d{9,22}$').hasMatch(value.trim());
 
 /// Builds the UPI deep link that opens the panelist's UPI app
-/// prefilled for a refund to the customer. Same shape as the
-/// OnlinePaymentScreen payment link.
+/// prefilled for a refund to the customer. Same shape as a
+/// standard UPI payment link.
 String refundUpiLink({
   required String customerUpi,
   required String customerName,

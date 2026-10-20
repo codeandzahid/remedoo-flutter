@@ -872,6 +872,8 @@ class AppState extends ChangeNotifier {
       payment: '${r['payment_method'] ?? 'cod'}',
       placedAt: placed,
       status: '${r['status'] ?? 'placed'}',
+      notes: '${r['notes'] ?? ''}',
+      pharmacyId: _strOrNull(r['pharmacy_id']),
       paymentMethod: _strOrNull(r['payment_method']),
       paymentStatus: _strOrNull(r['payment_status']),
       paymentRef: _strOrNull(r['payment_ref']),
@@ -947,7 +949,7 @@ class AppState extends ChangeNotifier {
       total: order.total,
       address: order.address,
       payment: order.payment,
-      notes: null,
+      notes: order.notes.isEmpty ? null : order.notes,
       paymentRef: order.paymentRef,
       customerUpi: order.customerUpi,
     )
@@ -1409,6 +1411,7 @@ class AppState extends ChangeNotifier {
     required String payment,
     String? paymentRef,
     String? customerUpi,
+    String? notes,
   }) {
     final subtotal = cartSubtotal;
     final deliveryFee = subtotal >= 499 ? 0.0 : 30.0;
@@ -1423,6 +1426,8 @@ class AppState extends ChangeNotifier {
       address: address,
       payment: payment,
       placedAt: DateTime.now(),
+      notes: notes?.trim() ?? '',
+      pharmacyId: pharmacyId,
       paymentMethod:
           payment.toLowerCase().contains('online') ? 'online' : 'cod',
       paymentStatus:

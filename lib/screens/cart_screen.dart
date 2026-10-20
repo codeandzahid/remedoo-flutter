@@ -12,6 +12,7 @@ import '../theme.dart';
 import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
 import 'remedoo_pharmacy_screen.dart';
+import 'payment_failure_screen.dart';
 import '../app_navigator.dart';
 
 /// Your Cart — matches Cart.tsx: gradient header, item rows with steppers,
@@ -143,6 +144,19 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _placeOrder(AppState state, double total) async {
     if (!checkLogin(context)) return;
+    // Prescription-required items: the upload shown in this screen is
+    // mandatory for such carts (audit fix 2026-10-19) — the order must
+    // not proceed without an attached prescription.
+    final requiresRx =
+        state.cartLines.any((l) => l.medicine.rxRequired);
+    if (requiresRx && _rxFileName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Please upload your prescription to place this order')),
+      );
+      return;
+    }
     // No active gateway: popup explains online payment is unavailable
     // and the order continues as Cash on Delivery only.
     if (_payment == 'Pay Online' &&
@@ -176,6 +190,9 @@ class _CartScreenState extends State<CartScreen> {
       customerUpi: _payerUpi.text.trim().isEmpty
           ? null
           : _payerUpi.text.trim(),
+      notes: _instructions.text.trim().isEmpty
+          ? null
+          : _instructions.text.trim(),
     );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Order placed successfully!')),
@@ -220,7 +237,11 @@ class _CartScreenState extends State<CartScreen> {
       description:
           'Medicine order: ${state.cartPharmacyName ?? 'Pharmacy'}',
       providerKind: 'pharmacy',
-      providerId: state.cartPharmacyId,
+      // The in-house Remedoo Pharmacy storefront ('remedoo') is not a
+      // provider record: its payments go to Remedoo's central UPI, so
+      // no provider id is sent (the gateway resolves the central VPA).
+      providerId:
+          state.cartPharmacyId == 'remedoo' ? null : state.cartPharmacyId,
       payerUpi: _payerUpi.text.trim().isEmpty
           ? null
           : _payerUpi.text.trim(),
@@ -236,12 +257,15 @@ class _CartScreenState extends State<CartScreen> {
         if (!completer.isCompleted) completer.complete(true);
       },
       onPaymentError: (error) {
+        if (!completer.isCompleted) completer.complete(false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Payment failed: $error')),
           );
+          // Real failure flow (audit fix): show the payment-failure
+          // screen with retry / different-method options.
+          pushPage(context, PaymentFailureScreen(amount: total));
         }
-        if (!completer.isCompleted) completer.complete(false);
       },
     );
     return completer.future;

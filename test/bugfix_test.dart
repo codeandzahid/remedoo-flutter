@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:remedoo_app/data/mock_data.dart';
 import 'package:remedoo_app/screens/appointments_screen.dart';
 import 'package:remedoo_app/screens/booking_screen.dart';
-import 'package:remedoo_app/screens/online_payment_screen.dart';
 import 'package:remedoo_app/screens/main_shell.dart';
 import 'package:remedoo_app/screens/profile_screen.dart';
 import 'package:remedoo_app/screens/remedoo_pharmacy_screen.dart';

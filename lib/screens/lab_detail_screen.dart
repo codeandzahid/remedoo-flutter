@@ -92,8 +92,14 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
     }
     final l = widget.lab;
     final tests = _tests();
-    final selectedTests =
-        tests.where((t) => _selected.contains(t.id)).toList();
+    // The booked set is derived from the FULL catalogue, not the
+    // filtered/searched list (audit fix 2026-10-19): tests the patient
+    // selected stay selected — and stay in the Book count, total and
+    // booking — even when a category/search change hides them.
+    final selectedTests = labTests
+        .take(12)
+        .where((t) => _selected.contains(t.id))
+        .toList();
     final total = selectedTests.fold<double>(0, (s, t) => s + t.price);
     final categories = [
       'All',

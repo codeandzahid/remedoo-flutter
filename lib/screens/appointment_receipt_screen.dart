@@ -14,6 +14,20 @@ class AppointmentReceiptScreen extends StatelessWidget {
 
   const AppointmentReceiptScreen({super.key, required this.appointment});
 
+  /// Truthful receipt status for every appointment state — the
+  /// receipt is reachable for pending and past appointments too
+  /// (audit fix 2026-10-19), not just confirmed ones.
+  static String _statusLabel(Appointment a) {
+    switch (a.status) {
+      case 'pending':
+        return 'PENDING APPROVAL';
+      case 'cancelled':
+        return 'CANCELLED';
+      default:
+        return 'CONFIRMED';
+    }
+  }
+
   Future<void> _printReceipt(BuildContext context) async {
     final state = AppStateScope.of(context);
     final a = appointment;
@@ -80,11 +94,7 @@ class AppointmentReceiptScreen extends StatelessWidget {
                 _pdfRow('Consultation Fee',
                     'Rs ${a.fee.toStringAsFixed(0)}'),
                 _pdfRow('Payment Method', a.payment),
-                _pdfRow(
-                    'Status',
-                    a.status == 'upcoming'
-                        ? 'CONFIRMED'
-                        : 'PENDING APPROVAL'),
+                _pdfRow('Status', _statusLabel(a)),
                 if (a.notes.isNotEmpty)
                   _pdfRow('Notes', a.notes),
                 pw.SizedBox(height: 24),
@@ -213,20 +223,23 @@ class AppointmentReceiptScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: a.status == 'upcoming'
-                        ? RemedooTheme.success.withValues(alpha: 0.15)
-                        : RemedooTheme.warning.withValues(alpha: 0.15),
+                    color: (a.status == 'pending'
+                            ? RemedooTheme.warning
+                            : a.status == 'cancelled'
+                                ? RemedooTheme.destructive
+                                : RemedooTheme.success)
+                        .withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    a.status == 'upcoming'
-                        ? 'CONFIRMED'
-                        : 'PENDING APPROVAL',
+                    _statusLabel(a),
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
-                      color: a.status == 'upcoming'
-                          ? RemedooTheme.success
-                          : RemedooTheme.warning,
+                      color: a.status == 'pending'
+                          ? RemedooTheme.warning
+                          : a.status == 'cancelled'
+                              ? RemedooTheme.destructive
+                              : RemedooTheme.success,
                     ),
                   ),
                 ),

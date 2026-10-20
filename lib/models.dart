@@ -199,6 +199,14 @@ class MedOrder {
   final DateTime placedAt;
   String status; // placed, confirmed, out_for_delivery, delivered
 
+  /// Special instructions the patient typed at checkout (sent to the
+  /// backend orders.notes column; '' when none).
+  final String notes;
+
+  /// The pharmacy this order belongs to (backend pharmacy id; the
+  /// in-house storefront uses 'remedoo'). Null for older local rows.
+  final String? pharmacyId;
+
   /// Backend payment fields (orders table): 'online'/'cod' and the
   /// payment status ('pending', 'paid'…). Null for demo/local rows
   /// that never carried them.
@@ -230,6 +238,8 @@ class MedOrder {
     required this.payment,
     required this.placedAt,
     this.status = 'placed',
+    this.notes = '',
+    this.pharmacyId,
     this.paymentMethod,
     this.paymentStatus,
     this.paymentRef,

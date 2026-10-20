@@ -10,6 +10,7 @@ import '../utils/device_actions.dart';
 import '../utils/refunds.dart';
 import '../widgets/provider_payments.dart';
 import '../widgets/widgets.dart';
+import 'appointment_receipt_screen.dart';
 import 'booking_screen.dart';
 import '../app_navigator.dart';
 
@@ -32,7 +33,12 @@ class AppointmentDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final a = appointment;
-    final isUpcoming = a.status == 'upcoming';
+    // 'pending' (awaiting provider approval) is an upcoming
+    // appointment for action purposes — the list screen treats it
+    // the same way and offers Reschedule/Cancel there, so the detail
+    // page must too (audit fix 2026-10-19).
+    final isUpcoming =
+        a.status == 'upcoming' || a.status == 'pending';
     return Scaffold(
       body: Column(
         children: [
@@ -135,6 +141,19 @@ class AppointmentDetailScreen extends StatelessWidget {
                       onPressed: () => openDirections(context,
                           name: a.place, address: a.place),
                     ),
+                    if (a.status != 'cancelled') ...[
+                      const SizedBox(height: 10),
+                      RButton(
+                        label: 'View Receipt',
+                        icon: Icons.receipt_long_outlined,
+                        variant: RButtonVariant.outline,
+                        fullWidth: true,
+                        onPressed: () => pushPage(
+                          context,
+                          AppointmentReceiptScreen(appointment: a),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     if (isUpcoming) ...[
                       RButton(

@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
+import '../services/payment_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
-import 'online_payment_screen.dart';
+import 'payment_failure_screen.dart';
 import '../app_navigator.dart';
 
 /// Checkout for the Remedoo Pharmacy store — matches RemedooCheckout.tsx:
@@ -25,10 +29,9 @@ class _RemedooCheckoutScreenState
     extends State<RemedooCheckoutScreen> {
   final _address = TextEditingController();
   final _notes = TextEditingController();
+  final _payerUpi = TextEditingController();
   String _payment = 'Cash on Delivery';
 
-  /// Customer's own UPI ID reported by the payment page (refunds).
-  String? _customerUpi;
   String? _rxFileName;
   bool _locating = false;
 
@@ -36,6 +39,7 @@ class _RemedooCheckoutScreenState
   void dispose() {
     _address.dispose();
     _notes.dispose();
+    _payerUpi.dispose();
     super.dispose();
   }
 
@@ -132,6 +136,18 @@ class _RemedooCheckoutScreenState
 
   void _placeOrder(AppState state) async {
     if (!checkLogin(context)) return;
+    // Prescription-required items: the upload shown in this checkout
+    // is mandatory for such carts (audit fix 2026-10-19) — the order
+    // must not proceed without an attached prescription.
+    final hasRx = state.cartLines.any((l) => l.medicine.rxRequired);
+    if (hasRx && _rxFileName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Please upload your prescription to place this order')),
+      );
+      return;
+    }
     if (_address.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -139,43 +155,116 @@ class _RemedooCheckoutScreenState
       );
       return;
     }
-    // "Pay Online" opens the payment page first — the order is only
-    // placed after the user completes payment there.
+    // "Pay Online" runs the gateway checkout first — the order is
+    // only placed after the payment succeeds (same rail as the cart
+    // screen). The amount charged is exactly the summary total: the
+    // delivery fee is 0 once the free-delivery threshold is reached
+    // (audit fix 2026-10-19 — this used to add the raw delivery fee
+    // on top even when delivery was free).
     String? paymentRef;
     if (_payment == 'Pay Online') {
-      final pharmacies = state.activePharmacies
-          .where((p) => p.id == state.cartPharmacyId);
-      final pharmacy =
-          pharmacies.isNotEmpty ? pharmacies.first : null;
-      final total = state.cartTotal + state.deliveryFee;
-      final orderId = 'ORD${DateTime.now().millisecondsSinceEpoch}';
-      paymentRef = orderId;
-      final paid = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OnlinePaymentScreen(
-            amount: total,
-            recipientName: pharmacy?.name ?? 'Pharmacy',
-            recipientUpiId: pharmacy?.upiId,
-            orderId: orderId,
-            orderLabel: 'Order Total',
-            onPayerUpi: (v) => _customerUpi = v,
-          ),
-        ),
-      );
-      // Payment page dismissed or payment not completed: do not order.
-      if (paid != true || !mounted) return;
+      if (!PaymentService.instance.hasActiveGateway) {
+        await PaymentService.showNoGatewayDialog(context,
+            offlineLabel: 'Cash on Delivery');
+        if (!mounted) return;
+        setState(() => _payment = 'Cash on Delivery');
+        return;
+      }
+      final subtotal = state.cartTotal;
+      final delivery = subtotal >= state.freeDeliveryThreshold
+          ? 0.0
+          : state.deliveryFee;
+      final total = subtotal + delivery;
+      paymentRef = 'ORD${DateTime.now().millisecondsSinceEpoch}';
+      final paid = await _payOnline(state, total, paymentRef);
+      if (!paid || !mounted) return;
     }
     state.placeOrder(
       address: _address.text.trim(),
       payment: _payment,
       paymentRef: paymentRef,
-      customerUpi: _customerUpi,
+      customerUpi: _payerUpi.text.trim().isEmpty
+          ? null
+          : _payerUpi.text.trim(),
+      notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
     );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Order placed successfully!')),
     );
     Navigator.popUntil(context, (r) => r.isFirst);
+  }
+
+  /// Runs the hosted gateway payment for this checkout. Returns true
+  /// only when the payment succeeds. The cart's pharmacy decides the
+  /// recipient: a real provider pharmacy is paid on its own UPI (the
+  /// gateway resolves it from the provider id); the in-house Remedoo
+  /// Pharmacy storefront (cart id 'remedoo') is Remedoo itself, so no
+  /// provider id is sent and the payment goes to Remedoo's central
+  /// UPI — this checkout previously dead-ended for that cart because
+  /// 'remedoo' is not a provider record with its own UPI.
+  Future<bool> _payOnline(
+      AppState state, double total, String orderRef) async {
+    final completer = Completer<bool>();
+    PaymentService.instance.onPaymentBusy = () async {
+      if (!mounted) return false;
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.hourglass_top, size: 36),
+          title: const Text('A payment is pending'),
+          content: const Text(
+            'Another payment is being completed right now. It will '
+            'finish, or auto-expire within 5 minutes.\n\n'
+            'You can wait and try again — or tap Pay New to cancel '
+            'the pending payment and start yours now.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Wait'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Pay New'),
+            ),
+          ],
+        ),
+      );
+      return choice ?? false;
+    };
+    PaymentService.instance.pay(
+      amount: total,
+      orderId: orderRef,
+      description:
+          'Medicine order: ${state.cartPharmacyName ?? 'Remedoo Pharmacy'}',
+      providerKind: 'pharmacy',
+      providerId:
+          state.cartPharmacyId == 'remedoo' ? null : state.cartPharmacyId,
+      payerUpi: _payerUpi.text.trim().isEmpty
+          ? null
+          : _payerUpi.text.trim(),
+      contact: state.phone.isNotEmpty ? state.phone : null,
+      email: state.email.isNotEmpty ? state.email : null,
+      customerName: state.userName.isNotEmpty ? state.userName : null,
+      onPaymentSuccess: (paymentId) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment successful: $paymentId')),
+          );
+        }
+        if (!completer.isCompleted) completer.complete(true);
+      },
+      onPaymentError: (error) {
+        if (!completer.isCompleted) completer.complete(false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment failed: $error')),
+          );
+          pushPage(context, PaymentFailureScreen(amount: total));
+        }
+      },
+    );
+    return completer.future;
   }
 
   Widget _stickyHeader() {
@@ -462,9 +551,18 @@ class _RemedooCheckoutScreenState
     final pharmacy =
         pharmacies.isNotEmpty ? pharmacies.first : null;
     final codOn = pharmacy?.payInClinicEnabled ?? true;
+    // Pay Online is offered only while a payment gateway is active
+    // (same rule as the cart screen) — otherwise the only honest
+    // option is Cash on Delivery, with a note saying so.
+    final onlineAvailable = PaymentService.instance.hasActiveGateway;
+    if (!onlineAvailable && _payment == 'Pay Online') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _payment = 'Cash on Delivery');
+      });
+    }
     final methods = [
       if (codOn) 'Cash on Delivery',
-      'Pay Online',
+      if (onlineAvailable) 'Pay Online',
     ];
 
     return RCard(
@@ -523,6 +621,31 @@ class _RemedooCheckoutScreenState
               );
             }).toList(),
           ),
+          if (!onlineAvailable) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.info_outline,
+                    size: 15, color: RemedooTheme.warning),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                      'Online payment is not available right now — Cash on Delivery only.',
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          color: scheme.onSurfaceVariant)),
+                ),
+              ],
+            ),
+          ],
+          if (_payment == 'Pay Online') ...[
+            const SizedBox(height: 10),
+            RTextField(
+              controller: _payerUpi,
+              label: 'Your UPI ID (for refunds, optional)',
+              hint: 'yourname@okhdfcbank',
+            ),
+          ],
         ],
       ),
     );

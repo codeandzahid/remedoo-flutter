@@ -208,7 +208,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
               const SizedBox(height: 12),
               Row(
                 children: [
-                  if (a.status == 'upcoming')
+                  // Receipt for confirmed AND pending bookings (the
+                  // receipt itself labels pending as PENDING APPROVAL);
+                  // it used to be gated to 'upcoming' only (audit fix
+                  // 2026-10-19).
+                  if (a.status == 'upcoming' || a.status == 'pending')
                     Expanded(
                       child: RButton(
                         label: 'Receipt',
@@ -221,7 +225,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
                         ),
                       ),
                     ),
-                  if (a.status == 'upcoming')
+                  if (a.status == 'upcoming' || a.status == 'pending')
                     const SizedBox(width: 10),
                   Expanded(
                     child: RButton(
