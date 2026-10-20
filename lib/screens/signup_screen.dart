@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../responsive/responsive.dart';
+import '../services/auth_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/email_otp_field.dart';
 import '../widgets/widgets.dart';
+
+/// Whether a Step 2 submit result means the account is finished and
+/// the form should hand over to the app: the submit succeeded, OR it
+/// reported the account already exists — i.e. an earlier submit had
+/// in fact completed it (the first submit's success used to leave
+/// this form on screen with no message at all, so the signup LOOKED
+/// like a silent failure until any second submit tripped the
+/// already-exists branch and popped into the app; the mobile number
+/// the tester added for that second submit was never the problem —
+/// the profile's phone column is nullable and Step 2 stores it only
+/// when provided).
+bool signupSubmitLeavesForm(AuthResult result) =>
+    result.ok || (result.error ?? '').contains('already exists');
 
 /// Modern signup screen matching the login redesign.
 ///
@@ -261,15 +275,19 @@ class _SignupScreenState extends State<SignupScreen> {
     );
     if (!mounted) return;
     setState(() => _busy = false);
-    if (!result.ok) {
-      if ((result.error ?? '').contains('already exists')) {
-        // Existing account: the OTP sign-in is valid, go to the app.
-        Navigator.popUntil(context, (r) => r.isFirst);
-        return;
-      }
-      setState(() => _error = result.error);
+    if (signupSubmitLeavesForm(result)) {
+      // The account is complete and RootGate has swapped its home to
+      // the dashboard. When this screen was PUSHED from the login
+      // screen (the normal Create Account route) that swap happens
+      // underneath this route, so pop back to it — without this, a
+      // successful submit left the form on screen with no message and
+      // looked like a silent failure. In RootGate resume mode this
+      // screen IS the first route, so the pop is a no-op and
+      // RootGate's rebuild replaces it with the dashboard.
+      Navigator.popUntil(context, (r) => r.isFirst);
+      return;
     }
-    // Success: RootGate picks up the session and shows the dashboard.
+    setState(() => _error = result.error);
   }
 
   @override
@@ -408,7 +426,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                             const SizedBox(height: 14),
                             RTextField(
-                              label: 'Mobile Number',
+                              label: 'Mobile Number (optional)',
                               hint: '+91 XXXXX XXXXX',
                               controller: _phone,
                               keyboardType: TextInputType.phone,

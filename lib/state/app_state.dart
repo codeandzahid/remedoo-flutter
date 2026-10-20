@@ -543,11 +543,16 @@ class AppState extends ChangeNotifier {
     final existing = await _repo.fetchProfile();
     final existingName =
         '${existing?['full_name'] ?? ''}'.trim();
-    if (existingName.isNotEmpty) {
-      // The account IS finished (it has a name): adopt it and lift the
-      // completion gate so the caller lands in the app, not Step 2.
+    if (profileCompleteFor(
+      profileName: existingName,
+      userMetadata: _supaUser?.userMetadata,
+    )) {
+      // The account IS finished (a name on the profile, or one in the
+      // auth metadata from a submit whose profile save did not land):
+      // adopt it and lift the completion gate so the caller lands in
+      // the app, not Step 2.
       _profileComplete = true;
-      _name = existingName;
+      if (existingName.isNotEmpty) _name = existingName;
       notifyListeners();
       return const AuthResult.failure(
           'An account with this email already exists. Signed you in instead.');
@@ -566,7 +571,17 @@ class AppState extends ChangeNotifier {
     if (dateOfBirth != null && dateOfBirth.isNotEmpty) {
       profile['date_of_birth'] = dateOfBirth;
     }
-    await _repo.saveProfile(profile);
+    final saved = await _repo.saveProfile(profile);
+    if (!saved) {
+      // The password + metadata name above did land, so a retry hits
+      // the finished-account guard at the top and lands in the app —
+      // but say plainly that THIS submit did not save, instead of the
+      // old behaviour of reporting success with nothing stored.
+      return const AuthResult.failure(
+          'Your account was created, but your profile could not be '
+          'saved. Check your connection and tap Create Account again '
+          'to finish.');
+    }
     // Set local fields immediately (no waiting on a profile re-fetch).
     _name = name;
     _profileComplete = true;

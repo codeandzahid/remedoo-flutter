@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remedoo_app/main.dart';
+import 'package:remedoo_app/screens/signup_screen.dart';
 import 'package:remedoo_app/services/auth_service.dart';
 import 'package:remedoo_app/state/app_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -79,6 +80,44 @@ void main() {
       );
       expect(
         AppState.profileCompleteFor(profileName: '', userMetadata: null),
+        isFalse,
+      );
+    });
+  });
+
+  group('Step 2 submit: when does the form hand over to the app', () {
+    // Regression (Live Test 3 follow-up): a successful submit in the
+    // PUSHED signup screen (Create Account from the login screen)
+    // never navigated anywhere — RootGate swapped its home underneath
+    // the pushed route, so the form sat there with no error and the
+    // signup looked like a silent failure. The mobile number blamed
+    // for it is optional (profiles.phone is nullable); any second
+    // submit only "worked" because it tripped the already-exists pop.
+    test('a successful submit leaves the form', () {
+      expect(signupSubmitLeavesForm(const AuthResult.success()), isTrue);
+    });
+
+    test('an already-exists result leaves the form (account finished)',
+        () {
+      expect(
+        signupSubmitLeavesForm(const AuthResult.failure(
+            'An account with this email already exists. '
+            'Signed you in instead.')),
+        isTrue,
+      );
+    });
+
+    test('a genuine failure stays on the form and shows its error',
+        () {
+      expect(
+        signupSubmitLeavesForm(const AuthResult.failure(
+            'Your account was created, but your profile could not '
+            'be saved.')),
+        isFalse,
+      );
+      expect(
+        signupSubmitLeavesForm(
+            const AuthResult.failure('Network request failed')),
         isFalse,
       );
     });
