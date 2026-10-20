@@ -260,6 +260,11 @@ class SupabaseRepository {
     String? prescriptionUrl,
     String? paymentRef,
     String? customerUpi,
+    // Canonical appointments.payment_method value ('online' |
+    // 'at_clinic', schema_part_02). Used to default to the column
+    // default 'at_clinic' for EVERY booking, so a patient who paid
+    // online was stored as pay-at-clinic.
+    String paymentMethod = 'at_clinic',
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
@@ -277,6 +282,7 @@ class SupabaseRepository {
             ? timeLabel.substring(0, 5)
             : timeLabel,
         'status': 'pending',
+        'payment_method': paymentMethod,
         'notes': notes,
         // So the provider panel can open the patient's uploaded
         // prescription (the column exists; it was never written).
@@ -455,7 +461,11 @@ class SupabaseRepository {
     try {
       final rows = await _db
           .from('appointments')
-          .select('*, doctors(name), hospitals(name), labs(name)')
+          // The doctor embed also carries specialization + fee: the
+          // appointments table has no fee column of its own, so the
+          // receipt/details read them from the doctor's record.
+          .select(
+              '*, doctors(name, specialization, consultation_fee), hospitals(name), labs(name)')
           .eq('patient_id', uid)
           .order('appointment_date', ascending: false)
           .order('appointment_time', ascending: false)
@@ -1834,16 +1844,41 @@ class SupabaseRepository {
     }
   }
 
-  /// Admin list of all appointments, newest first.
+  /// Admin list of all appointments, newest first, with the booked
+  /// provider's name embedded (the FK-backed relations). Patient
+  /// names cannot be embedded — appointments.patient_id has no FK to
+  /// profiles — so they are resolved client-side from the profiles
+  /// table and stamped onto each row as 'patient_name' (same
+  /// client-join pattern as fetchAllProfiles attaching roles).
   Future<List<Map<String, dynamic>>> adminFetchAppointments() async {
     if (!_ready) return const [];
     try {
       final rows = await _db
           .from('appointments')
-          .select('*')
+          .select(
+              '*, doctors(name), hospitals(name), labs(name), pharmacies(name)')
           .order('created_at', ascending: false)
           .limit(200);
-      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      final list = rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      try {
+        final profs = await _db
+            .from('profiles')
+            .select('user_id, full_name, email')
+            .limit(500);
+        final byId = <String, Map<String, dynamic>>{
+          for (final p in profs) '${p['user_id']}': p,
+        };
+        for (final r in list) {
+          final p = byId['${r['patient_id']}'];
+          if (p == null) continue;
+          final name = '${p['full_name'] ?? ''}'.trim();
+          r['patient_name'] = name.isNotEmpty ? name : '${p['email'] ?? ''}';
+        }
+      } catch (_) {
+        // Names are display-only; a profiles hiccup must not empty
+        // the appointments list.
+      }
+      return list;
     } catch (e) {
       debugPrint('adminFetchAppointments failed: $e');
       return const [];

@@ -13,6 +13,30 @@ String _fmtDate(String? iso) {
   }
 }
 
+/// Who booked and who they booked with, for one admin appointment
+/// row. Provider names come from the query's embedded provider rows;
+/// 'patient_name' is stamped onto the row by the repository (there
+/// is no FK from appointments.patient_id to profiles to embed).
+({String patient, String provider}) adminAppointmentNames(
+    Map<String, dynamic> a) {
+  String embeddedName(String key) {
+    final v = a[key];
+    return v is Map ? '${v['name'] ?? ''}'.trim() : '';
+  }
+
+  var provider = '';
+  for (final key in ['doctors', 'hospitals', 'labs', 'pharmacies']) {
+    if (provider.isEmpty) provider = embeddedName(key);
+  }
+  final patient = '${a['patient_name'] ?? ''}'.trim();
+  return (
+    patient: patient.isEmpty ? 'Patient' : patient,
+    provider: provider.isEmpty
+        ? '${a['service_type'] ?? 'Appointment'}'
+        : provider,
+  );
+}
+
 /// Admin appointments: real Supabase appointments, filterable.
 class AdminAppointmentsScreen extends StatefulWidget {
   const AdminAppointmentsScreen({super.key});
@@ -43,7 +67,10 @@ class _AdminAppointmentsScreenState
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final statuses = ['All', 'pending', 'upcoming', 'cancelled', 'completed'];
+    // Canonical stored statuses (the appointments CHECK constraint);
+    // 'upcoming' is a patient-side display word and never stored, so
+    // filtering on it always came back empty.
+    final statuses = ['All', 'pending', 'confirmed', 'cancelled', 'completed'];
     var list = state.adminAppointments.toList();
     if (_filter != 'All') {
       list = list
@@ -104,6 +131,7 @@ class _AdminAppointmentsScreenState
 
   Widget _card(Map<String, dynamic> a) {
     final scheme = Theme.of(context).colorScheme;
+    final names = adminAppointmentNames(a);
     final when =
         '${_fmtDate(a['appointment_date']?.toString())} ${a['appointment_time'] ?? ''}'
             .trim();
@@ -113,16 +141,14 @@ class _AdminAppointmentsScreenState
         padding: const EdgeInsets.symmetric(
             horizontal: 8, vertical: 6),
         child: ListTile(
-          leading: InitialsAvatar(
-              name: '${a['service_type'] ?? 'Visit'}',
-              radius: 22),
-          title: Text('${a['service_type'] ?? 'Appointment'}',
+          leading: InitialsAvatar(name: names.patient, radius: 22),
+          title: Text(names.patient,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style:
                   const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text(
-              '${when.isEmpty ? '—' : when}${a['notes'] != null && '${a['notes']}'.isNotEmpty ? ' • ${a['notes']}' : ''}',
+              '${names.provider} • ${when.isEmpty ? '—' : when}${a['notes'] != null && '${a['notes']}'.isNotEmpty ? ' • ${a['notes']}' : ''}',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -186,6 +212,18 @@ class _AdminAppointmentsScreenState
   }
 
   Future<void> _approve(Map<String, dynamic> a) async {
+    // Approving an already-decided row is a no-op with a plain
+    // message, not a failed write with a scary error.
+    final status = '${a['status'] ?? ''}';
+    if (status != 'pending') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(status == AppState.approvedDbStatus
+                ? 'This appointment is already approved.'
+                : 'This appointment is already $status.')),
+      );
+      return;
+    }
     final ok = await confirmDialog(
       context,
       title: 'Approve appointment?',
@@ -194,21 +232,17 @@ class _AdminAppointmentsScreenState
     );
     if (!ok || !mounted) return;
     final state = AppStateScope.of(context);
-    final done = await state
-        .updateAdminAppointment('${a['id']}', {'status': 'upcoming'});
-    if (done) {
-      // Notify patient
-      final patientId = '${a['patient_id'] ?? a['user_id'] ?? ''}';
-      if (patientId.isNotEmpty) {
-        await state.supabaseRepository.sendNotificationToUser(
-              userId: patientId,
-              title: 'Appointment Confirmed',
-              message:
-                  'Your appointment was successfully booked. You can now view and print your appointment letter.',
-              type: 'appointment',
-            );
-      }
-    }
+    // 'confirmed' is the storable approved status (see
+    // AppState.approvedDbStatus) — writing the display word
+    // 'upcoming' here violated the table's CHECK constraint, so
+    // every approval failed and the patient was never notified.
+    // No app-side notification is sent on success: the database
+    // trigger (notify_appointment_change) inserts the patient's
+    // "Appointment Confirmed" notification on this status change,
+    // and an admin-side insert (RLS-allowed for admins) would
+    // duplicate it.
+    final done = await state.updateAdminAppointment(
+        '${a['id']}', {'status': AppState.approvedDbStatus});
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -229,18 +263,8 @@ class _AdminAppointmentsScreenState
     final state = AppStateScope.of(context);
     final done = await state
         .updateAdminAppointment('${a['id']}', {'status': 'cancelled'});
-    if (done) {
-      final patientId = '${a['patient_id'] ?? a['user_id'] ?? ''}';
-      if (patientId.isNotEmpty) {
-        await state.supabaseRepository.sendNotificationToUser(
-              userId: patientId,
-              title: 'Appointment Not Approved',
-              message:
-                  'Your appointment request was not approved. Please try another slot.',
-              type: 'appointment',
-            );
-      }
-    }
+    // No app-side notification here either: the same DB trigger
+    // notifies the patient of the cancellation (see _approve).
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

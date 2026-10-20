@@ -784,7 +784,40 @@ class AppState extends ChangeNotifier {
     return v is Map ? '${v['name'] ?? ''}' : '';
   }
 
-  Appointment _apptFromRow(Map<String, dynamic> r) {
+  static Map<String, dynamic>? _embeddedMap(
+      Map<String, dynamic> r, String key) {
+    final v = r[key];
+    return v is Map ? Map<String, dynamic>.from(v) : null;
+  }
+
+  /// Display label for a stored appointments.payment_method value
+  /// ('online' | 'at_clinic' — schema_part_02). Matches the labels
+  /// BookingScreen puts on locally-created appointments, so a booking
+  /// reads the same before and after a reload.
+  static String _paymentLabel(dynamic dbValue) =>
+      '$dbValue' == 'online' ? 'Pay Online' : 'At Clinic';
+
+  /// Stored appointments.payment_method for a display payment label
+  /// (inverse of [_paymentLabel]).
+  static String dbPaymentMethod(String paymentLabel) =>
+      paymentLabel.toLowerCase().contains('online')
+          ? 'online'
+          : 'at_clinic';
+
+  /// The status written to the appointments table when a booking is
+  /// approved. The table's CHECK constraint only allows 'pending',
+  /// 'confirmed', 'completed', 'cancelled' — 'upcoming' is a
+  /// local-display word only, and writing it made every admin
+  /// approval fail (and with it the approval notification, which
+  /// the DB trigger sends on the status change to 'confirmed').
+  static const String approvedDbStatus = 'confirmed';
+
+  /// Test-visible access to the backend-row mapper below.
+  @visibleForTesting
+  static Appointment apptFromRowForTest(Map<String, dynamic> r) =>
+      _apptFromRow(r);
+
+  static Appointment _apptFromRow(Map<String, dynamic> r) {
     final kind = '${r['service_type'] ?? 'doctor'}';
     String refId = '';
     String title = 'Appointment';
@@ -812,15 +845,21 @@ class AppState extends ChangeNotifier {
     var timeLabel = '${r['appointment_time'] ?? ''}';
     if (timeLabel.length >= 5) timeLabel = timeLabel.substring(0, 5);
     final st = '${r['status'] ?? 'pending'}';
+    // Doctor rows embed the doctor's record: the real specialty and
+    // fee live there (appointments has no fee column). Both used to
+    // be fabricated here — specialty was the service_type ('doctor')
+    // and the fee a hardcoded 0.
+    final doc = kind == 'doctor' ? _embeddedMap(r, 'doctors') : null;
+    final docSpecialty = '${doc?['specialization'] ?? ''}'.trim();
     return Appointment(
       id: '${r['id']}',
       doctorName: title,
-      specialty: kind,
+      specialty: docSpecialty.isNotEmpty ? docSpecialty : kind,
       place: '',
       date: date,
       timeLabel: timeLabel,
-      fee: 0,
-      payment: 'online',
+      fee: (doc?['consultation_fee'] as num?)?.toDouble() ?? 0,
+      payment: _paymentLabel(r['payment_method']),
       kind: kind,
       refId: refId,
       notes: '${r['notes'] ?? ''}',
@@ -948,6 +987,9 @@ class AppState extends ChangeNotifier {
           : null,
       paymentRef: appt.paymentRef,
       customerUpi: appt.customerUpi,
+      // Store the method the patient actually picked — without this
+      // every row silently took the column default 'at_clinic'.
+      paymentMethod: dbPaymentMethod(appt.payment),
     )
         .then((remoteId) {
       if (remoteId != null) _remoteAppointmentIds[appt.id] = remoteId;
@@ -1148,8 +1190,9 @@ class AppState extends ChangeNotifier {
     final appt = appointments.where((a) => a.id == id).firstOrNull;
     if (appt == null) return;
     appt.status = 'upcoming';
-    // Sync to backend
-    unawaited(_repo.updateAppointmentStatus(id, 'upcoming'));
+    // Sync to backend — 'confirmed' is the storable approved status;
+    // the DB rejects 'upcoming' (see approvedDbStatus).
+    unawaited(_repo.updateAppointmentStatus(id, approvedDbStatus));
     addNotification(
       title: 'Appointment confirmed',
       message: '${appt.doctorName} on ${appt.date.day}/${appt.date.month} at ${appt.timeLabel} is confirmed',
@@ -2336,9 +2379,16 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get adminAppointments => _adminAppointments;
 
   Future<void> loadAdminAppointments() async {
+    final rows = await _repo.adminFetchAppointments();
+    // De-duplicate by id — a booking must never appear twice. (The
+    // fetch is awaited BEFORE touching the list: the old
+    // clear()..addAll(await …) cascade ran clear() first, so two
+    // overlapping loads — dashboard + screen — both appended and
+    // every row rendered twice.)
+    final seen = <String>{};
     _adminAppointments
       ..clear()
-      ..addAll(await _repo.adminFetchAppointments());
+      ..addAll(rows.where((r) => seen.add('${r['id']}')));
     notifyListeners();
   }
 
