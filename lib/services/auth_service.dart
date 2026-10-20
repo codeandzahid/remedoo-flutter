@@ -39,6 +39,47 @@ enum EmailSignupState {
   complete,
 }
 
+/// What an auth-callback URL landing turned out to be, decided by
+/// [AuthService.callbackKindFor] from the session exchange's redirect
+/// type and the resulting user's confirmation timestamp.
+enum AuthCallbackKind {
+  /// No callback in the URL, or the exchange failed / left no session
+  /// (expired or already-used link): boot continues untouched.
+  none,
+
+  /// Password-recovery return: RootGate shows ResetPasswordScreen,
+  /// exactly as it always has (decided by gotrue's passwordRecovery
+  /// event, not by this classification).
+  recovery,
+
+  /// Signup email-confirmation return (the "Verify automatically" /
+  /// "Confirm email address" link in the confirmation email): the
+  /// account's email was confirmed by this very landing, so RootGate
+  /// shows the Email Verified screen before anything else.
+  emailConfirmation,
+
+  /// Any other link sign-in — e.g. a magic link for an account whose
+  /// email was confirmed long ago: an ordinary sign-in that lands in
+  /// the app as usual, with no Verified screen and no sign-out.
+  signIn,
+}
+
+/// The outcome of processing the page URL's auth callback
+/// ([AuthService.handleAuthCallbackFromUrl]).
+class AuthCallbackResult {
+  final AuthCallbackKind kind;
+  final bool sessionEstablished;
+
+  const AuthCallbackResult(
+    this.kind, {
+    this.sessionEstablished = false,
+  });
+
+  /// No callback was processed (plain URL, offline, or failed exchange).
+  static const AuthCallbackResult none =
+      AuthCallbackResult(AuthCallbackKind.none);
+}
+
 /// Wraps Supabase Auth for the Remedoo app.
 ///
 /// - Email/password sign-up (with optional email confirmation), sign-in,
@@ -127,6 +168,52 @@ class AuthService {
     return false;
   }
 
+  /// How long before the URL exchange an email confirmation still
+  /// counts as "confirmed by this landing". GoTrue stamps
+  /// `email_confirmed_at` at the moment the emailed link is tapped,
+  /// seconds before it redirects back into the app, so a confirmation
+  /// return always falls inside this window; a magic-link sign-in for
+  /// an established account carries a confirmation timestamp from
+  /// signup day instead and never does.
+  static const confirmationLandingWindow = Duration(minutes: 15);
+
+  /// Classifies an auth-callback URL exchange into an
+  /// [AuthCallbackKind]. Pure and testable: the decision inputs are
+  /// the exchange's own signals, nothing else.
+  ///
+  /// [redirectType] is gotrue's marker for the exchange: the string
+  /// 'passwordRecovery' when the flow was started as a password reset
+  /// in this browser (PKCE verifier suffix), or the landing URL's
+  /// `type` parameter on implicit returns ('recovery', 'signup',
+  /// 'magiclink', …). A PKCE *confirmation* return carries no marker
+  /// at all — the URL is just `?code=` — so it is recognised by
+  /// [emailConfirmedAt] (the resulting user's `email_confirmed_at`):
+  /// only a landing that itself confirmed the email has that
+  /// timestamp within [confirmationLandingWindow] of the exchange
+  /// (a few minutes of clock skew in the other direction is allowed).
+  static AuthCallbackKind callbackKindFor({
+    required bool sessionEstablished,
+    required String? redirectType,
+    required String? emailConfirmedAt,
+    required DateTime now,
+  }) {
+    if (!sessionEstablished) return AuthCallbackKind.none;
+    final type = (redirectType ?? '').trim().toLowerCase();
+    if (type == 'passwordrecovery' || type == 'recovery') {
+      return AuthCallbackKind.recovery;
+    }
+    if (type == 'signup') return AuthCallbackKind.emailConfirmation;
+    final confirmedAt = DateTime.tryParse(emailConfirmedAt ?? '');
+    if (confirmedAt != null) {
+      final delta = now.difference(confirmedAt);
+      if (delta >= const Duration(minutes: -5) &&
+          delta <= confirmationLandingWindow) {
+        return AuthCallbackKind.emailConfirmation;
+      }
+    }
+    return AuthCallbackKind.signIn;
+  }
+
   /// Exchanges the auth callback in the current page URL (web) for a
   /// session: password-recovery, email-confirmation and magic-link
   /// returns all arrive this way (a `?code=` in the URL).
@@ -135,20 +222,31 @@ class AuthService {
   /// [authStateChanges] — the exchange is what emits the signedIn /
   /// passwordRecovery events, and the stream does not replay them
   /// (see [init] for why supabase_flutter's automatic handling is
-  /// disabled). Returns true when a session was established. Never
-  /// throws: an expired or already-used link just returns false and
-  /// boot continues with whatever session (if any) was restored.
-  Future<bool> handleAuthCallbackFromUrl() async {
-    if (!_initialized || !kIsWeb) return false;
+  /// disabled). Never throws: an expired or already-used link just
+  /// returns [AuthCallbackResult.none] and boot continues with
+  /// whatever session (if any) was restored. On success the result
+  /// also classifies the landing (see [callbackKindFor]) so callers
+  /// can tell a signup confirmation return — which shows the Email
+  /// Verified screen — apart from an ordinary link sign-in.
+  Future<AuthCallbackResult> handleAuthCallbackFromUrl() async {
+    if (!_initialized || !kIsWeb) return AuthCallbackResult.none;
     final uri = Uri.base;
-    if (!isAuthCallbackUri(uri)) return false;
+    if (!isAuthCallbackUri(uri)) return AuthCallbackResult.none;
     try {
-      await _client.auth.getSessionFromUrl(uri);
+      final response = await _client.auth.getSessionFromUrl(uri);
       clearAuthUrlParameters();
-      return true;
+      return AuthCallbackResult(
+        callbackKindFor(
+          sessionEstablished: true,
+          redirectType: response.redirectType,
+          emailConfirmedAt: response.session.user.emailConfirmedAt,
+          now: DateTime.now(),
+        ),
+        sessionEstablished: true,
+      );
     } catch (e) {
       debugPrint('Auth callback handling failed: $e');
-      return false;
+      return AuthCallbackResult.none;
     }
   }
 

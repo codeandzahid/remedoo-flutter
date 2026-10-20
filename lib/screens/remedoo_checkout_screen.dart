@@ -34,6 +34,22 @@ class _RemedooCheckoutScreenState
 
   String? _rxFileName;
   bool _locating = false;
+  bool _addressPrefilled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Start with the patient's saved address filled in instead of
+    // blank (sweep fix 2026-10-20). One-time only: the chips, GPS
+    // and manual typing keep working exactly as before.
+    if (!_addressPrefilled) {
+      _addressPrefilled = true;
+      final saved = AppStateScope.of(context).defaultDeliveryAddress;
+      if (saved != null && _address.text.isEmpty) {
+        _address.text = saved;
+      }
+    }
+  }
 
   @override
   void dispose() {

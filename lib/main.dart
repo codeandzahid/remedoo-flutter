@@ -9,6 +9,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/maintenance_screen.dart';
 import 'screens/reset_password_screen.dart';
+import 'screens/email_verified_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/partner/doctor_dashboard.dart';
@@ -78,6 +79,7 @@ class _RootGateState extends State<RootGate> {
     _booted = true;
     final state = AppStateScope.of(context);
     state.onPasswordRecovery = _goToPasswordReset;
+    state.onEmailConfirmation = _goToEmailVerified;
     // Boot Supabase (persisted session restore + auth-link handling),
     // then attach the auth listener. Never throws: offline falls back
     // to the login/guest flow.
@@ -108,6 +110,7 @@ class _RootGateState extends State<RootGate> {
   void dispose() {
     try {
       AppStateScope.of(context).onPasswordRecovery = null;
+      AppStateScope.of(context).onEmailConfirmation = null;
     } catch (_) {}
     super.dispose();
   }
@@ -115,6 +118,12 @@ class _RootGateState extends State<RootGate> {
   void _goToPasswordReset() {
     appNavigatorKey.currentState?.push(
       MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+    );
+  }
+
+  void _goToEmailVerified() {
+    appNavigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => const EmailVerifiedScreen()),
     );
   }
 

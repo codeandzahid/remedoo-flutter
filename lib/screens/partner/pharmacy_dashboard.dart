@@ -448,6 +448,20 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
                       color: scheme.onSurfaceVariant),
                 ),
               ),
+            // The patient's checkout note rides along in the row
+            // (fetchPharmacyOrders selects *) — surface it like the
+            // other partner dashboards surface appointment notes
+            // (sweep fix 2026-10-20).
+            if ('${o['notes'] ?? ''}'.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Note: ${o['notes']}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant),
+                ),
+              ),
             // Step-by-step action buttons
             if (status == 'placed') ...[
               const SizedBox(height: 12),

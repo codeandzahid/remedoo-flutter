@@ -126,12 +126,31 @@ class AppState extends ChangeNotifier {
     // Subscribed — now it is safe to exchange any auth code in the URL.
     // For a recovery return this emits passwordRecovery into the
     // listener above, which routes to the new-password screen.
-    await AuthService.instance.handleAuthCallbackFromUrl();
+    final callback = await AuthService.instance.handleAuthCallbackFromUrl();
+    if (callback.kind == AuthCallbackKind.emailConfirmation) {
+      // A signup email-confirmation return: the signedIn event above
+      // has already synced the session. Route to the Email Verified
+      // screen (RootGate pushes it above its normal routing, the same
+      // robust way as password recovery). Recovery returns never
+      // reach this branch — they classify as recovery and are routed
+      // by the passwordRecovery event instead — and ordinary link
+      // sign-ins (an old account's magic link) classify as signIn and
+      // simply land in the app.
+      final cb = onEmailConfirmation;
+      if (cb != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => cb());
+      }
+    }
   }
 
   /// Fired when a password-recovery link is opened (RootGate navigates to
   /// the new-password screen). Set by RootGate; null everywhere else.
   void Function()? onPasswordRecovery;
+
+  /// Fired when a signup email-confirmation link is opened and a
+  /// session results (RootGate navigates to the Email Verified
+  /// screen). Set by RootGate; null everywhere else.
+  void Function()? onEmailConfirmation;
 
   void _syncUserFromSession() {
     final session = AuthService.instance.currentSession;
@@ -984,7 +1003,12 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  MedOrder _orderFromRow(Map<String, dynamic> r) {
+  /// Test-visible access to the backend-row mapper below.
+  @visibleForTesting
+  static MedOrder orderFromRowForTest(Map<String, dynamic> r) =>
+      _orderFromRow(r);
+
+  static MedOrder _orderFromRow(Map<String, dynamic> r) {
     final items = <CartLine>[];
     final raw = r['order_items'];
     if (raw is List) {
@@ -2102,6 +2126,10 @@ class AppState extends ChangeNotifier {
       cartPharmacyId = null;
       cartPharmacyName = null;
     }
+    // Persist like every other cart mutation: without this the
+    // removal lived only in memory and the line came back on the
+    // next loadPersistedState() (sweep fix 2026-10-20).
+    _persistCart();
     notifyListeners();
   }
 
@@ -2112,6 +2140,7 @@ class AppState extends ChangeNotifier {
       cartPharmacyId = null;
       cartPharmacyName = null;
     }
+    _persistCart();
     notifyListeners();
   }
 
@@ -2806,6 +2835,22 @@ class AppState extends ChangeNotifier {
   static const _kAddressesKey = 'remedoo_addresses_v1';
 
   final List<SavedAddress> savedAddresses = [];
+
+  /// The delivery address a checkout field should start with
+  /// (sweep fix 2026-10-20 — both checkouts previously opened with
+  /// a blank address even when the patient had one on file, and the
+  /// first Place Order failed with "Please enter a delivery
+  /// address"). Priority matches the checkouts' own address source:
+  /// the first entry of the saved-address book (the list both
+  /// checkout screens offer as chips), then the profile Saved
+  /// Address ([userAddress]). Null when nothing is on file.
+  String? get defaultDeliveryAddress {
+    for (final a in savedAddresses) {
+      if (a.address.trim().isNotEmpty) return a.address;
+    }
+    final profile = userAddress?.trim() ?? '';
+    return profile.isEmpty ? null : profile;
+  }
 
   void addSavedAddress(SavedAddress address) {
     savedAddresses.add(address);

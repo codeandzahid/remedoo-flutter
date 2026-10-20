@@ -145,6 +145,10 @@ class OrderTrackingScreen extends StatelessWidget {
                   _pharmacyCard(context),
                   const SizedBox(height: 12),
                   _addressCard(context),
+                  if (o.notes.trim().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _notesCard(context),
+                  ],
                   const SizedBox(height: 12),
                   _itemsBillCard(context),
                   const SizedBox(height: 12),
@@ -463,6 +467,40 @@ class OrderTrackingScreen extends StatelessWidget {
                         fontSize: 14)),
                 const SizedBox(height: 3),
                 Text(order.address,
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        color: scheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The patient's checkout note, shown when one was given. The
+  /// note was stored on the order (orders.notes) and mapped into
+  /// MedOrder from the start, but no patient screen ever rendered
+  /// it (sweep fix 2026-10-20).
+  Widget _notesCard(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.sticky_note_2_outlined,
+              size: 18, color: scheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Order Note',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14)),
+                const SizedBox(height: 3),
+                Text(order.notes,
                     style: TextStyle(
                         fontSize: 12.5,
                         color: scheme.onSurfaceVariant)),
