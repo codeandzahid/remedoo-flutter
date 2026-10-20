@@ -329,8 +329,51 @@ class OrderTrackingScreen extends StatelessWidget {
     );
   }
 
+  /// One round icon action in the pharmacy card.
+  Widget _roundAction(
+    BuildContext context, {
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: scheme.primary.withValues(alpha: 0.1),
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Icon(icon, size: 18, color: scheme.primary),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _pharmacyCard(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final state = AppStateScope.of(context);
+    // Resolve the order's pharmacy so Call reaches the pharmacy
+    // itself. This card previously dialled the Remedoo support
+    // number while presenting itself as the pharmacy (audit fix
+    // 2026-10-19).
+    Pharmacy? pharmacy;
+    for (final p in state.activePharmacies) {
+      if ((order.pharmacyId != null &&
+              order.pharmacyId!.isNotEmpty &&
+              p.id == order.pharmacyId) ||
+          p.name == order.pharmacyName) {
+        pharmacy = p;
+        break;
+      }
+    }
+    final pharmacyPhone = pharmacy?.phone ?? '';
+    final supportPhone = state.supportPhone;
     return RCard(
       child: Row(
         children: [
@@ -364,32 +407,38 @@ class OrderTrackingScreen extends StatelessWidget {
               ],
             ),
           ),
-          Material(
-            color: scheme.primary.withValues(alpha: 0.1),
-            shape: const CircleBorder(),
-            child: InkWell(
-              onTap: () {
-                final phone =
-                    AppStateScope.of(context).supportPhone;
-                if (phone.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Support number not configured.')),
-                  );
-                  return;
-                }
-                dialNumber(context, phone);
-              },
-              customBorder: const CircleBorder(),
-              child: SizedBox(
-                width: 40,
-                height: 40,
-                child: Icon(Icons.call,
-                    size: 18, color: scheme.primary),
+          if (pharmacyPhone.isNotEmpty)
+            _roundAction(
+              context,
+              icon: Icons.call,
+              tooltip: 'Call ${order.pharmacyName}',
+              onTap: () => dialNumber(context, pharmacyPhone),
+            ),
+          if (pharmacy != null && pharmacy.location.isNotEmpty) ...[
+            if (pharmacyPhone.isNotEmpty) const SizedBox(width: 8),
+            _roundAction(
+              context,
+              icon: Icons.directions_outlined,
+              tooltip: 'Directions to ${pharmacy.name}',
+              onTap: () => openDirections(
+                context,
+                name: pharmacy!.name,
+                address: pharmacy.location,
               ),
             ),
-          ),
+          ],
+          // No pharmacy number on record: offer Remedoo support,
+          // labelled as support — not as the pharmacy.
+          if (pharmacyPhone.isEmpty && supportPhone.isNotEmpty) ...[
+            if (pharmacy != null && pharmacy.location.isNotEmpty)
+              const SizedBox(width: 8),
+            _roundAction(
+              context,
+              icon: Icons.support_agent,
+              tooltip: 'Call Remedoo support',
+              onTap: () => dialNumber(context, supportPhone),
+            ),
+          ],
         ],
       ),
     );

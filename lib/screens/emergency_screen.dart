@@ -293,13 +293,31 @@ class EmergencyScreen extends StatelessWidget {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Call dials the hospital's real number from its
+                // record; hidden when the hospital has provided
+                // none. It previously dialled a hardcoded
+                // placeholder number (audit fix 2026-10-19).
+                if (h.phone.isNotEmpty) ...[
+                  RButton(
+                    label: 'Call',
+                    icon: Icons.call,
+                    variant: RButtonVariant.danger,
+                    small: true,
+                    onPressed: () =>
+                        _callDialog(context, h.name, h.phone),
+                  ),
+                  const SizedBox(height: 6),
+                ],
                 RButton(
-                  label: 'Call',
-                  icon: Icons.call,
-                  variant: RButtonVariant.danger,
+                  label: 'Directions',
+                  icon: Icons.directions_outlined,
+                  variant: RButtonVariant.outline,
                   small: true,
-                  onPressed: () =>
-                      _callDialog(context, h.name, '0194-000000'),
+                  onPressed: () => openDirections(
+                    context,
+                    name: h.name,
+                    address: h.location,
+                  ),
                 ),
                 if (AppStateScope.of(context).isSignedIn && !h.government) ...[
                   const SizedBox(height: 6),

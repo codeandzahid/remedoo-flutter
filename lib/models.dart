@@ -61,6 +61,12 @@ class Hospital {
   final bool payInClinicEnabled;
   final bool upiEnabled;
 
+  /// Real contact numbers from the hospitals table ('' when the
+  /// hospital has not provided one — call actions hide rather than
+  /// dial a placeholder).
+  final String phone;
+  final String emergencyContact;
+
   const Hospital({
     required this.id,
     required this.name,
@@ -77,6 +83,8 @@ class Hospital {
     this.upiId,
     this.payInClinicEnabled = false,
     this.upiEnabled = false,
+    this.phone = '',
+    this.emergencyContact = '',
   });
 }
 
@@ -97,6 +105,9 @@ class Lab {
   final bool payInClinicEnabled;
   final bool upiEnabled;
 
+  /// Real contact number from the labs table ('' when not provided).
+  final String phone;
+
   const Lab({
     required this.id,
     required this.name,
@@ -113,6 +124,7 @@ class Lab {
     this.upiId,
     this.payInClinicEnabled = false,
     this.upiEnabled = false,
+    this.phone = '',
   });
 }
 
@@ -132,6 +144,10 @@ class Pharmacy {
   final bool payInClinicEnabled;
   final bool upiEnabled;
 
+  /// Real contact number from the pharmacies table ('' when not
+  /// provided).
+  final String phone;
+
   const Pharmacy({
     required this.id,
     required this.name,
@@ -147,6 +163,7 @@ class Pharmacy {
     this.upiId,
     this.payInClinicEnabled = false,
     this.upiEnabled = false,
+    this.phone = '',
   });
 }
 

@@ -257,6 +257,26 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
             children: [
               RRatingPill(rating: p.rating),
               const Spacer(),
+              // Real pharmacy number from its record; hidden when
+              // the pharmacy has not provided one.
+              if (p.phone.isNotEmpty) ...[
+                GestureDetector(
+                  onTap: () => dialNumber(context, p.phone),
+                  child: Row(
+                    children: [
+                      Icon(Icons.call_outlined,
+                          size: 14, color: scheme.primary),
+                      const SizedBox(width: 4),
+                      Text('Call Pharmacy',
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.primary)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
               GestureDetector(
                 onTap: _directions,
                 child: Row(

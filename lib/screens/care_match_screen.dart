@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../data/mock_data.dart' as catalog;
+import '../models.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
@@ -31,6 +33,90 @@ const _urgencies = [
   'Within a few days',
   'Urgent',
 ];
+
+/// Symptom keyword → catalog specialties it points to. Used to
+/// rank doctors by genuine relevance to what the patient typed —
+/// Smart Care previously ignored the symptom text entirely and
+/// stamped fabricated "match %" numbers on the first results
+/// (audit fix 2026-10-19).
+const _symptomSpecialties = <String, List<String>>{
+  'chest': ['Cardiology'],
+  'heart': ['Cardiology'],
+  'palpitation': ['Cardiology'],
+  'skin': ['Dermatology'],
+  'rash': ['Dermatology'],
+  'itching': ['Dermatology'],
+  'acne': ['Dermatology'],
+  'headache': ['Neurology'],
+  'migraine': ['Neurology'],
+  'dizziness': ['Neurology'],
+  'nerve': ['Neurology'],
+  'bone': ['Orthopedics'],
+  'joint': ['Orthopedics'],
+  'back pain': ['Orthopedics'],
+  'fracture': ['Orthopedics'],
+  'knee': ['Orthopedics'],
+  'child': ['Pediatrics'],
+  'baby': ['Pediatrics'],
+  'infant': ['Pediatrics'],
+  'pregnancy': ['Gynecology'],
+  'period': ['Gynecology'],
+  'ear': ['ENT'],
+  'nose': ['ENT'],
+  'throat': ['ENT'],
+  'sinus': ['ENT'],
+  'eye': ['Ophthalmology'],
+  'vision': ['Ophthalmology'],
+  'anxiety': ['Psychiatry'],
+  'stress': ['Psychiatry'],
+  'depression': ['Psychiatry'],
+  'sleep': ['Psychiatry'],
+  'tooth': ['Dentistry'],
+  'teeth': ['Dentistry'],
+  'dental': ['Dentistry'],
+  'gum': ['Dentistry'],
+  'stomach': ['Gastroenterology'],
+  'digestion': ['Gastroenterology'],
+  'acidity': ['Gastroenterology'],
+  'nausea': ['Gastroenterology'],
+  'abdominal': ['Gastroenterology'],
+  'urine': ['Urology'],
+  'urinary': ['Urology'],
+  'kidney': ['Nephrology'],
+  'cough': ['Pulmonology'],
+  'breath': ['Pulmonology'],
+  'asthma': ['Pulmonology'],
+  'lung': ['Pulmonology'],
+  'diabetes': ['Endocrinology'],
+  'sugar': ['Endocrinology'],
+  'thyroid': ['Endocrinology'],
+  'hormone': ['Endocrinology'],
+  'fever': ['General Physician'],
+  'cold': ['General Physician'],
+  'flu': ['General Physician'],
+  'body ache': ['General Physician'],
+  'weakness': ['General Physician'],
+};
+
+/// The catalog specialties relevant to a free-text symptom
+/// description. Empty when the text names nothing recognisable —
+/// callers then fall back to plain rating/distance ranking and say
+/// so, rather than inventing a match score.
+Set<String> relevantSpecialtiesForSymptom(String symptomText) {
+  final text = symptomText.toLowerCase();
+  final out = <String>{};
+  if (text.trim().isEmpty) return out;
+  _symptomSpecialties.forEach((keyword, specs) {
+    if (text.contains(keyword)) out.addAll(specs);
+  });
+  // A specialty named outright in the text is relevant too.
+  for (final specs in _symptomSpecialties.values) {
+    for (final s in specs) {
+      if (text.contains(s.toLowerCase())) out.add(s);
+    }
+  }
+  return out;
+}
 
 /// Smart Care Finder: symptom input + preferences → ranked matches.
 class CareMatchScreen extends StatefulWidget {
@@ -347,15 +433,29 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
     final urgent = _urgency == 'Urgent';
     final budget = _budgetValue;
     final distance = _distanceValue;
+    final symptomText = _symptom.text.trim();
+    final relevantSpecs = relevantSpecialtiesForSymptom(symptomText);
+    bool doctorRelevant(Doctor d) => relevantSpecs
+        .any((s) => s.toLowerCase() == d.specialty.toLowerCase());
     Widget staggered(Widget card) =>
         StaggerItem(index: out.length % 6, child: card);
     if (_careType == 'Anything suitable' || _careType == 'Doctor') {
       final docs = state.activeDoctors
           .where((d) =>
               d.fee <= budget && d.distanceKm <= distance)
-          .take(2)
-          .toList();
-      for (final d in docs) {
+          .toList()
+        ..sort((a, b) {
+          // Symptom-relevant specialties first, then rating,
+          // then distance. No invented percentages anywhere.
+          final ra = doctorRelevant(a) ? 0 : 1;
+          final rb = doctorRelevant(b) ? 0 : 1;
+          if (ra != rb) return ra.compareTo(rb);
+          final byRating = b.rating.compareTo(a.rating);
+          if (byRating != 0) return byRating;
+          return a.distanceKm.compareTo(b.distanceKm);
+        });
+      for (final d in docs.take(3)) {
+        final relevant = doctorRelevant(d);
         out.add(staggered(_matchCard(
           kind: 'Doctor',
           icon: Icons.medical_services,
@@ -363,9 +463,10 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
           sub:
               '${d.specialty} • ${inr(d.fee)} • ${d.distanceKm.toStringAsFixed(1)} km',
           rating: d.rating,
-          pct: urgent ? 96 : 92,
-          reason:
-              'Matches your symptoms and stays within your budget and distance.',
+          tag: relevant ? 'Matches your symptoms' : null,
+          reason: relevant
+              ? '${d.specialty} specialist — relevant to the symptoms you described, and within your budget and distance.'
+              : 'Highly rated ${d.specialty} within your budget and distance.',
           onTap: () {
             if (!checkLogin(context, 'Please login to view details')) return;
             Navigator.push(
@@ -380,9 +481,18 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
     if (_careType == 'Anything suitable' || _careType == 'Hospital') {
       final hs = state.activeHospitals
           .where((h) => h.distanceKm <= distance)
-          .take(2)
-          .toList();
-      for (final h in hs) {
+          .toList()
+        ..sort((a, b) {
+          if (urgent) {
+            final ia = a.hasIcu ? 0 : 1;
+            final ib = b.hasIcu ? 0 : 1;
+            if (ia != ib) return ia.compareTo(ib);
+          }
+          final byRating = b.rating.compareTo(a.rating);
+          if (byRating != 0) return byRating;
+          return a.distanceKm.compareTo(b.distanceKm);
+        });
+      for (final h in hs.take(2)) {
         out.add(staggered(_matchCard(
           kind: 'Hospital',
           icon: Icons.local_hospital_outlined,
@@ -390,9 +500,10 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
           sub:
               '${h.location} • ${h.distanceKm.toStringAsFixed(1)} km',
           rating: h.rating,
-          pct: urgent ? 94 : 88,
-          reason:
-              'Well-rated hospital close to you with emergency support.',
+          tag: h.hasIcu ? 'ICU available' : null,
+          reason: urgent && h.hasIcu
+              ? 'Has ICU facilities and is within your distance — a safer pick for urgent care.'
+              : 'Well-rated hospital within your distance.',
           onTap: () {
             if (!checkLogin(context, 'Please login to view details')) return;
             Navigator.push(
@@ -406,11 +517,22 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
       }
     }
     if (_careType == 'Anything suitable' || _careType == 'Lab test') {
+      // Tests whose name/category shares a word with the symptom
+      // text are the honest "related tests" signal.
+      final words = symptomText
+          .toLowerCase()
+          .split(RegExp(r'[^a-z]+'))
+          .where((w) => w.length > 3)
+          .toSet();
+      final relatedTests = catalog.labTests.where((t) {
+        final hay = '${t.name} ${t.category}'.toLowerCase();
+        return words.any((w) => hay.contains(w));
+      }).toList();
       final ls = state.activeLabs
           .where((l) => l.distanceKm <= distance)
-          .take(1)
-          .toList();
-      for (final l in ls) {
+          .toList()
+        ..sort((a, b) => b.rating.compareTo(a.rating));
+      for (final l in ls.take(2)) {
         out.add(staggered(_matchCard(
           kind: 'Lab',
           icon: Icons.science_outlined,
@@ -418,9 +540,12 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
           sub:
               '${l.testCount} tests • Report in ${l.turnaround}',
           rating: l.rating,
-          pct: 85,
-          reason:
-              'Recommended lab for the tests your symptoms suggest.',
+          tag: relatedTests.isNotEmpty
+              ? 'Symptom-related tests'
+              : null,
+          reason: relatedTests.isNotEmpty
+              ? 'Offers tests related to your symptoms, e.g. ${relatedTests.first.name}.'
+              : 'Highly rated lab within your distance.',
           onTap: () {
             if (!checkLogin(context, 'Please login to view details')) return;
             Navigator.push(
@@ -451,7 +576,7 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
     required String name,
     required String sub,
     required double rating,
-    required int pct,
+    required String? tag,
     required String reason,
     required VoidCallback onTap,
   }) {
@@ -485,20 +610,21 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: scheme.primary
-                        .withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+                if (tag != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 9, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: scheme.primary
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(tag,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.primary)),
                   ),
-                  child: Text('$pct% match',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.primary)),
-                ),
               ],
             ),
             const SizedBox(height: 8),

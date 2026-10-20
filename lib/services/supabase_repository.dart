@@ -105,6 +105,8 @@ class SupabaseRepository {
       upiId: r['upi_id']?.toString(),
       payInClinicEnabled: r['pay_in_clinic_enabled'] == true,
       upiEnabled: r['upi_enabled'] == true,
+      phone: '${r['phone'] ?? ''}',
+      emergencyContact: '${r['emergency_contact'] ?? ''}',
     );
   }
 
@@ -142,6 +144,7 @@ class SupabaseRepository {
       upiId: r['upi_id']?.toString(),
       payInClinicEnabled: r['pay_in_clinic_enabled'] == true,
       upiEnabled: r['upi_enabled'] == true,
+      phone: '${r['phone'] ?? ''}',
     );
   }
 
@@ -178,6 +181,7 @@ class SupabaseRepository {
       upiId: r['upi_id']?.toString(),
       payInClinicEnabled: r['pay_in_clinic_enabled'] == true,
       upiEnabled: r['upi_enabled'] == true,
+      phone: '${r['phone'] ?? ''}',
     );
   }
 

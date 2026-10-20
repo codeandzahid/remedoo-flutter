@@ -238,28 +238,59 @@ class HospitalDetailScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(Icons.phone_outlined,
-                      size: 15, color: scheme.primary),
-                  const SizedBox(width: 6),
-                  Text('1800-123-4567',
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: scheme.primary,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 18),
-                  const Icon(Icons.phone_outlined,
-                      size: 15, color: RemedooTheme.emergency),
-                  const SizedBox(width: 6),
-                  const Text('Emergency',
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: RemedooTheme.emergency,
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
+              // Real contact numbers from the hospital's record,
+              // tappable to call. The row hides entirely when the
+              // hospital has provided neither number — it used to
+              // show a hardcoded placeholder number (audit fix
+              // 2026-10-19).
+              if (h.phone.isNotEmpty ||
+                  h.emergencyContact.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    if (h.phone.isNotEmpty)
+                      GestureDetector(
+                        onTap: () => dialNumber(context, h.phone),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.phone_outlined,
+                                size: 15, color: scheme.primary),
+                            const SizedBox(width: 6),
+                            Text(h.phone,
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    color: scheme.primary,
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    if (h.phone.isNotEmpty &&
+                        h.emergencyContact.isNotEmpty)
+                      const SizedBox(width: 18),
+                    if (h.emergencyContact.isNotEmpty)
+                      GestureDetector(
+                        onTap: () =>
+                            dialNumber(context, h.emergencyContact),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.phone_outlined,
+                                size: 15,
+                                color: RemedooTheme.emergency),
+                            const SizedBox(width: 6),
+                            Text(
+                                'Emergency: ${h.emergencyContact}',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    color: RemedooTheme.emergency,
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 10),
               GestureDetector(
                 onTap: () => openDirections(

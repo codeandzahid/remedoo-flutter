@@ -324,6 +324,26 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
                     ],
                   ),
                 ),
+                // Real lab number from its record; hidden when the
+                // lab has not provided one (audit fix 2026-10-19).
+                if (l.phone.isNotEmpty) ...[
+                  const SizedBox(width: 16),
+                  GestureDetector(
+                    onTap: () => dialNumber(context, l.phone),
+                    child: Row(
+                      children: [
+                        Icon(Icons.call_outlined,
+                            size: 14, color: scheme.primary),
+                        const SizedBox(width: 6),
+                        Text('Call Lab',
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.primary)),
+                      ],
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 if (l.nabl) const StatusChip(status: 'NABL Accredited'),
               ],

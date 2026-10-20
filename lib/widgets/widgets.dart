@@ -895,18 +895,30 @@ class LabCompareSheet extends StatelessWidget {
   }
 }
 
-/// Simple help dialog for the floating "?" button.
+/// Simple help dialog for the floating "?" button. Contact lines
+/// come from the admin-configured support settings and are only
+/// shown when actually configured — this dialog previously
+/// displayed a hardcoded placeholder number (audit fix
+/// 2026-10-19).
 void showHelpDialog(BuildContext context) {
+  final state = AppStateScope.of(context);
+  final phone = state.supportPhone.trim();
+  final email = state.supportEmail.trim();
+  final buffer = StringBuffer('Our support team is available 24x7.');
+  if (phone.isNotEmpty || email.isNotEmpty) {
+    buffer.write('\n');
+    if (phone.isNotEmpty) buffer.write('\n• Call us: $phone');
+    if (email.isNotEmpty) buffer.write('\n• Email: $email');
+  } else {
+    buffer.write(
+        '\n\nYou can reach us any time from Help & Support in Settings.');
+  }
+  buffer.write('\n\nFor emergencies, use the Emergency SOS screen.');
   showDialog(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: const Text('Need help?'),
-      content: const Text(
-        'Our support team is available 24x7.\n\n'
-        '• Call us: 1800-123-4567\n'
-        '• Email: care@remedoo.app\n\n'
-        'For emergencies, use the Emergency SOS screen.',
-      ),
+      content: Text(buffer.toString()),
       actions: [
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext),
