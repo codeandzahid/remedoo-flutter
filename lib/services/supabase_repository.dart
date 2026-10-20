@@ -67,6 +67,7 @@ class SupabaseRepository {
       upiEnabled: r['upi_enabled'] == true,
       consultationDuration:
           (r['consultation_duration'] as num?)?.toInt() ?? 30,
+      phone: '${r['phone'] ?? ''}',
     );
   }
 

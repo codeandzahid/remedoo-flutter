@@ -23,6 +23,10 @@ class Doctor {
   final bool upiEnabled;
   final int consultationDuration;
 
+  /// Real contact number from the doctors table ('' when not
+  /// provided).
+  final String phone;
+
   const Doctor({
     required this.id,
     required this.name,
@@ -41,6 +45,7 @@ class Doctor {
     this.payInClinicEnabled = false,
     this.upiEnabled = false,
     this.consultationDuration = 30,
+    this.phone = '',
   });
 }
 

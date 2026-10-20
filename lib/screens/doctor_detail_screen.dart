@@ -312,19 +312,24 @@ class DoctorDetailScreen extends StatelessWidget {
             },
           ),
           const SizedBox(height: 10),
+          // Dials the doctor's own number when one is on file;
+          // otherwise the button is honestly labelled as Remedoo
+          // support (it previously always dialled support while
+          // saying "Call Clinic" — audit fix 2026-10-19).
           RButton(
-            label: 'Call Clinic',
+            label: d.phone.isNotEmpty ? 'Call Clinic' : 'Call Support',
             icon: Icons.call,
             variant: RButtonVariant.outline,
             fullWidth: true,
             onPressed: () {
-              final phone =
-                  AppStateScope.of(context).supportPhone;
+              final phone = d.phone.isNotEmpty
+                  ? d.phone
+                  : AppStateScope.of(context).supportPhone;
               if (phone.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                       content:
-                          Text('Support number not configured.')),
+                          Text('No contact number available.')),
                 );
                 return;
               }
