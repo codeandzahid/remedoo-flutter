@@ -9,6 +9,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/maintenance_screen.dart';
 import 'screens/reset_password_screen.dart';
+import 'screens/signup_screen.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/partner/doctor_dashboard.dart';
 import 'screens/partner/hospital_dashboard.dart';
@@ -94,6 +95,10 @@ class _RootGateState extends State<RootGate> {
         // provider / patient) so RootGate routes to the right shell
         // instead of dropping providers into the patient view.
         await state.resolveBackendRole();
+        // And check whether this account ever finished signup: a
+        // confirmation-link landing creates the session before Step 2
+        // (name + password) was ever shown.
+        await state.resolveProfileCompleteness();
       }
       if (mounted) setState(() => _authReady = true);
     });
@@ -133,6 +138,15 @@ class _RootGateState extends State<RootGate> {
         return const LabDashboard();
       case 'hospital':
         return const HospitalDashboard();
+    }
+    // Signup-completion gate: a signed-in patient account that never
+    // finished Step 2 (no name on the profile — e.g. it confirmed via
+    // the email link, which creates the session directly) completes
+    // it here before reaching the dashboard. Password recovery is not
+    // affected: its screen is pushed above this gate by
+    // _goToPasswordReset, exactly as before.
+    if (state.isSignedIn && !state.profileComplete) {
+      return const SignupScreen(resumeIncompleteSignup: true);
     }
     return const MainShell();
   }

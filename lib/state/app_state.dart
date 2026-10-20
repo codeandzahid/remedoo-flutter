@@ -163,6 +163,19 @@ class AppState extends ChangeNotifier {
   bool get isSignedIn => _supaUser != null || _mockLoggedIn;
   bool get seenOnboarding => _seenOnboarding;
 
+  /// False only while a real signed-in account is known to have an
+  /// unfinished signup (no name on the profile or in the auth
+  /// metadata — see [profileCompleteFor]). RootGate shows the Step 2
+  /// completion screen while this is false. Defaults to true —
+  /// guests, mock logins and tests are never gated — and is resolved
+  /// from the backend profile on sign-in / session restore.
+  bool _profileComplete = true;
+  bool get profileComplete => _profileComplete;
+
+  /// Test-only: forces the signup-completion flag RootGate gates on.
+  @visibleForTesting
+  void debugSetProfileComplete(bool value) => _profileComplete = value;
+
   /// Display name: Supabase user metadata -> email fallback -> mock name.
   String get userName {
     // Prefer the explicitly saved name (profile edits) over auth metadata.
@@ -531,6 +544,11 @@ class AppState extends ChangeNotifier {
     final existingName =
         '${existing?['full_name'] ?? ''}'.trim();
     if (existingName.isNotEmpty) {
+      // The account IS finished (it has a name): adopt it and lift the
+      // completion gate so the caller lands in the app, not Step 2.
+      _profileComplete = true;
+      _name = existingName;
+      notifyListeners();
       return const AuthResult.failure(
           'An account with this email already exists. Signed you in instead.');
     }
@@ -551,6 +569,7 @@ class AppState extends ChangeNotifier {
     await _repo.saveProfile(profile);
     // Set local fields immediately (no waiting on a profile re-fetch).
     _name = name;
+    _profileComplete = true;
     if (phone != null && phone.isNotEmpty) _phone = phone;
     if (gender != null && gender.isNotEmpty) _gender = gender;
     _syncUserFromSession();
@@ -574,6 +593,7 @@ class AppState extends ChangeNotifier {
   void _clearAuthLocal({bool notify = true}) {
     _guest = false;
     _mockLoggedIn = false;
+    _profileComplete = true;
     _name = 'Patient';
     _email = '';
     _providerRole = null;
@@ -755,6 +775,12 @@ class AppState extends ChangeNotifier {
       final av = '${prof['avatar_url'] ?? ''}';
       if (av.isNotEmpty) _avatarUrl = av;
     }
+    // Signup-completion gate (see RootGate): a session whose profile
+    // has no name anywhere never finished signup Step 2.
+    _profileComplete = profileCompleteFor(
+      profileName: prof == null ? '' : '${prof['full_name'] ?? ''}',
+      userMetadata: _supaUser?.userMetadata,
+    );
     final nrows = await _repo.fetchNotifications();
     notifications
       ..clear()
@@ -768,6 +794,25 @@ class AppState extends ChangeNotifier {
           )));
     // Load support tickets so pending/open show correctly
     unawaited(loadUserTickets());
+    notifyListeners();
+  }
+
+  /// Resolves ONLY the signup-completion flag from the backend
+  /// profile (one small query). RootGate awaits this at boot when a
+  /// session was restored — e.g. a signup confirmation link landing —
+  /// so an unfinished account's first painted screen is the Step 2
+  /// completion screen, not a dashboard flash. Later sign-ins get the
+  /// same answer from [loadUserProductionData].
+  Future<void> resolveProfileCompleteness() async {
+    if (_supaUser == null) {
+      _profileComplete = true;
+      return;
+    }
+    final prof = await _repo.fetchProfile();
+    _profileComplete = profileCompleteFor(
+      profileName: prof == null ? '' : '${prof['full_name'] ?? ''}',
+      userMetadata: _supaUser?.userMetadata,
+    );
     notifyListeners();
   }
 
@@ -825,6 +870,27 @@ class AppState extends ChangeNotifier {
         'cancelled' => 'cancelled',
         _ => 'upcoming',
       };
+
+  /// Whether a signed-in account has FINISHED signup. This is the
+  /// signup flow's own completion signal (the same one
+  /// [completeOtpSignup] checks): a name on the profiles row, or a
+  /// name stored in the auth user's metadata at signup. An account
+  /// with neither was created but never completed Step 2 — it has no
+  /// usable name (the greeting falls back to the email prefix) and,
+  /// on the OTP route, no password either. RootGate routes such
+  /// accounts into the Step 2 completion screen instead of dropping
+  /// them on the dashboard (Live Test 3, 2026-10-20).
+  static bool profileCompleteFor({
+    required String profileName,
+    Map<String, dynamic>? userMetadata,
+  }) {
+    if (profileName.trim().isNotEmpty) return true;
+    final meta = userMetadata ?? const <String, dynamic>{};
+    for (final key in const ['display_name', 'full_name']) {
+      if ('${meta[key] ?? ''}'.trim().isNotEmpty) return true;
+    }
+    return false;
+  }
 
   /// Test-visible access to the backend-row mapper below.
   @visibleForTesting

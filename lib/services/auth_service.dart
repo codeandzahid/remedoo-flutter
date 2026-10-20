@@ -24,6 +24,21 @@ class AuthResult {
   const AuthResult.failure(String error) : this._(ok: false, error: error);
 }
 
+/// Where an email address stands in the signup flow (see
+/// [AuthService.emailSignupState]).
+enum EmailSignupState {
+  /// No account with this email: a fresh signup.
+  newAccount,
+
+  /// An account exists but signup was never finished (Step 2 not
+  /// completed). The owner may resume and finish the SAME account.
+  incomplete,
+
+  /// A finished account: the duplicate-email guard blocks signup and
+  /// points the user to log in instead.
+  complete,
+}
+
 /// Wraps Supabase Auth for the Remedoo app.
 ///
 /// - Email/password sign-up (with optional email confirmation), sign-in,
@@ -234,12 +249,69 @@ class AuthService {
     }
   }
 
+  /// Maps an `email_signup_state` RPC value to [EmailSignupState].
+  /// Anything unrecognized (including null) is treated as a new email:
+  /// the send itself stays the authority on real duplicates.
+  static EmailSignupState emailSignupStateFromValue(Object? value) {
+    switch ('$value'.trim().toLowerCase()) {
+      case 'complete':
+        return EmailSignupState.complete;
+      case 'incomplete':
+        return EmailSignupState.incomplete;
+      default:
+        return EmailSignupState.newAccount;
+    }
+  }
+
+  /// Signup state of an email address: no account, a half-created
+  /// account (user exists but signup Step 2 was never finished — no
+  /// name on the profile, no role, no name in metadata), or a finished
+  /// account. Backed by the `email_signup_state` RPC
+  /// (supabase/migration/email_signup_state.sql), which returns only
+  /// one of those three words — no account data is exposed.
+  ///
+  /// The duplicate-email guard must only hard-block FINISHED accounts:
+  /// a half-created account belongs to the same person returning to
+  /// finish signup, and blocking them dead-ends the account (no
+  /// password was ever set, so they cannot log in either). Resuming
+  /// re-uses the same account — one email stays one account.
+  ///
+  /// If the RPC is unavailable (migration not applied yet), falls back
+  /// to the plain [emailAlreadyRegistered] check: an existing email is
+  /// then treated as complete, a new one as new.
+  Future<EmailSignupState> emailSignupState(String email) async {
+    try {
+      final res = await _client.rpc(
+        'email_signup_state',
+        params: {'check_email': email.trim()},
+      );
+      return emailSignupStateFromValue(res);
+    } catch (e) {
+      debugPrint('emailSignupState failed, falling back: $e');
+      final used = await emailAlreadyRegistered(email);
+      return used
+          ? EmailSignupState.complete
+          : EmailSignupState.newAccount;
+    }
+  }
+
   /// Send an email OTP for registration verification.
   /// Unlike [sendMagicLink], this omits the redirect so Supabase sends a
   /// code the user types back into the form.
+  ///
+  /// What lands in the inbox is decided by the project's Magic Link
+  /// email template (Authentication -> Email Templates -> Magic Link):
+  /// it must contain {{ .Token }} — with only {{ .ConfirmationURL }}
+  /// the user receives a link and no code, while this UI waits for a
+  /// code (Live Test 3, 2026-10-20). [shouldCreateUser] is passed
+  /// explicitly: registration relies on the OTP send creating the
+  /// (unconfirmed) account that Step 2 then completes.
   Future<AuthResult> sendEmailOtp(String email) async {
     try {
-      await _client.auth.signInWithOtp(email: email);
+      await _client.auth.signInWithOtp(
+        email: email,
+        shouldCreateUser: true,
+      );
       return const AuthResult.success();
     } on AuthException catch (e) {
       return AuthResult.failure(_friendlyMessage(e));

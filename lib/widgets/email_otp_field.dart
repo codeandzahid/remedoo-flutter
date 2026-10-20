@@ -66,9 +66,11 @@ class EmailOtpField extends StatefulWidget {
   final String hint;
 
   /// When true (signup / registration), an email that already belongs to
-  /// an existing account is rejected with "email already used" before any
-  /// OTP is sent. Leave false for login flows, where existing emails are
-  /// expected.
+  /// a FINISHED account is rejected with "email already used" before any
+  /// OTP is sent. A half-created account (signup started but never
+  /// finished) is allowed through so its owner can resume and complete
+  /// the same account. Leave false for login flows, where existing
+  /// emails are expected.
   final bool blockExistingEmail;
 
   const EmailOtpField({
@@ -159,11 +161,12 @@ class _EmailOtpFieldState extends State<EmailOtpField> {
       _error = null;
       _info = null;
     });
+    var resuming = false;
     if (widget.blockExistingEmail) {
-      final used =
-          await AuthService.instance.emailAlreadyRegistered(email);
+      final signupState =
+          await AuthService.instance.emailSignupState(email);
       if (!mounted) return;
-      if (used) {
+      if (signupState == EmailSignupState.complete) {
         setState(() {
           _busy = false;
           _error =
@@ -171,6 +174,11 @@ class _EmailOtpFieldState extends State<EmailOtpField> {
         });
         return;
       }
+      // A half-created account (Step 2 never finished) is NOT blocked:
+      // its owner is resuming the same account. Blocking them would
+      // dead-end it — no password was ever set, so login is impossible
+      // too (Live Test 3, 2026-10-20).
+      resuming = signupState == EmailSignupState.incomplete;
     }
     final result = await AuthService.instance.sendEmailOtp(email);
     if (!mounted) return;
@@ -181,7 +189,10 @@ class _EmailOtpFieldState extends State<EmailOtpField> {
     }
     setState(() {
       _otpSent = true;
-      _info = 'Code sent to $email';
+      _info = resuming
+          ? 'This email has an unfinished signup. Enter the code we '
+              'just sent to finish creating your account.'
+          : 'Code sent to $email';
     });
     _startCooldown();
   }

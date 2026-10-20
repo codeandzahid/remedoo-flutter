@@ -7,8 +7,16 @@ import '../widgets/email_otp_field.dart';
 import '../widgets/widgets.dart';
 
 /// Modern signup screen matching the login redesign.
+///
+/// With [resumeIncompleteSignup] the screen is shown by RootGate as
+/// the home for a signed-in account that never finished signup (it
+/// confirmed via the email link, so Step 1 is already done): the
+/// email is pre-verified from the live session and only Step 2
+/// (name + password) is asked for, completing the SAME account.
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  final bool resumeIncompleteSignup;
+
+  const SignupScreen({super.key, this.resumeIncompleteSignup = false});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -25,6 +33,20 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _emailVerified = false;
   String _gender = 'Male';
   DateTime? _dob;
+  bool _resumed = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Resume mode: the live session IS the email verification (the
+    // user arrived by tapping the emailed link), so Step 1 is done —
+    // lock the session's email in and show Step 2 directly.
+    if (widget.resumeIncompleteSignup && !_resumed) {
+      _resumed = true;
+      _email.text = AppStateScope.of(context).email;
+      _emailVerified = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -123,13 +145,15 @@ class _SignupScreenState extends State<SignupScreen> {
                 Icon(Icons.cake_outlined,
                     size: 18, color: scheme.onSurfaceVariant),
                 const SizedBox(width: 10),
-                Text(label,
-                    style: TextStyle(
-                        fontSize: 14,
-                        color: _dob == null
-                            ? scheme.onSurfaceVariant
-                            : scheme.onSurface)),
-                const Spacer(),
+                Expanded(
+                  child: Text(label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 14,
+                          color: _dob == null
+                              ? scheme.onSurfaceVariant
+                              : scheme.onSurface)),
+                ),
                 if (_dob != null)
                   InkWell(
                     onTap: () => setState(() => _dob = null),
@@ -188,10 +212,13 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
         ),
         const SizedBox(width: 10),
-        Text(
-          title,
-          style: const TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w700),
+        Expanded(
+          child: Text(
+            title,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w700),
+          ),
         ),
       ],
     );
@@ -252,7 +279,10 @@ class _SignupScreenState extends State<SignupScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const BackButton(),
+        // In RootGate resume mode this screen IS the home: no back.
+        leading: widget.resumeIncompleteSignup
+            ? const SizedBox.shrink()
+            : const BackButton(),
       ),
       extendBodyBehindAppBar: true,
       body: Container(
@@ -310,10 +340,12 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Create account',
+                    Text(
+                      widget.resumeIncompleteSignup
+                          ? 'Finish your account'
+                          : 'Create account',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
@@ -480,32 +512,51 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Already have an account?',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color:
-                                scheme.onSurfaceVariant,
-                          ),
-                        ),
-                        TextButton(
+                    if (widget.resumeIncompleteSignup)
+                      // Shown as the app home by RootGate: there is no
+                      // login screen to pop back to, but the user can
+                      // always sign out of the unfinished account.
+                      Center(
+                        child: TextButton(
                           onPressed: () =>
-                              Navigator.pop(context),
+                              AppStateScope.of(context).logout(),
                           child: Text(
-                            'Sign In',
+                            'Sign out instead',
                             style: TextStyle(
-                              color: scheme.primary,
-                              fontWeight: FontWeight.w700,
+                              color: scheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      )
+                    else
+                      Row(
+                        mainAxisAlignment:
+                            MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Already have an account?',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color:
+                                  scheme.onSurfaceVariant,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.pop(context),
+                            child: Text(
+                              'Sign In',
+                              style: TextStyle(
+                                color: scheme.primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     const SizedBox(height: 24),
                   ],
                 ),
