@@ -812,6 +812,20 @@ class AppState extends ChangeNotifier {
   /// the DB trigger sends on the status change to 'confirmed').
   static const String approvedDbStatus = 'confirmed';
 
+  /// Local display status for a stored appointments.status value.
+  /// 'pending' stays 'pending': collapsing it into 'upcoming' made
+  /// unapproved bookings carry "Upcoming" badges and CONFIRMED
+  /// receipts (Live Test 2 follow-up, D5). 'confirmed' displays as
+  /// 'upcoming' — the local word the dashboard Next Appointment
+  /// card, the receipt badge switch and the booking gate use — and
+  /// 'completed' keeps the local equivalent it has always had here,
+  /// 'upcoming'.
+  static String localStatusFor(String dbStatus) => switch (dbStatus) {
+        'pending' => 'pending',
+        'cancelled' => 'cancelled',
+        _ => 'upcoming',
+      };
+
   /// Test-visible access to the backend-row mapper below.
   @visibleForTesting
   static Appointment apptFromRowForTest(Map<String, dynamic> r) =>
@@ -863,7 +877,7 @@ class AppState extends ChangeNotifier {
       kind: kind,
       refId: refId,
       notes: '${r['notes'] ?? ''}',
-      status: st == 'cancelled' ? 'cancelled' : 'upcoming',
+      status: localStatusFor(st),
       remoteStatus: st,
       paymentRef: _strOrNull(r['payment_ref']),
       customerUpi: _strOrNull(r['customer_upi']),
@@ -1302,14 +1316,17 @@ class AppState extends ChangeNotifier {
             '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
         // Skip slots already taken (from real bookings)
         final taken = _takenSlots.contains(_slotKey(title, day, label));
-        // Also check against actual appointments in the list
+        // Also check against actual appointments in the list. A
+        // pending booking holds its slot too (it is awaiting
+        // approval, not free) — it blocked the slot before the D5
+        // status-mapping fix and must keep doing so.
         final booked = appointments.any((a) =>
             a.doctorName == title &&
             a.date.year == day.year &&
             a.date.month == day.month &&
             a.date.day == day.day &&
             a.timeLabel == label &&
-            a.status == 'upcoming');
+            (a.status == 'upcoming' || a.status == 'pending'));
         if (!taken && !booked) out.add(label);
       }
     }

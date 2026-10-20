@@ -304,16 +304,17 @@ class Appointment {
   final String refId;
   final String notes;
   final List<LabTest> tests;
-  String status; // upcoming, cancelled
+  String status; // pending, upcoming, cancelled
   final String? bookingForMemberId;
   final String? bookingForName;
   final String? prescriptionPath;
   final String? prescriptionName;
 
   /// Raw backend status from the appointments table ('pending',
-  /// 'confirmed', 'cancelled'…). The local [status] collapses
-  /// everything non-cancelled to 'upcoming', so the confirmed-cancel
-  /// OTP gate reads this field instead.
+  /// 'confirmed', 'cancelled'…). The local [status] is a display
+  /// word ('pending', 'upcoming' for confirmed/completed,
+  /// 'cancelled'), so the confirmed-cancel OTP gate reads this
+  /// field instead.
   final String? remoteStatus;
 
   /// Checkout reference (APT…) linking this appointment to its

@@ -10,14 +10,21 @@ import 'package:remedoo_app/state/app_state.dart';
 ///  D3 the admin list showed "doctor" instead of names, duplicated
 ///     rows, and never refreshed after approving;
 ///  D4 the receipt specialty read "doctor" instead of the real one.
+/// Plus the follow-up found while fixing them:
+///  D5 a still-pending appointment displayed as "Upcoming" with a
+///     CONFIRMED receipt badge, because the row mapper collapsed
+///     every non-cancelled stored status into 'upcoming'.
 void main() {
-  Map<String, dynamic> doctorRow({String? paymentMethod = 'at_clinic'}) => {
+  Map<String, dynamic> doctorRow(
+          {String? paymentMethod = 'at_clinic',
+          String status = 'pending'}) =>
+      {
         'id': '13bfcd29-a8b6-47ed-aef9-f8ec05e3c103',
         'service_type': 'doctor',
         'doctor_id': 'doc-1',
         'appointment_date': '2026-10-20',
         'appointment_time': '09:00:00',
-        'status': 'pending',
+        'status': status,
         'payment_method': paymentMethod,
         'notes': '',
         'doctors': {
@@ -76,6 +83,48 @@ void main() {
       // notification never fired.
       expect(AppState.approvedDbStatus, 'confirmed');
       expect(AppState.approvedDbStatus, isNot('upcoming'));
+    });
+  });
+
+  group('D5: stored status -> local display status', () {
+    test('pending stays pending — not upcoming, not confirmed', () {
+      final a = AppState.apptFromRowForTest(doctorRow(status: 'pending'));
+      expect(a.status, 'pending',
+          reason: 'an unapproved booking must not display as '
+              '"Upcoming" or get a CONFIRMED receipt badge');
+      expect(a.remoteStatus, 'pending');
+    });
+
+    test('confirmed displays as upcoming (the local vocabulary)', () {
+      final a = AppState.apptFromRowForTest(doctorRow(status: 'confirmed'));
+      expect(a.status, 'upcoming');
+      expect(a.remoteStatus, 'confirmed');
+    });
+
+    test('cancelled stays cancelled', () {
+      final a = AppState.apptFromRowForTest(doctorRow(status: 'cancelled'));
+      expect(a.status, 'cancelled');
+      expect(a.remoteStatus, 'cancelled');
+    });
+
+    test('completed keeps its existing local equivalent, upcoming', () {
+      final a = AppState.apptFromRowForTest(doctorRow(status: 'completed'));
+      expect(a.status, 'upcoming');
+      expect(a.remoteStatus, 'completed');
+    });
+
+    test('a row without a status defaults to pending, never confirmed',
+        () {
+      final row = doctorRow()..remove('status');
+      final a = AppState.apptFromRowForTest(row);
+      expect(a.status, 'pending');
+    });
+
+    test('localStatusFor maps the full stored vocabulary', () {
+      expect(AppState.localStatusFor('pending'), 'pending');
+      expect(AppState.localStatusFor('confirmed'), 'upcoming');
+      expect(AppState.localStatusFor('completed'), 'upcoming');
+      expect(AppState.localStatusFor('cancelled'), 'cancelled');
     });
   });
 
