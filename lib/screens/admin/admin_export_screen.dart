@@ -27,6 +27,16 @@ const kExportDatasets = <(String, String, IconData)>[
   ('Refunds', 'refunds', Icons.replay),
   ('Emergency Requests', 'emergency_requests', Icons.sos),
   ('Notifications', 'notifications', Icons.notifications),
+  // Added in the audit-76 programme: finance and operations
+  // datasets the export screen used to omit.
+  ('Payout Requests', 'payout_requests', Icons.payments),
+  ('Provider Wallets', 'provider_wallets', Icons.account_balance_wallet),
+  ('Provider Earnings', 'provider_earnings', Icons.trending_up),
+  ('Coupons', 'coupons', Icons.local_offer),
+  ('FAQs', 'faqs', Icons.help_outline),
+  ('Lab Samples', 'lab_sample_collections', Icons.science_outlined),
+  ('Deliveries', 'delivery_orders', Icons.delivery_dining),
+  ('Subscription Plans', 'subscription_plans', Icons.workspace_premium),
 ];
 
 String _csvCell(dynamic v) {

@@ -72,6 +72,7 @@ class _AdminAppSettingsScreenState
   // Fees
   late final TextEditingController _deliveryFee;
   late final TextEditingController _freeThreshold;
+  late final TextEditingController _feesCurrency;
 
   // Emergency
   List<Map<String, String>> _numbers = [];
@@ -88,6 +89,7 @@ class _AdminAppSettingsScreenState
     _maintMsg = TextEditingController();
     _deliveryFee = TextEditingController();
     _freeThreshold = TextEditingController();
+    _feesCurrency = TextEditingController();
     _sosMsg = TextEditingController();
     _supportPhone = TextEditingController();
     _supportEmail = TextEditingController();
@@ -113,6 +115,7 @@ class _AdminAppSettingsScreenState
   void dispose() {
     _maintMsg.dispose();
     _deliveryFee.dispose();
+    _feesCurrency.dispose();
     _freeThreshold.dispose();
     _sosMsg.dispose();
     _supportPhone.dispose();
@@ -209,6 +212,9 @@ class _AdminAppSettingsScreenState
         _deliveryFee.text = '${fees['delivery_fee'] ?? 30}';
         _freeThreshold.text =
             '${fees['free_delivery_threshold'] ?? 499}';
+        // The seeded fees config carries a currency that no
+        // field could edit (audit Admin gap 16).
+        _feesCurrency.text = '${fees['currency'] ?? 'INR'}';
         _numbers = [
           for (final n in (emg['numbers'] as List? ?? []))
             {
@@ -237,51 +243,6 @@ class _AdminAppSettingsScreenState
       SnackBar(
           content: Text(ok
               ? 'Saved — live across website and app'
-              : 'Could not save (admin only)')),
-    );
-  }
-
-  /// Save Razorpay config: public settings to app_config,
-  /// secrets to secure_settings (admin-only).
-  Future<void> _saveRazorpay() async {
-    setState(() => _saving = true);
-    final state = AppStateScope.of(context);
-    final repo = state.supabaseRepository;
-
-    // Public config (key_id is safe to expose to clients)
-    final okPublic = await state.saveAppConfigValue('razorpay', {
-      'enabled': _razorpayEnabled,
-      'key_id': _razorpayKeyId.text.trim(),
-    });
-
-    // Secrets go to admin-only table
-    bool okSecrets = true;
-    final secret = _razorpayKeySecret.text.trim();
-    final webhook = _razorpayWebhookSecret.text.trim();
-    if (secret.isNotEmpty) {
-      okSecrets = await repo.saveSecureSetting(
-              'razorpay_key_secret', secret) &&
-          okSecrets;
-    }
-    if (webhook.isNotEmpty) {
-      okSecrets = await repo.saveSecureSetting(
-              'razorpay_webhook_secret', webhook) &&
-          okSecrets;
-    }
-    // Also store key_id in secure settings for Edge Functions
-    final keyId = _razorpayKeyId.text.trim();
-    if (keyId.isNotEmpty) {
-      okSecrets =
-          await repo.saveSecureSetting('razorpay_key_id', keyId) &&
-              okSecrets;
-    }
-
-    if (!mounted) return;
-    setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(okPublic && okSecrets
-              ? 'Razorpay saved securely — Route payments ready'
               : 'Could not save (admin only)')),
     );
   }
@@ -720,6 +681,28 @@ class _AdminAppSettingsScreenState
     );
   }
 
+  /// Fees save with real validation (audit Admin gaps 16/23:
+  /// a typo used to save silently as the default 30 / 499).
+  Future<void> _saveFees() async {
+    final fee = num.tryParse(_deliveryFee.text.trim());
+    final threshold = num.tryParse(_freeThreshold.text.trim());
+    if (fee == null || threshold == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Enter valid numbers for the delivery fee and free-above amount.')),
+      );
+      return;
+    }
+    await _save('fees', {
+      'delivery_fee': fee,
+      'free_delivery_threshold': threshold,
+      'currency': _feesCurrency.text.trim().isEmpty
+          ? 'INR'
+          : _feesCurrency.text.trim().toUpperCase(),
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -802,18 +785,16 @@ class _AdminAppSettingsScreenState
                   ],
                 ),
                 const SizedBox(height: 12),
+                RTextField(
+                  label: 'Currency code',
+                  hint: 'INR',
+                  controller: _feesCurrency,
+                ),
+                const SizedBox(height: 12),
                 RButton(
                   label: 'Save',
                   small: true,
-                  onPressed: _saving
-                      ? null
-                      : () => _save('fees', {
-                            'delivery_fee':
-                                num.tryParse(_deliveryFee.text) ?? 30,
-                            'free_delivery_threshold':
-                                num.tryParse(_freeThreshold.text) ??
-                                    499,
-                          }),
+                  onPressed: _saving ? null : _saveFees,
                 ),
               ],
             ),
@@ -853,7 +834,7 @@ class _AdminAppSettingsScreenState
                         value: _singleVendorPharmacyId,
                         decoration: const InputDecoration(
                           labelText: 'Single vendor pharmacy',
-                          border: OutlineInputBorder(),
+                          isDense: true,
                         ),
                         items: [
                           for (final p in pharmacies)

@@ -190,6 +190,13 @@ class _AdminApprovalsScreenState
               ],
             ),
             const SizedBox(height: 10),
+            if (!pending && a['decided_at'] != null)
+              Text(
+                  'Decided ${_fmtDate(a['decided_at']?.toString())}'
+                  '${a['decided_by'] != null ? ' • by ${a['decided_by']}' : ''}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant)),
             Text(
                 'Phone: ${a['phone'] ?? '—'} • License: ${a['license_no'] ?? '—'}',
                 style: TextStyle(

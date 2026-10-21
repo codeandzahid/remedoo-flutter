@@ -1694,7 +1694,7 @@ class SupabaseRepository {
         try {
           final p = await _db
               .from('profiles')
-              .select('full_name, email, phone')
+              .select('full_name, email, phone, status')
               .eq('user_id', uid)
               .limit(1);
           if (p.isNotEmpty) profile = Map<String, dynamic>.from(p.first);
@@ -1717,6 +1717,7 @@ class SupabaseRepository {
           'name': profile['full_name'] ?? '',
           'email': profile['email'] ?? '',
           'phone': profile['phone'] ?? '',
+          'status': profile['status'] ?? 'active',
           'sections': sections,
         });
       }
@@ -1975,15 +1976,31 @@ class SupabaseRepository {
   /// Admin approve/reject of a provider application.
   Future<bool> decideProviderApplication(String id, String status) async {
     if (!_ready) return false;
+    final stamp = <String, dynamic>{
+      'status': status,
+      'decided_at': DateTime.now().toIso8601String(),
+      // Audit trail (Admin gap 28): who decided. The column
+      // arrives with provider_application_decided_by.sql — retry
+      // without it until that migration is applied.
+      if (_uid != null) 'decided_by': _uid,
+    };
     try {
-      await _db.from('provider_applications').update({
-        'status': status,
-        'decided_at': DateTime.now().toIso8601String(),
-      }).eq('id', id);
+      await _db.from('provider_applications').update(stamp).eq('id', id);
       return true;
     } catch (e) {
-      debugPrint('decideProviderApplication failed: $e');
-      return false;
+      try {
+        await _db
+            .from('provider_applications')
+            .update({
+              'status': status,
+              'decided_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', id);
+        return true;
+      } catch (e2) {
+        debugPrint('decideProviderApplication failed: $e2');
+        return false;
+      }
     }
   }
 
@@ -2194,6 +2211,25 @@ class SupabaseRepository {
     }
   }
 
+  /// Admin updates an announcement (audit Admin gap 19:
+  /// announcements could only be published or deleted — a typo
+  /// meant delete-and-republish).
+  Future<bool> updateAnnouncement(String id,
+      {String? title, String? message, String? audience}) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('announcements').update({
+        if (title != null) 'title': title,
+        if (message != null) 'message': message,
+        if (audience != null) 'audience': audience,
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateAnnouncement failed: $e');
+      return false;
+    }
+  }
+
   /// Admin deletes an announcement.
   Future<bool> deleteAnnouncement(String id) async {
     if (!_ready) return false;
@@ -2228,7 +2264,8 @@ class SupabaseRepository {
     try {
       final rows = await _db
           .from('profiles')
-          .select('user_id, full_name, email, phone, created_at')
+          .select(
+              'user_id, full_name, email, phone, created_at, status, gender, date_of_birth, address, language, upi_id, avatar_url')
           .order('created_at', ascending: false)
           .limit(500);
       final profiles = rows.map((r) => Map<String, dynamic>.from(r)).toList();
@@ -2247,6 +2284,23 @@ class SupabaseRepository {
     } catch (e) {
       debugPrint('fetchAllProfiles failed: $e');
       return const [];
+    }
+  }
+
+  /// Admin edit of a user's profile row (audit Admin gap 6:
+  /// Users could only have their role changed — name, phone,
+  /// status and the rest were view-only, and nobody could be
+  /// suspended). profiles.status 'suspended' is the deactivation
+  /// flag the admin surfaces read.
+  Future<bool> adminUpdateProfile(
+      String userId, Map<String, dynamic> values) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('profiles').update(values).eq('user_id', userId);
+      return true;
+    } catch (e) {
+      debugPrint('adminUpdateProfile failed: $e');
+      return false;
     }
   }
 

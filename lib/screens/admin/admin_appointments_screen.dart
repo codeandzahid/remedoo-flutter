@@ -248,7 +248,139 @@ class _AdminAppointmentsScreenState
         onApprove: _approve,
         onReject: _reject,
         onCancel: _confirmCancel,
+        onEdit: _editAppointment,
       ),
+    );
+  }
+
+
+  /// Appointment editor (audit Admin gap 10: appointments were
+  /// action-only — no way to correct a date/time, set a token,
+  /// department, video link or payment status).
+  Future<void> _editAppointment(Map<String, dynamic> a) async {
+    final date = TextEditingController(
+        text: '${a['appointment_date'] ?? ''}'.split('T').first);
+    final time = TextEditingController(
+        text: '${a['appointment_time'] ?? ''}');
+    final token = TextEditingController(
+        text: '${a['token_number'] ?? ''}');
+    final department =
+        TextEditingController(text: '${a['department'] ?? ''}');
+    final meetingLink = TextEditingController(
+        text: '${a['video_meeting_link'] ?? ''}');
+    final notes =
+        TextEditingController(text: '${a['notes'] ?? ''}');
+    var video = a['is_video_consultation'] == true;
+    var payStatus = '${a['payment_status'] ?? 'pending'}';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Edit appointment'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: date,
+                  decoration: const InputDecoration(
+                      labelText: 'Date (YYYY-MM-DD)'),
+                ),
+                TextField(
+                  controller: time,
+                  decoration: const InputDecoration(
+                      labelText: 'Time (HH:MM)'),
+                ),
+                TextField(
+                  controller: token,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                      labelText: 'Token number'),
+                ),
+                TextField(
+                  controller: department,
+                  decoration:
+                      const InputDecoration(labelText: 'Department'),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Video consultation'),
+                  value: video,
+                  onChanged: (v) => setD(() => video = v),
+                ),
+                TextField(
+                  controller: meetingLink,
+                  decoration: const InputDecoration(
+                      labelText: 'Video meeting link'),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: const ['pending', 'paid', 'refunded',
+                          'failed']
+                      .contains(payStatus)
+                      ? payStatus
+                      : 'pending',
+                  decoration: const InputDecoration(
+                      labelText: 'Payment status'),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'pending', child: Text('pending')),
+                    DropdownMenuItem(value: 'paid', child: Text('paid')),
+                    DropdownMenuItem(
+                        value: 'refunded', child: Text('refunded')),
+                    DropdownMenuItem(
+                        value: 'failed', child: Text('failed')),
+                  ],
+                  onChanged: (v) =>
+                      setD(() => payStatus = v ?? 'pending'),
+                ),
+                TextField(
+                  controller: notes,
+                  maxLines: 2,
+                  decoration:
+                      const InputDecoration(labelText: 'Notes'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    if (date.text.trim().isNotEmpty &&
+        DateTime.tryParse(date.text.trim()) == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Date must be YYYY-MM-DD.')));
+      return;
+    }
+    final done = await AppStateScope.of(context)
+        .updateAdminAppointment('${a['id']}', {
+      'appointment_date': date.text.trim(),
+      'appointment_time': time.text.trim(),
+      'token_number': int.tryParse(token.text.trim()),
+      'department': department.text.trim().isEmpty
+          ? null
+          : department.text.trim(),
+      'is_video_consultation': video,
+      'video_meeting_link': meetingLink.text.trim().isEmpty
+          ? null
+          : meetingLink.text.trim(),
+      'payment_status': payStatus,
+      'notes': notes.text.trim(),
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(done
+              ? 'Appointment updated.'
+              : 'Could not update. Try again.')),
     );
   }
 
@@ -350,12 +482,14 @@ class _AppointmentDetailDialog extends StatelessWidget {
   final ValueChanged<Map<String, dynamic>> onApprove;
   final ValueChanged<Map<String, dynamic>> onReject;
   final ValueChanged<Map<String, dynamic>> onCancel;
+  final ValueChanged<Map<String, dynamic>> onEdit;
 
   const _AppointmentDetailDialog({
     required this.initialRow,
     required this.onApprove,
     required this.onReject,
     required this.onCancel,
+    required this.onEdit,
   });
 
   Widget _field(BuildContext context, String label, String value) {
@@ -432,6 +566,18 @@ class _AppointmentDetailDialog extends StatelessWidget {
               _field(context, 'Payment', d.payment),
               if (d.notes.isNotEmpty)
                 _field(context, 'Reason / notes', d.notes),
+              if (row['token_number'] != null)
+                _field(context, 'Token', '${row['token_number']}'),
+              if ('${row['department'] ?? ''}'.isNotEmpty)
+                _field(context, 'Department', '${row['department']}'),
+              if (row['is_video_consultation'] == true)
+                _field(context, 'Video consult', 'Yes'),
+              if ('${row['video_meeting_link'] ?? ''}'.isNotEmpty)
+                _field(context, 'Meeting link',
+                    '${row['video_meeting_link']}'),
+              if ('${row['payment_status'] ?? ''}'.isNotEmpty)
+                _field(context, 'Payment status',
+                    '${row['payment_status']}'),
               if (d.bookedOn.isNotEmpty)
                 _field(context, 'Booked on', d.bookedOn),
             ],
@@ -442,6 +588,10 @@ class _AppointmentDetailDialog extends StatelessWidget {
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Close'),
+        ),
+        TextButton(
+          onPressed: () => onEdit(row),
+          child: const Text('Edit'),
         ),
         if (status == 'pending') ...[
           RButton(

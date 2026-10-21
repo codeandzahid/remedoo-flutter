@@ -1,12 +1,20 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
+import '../../data/mock_data.dart' show specialties;
 import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/existing_user_lookup.dart';
 import '../../widgets/widgets.dart';
 
-/// Field types for [AdminField]: 'text', 'int', 'double', 'bool', 'fk'.
+/// Field types for [AdminField]: 'text', 'textarea', 'int',
+/// 'double', 'bool', 'fk', 'dropdown', 'date', 'array', 'json',
+/// 'url'. (The engine used to know only text/int/double/bool/fk,
+/// so whole column families — arrays, JSONB hours, dates, enum
+/// statuses — could not be edited at all: audit Admin gaps
+/// 3/11/12/13.)
 class AdminField {
   final String key;
   final String label;
@@ -17,6 +25,16 @@ class AdminField {
   /// For type 'fk': the referenced admin table and the label column to show.
   final String? fkTable;
 
+  /// For type 'dropdown': the constrained choices (enum fields
+  /// were free text — a typo silently created a wrongly-approved
+  /// or invalid record).
+  final List<String>? options;
+
+  /// Numeric range validation for 'int'/'double' fields
+  /// (rating 0–5, discount 0–100…).
+  final num? min;
+  final num? max;
+
   const AdminField({
     required this.key,
     required this.label,
@@ -24,6 +42,9 @@ class AdminField {
     this.required = false,
     this.defaultValue,
     this.fkTable,
+    this.options,
+    this.min,
+    this.max,
   });
 }
 
@@ -306,13 +327,13 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
     );
   }
 
-  void _editDialog(Map<String, dynamic>? row) {
+  Future<void> _editDialog(Map<String, dynamic>? row) async {
     final state = AppStateScope.of(context);
     final fields = _fields;
     final ctrls = {
-      for (final f in fields.where((f) => f.type != 'bool'))
-        f.key: TextEditingController(
-            text: _initialText(f, row?[f.key]))
+      for (final f in fields.where((f) =>
+          f.type != 'bool' && f.type != 'fk' && f.type != 'dropdown'))
+        f.key: TextEditingController(text: _initialText(f, row?[f.key]))
     };
     final bools = {
       for (final f in fields.where((f) => f.type == 'bool'))
@@ -322,147 +343,247 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
       for (final f in fields.where((f) => f.type == 'fk'))
         f.key: row?[f.key]?.toString(),
     };
-    showResponsiveDialog(
+    final dropValues = {
+      for (final f in fields.where((f) => f.type == 'dropdown'))
+        f.key: _initialDrop(f, row?[f.key]),
+    };
+    await showResponsiveDialog(
       context,
       (_) => StatefulBuilder(
         builder: (ctx, setD) {
+          Widget fieldWidget(AdminField f) {
+            if (f.type == 'bool') {
+              return SwitchListTile(
+                value: bools[f.key]!,
+                onChanged: (v) => setD(() => bools[f.key] = v),
+                title: Text(f.label),
+                contentPadding: EdgeInsets.zero,
+              );
+            }
+            if (f.type == 'fk' || f.type == 'dropdown') {
+              final isFk = f.type == 'fk';
+              final options = isFk
+                  ? state.adminTable(f.fkTable!)
+                  : const <Map<String, dynamic>>[];
+              final value = isFk ? fkValues[f.key] : dropValues[f.key];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                // No OutlineInputBorder override: the control
+                // inherits the Remidy admin input theme like
+                // every other field (audit Admin gap 25).
+                child: DropdownButtonFormField<String>(
+                  initialValue: value,
+                  decoration: InputDecoration(
+                    labelText: '${f.label}${f.required ? ' *' : ''}',
+                  ),
+                  items: [
+                    if (!f.required)
+                      const DropdownMenuItem(
+                          value: null, child: Text('—')),
+                    if (isFk)
+                      for (final o in options)
+                        DropdownMenuItem(
+                          value: '${o['id']}',
+                          child: Text('${o['name'] ?? o['id']}',
+                              overflow: TextOverflow.ellipsis),
+                        )
+                    else
+                      for (final o in f.options ?? const <String>[])
+                        DropdownMenuItem(value: o, child: Text(o)),
+                  ],
+                  onChanged: (v) => setD(() {
+                    if (isFk) {
+                      fkValues[f.key] = v;
+                    } else {
+                      dropValues[f.key] = v;
+                    }
+                  }),
+                ),
+              );
+            }
+            if (f.type == 'date') {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: RTextField(
+                  label: '${f.label}${f.required ? ' *' : ''}',
+                  controller: ctrls[f.key],
+                  hint: 'YYYY-MM-DD',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.calendar_month_outlined,
+                        size: 20),
+                    onPressed: () async {
+                      final current =
+                          DateTime.tryParse(ctrls[f.key]!.text.trim());
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: current ?? DateTime.now(),
+                        firstDate: DateTime(1930),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        ctrls[f.key]!.text =
+                            picked.toIso8601String().substring(0, 10);
+                        setD(() {});
+                      }
+                    },
+                  ),
+                ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: RTextField(
+                label: '${f.label}${f.required ? ' *' : ''}',
+                controller: ctrls[f.key],
+                hint: f.type == 'array'
+                    ? 'Separate items with commas'
+                    : f.type == 'json'
+                        ? 'JSON, e.g. {"mon-fri": "09:00-17:00"}'
+                        : null,
+                maxLines: (f.type == 'json' || f.type == 'textarea')
+                    ? 3
+                    : 1,
+                keyboardType: (f.type == 'int' || f.type == 'double')
+                    ? TextInputType.number
+                    : TextInputType.text,
+              ),
+            );
+          }
+
           final dialog = AlertDialog(
-          title: Text(
-              '${row == null ? 'Add' : 'Edit'} ${widget.singular}',
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w800)),
-          content: SizedBox(
-            width: 420,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: fields.map((f) {
-                  if (f.type == 'bool') {
-                    return SwitchListTile(
-                      value: bools[f.key]!,
-                      onChanged: (v) =>
-                          setD(() => bools[f.key] = v),
-                      title: Text(f.label),
-                      contentPadding: EdgeInsets.zero,
-                    );
-                  }
-                  if (f.type == 'fk') {
-                    final options =
-                        state.adminTable(f.fkTable!);
-                    return Padding(
-                      padding:
-                          const EdgeInsets.only(bottom: 12),
-                      child: DropdownButtonFormField<String>(
-                        initialValue: fkValues[f.key],
-                        decoration: InputDecoration(
-                          labelText:
-                              '${f.label}${f.required ? ' *' : ''}',
-                          border:
-                              const OutlineInputBorder(),
-                        ),
-                        items: [
-                          for (final o in options)
-                            DropdownMenuItem(
-                              value: '${o['id']}',
-                              child: Text(
-                                  '${o['name'] ?? o['id']}',
-                                  overflow:
-                                      TextOverflow.ellipsis),
-                            ),
-                        ],
-                        onChanged: (v) =>
-                            setD(() => fkValues[f.key] = v),
-                      ),
-                    );
-                  }
-                  return Padding(
-                    padding:
-                        const EdgeInsets.only(bottom: 12),
-                    child: RTextField(
-                      label:
-                          '${f.label}${f.required ? ' *' : ''}',
-                      controller: ctrls[f.key],
-                      keyboardType: (f.type == 'int' ||
-                              f.type == 'double')
-                          ? TextInputType.number
-                          : TextInputType.text,
-                    ),
-                  );
-                }).toList(),
+            title: Text('${row == null ? 'Add' : 'Edit'} ${widget.singular}',
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w800)),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: fields.map(fieldWidget).toList(),
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            RButton(
-              label: 'Save',
-              small: true,
-              onPressed: () async {
-                for (final f in fields) {
-                  if (!f.required) continue;
-                  final empty = f.type == 'bool'
-                      ? false
-                      : f.type == 'fk'
-                          ? (fkValues[f.key] == null ||
-                              fkValues[f.key]!.isEmpty)
-                          : ctrls[f.key]!.text.trim().isEmpty;
-                  if (empty) {
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(
-                      SnackBar(
-                          content: Text(
-                              '${f.label} is required')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              RButton(
+                label: 'Save',
+                small: true,
+                onPressed: () async {
+                  void fail(String msg) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(msg)),
                     );
-                    return;
                   }
-                }
-                final values =
-                    <String, dynamic>{};
-                for (final f in fields) {
-                  if (f.type == 'bool') {
-                    values[f.key] = bools[f.key]!;
-                  } else if (f.type == 'fk') {
-                    values[f.key] = fkValues[f.key];
-                  } else if (f.type == 'int') {
-                    values[f.key] = int.tryParse(
-                            ctrls[f.key]!.text.trim()) ??
-                        0;
-                  } else if (f.type == 'double') {
-                    values[f.key] = double.tryParse(
-                            ctrls[f.key]!.text.trim()) ??
-                        0;
-                  } else {
-                    values[f.key] =
-                        ctrls[f.key]!.text.trim();
+
+                  final values = <String, dynamic>{};
+                  for (final f in fields) {
+                    if (f.type == 'bool') {
+                      values[f.key] = bools[f.key]!;
+                      continue;
+                    }
+                    if (f.type == 'fk') {
+                      if (f.required &&
+                          (fkValues[f.key] == null ||
+                              fkValues[f.key]!.isEmpty)) {
+                        fail('${f.label} is required');
+                        return;
+                      }
+                      values[f.key] = fkValues[f.key];
+                      continue;
+                    }
+                    if (f.type == 'dropdown') {
+                      if (f.required &&
+                          (dropValues[f.key] == null ||
+                              dropValues[f.key]!.isEmpty)) {
+                        fail('${f.label} is required');
+                        return;
+                      }
+                      values[f.key] = dropValues[f.key];
+                      continue;
+                    }
+                    final text = ctrls[f.key]!.text.trim();
+                    if (text.isEmpty) {
+                      if (f.required) {
+                        fail('${f.label} is required');
+                        return;
+                      }
+                      // Blank on EDIT keeps the stored value —
+                      // the key is simply not sent (audit Admin
+                      // gap 14: a cleared field used to be saved
+                      // back as 0 / '' over real data).
+                      if (row == null) {
+                        if (f.type == 'int' || f.type == 'double') {
+                          if (f.defaultValue != null) {
+                            values[f.key] = f.defaultValue;
+                          }
+                        } else {
+                          values[f.key] = '';
+                        }
+                      }
+                      continue;
+                    }
+                    if (f.type == 'int' || f.type == 'double') {
+                      final n = f.type == 'int'
+                          ? int.tryParse(text)
+                          : double.tryParse(text);
+                      if (n == null) {
+                        fail('${f.label} must be a number');
+                        return;
+                      }
+                      if ((f.min != null && n < f.min!) ||
+                          (f.max != null && n > f.max!)) {
+                        fail('${f.label} must be between '
+                            '${f.min} and ${f.max}');
+                        return;
+                      }
+                      values[f.key] = n;
+                    } else if (f.type == 'array') {
+                      values[f.key] = text
+                          .split(',')
+                          .map((s) => s.trim())
+                          .where((s) => s.isNotEmpty)
+                          .toList();
+                    } else if (f.type == 'json') {
+                      try {
+                        values[f.key] = jsonDecode(text);
+                      } catch (_) {
+                        fail('${f.label} must be valid JSON');
+                        return;
+                      }
+                    } else if (f.type == 'date') {
+                      if (DateTime.tryParse(text) == null) {
+                        fail('${f.label} must be a date (YYYY-MM-DD)');
+                        return;
+                      }
+                      values[f.key] = text;
+                    } else {
+                      values[f.key] = text;
+                    }
                   }
-                }
-                if (row != null) {
-                  values['id'] = row['id'];
-                }
-                Navigator.pop(context);
-                final ok = await state.adminSaveRow(
-                    widget.table, values);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(ok
-                          ? '${widget.singular} saved.'
-                          : 'Save failed. Please try again.')),
-                );
-              },
-            ),
-          ],
+                  if (row != null) values['id'] = row['id'];
+                  Navigator.pop(context);
+                  final ok =
+                      await state.adminSaveRow(widget.table, values);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content: Text(ok
+                            ? '${widget.singular} saved.'
+                            : 'Save failed. Please try again.')),
+                  );
+                },
+              ),
+            ],
           );
           // Existing-patient autofill (owner order, 2026-10-21):
           // when the typed Phone exactly matches a patient account,
           // ExistingUserLookup offers their saved details; Fill maps
-          // name / phone / address onto the fields these catalog
-          // forms have (address lands in Location where present).
-          // Tables without a phone field (lab tests, medicines)
-          // keep the plain dialog.
+          // name / phone / address / gender / DOB onto the fields
+          // the form actually has (audit Admin gap 20: gender and
+          // DOB used to be silently discarded).
           final phoneCtrl = ctrls['phone'];
           if (phoneCtrl == null) return dialog;
           return ExistingUserLookup(
@@ -479,6 +600,20 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
               if (locationCtrl != null && record.address.isNotEmpty) {
                 locationCtrl.text = record.address;
               }
+              if (record.gender.isNotEmpty &&
+                  dropValues.containsKey('gender')) {
+                final g = record.gender.toLowerCase();
+                final match = (fields
+                        .firstWhere((f) => f.key == 'gender')
+                        .options ??
+                    const <String>[])
+                    .where((o) => o.toLowerCase() == g);
+                if (match.isNotEmpty) dropValues['gender'] = match.first;
+              }
+              final dobCtrl = ctrls['date_of_birth'];
+              if (dobCtrl != null && record.dateOfBirth.isNotEmpty) {
+                dobCtrl.text = record.dateOfBirth;
+              }
               setD(() {});
             },
             child: dialog,
@@ -486,10 +621,30 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
         },
       ),
     );
+    // The dialog's controllers are disposed once it closes
+    // (they used to leak on every open — audit SUSPECTED,
+    // verified in code).
+    for (final c in ctrls.values) {
+      c.dispose();
+    }
+  }
+
+  String? _initialDrop(AdminField f, dynamic v) {
+    final s = v?.toString();
+    if (s != null && s.isNotEmpty) return s;
+    if (f.defaultValue != null) return '${f.defaultValue}';
+    return null;
   }
 
   String _initialText(AdminField f, dynamic v) {
-    if (v != null) return '$v';
+    if (v != null) {
+      // Array columns (text[]) arrive as Lists and JSONB columns
+      // as Maps — render them in the editable text form the
+      // dialog parses back on save.
+      if (v is List) return v.join(', ');
+      if (v is Map) return jsonEncode(v);
+      return '$v';
+    }
     if (f.defaultValue != null) return '${f.defaultValue}';
     return '';
   }
@@ -502,39 +657,79 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
 }
 
 /// Field specs per catalog table.
+/// Field specs per catalog table. Completed under the
+/// form-pages audit (Admin gaps 3/11/12/13): every panel-relevant
+/// column is present, enum columns are dropdowns, and numeric
+/// columns carry their real ranges.
 List<AdminField> adminTableFields(String table) {
   switch (table) {
     case 'doctors':
-      return const [
-        AdminField(key: 'name', label: 'Name', required: true),
-        AdminField(key: 'specialization', label: 'Specialty'),
+      return [
+        const AdminField(key: 'name', label: 'Name', required: true),
         AdminField(
-            key: 'consultation_fee',
-            label: 'Fee (₹)',
-            type: 'double'),
-        AdminField(
-            key: 'rating', label: 'Rating', type: 'double'),
-        AdminField(
+            key: 'specialization',
+            label: 'Specialty',
+            type: 'dropdown',
+            options: specialties),
+        const AdminField(
+            key: 'hospital_id',
+            label: 'Hospital',
+            type: 'fk',
+            fkTable: 'hospitals'),
+        const AdminField(
+            key: 'consultation_fee', label: 'Fee (₹)', type: 'double'),
+        const AdminField(
+            key: 'rating',
+            label: 'Rating',
+            type: 'double',
+            min: 0,
+            max: 5),
+        const AdminField(
             key: 'experience_years',
             label: 'Experience (yrs)',
-            type: 'int'),
-        AdminField(key: 'phone', label: 'Phone'),
-        AdminField(key: 'bio', label: 'About'),
-        AdminField(
+            type: 'int',
+            min: 0,
+            max: 70),
+        const AdminField(key: 'phone', label: 'Phone'),
+        const AdminField(
+            key: 'gender',
+            label: 'Gender',
+            type: 'dropdown',
+            options: ['male', 'female', 'other']),
+        const AdminField(key: 'bio', label: 'About', type: 'textarea'),
+        const AdminField(key: 'image_url', label: 'Photo URL', type: 'url'),
+        const AdminField(
+            key: 'working_hours',
+            label: 'Working Hours (JSON)',
+            type: 'json'),
+        const AdminField(
+            key: 'vacation_dates',
+            label: 'Vacation Dates (YYYY-MM-DD, comma separated)',
+            type: 'array'),
+        const AdminField(
+            key: 'license_url', label: 'License Doc URL', type: 'url'),
+        const AdminField(
+            key: 'gst_url', label: 'GST Doc URL', type: 'url'),
+        const AdminField(
+            key: 'additional_docs_urls',
+            label: 'Other Doc URLs (comma separated)',
+            type: 'array'),
+        const AdminField(key: 'user_id', label: 'Linked User ID'),
+        const AdminField(
             key: 'approval_status',
             label: 'Status',
+            type: 'dropdown',
+            options: ['pending', 'approved', 'rejected'],
             defaultValue: 'approved'),
-        AdminField(
-            key: 'is_featured',
-            label: 'Featured',
-            type: 'bool'),
-        AdminField(key: 'upi_id', label: 'UPI ID'),
-        AdminField(
+        const AdminField(
+            key: 'is_featured', label: 'Featured', type: 'bool'),
+        const AdminField(key: 'upi_id', label: 'UPI ID'),
+        const AdminField(
             key: 'upi_enabled',
             label: 'UPI Payments',
             type: 'bool',
             defaultValue: true),
-        AdminField(
+        const AdminField(
             key: 'pay_in_clinic_enabled',
             label: 'Pay in Clinic',
             type: 'bool',
@@ -544,31 +739,46 @@ List<AdminField> adminTableFields(String table) {
       return const [
         AdminField(key: 'name', label: 'Name', required: true),
         AdminField(key: 'location', label: 'Location'),
+        AdminField(key: 'latitude', label: 'Latitude', type: 'double'),
+        AdminField(key: 'longitude', label: 'Longitude', type: 'double'),
+        AdminField(key: 'beds', label: 'Beds', type: 'int', min: 0),
         AdminField(
-            key: 'beds', label: 'Beds', type: 'int'),
+            key: 'total_icu_beds',
+            label: 'ICU Beds',
+            type: 'int',
+            min: 0),
         AdminField(
-            key: 'icu_available',
-            label: 'ICU Available',
-            type: 'bool'),
+            key: 'icu_available', label: 'ICU Available', type: 'bool'),
         AdminField(
-            key: 'is_government',
-            label: 'Government',
-            type: 'bool'),
+            key: 'is_government', label: 'Government', type: 'bool'),
         AdminField(key: 'phone', label: 'Phone'),
+        AdminField(key: 'emergency_contact', label: 'Emergency Contact'),
         AdminField(
             key: 'consultation_fee',
             label: 'Consultation Fee (₹)',
             type: 'double'),
+        AdminField(key: 'rating', label: 'Rating', type: 'double', min: 0, max: 5),
+        AdminField(key: 'image_url', label: 'Photo URL', type: 'url'),
         AdminField(
-            key: 'rating', label: 'Rating', type: 'double'),
+            key: 'working_hours', label: 'Working Hours (JSON)', type: 'json'),
+        AdminField(
+            key: 'holidays',
+            label: 'Holidays (YYYY-MM-DD, comma separated)',
+            type: 'array'),
+        AdminField(key: 'license_url', label: 'License Doc URL', type: 'url'),
+        AdminField(key: 'gst_url', label: 'GST Doc URL', type: 'url'),
+        AdminField(
+            key: 'additional_docs_urls',
+            label: 'Other Doc URLs (comma separated)',
+            type: 'array'),
+        AdminField(key: 'user_id', label: 'Linked User ID'),
         AdminField(
             key: 'approval_status',
             label: 'Status',
+            type: 'dropdown',
+            options: ['pending', 'approved', 'rejected'],
             defaultValue: 'approved'),
-        AdminField(
-            key: 'is_featured',
-            label: 'Featured',
-            type: 'bool'),
+        AdminField(key: 'is_featured', label: 'Featured', type: 'bool'),
         AdminField(key: 'upi_id', label: 'UPI ID'),
         AdminField(
             key: 'upi_enabled',
@@ -587,15 +797,27 @@ List<AdminField> adminTableFields(String table) {
         AdminField(key: 'location', label: 'Location'),
         AdminField(key: 'phone', label: 'Phone'),
         AdminField(
-            key: 'rating', label: 'Rating', type: 'double'),
+            key: 'services',
+            label: 'Services (comma separated)',
+            type: 'array'),
+        AdminField(key: 'rating', label: 'Rating', type: 'double', min: 0, max: 5),
+        AdminField(key: 'image_url', label: 'Photo URL', type: 'url'),
+        AdminField(
+            key: 'working_hours', label: 'Working Hours (JSON)', type: 'json'),
+        AdminField(key: 'license_url', label: 'License Doc URL', type: 'url'),
+        AdminField(key: 'gst_url', label: 'GST Doc URL', type: 'url'),
+        AdminField(
+            key: 'additional_docs_urls',
+            label: 'Other Doc URLs (comma separated)',
+            type: 'array'),
+        AdminField(key: 'user_id', label: 'Linked User ID'),
         AdminField(
             key: 'approval_status',
             label: 'Status',
+            type: 'dropdown',
+            options: ['pending', 'approved', 'rejected'],
             defaultValue: 'approved'),
-        AdminField(
-            key: 'is_featured',
-            label: 'Featured',
-            type: 'bool'),
+        AdminField(key: 'is_featured', label: 'Featured', type: 'bool'),
         AdminField(key: 'upi_id', label: 'UPI ID'),
         AdminField(
             key: 'upi_enabled',
@@ -617,44 +839,73 @@ List<AdminField> adminTableFields(String table) {
             type: 'fk',
             required: true,
             fkTable: 'labs'),
-        AdminField(key: 'category', label: 'Category'),
         AdminField(
-            key: 'price', label: 'Price (₹)', type: 'double'),
+            key: 'category',
+            label: 'Category',
+            type: 'dropdown',
+            options: [
+              'General',
+              'Blood',
+              'Urine',
+              'Imaging',
+              'Cardiac',
+              'Diabetes',
+              'Thyroid',
+              'Vitamins',
+              'Infection',
+              'Hormones',
+            ]),
+        AdminField(key: 'price', label: 'Price (₹)', type: 'double', min: 0),
         AdminField(
             key: 'discount_percent',
             label: 'Discount %',
-            type: 'double'),
+            type: 'double',
+            min: 0,
+            max: 100),
         AdminField(
-            key: 'sample_type', label: 'Sample Type'),
+            key: 'sample_type',
+            label: 'Sample Type',
+            type: 'dropdown',
+            options: ['Blood', 'Urine', 'Swab', 'Stool', 'Other']),
+        AdminField(key: 'turnaround_time', label: 'Turnaround Time'),
+        AdminField(key: 'is_popular', label: 'Popular', type: 'bool'),
         AdminField(
-            key: 'turnaround_time',
-            label: 'Turnaround Time'),
-        AdminField(
-            key: 'is_popular',
-            label: 'Popular',
-            type: 'bool'),
-        AdminField(
-            key: 'requires_fasting',
-            label: 'Requires Fasting',
-            type: 'bool'),
+            key: 'requires_fasting', label: 'Requires Fasting', type: 'bool'),
         AdminField(
             key: 'home_collection',
             label: 'Home Collection',
             type: 'bool',
             defaultValue: true),
-        AdminField(key: 'description', label: 'Description'),
+        AdminField(
+            key: 'home_collection_fee',
+            label: 'Home Collection Fee (₹)',
+            type: 'double',
+            min: 0),
+        AdminField(key: 'description', label: 'Description', type: 'textarea'),
       ];
     case 'pharmacies':
       return const [
         AdminField(key: 'name', label: 'Name', required: true),
         AdminField(key: 'location', label: 'Location'),
         AdminField(key: 'phone', label: 'Phone'),
+        AdminField(key: 'rating', label: 'Rating', type: 'double', min: 0, max: 5),
+        AdminField(key: 'image_url', label: 'Photo URL', type: 'url'),
         AdminField(
-            key: 'rating', label: 'Rating', type: 'double'),
+            key: 'working_hours', label: 'Working Hours (JSON)', type: 'json'),
+        AdminField(key: 'license_url', label: 'License Doc URL', type: 'url'),
+        AdminField(key: 'gst_url', label: 'GST Doc URL', type: 'url'),
+        AdminField(
+            key: 'additional_docs_urls',
+            label: 'Other Doc URLs (comma separated)',
+            type: 'array'),
+        AdminField(key: 'user_id', label: 'Linked User ID'),
         AdminField(
             key: 'approval_status',
             label: 'Status',
+            type: 'dropdown',
+            options: ['pending', 'approved', 'rejected'],
             defaultValue: 'approved'),
+        AdminField(key: 'is_featured', label: 'Featured', type: 'bool'),
         AdminField(key: 'upi_id', label: 'UPI ID'),
         AdminField(
             key: 'upi_enabled',
@@ -676,15 +927,15 @@ List<AdminField> adminTableFields(String table) {
             type: 'fk',
             required: true,
             fkTable: 'pharmacies'),
-        AdminField(
-            key: 'generic_name', label: 'Generic Name'),
+        AdminField(key: 'generic_name', label: 'Generic Name'),
         AdminField(key: 'category', label: 'Category'),
-        AdminField(
-            key: 'price', label: 'Price (₹)', type: 'double'),
+        AdminField(key: 'price', label: 'Price (₹)', type: 'double', min: 0),
         AdminField(
             key: 'discount_percent',
             label: 'Discount %',
-            type: 'double'),
+            type: 'double',
+            min: 0,
+            max: 100),
         AdminField(
             key: 'requires_prescription',
             label: 'Requires Prescription',
@@ -695,12 +946,17 @@ List<AdminField> adminTableFields(String table) {
             type: 'bool',
             defaultValue: true),
         AdminField(
-            key: 'stock_quantity',
-            label: 'Stock Qty',
-            type: 'int'),
-        AdminField(key: 'unit', label: 'Unit'),
+            key: 'stock_quantity', label: 'Stock Qty', type: 'int', min: 0),
         AdminField(
-            key: 'manufacturer', label: 'Manufacturer'),
+            key: 'unit',
+            label: 'Unit',
+            type: 'dropdown',
+            options: ['strip', 'bottle', 'tablet', 'syrup', 'tube', 'pack', 'piece']),
+        AdminField(key: 'manufacturer', label: 'Manufacturer'),
+        AdminField(key: 'batch_number', label: 'Batch Number'),
+        AdminField(key: 'expiry_date', label: 'Expiry Date', type: 'date'),
+        AdminField(key: 'description', label: 'Description', type: 'textarea'),
+        AdminField(key: 'image_url', label: 'Photo URL', type: 'url'),
       ];
     default:
       return const [

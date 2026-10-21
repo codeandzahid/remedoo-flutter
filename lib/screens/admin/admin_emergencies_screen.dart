@@ -42,7 +42,9 @@ class _AdminEmergenciesScreenState
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    await AppStateScope.of(context).loadEmergencyRequests();
+    final state = AppStateScope.of(context);
+    await state.loadEmergencyRequests();
+    await state.loadAmbulances();
     if (mounted) setState(() => _loading = false);
   }
 
@@ -112,7 +114,7 @@ class _AdminEmergenciesScreenState
             ),
             if (r['assigned_ambulance_id'] != null)
               Text(
-                'Ambulance: ${r['assigned_ambulance_id']}',
+                'Ambulance: ${state.ambulances.where((a) => '${a['id']}' == '${r['assigned_ambulance_id']}').map((a) => '${a['vehicle_number'] ?? ''}').firstOrNull ?? r['assigned_ambulance_id']}',
                 style: TextStyle(
                     fontSize: 12,
                     color: scheme.onSurfaceVariant),
@@ -140,6 +142,44 @@ class _AdminEmergenciesScreenState
                     const SnackBar(
                         content: Text(
                             'Update failed. Try again.')),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 10),
+            // Ambulance assignment (audit Admin gap 22: the
+            // assigned vehicle used to be display-only text —
+            // dispatch was a status word with no way to choose
+            // WHICH ambulance goes).
+            DropdownButtonFormField<String>(
+              initialValue: r['assigned_ambulance_id']?.toString(),
+              decoration: const InputDecoration(
+                labelText: 'Assign ambulance',
+                isDense: true,
+              ),
+              items: [
+                const DropdownMenuItem(
+                    value: null, child: Text('Not assigned')),
+                for (final a in state.ambulances)
+                  DropdownMenuItem(
+                    value: '${a['id']}',
+                    child: Text(
+                        '${a['vehicle_number'] ?? 'Vehicle'} • ${a['status'] ?? ''}'),
+                  ),
+              ],
+              onChanged: (v) async {
+                final fields = <String, dynamic>{
+                  'assigned_ambulance_id': v,
+                  // Assigning a vehicle IS the dispatch step.
+                  if (v != null && status == 'pending')
+                    'status': 'dispatched',
+                };
+                final ok = await state.updateEmergencyRequest(
+                    '${r['id']}', fields);
+                if (context.mounted && !ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Assignment failed. Try again.')),
                   );
                 }
               },

@@ -25,75 +25,6 @@ class _Scaffold extends StatelessWidget {
   }
 }
 
-/// Notice shown by screens that were removed during the admin cleanup.
-/// Kept as stubs so admin_shell.dart still compiles until the nav is rewired.
-class _RemovedNotice extends StatelessWidget {
-  final String title;
-  final String reason;
-
-  const _RemovedNotice({required this.title, required this.reason});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: REmptyState(
-          icon: Icons.info_outline,
-          title: '$title removed',
-          subtitle: reason,
-        ),
-      ),
-    );
-  }
-}
-
-/// OTP length + expiry — removed: auth is Supabase-managed.
-class OtpSettingsScreen extends StatelessWidget {
-  const OtpSettingsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => const _RemovedNotice(
-        title: 'OTP Settings',
-        reason:
-            'Verification codes are managed by Supabase Auth. This screen is no longer needed.',
-      );
-}
-
-/// API keys — removed: the generator produced fake keys.
-class ApiKeysScreen extends StatelessWidget {
-  const ApiKeysScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => const _RemovedNotice(
-        title: 'API Keys',
-        reason: 'The key generator was a demo. Real keys live in your '
-            'Supabase / Cloudflare dashboards.',
-      );
-}
-
-/// Quick actions toggles — removed: no app screen reads these.
-class QuickActionsScreen extends StatelessWidget {
-  const QuickActionsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => const _RemovedNotice(
-        title: 'Quick Actions',
-        reason: 'No screen in the app reads these shortcuts. Removed.',
-      );
-}
-
-/// Category actions toggles — removed: no app screen reads these.
-class CategoryActionsScreen extends StatelessWidget {
-  const CategoryActionsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => const _RemovedNotice(
-        title: 'Category Actions',
-        reason: 'No screen in the app reads these shortcuts. Removed.',
-      );
-}
-
 /// Per-category commission percentages, stored in app_config.
 class CommissionScreen extends StatefulWidget {
   const CommissionScreen({super.key});
@@ -434,6 +365,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
   late final TextEditingController _tagline;
   bool _init = false;
   bool _saving = false;
+  bool _touched = false;
 
   @override
   void didChangeDependencies() {
@@ -444,8 +376,22 @@ class _BrandingScreenState extends State<BrandingScreen> {
       _name = TextEditingController(text: '${b['app_name'] ?? 'Remedoo'}');
       _tagline = TextEditingController(
           text: '${b['tagline'] ?? 'Healthcare, simplified'}');
+      _name.addListener(() => _touched = true);
+      _tagline.addListener(() => _touched = true);
       _init = true;
-      s.loadAppConfig();
+      // The controllers above were seeded from whatever config
+      // was already in memory (audit Admin gap 24 — SUSPECTED,
+      // verified real): when the fresh config arrives, refill
+      // them unless the admin has already started typing.
+      s.loadAppConfig().then((_) {
+        if (!mounted || _touched) return;
+        final loaded = s.appConfigValue('branding');
+        setState(() {
+          _name.text = '${loaded['app_name'] ?? 'Remedoo'}';
+          _tagline.text =
+              '${loaded['tagline'] ?? 'Healthcare, simplified'}';
+        });
+      });
     }
   }
 
@@ -849,8 +795,14 @@ class _FeaturedScreenState extends State<FeaturedScreen>
 
   Future<void> _toggle(String table, Map<String, dynamic> row) async {
     final state = AppStateScope.of(context);
-    final updated = Map<String, dynamic>.from(row)
-      ..['is_featured'] = !(row['is_featured'] == true);
+    // Send ONLY the flag (audit Admin gap 24 — SUSPECTED, verified
+    // real): resending the whole loaded row could overwrite
+    // concurrent edits with stale values and trip read-only or
+    // generated columns.
+    final updated = <String, dynamic>{
+      'id': row['id'],
+      'is_featured': !(row['is_featured'] == true),
+    };
     final ok = await state.adminSaveRow(table, updated);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

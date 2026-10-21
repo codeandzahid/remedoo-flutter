@@ -41,6 +41,130 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     if (ok) _load();
   }
 
+
+  /// Profile + status editor (audit Admin gap 6).
+  Future<void> _editUser(Map<String, dynamic> u) async {
+    final name = TextEditingController(text: '${u['full_name'] ?? ''}');
+    final phone = TextEditingController(text: '${u['phone'] ?? ''}');
+    final address = TextEditingController(text: '${u['address'] ?? ''}');
+    final language =
+        TextEditingController(text: '${u['language'] ?? ''}');
+    final upi = TextEditingController(text: '${u['upi_id'] ?? ''}');
+    final dob = TextEditingController(
+        text: '${u['date_of_birth'] ?? ''}'.split('T').first);
+    var gender = '${u['gender'] ?? ''}';
+    var status = '${u['status'] ?? 'active'}';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text('Edit ${u['email'] ?? 'user'}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                    controller: name,
+                    decoration:
+                        const InputDecoration(labelText: 'Full name')),
+                TextField(
+                    controller: phone,
+                    decoration:
+                        const InputDecoration(labelText: 'Phone')),
+                TextField(
+                    controller: address,
+                    decoration:
+                        const InputDecoration(labelText: 'Address')),
+                TextField(
+                    controller: language,
+                    decoration: const InputDecoration(
+                        labelText: 'Language code (en, hi, ur, ks)')),
+                TextField(
+                    controller: upi,
+                    decoration:
+                        const InputDecoration(labelText: 'UPI ID')),
+                TextField(
+                  controller: dob,
+                  decoration: const InputDecoration(
+                      labelText: 'Date of birth (YYYY-MM-DD)'),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: const ['male', 'female', 'other']
+                          .contains(gender)
+                      ? gender
+                      : null,
+                  decoration:
+                      const InputDecoration(labelText: 'Gender'),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('—')),
+                    DropdownMenuItem(value: 'male', child: Text('male')),
+                    DropdownMenuItem(
+                        value: 'female', child: Text('female')),
+                    DropdownMenuItem(
+                        value: 'other', child: Text('other')),
+                  ],
+                  onChanged: (v) => setD(() => gender = v ?? ''),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: status,
+                  decoration: const InputDecoration(
+                      labelText: 'Account status'),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'active', child: Text('active')),
+                    DropdownMenuItem(
+                        value: 'suspended',
+                        child: Text('suspended')),
+                  ],
+                  onChanged: (v) =>
+                      setD(() => status = v ?? 'active'),
+                ),
+                if (status == 'suspended')
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'A suspended user is flagged in every admin list. '
+                      'Their sign-in should be treated as blocked.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (saved != true) return;
+    final ok = await SupabaseRepository.instance.adminUpdateProfile(
+      '${u['user_id']}',
+      {
+        'full_name': name.text.trim(),
+        'phone': phone.text.trim(),
+        'address': address.text.trim(),
+        'language':
+            language.text.trim().isEmpty ? null : language.text.trim(),
+        'upi_id': upi.text.trim().isEmpty ? null : upi.text.trim(),
+        'gender': gender.isEmpty ? null : gender,
+        'date_of_birth': dob.text.trim().isEmpty ? null : dob.text.trim(),
+        'status': status,
+      },
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(ok ? 'User updated.' : 'Update failed.')),
+    );
+    if (ok) _load();
+  }
+
   void _showRoleDialog(Map<String, dynamic> user) {
     const roles = ['user', 'doctor', 'pharmacy', 'lab', 'hospital', 'driver', 'admin'];
     final current = '${user['role'] ?? 'user'}';
@@ -141,6 +265,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 6),
                         child: ListTile(
+                          onTap: () => _editUser(u),
                           leading: CircleAvatar(
                             backgroundColor: scheme.primary
                                 .withValues(alpha: 0.12),
@@ -166,6 +291,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                               if ('${u['phone'] ?? ''}'.isNotEmpty)
                                 Text('${u['phone']}',
                                     style: const TextStyle(fontSize: 12)),
+                              if ('${u['status'] ?? 'active'}' ==
+                                  'suspended')
+                                const Text('SUSPENDED',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.red)),
                             ],
                           ),
                           trailing: InkWell(

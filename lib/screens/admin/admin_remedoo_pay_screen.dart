@@ -124,6 +124,21 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
   }
 
   Future<void> _save({bool makeActive = false}) async {
+    // Same UPI format rule as the provider UPI dialog (audit
+    // Admin gap 18: this editor used to accept any text, so a
+    // malformed platform VPA reached live checkout).
+    final vpa = _vpa.text.trim();
+    if (vpa.isNotEmpty &&
+        !RegExp(r'^[\w.\-]{2,}@[a-zA-Z]{2,}$').hasMatch(vpa)) {
+      _snack(context,
+          'That UPI ID does not look right — it should look like name@bank.');
+      return;
+    }
+    if (makeActive && vpa.isEmpty) {
+      _snack(context,
+          'Enter the platform UPI ID before making Remedoo Pay active.');
+      return;
+    }
     final state = AppStateScope.of(context);
     final repo = state.supabaseRepository;
     setState(() => _saving = true);

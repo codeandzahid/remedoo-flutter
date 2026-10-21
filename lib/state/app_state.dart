@@ -3117,6 +3117,23 @@ class AppState extends ChangeNotifier {
     return ok;
   }
 
+  Future<bool> updateAnnouncement(String id,
+      {String? title, String? message, String? audience}) async {
+    final ok = await _repo.updateAnnouncement(id,
+        title: title, message: message, audience: audience);
+    if (ok) {
+      for (final a in _announcements) {
+        if ('${a['id']}' == id) {
+          if (title != null) a['title'] = title;
+          if (message != null) a['message'] = message;
+          if (audience != null) a['audience'] = audience;
+        }
+      }
+      notifyListeners();
+    }
+    return ok;
+  }
+
   Future<bool> deleteAnnouncement(String id) async {
     final ok = await _repo.deleteAnnouncement(id);
     if (ok) {

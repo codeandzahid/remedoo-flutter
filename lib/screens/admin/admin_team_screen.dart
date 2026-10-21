@@ -39,6 +39,7 @@ const kStaffSectionOptions = <(String, String)>[
   ('users', 'Users'),
   ('remedoo_pay', 'Remedoo Pay'),
   ('export_data', 'Export Data'),
+  ('panel_style', 'Panel Style'),
 ];
 
 String staffSectionLabel(String key) {
@@ -104,6 +105,32 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     }
     _snack('Staff account created.');
     _load();
+  }
+
+  /// Deactivate / reactivate a staff account (audit Admin
+  /// gap 17: there was no way to pause an account short of
+  /// deleting it). Deactivation clears all sections AND marks
+  /// the profile suspended; reactivation restores the profile
+  /// — sections are re-ticked by the super admin.
+  Future<void> _toggleActive(Map<String, dynamic> m, bool active) async {
+    final state = AppStateScope.of(context);
+    final repo = state.supabaseRepository;
+    final uid = '${m['user_id']}';
+    if (!active) {
+      await repo.updateStaffSections(uid, const []);
+    }
+    final ok = await repo.adminUpdateProfile(
+        uid, {'status': active ? 'active' : 'suspended'});
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(ok
+              ? (active
+                  ? 'Account reactivated. Tick the sections they may use.'
+                  : 'Account deactivated — access removed.')
+              : 'Could not update the account.')),
+    );
+    if (ok) _load();
   }
 
   Future<void> _editAccess(Map<String, dynamic> m) async {
@@ -245,6 +272,22 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                               ),
                             ],
                           ),
+                        ),
+                        if ('${m['status'] ?? 'active'}' ==
+                            'suspended')
+                          const Padding(
+                            padding: EdgeInsets.only(right: 4),
+                            child: Chip(
+                              label: Text('Suspended'),
+                              labelStyle: TextStyle(fontSize: 11),
+                              visualDensity:
+                                  VisualDensity.compact,
+                            ),
+                          ),
+                        Switch(
+                          value: '${m['status'] ?? 'active'}' !=
+                              'suspended',
+                          onChanged: (v) => _toggleActive(m, v),
                         ),
                         IconButton(
                           icon: const Icon(Icons.key_outlined),

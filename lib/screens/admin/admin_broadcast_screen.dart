@@ -190,13 +190,23 @@ class _AdminBroadcastScreenState
                               TextOverflow.ellipsis,
                         ),
                         isThreeLine: true,
-                        trailing: IconButton(
-                          icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red),
-                          tooltip: 'Delete',
-                          onPressed: () =>
-                              _confirmDelete(state, a),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              tooltip: 'Edit',
+                              onPressed: () => _edit(state, a),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red),
+                              tooltip: 'Delete',
+                              onPressed: () =>
+                                  _confirmDelete(state, a),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -204,6 +214,79 @@ class _AdminBroadcastScreenState
           ],
         ),
       ),
+    );
+  }
+
+
+  /// Edit a published announcement in place (audit Admin
+  /// gap 19).
+  Future<void> _edit(AppState state, Map<String, dynamic> a) async {
+    final title =
+        TextEditingController(text: '${a['title'] ?? ''}');
+    final message =
+        TextEditingController(text: '${a['message'] ?? ''}');
+    var audience = '${a['audience'] ?? 'all'}';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Edit announcement'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                    controller: title,
+                    decoration:
+                        const InputDecoration(labelText: 'Title')),
+                TextField(
+                  controller: message,
+                  maxLines: 4,
+                  decoration:
+                      const InputDecoration(labelText: 'Message'),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: audience,
+                  decoration:
+                      const InputDecoration(labelText: 'Audience'),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'all', child: Text('Everyone')),
+                    DropdownMenuItem(
+                        value: 'users', child: Text('Patients only')),
+                    DropdownMenuItem(
+                        value: 'providers',
+                        child: Text('Providers only')),
+                  ],
+                  onChanged: (v) =>
+                      setD(() => audience = v ?? 'all'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (saved != true) return;
+    final ok = await state.updateAnnouncement(
+      '${a['id']}',
+      title: title.text.trim(),
+      message: message.text.trim(),
+      audience: audience,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(
+              ok ? 'Announcement updated.' : 'Update failed.')),
     );
   }
 

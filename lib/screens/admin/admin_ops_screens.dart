@@ -258,6 +258,117 @@ class _AdminAmbulanceScreenState
     if (mounted) setState(() => _loading = false);
   }
 
+
+  /// Add / edit a fleet vehicle (audit Admin gap 7: the fleet
+  /// could not be created or edited at all — vehicle number and
+  /// driver details were display-only).
+  Future<void> _editAmbulance(BuildContext context, AppState state,
+      [Map<String, dynamic>? existing]) async {
+    final e = existing ?? {};
+    final vehicle =
+        TextEditingController(text: '${e['vehicle_number'] ?? ''}');
+    final driver =
+        TextEditingController(text: '${e['driver_name'] ?? ''}');
+    final phone =
+        TextEditingController(text: '${e['driver_phone'] ?? ''}');
+    final equipment = TextEditingController(
+        text: '${e['equipment_details'] ?? ''}');
+    var type = '${e['vehicle_type'] ?? 'BLS'}';
+    var status = '${e['status'] ?? 'available'}';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text(existing == null
+              ? 'Add ambulance'
+              : 'Edit ambulance'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                    controller: vehicle,
+                    decoration: const InputDecoration(
+                        labelText: 'Vehicle number *')),
+                TextField(
+                    controller: driver,
+                    decoration: const InputDecoration(
+                        labelText: 'Driver name')),
+                TextField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                        labelText: 'Driver phone')),
+                DropdownButtonFormField<String>(
+                  initialValue: type,
+                  decoration:
+                      const InputDecoration(labelText: 'Type'),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'BLS',
+                        child: Text('BLS — Basic Life Support')),
+                    DropdownMenuItem(
+                        value: 'ALS',
+                        child: Text('ALS — Advanced Life Support')),
+                    DropdownMenuItem(value: 'ICU', child: Text('ICU')),
+                    DropdownMenuItem(
+                        value: 'PTA',
+                        child: Text('PTA — Patient Transport')),
+                  ],
+                  onChanged: (v) => setD(() => type = v ?? 'BLS'),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue:
+                      _statuses.contains(status) ? status : 'available',
+                  decoration:
+                      const InputDecoration(labelText: 'Status'),
+                  items: [
+                    for (final s in _statuses)
+                      DropdownMenuItem(
+                          value: s,
+                          child: Text(s.replaceAll('_', ' '))),
+                  ],
+                  onChanged: (v) =>
+                      setD(() => status = v ?? 'available'),
+                ),
+                TextField(
+                    controller: equipment,
+                    decoration: const InputDecoration(
+                        labelText: 'Equipment details')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (saved != true) return;
+    if (vehicle.text.trim().isEmpty) {
+      _snack(context, 'Vehicle number is required.');
+      return;
+    }
+    final ok = await state.adminSaveRow('ambulances', {
+      if (existing != null) 'id': '${existing['id']}',
+      'vehicle_number': vehicle.text.trim(),
+      'driver_name': driver.text.trim(),
+      'driver_phone': phone.text.trim(),
+      'vehicle_type': type,
+      'status': status,
+      'equipment_details': equipment.text.trim(),
+    });
+    if (!context.mounted) return;
+    _snack(context,
+        ok ? 'Ambulance saved.' : 'Save failed. Try again.');
+    if (ok) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
@@ -266,20 +377,42 @@ class _AdminAmbulanceScreenState
           child: CircularProgressIndicator());
     }
     if (state.ambulances.isEmpty) {
-      return const REmptyState(
-        icon: Icons.emergency_outlined,
-        title: 'No ambulances',
-        subtitle:
-            'Fleet vehicles will appear here once added.',
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const REmptyState(
+            icon: Icons.emergency_outlined,
+            title: 'No ambulances',
+            subtitle:
+                'Fleet vehicles will appear here once added.',
+          ),
+          RButton(
+            label: 'Add ambulance',
+            icon: Icons.add,
+            onPressed: () => _editAmbulance(context, state),
+          ),
+        ],
       );
     }
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: state.ambulances.length,
-        itemBuilder: (_, i) =>
-            _card(context, state, state.ambulances[i]),
+        itemCount: state.ambulances.length + 1,
+        itemBuilder: (_, i) {
+          if (i == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: RButton(
+                label: 'Add ambulance',
+                icon: Icons.add,
+                variant: RButtonVariant.outline,
+                onPressed: () => _editAmbulance(context, state),
+              ),
+            );
+          }
+          return _card(context, state, state.ambulances[i - 1]);
+        },
       ),
     );
   }
@@ -301,7 +434,16 @@ class _AdminAmbulanceScreenState
                   const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text(
               '${a['driver_name'] ?? '—'} • ${a['driver_phone'] ?? '—'}'),
-          trailing: DropdownButton<String>(
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                tooltip: 'Edit vehicle',
+                onPressed: () =>
+                    _editAmbulance(context, state, a),
+              ),
+              DropdownButton<String>(
             value:
                 _statuses.contains(status) ? status : null,
             underline: const SizedBox.shrink(),
@@ -319,6 +461,8 @@ class _AdminAmbulanceScreenState
                     context, 'Update failed. Try again.');
               }
             },
+              ),
+            ],
           ),
         ),
       ),
@@ -440,17 +584,63 @@ class _AdminInventoryScreenState
                 ],
               ),
             ),
-            QtyStepper(
-              qty: stock,
-              onMinus: () => _setStock(
-                  context, state, id, stock - 1),
-              onPlus: () => _setStock(
-                  context, state, id, stock + 1),
+            Column(
+              children: [
+                QtyStepper(
+                  qty: stock,
+                  onMinus: () => _setStock(
+                      context, state, id, stock - 1),
+                  onPlus: () => _setStock(
+                      context, state, id, stock + 1),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      _editStock(context, state, m, stock),
+                  child: const Text('Set exact',
+                      style: TextStyle(fontSize: 11.5)),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Exact numeric stock entry (audit Admin gap 27: stock could
+  /// only be stepped ±1, so a bulk correction meant hundreds of
+  /// taps).
+  Future<void> _editStock(BuildContext context, AppState state,
+      Map<String, dynamic> m, int current) async {
+    final ctrl =
+        TextEditingController(text: current.toString());
+    final value = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Stock for ${m['name'] ?? 'medicine'}'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+              labelText: 'Quantity in stock',
+              border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(ctx, int.tryParse(ctrl.text.trim())),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (value == null || value < 0) return;
+    await _setStock(context, state, '${m['id']}', value);
   }
 
   Future<void> _setStock(BuildContext context, AppState state,
