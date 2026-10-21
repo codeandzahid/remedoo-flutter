@@ -6,6 +6,7 @@ import 'package:remedoo_app/app_navigator.dart';
 import 'package:remedoo_app/main.dart';
 import 'package:remedoo_app/screens/email_verified_screen.dart';
 import 'package:remedoo_app/screens/login_screen.dart';
+import 'package:remedoo_app/screens/signup_screen.dart';
 import 'package:remedoo_app/services/auth_service.dart';
 import 'package:remedoo_app/state/app_state.dart';
 
@@ -234,6 +235,158 @@ void main() {
       expect(find.text('Smart Care'), findsOneWidget);
       expect(find.text('Email Verified'), findsNothing);
       expect(find.byType(EmailVerifiedScreen), findsNothing);
+    });
+  });
+
+  group('link landings through RootGate', () {
+    // Boots the REAL app (RootGate) with a session already present,
+    // the way a link landing leaves it: the session has arrived and
+    // signup completeness is whatever [incomplete] says, resolved in
+    // the same boot — RootGate puts an unfinished account on the
+    // Step 2 gate and a finished one in the app. Supabase is not
+    // initialized in tests, so attachAuthListener stops early there;
+    // the landing itself is then driven through
+    // AppState.handleAuthCallbackLanding, the exact method
+    // attachAuthListener routes the URL exchange's result through.
+    Future<AppState> pumpLandedApp(
+      WidgetTester tester, {
+      required bool incomplete,
+    }) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      final state = AppState()
+        ..login(name: '', email: 'testf@example.com')
+        ..markOnboardingSeen();
+      if (incomplete) state.debugSetProfileComplete(false);
+      await tester.pumpWidget(
+          AppStateScope(state: state, child: const RemedooApp()));
+      bool settled() => incomplete
+          ? find.byType(SignupScreen).evaluate().isNotEmpty
+          : find.text('Smart Care').evaluate().isNotEmpty;
+      for (var i = 0; i < 40 && !settled(); i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      await tester.pumpAndSettle();
+      expect(settled(), isTrue, reason: 'boot should settle');
+      expect(find.byType(EmailVerifiedScreen), findsNothing);
+      return state;
+    }
+
+    Future<void> land(
+      WidgetTester tester,
+      AppState state,
+      AuthCallbackResult result,
+    ) async {
+      await state.handleAuthCallbackLanding(result);
+      // Presentation is registered as a post-frame callback (the
+      // same mechanism the recovery route uses; in the live app the
+      // frames boot keeps producing run it immediately). Force that
+      // frame here, then settle the route transition.
+      tester.binding.scheduleFrame();
+      await tester.pump();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'magic-link resume landing: a signIn-classified landing for '
+        'an incomplete account still presents the Verified screen '
+        'above the gate', (tester) async {
+      // The Run B regression (live, 2026-10-21): the account's email
+      // was confirmed by an earlier click, so this later "Sign in
+      // automatically" landing classifies as signIn (the landing
+      // itself confirmed nothing) — yet it is the resume moment for
+      // an unfinished signup and must not skip the Verified screen.
+      final state = await pumpLandedApp(tester, incomplete: true);
+      expect(find.byType(SignupScreen), findsOneWidget);
+
+      await land(
+        tester,
+        state,
+        const AuthCallbackResult(
+          AuthCallbackKind.signIn,
+          sessionEstablished: true,
+        ),
+      );
+
+      // The Verified screen is the top route, with the button right
+      // at first paint (completeness was resolved before presenting,
+      // so no "Continue to Login" flicker).
+      expect(find.byType(EmailVerifiedScreen), findsOneWidget);
+      expect(find.text('Finish Your Account'), findsOneWidget);
+      expect(find.text('Continue to Login'), findsNothing);
+
+      // Continue hands over to the completion gate underneath and
+      // keeps the session for Step 2.
+      await tester.tap(find.text('Finish Your Account'));
+      await tester.pumpAndSettle();
+      expect(find.byType(EmailVerifiedScreen), findsNothing);
+      expect(find.byType(SignupScreen), findsOneWidget);
+      expect(state.isSignedIn, isTrue);
+    });
+
+    testWidgets(
+        'fresh confirmation landing presents the Verified screen '
+        'above the gate', (tester) async {
+      final state = await pumpLandedApp(tester, incomplete: true);
+
+      await land(
+        tester,
+        state,
+        const AuthCallbackResult(
+          AuthCallbackKind.emailConfirmation,
+          sessionEstablished: true,
+        ),
+      );
+
+      expect(find.byType(EmailVerifiedScreen), findsOneWidget);
+      expect(find.text('Finish Your Account'), findsOneWidget);
+      expect(find.text('Continue to Login'), findsNothing);
+
+      await tester.tap(find.text('Finish Your Account'));
+      await tester.pumpAndSettle();
+      expect(find.byType(EmailVerifiedScreen), findsNothing);
+      expect(find.byType(SignupScreen), findsOneWidget);
+      expect(state.isSignedIn, isTrue);
+    });
+
+    testWidgets(
+        'established-account magic link: a signIn landing for a '
+        'complete account shows no Verified screen', (tester) async {
+      final state = await pumpLandedApp(tester, incomplete: false);
+      expect(find.text('Smart Care'), findsOneWidget);
+
+      await land(
+        tester,
+        state,
+        const AuthCallbackResult(
+          AuthCallbackKind.signIn,
+          sessionEstablished: true,
+        ),
+      );
+
+      expect(find.byType(EmailVerifiedScreen), findsNothing);
+      expect(find.text('Smart Care'), findsOneWidget);
+      expect(state.isSignedIn, isTrue);
+    });
+
+    testWidgets('recovery and empty landings never present the '
+        'Verified screen', (tester) async {
+      final state = await pumpLandedApp(tester, incomplete: true);
+
+      await land(tester, state, AuthCallbackResult.none);
+      expect(find.byType(EmailVerifiedScreen), findsNothing);
+
+      await land(
+        tester,
+        state,
+        const AuthCallbackResult(
+          AuthCallbackKind.recovery,
+          sessionEstablished: true,
+        ),
+      );
+      expect(find.byType(EmailVerifiedScreen), findsNothing);
+      expect(find.byType(SignupScreen), findsOneWidget);
     });
   });
 }

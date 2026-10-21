@@ -128,15 +128,51 @@ class AppState extends ChangeNotifier {
     // For a recovery return this emits passwordRecovery into the
     // listener above, which routes to the new-password screen.
     final callback = await AuthService.instance.handleAuthCallbackFromUrl();
-    if (callback.kind == AuthCallbackKind.emailConfirmation) {
-      // A signup email-confirmation return: the signedIn event above
-      // has already synced the session. Route to the Email Verified
-      // screen (RootGate pushes it above its normal routing, the same
-      // robust way as password recovery). Recovery returns never
-      // reach this branch — they classify as recovery and are routed
-      // by the passwordRecovery event instead — and ordinary link
-      // sign-ins (an old account's magic link) classify as signIn and
-      // simply land in the app.
+    await handleAuthCallbackLanding(callback);
+  }
+
+  /// Routes a session-establishing auth-callback landing (the result
+  /// of [AuthService.handleAuthCallbackFromUrl]) to the Email
+  /// Verified screen where one is owed. Called by
+  /// [attachAuthListener] with the URL exchange's result; tests call
+  /// it directly to simulate a landing.
+  ///
+  /// A confirmation return always presents the screen. A plain link
+  /// sign-in normally does not — it classifies as signIn precisely
+  /// because the landing itself did not confirm the email (an
+  /// established account's magic link) — and simply lands in the
+  /// app. The exception is an account that never finished signup:
+  /// its email stands verified (it was confirmed when the account
+  /// was created, or by an earlier code entry / link click), so a
+  /// later emailed link classifies as signIn even though the landing
+  /// is exactly the resume moment the Verified screen exists for —
+  /// live runs confirmed the screen was then silently skipped and
+  /// the user dropped straight onto the Step 2 form, while the same
+  /// account's first-confirming click had shown it. So a signIn
+  /// landing whose account is incomplete presents the screen too
+  /// (its Continue hands over to the completion gate underneath).
+  ///
+  /// Either way, completeness is resolved BEFORE presenting: the
+  /// screen used to be pushed while the flag was still its default,
+  /// so its button first painted "Continue to Login" and only later
+  /// flipped to "Finish Your Account". Recovery returns never reach
+  /// the presentation branch — they classify as recovery and are
+  /// routed by the passwordRecovery event instead.
+  Future<void> handleAuthCallbackLanding(AuthCallbackResult callback) async {
+    if (callback.kind != AuthCallbackKind.emailConfirmation &&
+        callback.kind != AuthCallbackKind.signIn) {
+      return;
+    }
+    // Sync the session user from the exchange itself: the auth
+    // stream's signedIn event is delivered asynchronously and may
+    // not have landed yet, but the completeness resolution below
+    // must read THIS landing's account.
+    _syncUserFromSession();
+    if (_supaUser != null) {
+      await resolveProfileCompleteness();
+    }
+    if (callback.kind == AuthCallbackKind.emailConfirmation ||
+        !_profileComplete) {
       final cb = onEmailConfirmation;
       if (cb != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) => cb());
