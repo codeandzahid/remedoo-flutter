@@ -6,6 +6,8 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/provider_payments.dart';
 import '../../widgets/provider_profile_form.dart';
+import '../../widgets/pharmacy_medicines_manager.dart';
+import '../../widgets/provider_wallet_card.dart';
 import '../../widgets/upi_setup_dialog.dart';
 import '../../widgets/widgets.dart';
 
@@ -332,6 +334,14 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
           providerName: '${_profile?['name'] ?? ''}',
         ),
         const SizedBox(height: 16),
+        PharmacyMedicinesManager(repo: _repo),
+        const SizedBox(height: 16),
+        ProviderWalletCard(
+          repo: _repo,
+          providerType: 'pharmacy',
+          providerId: '${_profile?['id'] ?? ''}',
+        ),
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
@@ -598,8 +608,17 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
                   ),
                 ],
               ),
-            ] else if (status == 'confirmed' ||
-                status == 'preparing') ...[
+            ] else if (status == 'confirmed') ...[
+              // The preparing step (audit Panelist 16: the status
+              // existed with a label and colour but NO button ever
+              // set it, so the documented flow skipped it).
+              const SizedBox(height: 12),
+              RButton(
+                label: 'Start preparing',
+                small: true,
+                onPressed: () => _setStatus(o, 'preparing'),
+              ),
+            ] else if (status == 'preparing') ...[
               const SizedBox(height: 12),
               RButton(
                 label: 'Mark ready — out for delivery',

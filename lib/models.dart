@@ -363,6 +363,12 @@ class Appointment {
   final String? department;
   final bool isVideoConsultation;
 
+  /// Lab collection choice (appointments.collection_type /
+  /// collection_address) — walk-in vs home collection (audit
+  /// Patient 11).
+  final String? collectionType;
+  final String? collectionAddress;
+
   /// Refund tracking after a paid-online appointment is cancelled.
   String? refundStatus;
   double? refundAmount;
@@ -393,6 +399,8 @@ class Appointment {
     this.customerUpi,
     this.department,
     this.isVideoConsultation = false,
+    this.collectionType,
+    this.collectionAddress,
     this.refundStatus,
     this.refundAmount,
     this.refundAt,
@@ -533,12 +541,28 @@ class LabTest {
   final String turnaround;
   final String category;
 
+  /// Backend catalogue fields (audit Patient 10: the lab detail
+  /// screen showed the same first-12 mock tests for every lab
+  /// because the model dropped lab_id and the clinical flags).
+  final String? labId;
+  final String sampleType;
+  final bool requiresFasting;
+  final bool homeCollection;
+  final double homeCollectionFee;
+  final String description;
+
   const LabTest({
     required this.id,
     required this.name,
     required this.price,
     this.turnaround = '6-12 hrs',
     this.category = 'General',
+    this.labId,
+    this.sampleType = 'Blood',
+    this.requiresFasting = false,
+    this.homeCollection = true,
+    this.homeCollectionFee = 0,
+    this.description = '',
   });
 }
 

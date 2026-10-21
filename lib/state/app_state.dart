@@ -872,6 +872,7 @@ class AppState extends ChangeNotifier {
     unawaited(loadMyRefunds());
     // Own reminders from health_reminders (audit Patient 14).
     unawaited(loadRemindersFromBackend());
+    unawaited(loadPatientLabSamples());
     final prof = await _repo.fetchProfile();
     if (prof != null) {
       final n = '${prof['full_name'] ?? ''}';
@@ -1087,6 +1088,8 @@ class AppState extends ChangeNotifier {
       customerUpi: _strOrNull(r['customer_upi']),
       department: _strOrNull(r['department']),
       isVideoConsultation: r['is_video_consultation'] == true,
+      collectionType: _strOrNull(r['collection_type']),
+      collectionAddress: _strOrNull(r['collection_address']),
       prescriptionPath: _strOrNull(r['prescription_url']),
       refundStatus: _strOrNull(r['refund_status']),
       refundAmount: (r['refund_amount'] as num?)?.toDouble(),
@@ -1197,6 +1200,18 @@ class AppState extends ChangeNotifier {
 
   /// Fire-and-forget Supabase insert for a new appointment; records the real
   /// row id so cancel works against the production table.
+  /// The note stored on the backend appointment row: the
+  /// patient's own note, prefixed with the booked test names for
+  /// lab bookings.
+  static String? _bookingNotes(Appointment appt) {
+    final parts = <String>[
+      if (appt.tests.isNotEmpty)
+        'Tests: ${appt.tests.map((t) => t.name).join(', ')}',
+      if (appt.notes.isNotEmpty) appt.notes,
+    ];
+    return parts.isEmpty ? null : parts.join(' • ');
+  }
+
   void _syncBookAppointment(Appointment appt) {
     if (_supaUser == null) return;
     _repo
@@ -1208,7 +1223,11 @@ class AppState extends ChangeNotifier {
       pharmacyId: appt.kind == 'pharmacy' ? appt.refId : null,
       date: appt.date,
       timeLabel: appt.timeLabel,
-      notes: appt.notes.isEmpty ? null : appt.notes,
+      // Lab bookings fold their selected test names into the
+      // note so the lab panel (and the sample record created
+      // from it) can see WHAT was booked — the tests list itself
+      // has no column on appointments.
+      notes: _bookingNotes(appt),
       // Only a real uploaded URL goes to the backend — a local
       // device path is meaningless to the provider's panel.
       prescriptionUrl: (appt.prescriptionPath ?? '').startsWith('http')
@@ -1222,6 +1241,8 @@ class AppState extends ChangeNotifier {
       paymentMethod: dbPaymentMethod(appt.payment),
       department: appt.department,
       isVideoConsultation: appt.isVideoConsultation,
+      collectionType: appt.collectionType,
+      collectionAddress: appt.collectionAddress,
     )
         .then((remoteId) {
       if (remoteId != null) _remoteAppointmentIds[appt.id] = remoteId;
@@ -1414,6 +1435,8 @@ class AppState extends ChangeNotifier {
     String? customerUpi,
     String? department,
     bool isVideoConsultation = false,
+    String? collectionType,
+    String? collectionAddress,
   }) {
     final appt = Appointment(
       id: 'A${DateTime.now().millisecondsSinceEpoch}',
@@ -1436,6 +1459,8 @@ class AppState extends ChangeNotifier {
       customerUpi: customerUpi,
       department: department,
       isVideoConsultation: isVideoConsultation,
+      collectionType: collectionType,
+      collectionAddress: collectionAddress,
     );
     appointments.add(appt);
     _takenSlots.add(_slotKey(title, date, timeLabel));
@@ -3453,8 +3478,49 @@ class AppState extends ChangeNotifier {
     unawaited(_persistMyReports());
   }
 
-  /// Removes a patient-uploaded report from the device list and
-  /// its persisted copy (audit fix 2026-10-19 — uploads previously
+  /// Merges lab-issued reports (lab_sample_collections rows with
+  /// an uploaded report) into the patient's report list — until
+  /// this existed, a report the LAB uploaded never reached the
+  /// patient anywhere (audit Panelist 2 / Patient 11 follow-on).
+  Future<void> loadPatientLabSamples() async {
+    final rows = await _repo.fetchPatientLabSamples();
+    if (rows.isEmpty) return;
+    var changed = false;
+    for (final r in rows) {
+      final id = 'sample-${r['id']}';
+      if (reports.any((x) => x.id == id)) continue;
+      var url = '${r['report_url'] ?? ''}';
+      if (url.isNotEmpty && !url.startsWith('http')) {
+        url = await _repo.signedStorageUrl('lab-reports', url) ?? url;
+      }
+      final lab = labs
+          .where((l) => l.id == '${r['lab_id']}')
+          .firstOrNull;
+      reports.add(LabReport(
+        id: id,
+        patientName: userName,
+        labName: lab?.name ?? 'Lab',
+        date: DateTime.tryParse('${r['created_at'] ?? ''}') ??
+            DateTime.now(),
+        status: r['status'] == 'completed' ? 'Completed' : 'In Progress',
+        tests: [
+          {
+            'name': '${r['test_name'] ?? 'Lab test'}',
+            'result': url.isNotEmpty ? 'Report file' : 'Awaiting report',
+            'unit': '-',
+            'range': '-',
+            'flag': 'Normal',
+          }
+        ],
+        fileUrl: url.isEmpty ? null : url,
+        fileName: url.isEmpty ? null : 'Lab report',
+      ));
+      changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+
+  /// Removes a patient-uploaded report from the device list and  /// its persisted copy (audit fix 2026-10-19 — uploads previously
   /// could not be deleted at all). Only uploaded reports live in
   /// this local list; the stored file itself is left untouched in
   /// storage, this removes the patient's on-device entry.

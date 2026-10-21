@@ -542,7 +542,7 @@ class AuthService {
           .from('user_roles')
           .select('role')
           .eq('user_id', uid)
-          .inFilter('role', ['doctor', 'pharmacy', 'lab', 'hospital'])
+          .inFilter('role', ['doctor', 'pharmacy', 'lab', 'hospital', 'driver'])
           .order('role')
           .limit(1);
       if (rows.isEmpty) return null;

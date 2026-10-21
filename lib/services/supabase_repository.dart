@@ -254,6 +254,13 @@ class SupabaseRepository {
       price: price * (1 - disc / 100),
       turnaround: '${r['turnaround_time'] ?? '6-12 hrs'}',
       category: '${r['category'] ?? ''}',
+      labId: r['lab_id']?.toString(),
+      sampleType: '${r['sample_type'] ?? 'Blood'}',
+      requiresFasting: r['requires_fasting'] == true,
+      homeCollection: r['home_collection'] != false,
+      homeCollectionFee:
+          (r['home_collection_fee'] as num?)?.toDouble() ?? 0,
+      description: '${r['description'] ?? ''}',
     );
   }
 
@@ -290,35 +297,47 @@ class SupabaseRepository {
     // the booking form never wrote them).
     String? department,
     bool isVideoConsultation = false,
+    // Lab collection choice (audit Patient 11): walk-in vs home
+    // collection + the collection address. The columns arrive
+    // with the appointments_collection_type migration; until the
+    // owner applies it the insert retries without them so a lab
+    // booking never fails over a missing column.
+    String? collectionType,
+    String? collectionAddress,
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
+    final payload = <String, dynamic>{
+      'patient_id': uid,
+      'service_type': serviceType,
+      'doctor_id': doctorId,
+      'hospital_id': hospitalId,
+      'lab_id': labId,
+      'pharmacy_id': pharmacyId,
+      'appointment_date':
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+      'appointment_time': timeLabel.length >= 5
+          ? timeLabel.substring(0, 5)
+          : timeLabel,
+      'status': 'pending',
+      'payment_method': paymentMethod,
+      'notes': notes,
+      if (familyMemberId != null && familyMemberId.isNotEmpty)
+        'family_member_id': familyMemberId,
+      if (department != null && department.isNotEmpty)
+        'department': department,
+      'is_video_consultation': isVideoConsultation,
+      // So the provider panel can open the patient's uploaded
+      // prescription (the column exists; it was never written).
+      if (prescriptionUrl != null && prescriptionUrl.isNotEmpty)
+        'prescription_url': prescriptionUrl,
+      if (collectionType != null && collectionType.isNotEmpty)
+        'collection_type': collectionType,
+      if (collectionAddress != null && collectionAddress.isNotEmpty)
+        'collection_address': collectionAddress,
+    };
     try {
-      final row = await _db.from('appointments').insert({
-        'patient_id': uid,
-        'service_type': serviceType,
-        'doctor_id': doctorId,
-        'hospital_id': hospitalId,
-        'lab_id': labId,
-        'pharmacy_id': pharmacyId,
-        'appointment_date':
-            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
-        'appointment_time': timeLabel.length >= 5
-            ? timeLabel.substring(0, 5)
-            : timeLabel,
-        'status': 'pending',
-        'payment_method': paymentMethod,
-        'notes': notes,
-        if (familyMemberId != null && familyMemberId.isNotEmpty)
-          'family_member_id': familyMemberId,
-        if (department != null && department.isNotEmpty)
-          'department': department,
-        'is_video_consultation': isVideoConsultation,
-        // So the provider panel can open the patient's uploaded
-        // prescription (the column exists; it was never written).
-        if (prescriptionUrl != null && prescriptionUrl.isNotEmpty)
-          'prescription_url': prescriptionUrl,
-      }).select('id');
+      final row = await _db.from('appointments').insert(payload).select('id');
       if (row.isNotEmpty) {
         final id = '${row.first['id']}';
         await _patchPaymentInfo('appointments', id,
@@ -327,6 +346,25 @@ class SupabaseRepository {
       }
       return null;
     } catch (e) {
+      if (payload.containsKey('collection_type')) {
+        debugPrint('bookAppointment retrying without collection '
+            'fields: $e');
+        payload.remove('collection_type');
+        payload.remove('collection_address');
+        try {
+          final row =
+              await _db.from('appointments').insert(payload).select('id');
+          if (row.isNotEmpty) {
+            final id = '${row.first['id']}';
+            await _patchPaymentInfo('appointments', id,
+                paymentRef: paymentRef, customerUpi: customerUpi);
+            return id;
+          }
+        } catch (e2) {
+          debugPrint('bookAppointment retry failed: $e2');
+        }
+        return null;
+      }
       debugPrint('bookAppointment failed: $e');
       return null;
     }
@@ -2640,6 +2678,524 @@ class SupabaseRepository {
       return true;
     } catch (e) {
       debugPrint('setProviderUpiOnRecord($table) failed: $e');
+      return false;
+    }
+  }
+
+  // ------------------------------------------------------------ batch 7:
+  // provider verticals (lab catalogue + samples, pharmacy
+  // medicines, hospital units, payouts, driver)
+
+  /// Resolves the signed-in provider's own record id in [table].
+  Future<String?> _ownProviderId(String table) async {
+    final me = await fetchOwnProviderRecord(table);
+    final id = me?['id'];
+    return id == null ? null : '$id';
+  }
+
+  // ----- Lab catalogue (audit Panelist 2 / M11) -----
+
+  Future<List<Map<String, dynamic>>> fetchOwnLabTests() async {
+    if (!_ready || _uid == null) return const [];
+    final labId = await _ownProviderId('labs');
+    if (labId == null) return const [];
+    try {
+      final rows = await _db
+          .from('lab_tests')
+          .select()
+          .eq('lab_id', labId)
+          .order('name');
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchOwnLabTests failed: $e');
+      return const [];
+    }
+  }
+
+  /// Insert (no id) or update (id present) one of the lab's own
+  /// tests. lab_id is always forced to the caller's own lab.
+  Future<bool> upsertOwnLabTest(Map<String, dynamic> values) async {
+    if (!_ready || _uid == null) return false;
+    final labId = await _ownProviderId('labs');
+    if (labId == null) return false;
+    try {
+      final row = Map<String, dynamic>.from(values)
+        ..['lab_id'] = labId;
+      final id = row.remove('id');
+      if (id != null && '$id'.isNotEmpty) {
+        await _db.from('lab_tests').update(row).eq('id', '$id');
+      } else {
+        await _db.from('lab_tests').insert(row);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('upsertOwnLabTest failed: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteOwnLabTest(String id) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('lab_tests').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('deleteOwnLabTest failed: $e');
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchOwnLabPackages() async {
+    if (!_ready || _uid == null) return const [];
+    final labId = await _ownProviderId('labs');
+    if (labId == null) return const [];
+    try {
+      final rows = await _db
+          .from('lab_test_packages')
+          .select()
+          .eq('lab_id', labId)
+          .order('name');
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchOwnLabPackages failed: $e');
+      return const [];
+    }
+  }
+
+  Future<bool> upsertOwnLabPackage(Map<String, dynamic> values) async {
+    if (!_ready || _uid == null) return false;
+    final labId = await _ownProviderId('labs');
+    if (labId == null) return false;
+    try {
+      final row = Map<String, dynamic>.from(values)
+        ..['lab_id'] = labId;
+      final id = row.remove('id');
+      if (id != null && '$id'.isNotEmpty) {
+        await _db.from('lab_test_packages').update(row).eq('id', '$id');
+      } else {
+        await _db.from('lab_test_packages').insert(row);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('upsertOwnLabPackage failed: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteOwnLabPackage(String id) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('lab_test_packages').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('deleteOwnLabPackage failed: $e');
+      return false;
+    }
+  }
+
+  // ----- Lab sample collections + reports (Panelist 2, Patient 11)
+
+  Future<List<Map<String, dynamic>>> fetchLabSamples() async {
+    if (!_ready || _uid == null) return const [];
+    final labId = await _ownProviderId('labs');
+    if (labId == null) return const [];
+    try {
+      final rows = await _db
+          .from('lab_sample_collections')
+          .select()
+          .eq('lab_id', labId)
+          .order('created_at', ascending: false)
+          .limit(200);
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchLabSamples failed: $e');
+      return const [];
+    }
+  }
+
+  /// The patient's own sample-collection rows (RLS: patients
+  /// select own) — lab-issued reports surface from here.
+  Future<List<Map<String, dynamic>>> fetchPatientLabSamples() async {
+    if (!_ready || _uid == null) return const [];
+    try {
+      final rows = await _db
+          .from('lab_sample_collections')
+          .select()
+          .eq('patient_id', _uid!)
+          .order('created_at', ascending: false)
+          .limit(100);
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchPatientLabSamples failed: $e');
+      return const [];
+    }
+  }
+
+  Future<bool> createLabSample(Map<String, dynamic> values) async {
+    if (!_ready || _uid == null) return false;
+    final labId = await _ownProviderId('labs');
+    if (labId == null) return false;
+    try {
+      await _db.from('lab_sample_collections').insert({
+        ...values,
+        'lab_id': labId,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('createLabSample failed: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateLabSample(
+      String id, Map<String, dynamic> values) async {
+    if (!_ready) return false;
+    try {
+      await _db
+          .from('lab_sample_collections')
+          .update(values)
+          .eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateLabSample failed: $e');
+      return false;
+    }
+  }
+
+  /// Uploads a finished lab report into the private lab-reports
+  /// bucket. The storage policy lets a patient read only objects
+  /// under their own user-id folder, so the path starts with the
+  /// patient's id. Returns the storage path, or null on failure.
+  Future<String?> uploadLabReport({
+    required String patientId,
+    required String sampleId,
+    required String fileName,
+    required Uint8List bytes,
+  }) async {
+    if (!_ready) return null;
+    try {
+      final ext = fileName.split('.').last.toLowerCase();
+      final contentType = ext == 'pdf'
+          ? 'application/pdf'
+          : 'image/${ext == 'jpg' ? 'jpeg' : ext}';
+      final safeName =
+          fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      final path = '$patientId/${sampleId}_$safeName';
+      await _db.storage.from('lab-reports').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+                contentType: contentType, upsert: true),
+          );
+      return path;
+    } catch (e) {
+      debugPrint('uploadLabReport failed: $e');
+      return null;
+    }
+  }
+
+  // ----- Pharmacy medicines & stock (Panelist 3 / 16) -----
+
+  Future<List<Map<String, dynamic>>> fetchOwnMedicines() async {
+    if (!_ready || _uid == null) return const [];
+    final pharmacyId = await _ownProviderId('pharmacies');
+    if (pharmacyId == null) return const [];
+    try {
+      final rows = await _db
+          .from('medicines')
+          .select()
+          .eq('pharmacy_id', pharmacyId)
+          .order('name');
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchOwnMedicines failed: $e');
+      return const [];
+    }
+  }
+
+  /// Relies on the "Pharmacies can manage own medicines" policy
+  /// (migration pharmacy_medicines_policy.sql); until the owner
+  /// applies it, writes fail closed and this returns false.
+  Future<bool> upsertOwnMedicine(Map<String, dynamic> values) async {
+    if (!_ready || _uid == null) return false;
+    final pharmacyId = await _ownProviderId('pharmacies');
+    if (pharmacyId == null) return false;
+    try {
+      final row = Map<String, dynamic>.from(values)
+        ..['pharmacy_id'] = pharmacyId;
+      final id = row.remove('id');
+      if (id != null && '$id'.isNotEmpty) {
+        await _db.from('medicines').update(row).eq('id', '$id');
+      } else {
+        await _db.from('medicines').insert(row);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('upsertOwnMedicine failed: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteOwnMedicine(String id) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('medicines').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('deleteOwnMedicine failed: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateMedicineStock(String id, int quantity) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('medicines').update({
+        'stock_quantity': quantity,
+        'in_stock': quantity > 0,
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateMedicineStock failed: $e');
+      return false;
+    }
+  }
+
+  // ----- Hospital units + ambulance config (Panelist 4) -----
+
+  /// [table] is one of departments | operation_theaters |
+  /// hospital_equipment — all share the hospital_id shape and
+  /// the "hospital admins manage own" RLS pattern.
+  Future<List<Map<String, dynamic>>> fetchOwnHospitalUnits(
+      String table) async {
+    if (!_ready || _uid == null) return const [];
+    final hospitalId = await _ownProviderId('hospitals');
+    if (hospitalId == null) return const [];
+    try {
+      final rows = await _db
+          .from(table)
+          .select()
+          .eq('hospital_id', hospitalId)
+          .order('created_at');
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchOwnHospitalUnits($table) failed: $e');
+      return const [];
+    }
+  }
+
+  Future<bool> upsertHospitalUnit(
+      String table, Map<String, dynamic> values) async {
+    if (!_ready || _uid == null) return false;
+    final hospitalId = await _ownProviderId('hospitals');
+    if (hospitalId == null) return false;
+    try {
+      final row = Map<String, dynamic>.from(values)
+        ..['hospital_id'] = hospitalId;
+      final id = row.remove('id');
+      if (id != null && '$id'.isNotEmpty) {
+        await _db.from(table).update(row).eq('id', '$id');
+      } else {
+        await _db.from(table).insert(row);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('upsertHospitalUnit($table) failed: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteHospitalUnit(String table, String id) async {
+    if (!_ready) return false;
+    try {
+      await _db.from(table).delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('deleteHospitalUnit($table) failed: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchAmbulanceConfig() async {
+    if (!_ready || _uid == null) return null;
+    final hospitalId = await _ownProviderId('hospitals');
+    if (hospitalId == null) return null;
+    try {
+      return await _db
+          .from('hospital_ambulance_config')
+          .select()
+          .eq('hospital_id', hospitalId)
+          .maybeSingle();
+    } catch (e) {
+      debugPrint('fetchAmbulanceConfig failed: $e');
+      return null;
+    }
+  }
+
+  Future<bool> saveAmbulanceConfig(Map<String, dynamic> values) async {
+    if (!_ready || _uid == null) return false;
+    final hospitalId = await _ownProviderId('hospitals');
+    if (hospitalId == null) return false;
+    try {
+      await _db.from('hospital_ambulance_config').upsert(
+        {...values, 'hospital_id': hospitalId},
+        onConflict: 'hospital_id',
+      );
+      return true;
+    } catch (e) {
+      debugPrint('saveAmbulanceConfig failed: $e');
+      return false;
+    }
+  }
+
+  // ----- Provider wallet / earnings / payouts (Panelist 11 / M20)
+
+  Future<Map<String, dynamic>?> fetchProviderWallet(
+      String providerType, String providerId) async {
+    if (!_ready) return null;
+    try {
+      return await _db
+          .from('provider_wallets')
+          .select()
+          .eq('provider_type', providerType)
+          .eq('provider_id', providerId)
+          .maybeSingle();
+    } catch (e) {
+      debugPrint('fetchProviderWallet failed: $e');
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchProviderEarnings(
+      String providerType, String providerId) async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('provider_earnings')
+          .select()
+          .eq('provider_type', providerType)
+          .eq('provider_id', providerId)
+          .order('created_at', ascending: false)
+          .limit(50);
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchProviderEarnings failed: $e');
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchOwnPayoutRequests() async {
+    if (!_ready || _uid == null) return const [];
+    try {
+      final rows = await _db
+          .from('payout_requests')
+          .select()
+          .eq('user_id', _uid!)
+          .order('requested_at', ascending: false)
+          .limit(50);
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchOwnPayoutRequests failed: $e');
+      return const [];
+    }
+  }
+
+  Future<bool> createPayoutRequest({
+    required String providerType,
+    required String providerId,
+    required double amount,
+    required Map<String, dynamic> bankDetails,
+  }) async {
+    if (!_ready || _uid == null) return false;
+    try {
+      await _db.from('payout_requests').insert({
+        'provider_type': providerType,
+        'provider_id': providerId,
+        'user_id': _uid,
+        'amount': amount,
+        'bank_details': bankDetails,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('createPayoutRequest failed: $e');
+      return false;
+    }
+  }
+
+  // ----- Driver (Panelist 9 / M19) -----
+
+  Future<Map<String, dynamic>?> fetchOwnDriverRecord() async {
+    if (!_ready || _uid == null) return null;
+    try {
+      return await _db
+          .from('delivery_drivers')
+          .select()
+          .eq('user_id', _uid!)
+          .maybeSingle();
+    } catch (e) {
+      debugPrint('fetchOwnDriverRecord failed: $e');
+      return null;
+    }
+  }
+
+  Future<bool> setDriverStatus(String driverId, String status) async {
+    if (!_ready) return false;
+    try {
+      await _db
+          .from('delivery_drivers')
+          .update({'status': status}).eq('id', driverId);
+      return true;
+    } catch (e) {
+      debugPrint('setDriverStatus failed: $e');
+      return false;
+    }
+  }
+
+  /// Deliveries assigned to the signed-in driver, each joined
+  /// with its remedoo_orders row (items, total, payment method).
+  Future<List<Map<String, dynamic>>> fetchDriverDeliveries() async {
+    if (!_ready || _uid == null) return const [];
+    final driver = await fetchOwnDriverRecord();
+    if (driver == null) return const [];
+    try {
+      final rows = await _db
+          .from('delivery_orders')
+          .select()
+          .eq('driver_id', '${driver['id']}')
+          .order('created_at', ascending: false)
+          .limit(100);
+      final deliveries = rows.cast<Map<String, dynamic>>();
+      for (final d in deliveries) {
+        try {
+          final order = await _db
+              .from('remedoo_orders')
+              .select()
+              .eq('id', '${d['order_id']}')
+              .maybeSingle();
+          if (order != null) d['order'] = order;
+        } catch (_) {
+          // Order details are best-effort; the delivery row alone
+          // still renders.
+        }
+      }
+      return deliveries;
+    } catch (e) {
+      debugPrint('fetchDriverDeliveries failed: $e');
+      return const [];
+    }
+  }
+
+  Future<bool> updateDeliveryStatus(String id, String status) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('delivery_orders').update({
+        'status': status,
+        if (status == 'delivered')
+          'delivered_at': DateTime.now().toIso8601String(),
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('updateDeliveryStatus failed: $e');
       return false;
     }
   }

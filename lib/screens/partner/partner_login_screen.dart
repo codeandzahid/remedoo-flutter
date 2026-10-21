@@ -26,7 +26,13 @@ class _PartnerLoginScreenState extends State<PartnerLoginScreen> {
   bool _busy = false;
   String? _error;
 
-  static const _providerRoles = {'doctor', 'pharmacy', 'lab', 'hospital'};
+  static const _providerRoles = {
+    'doctor',
+    'pharmacy',
+    'lab',
+    'hospital',
+    'driver',
+  };
 
   @override
   void dispose() {

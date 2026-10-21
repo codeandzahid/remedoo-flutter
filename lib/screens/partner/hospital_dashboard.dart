@@ -5,6 +5,8 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/provider_payments.dart';
 import '../../widgets/provider_profile_form.dart';
+import '../../widgets/hospital_units_manager.dart';
+import '../../widgets/provider_wallet_card.dart';
 import '../../widgets/upi_setup_dialog.dart';
 import '../../widgets/widgets.dart';
 
@@ -231,6 +233,14 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
           providerType: 'hospital',
           providerId: '${_profile?['id'] ?? ''}',
           providerName: '${_profile?['name'] ?? ''}',
+        ),
+        const SizedBox(height: 16),
+        HospitalUnitsManager(repo: _repo),
+        const SizedBox(height: 16),
+        ProviderWalletCard(
+          repo: _repo,
+          providerType: 'hospital',
+          providerId: '${_profile?['id'] ?? ''}',
         ),
         const SizedBox(height: 16),
         Row(

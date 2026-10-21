@@ -9,6 +9,7 @@ import 'screens/partner/doctor_dashboard.dart';
 import 'screens/partner/pharmacy_dashboard.dart';
 import 'screens/partner/lab_dashboard.dart';
 import 'screens/partner/hospital_dashboard.dart';
+import 'screens/driver_dashboard_screen.dart';
 
 /// Remedoo Partner entry point: `flutter build apk --target lib/main_partner.dart`
 /// (or `--flavor partner`). Boots straight into the provider login —
@@ -88,6 +89,8 @@ class _PartnerRootGateState extends State<PartnerRootGate> {
           return const LabDashboard();
         case 'hospital':
           return const HospitalDashboard();
+        case 'driver':
+          return const DriverDashboardScreen();
       }
     }
     return const PartnerLoginScreen();

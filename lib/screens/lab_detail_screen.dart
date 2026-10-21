@@ -50,7 +50,7 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
         kind: 'lab',
         refId: l.id,
         title: l.name,
-        subtitle: '${selectedTests.length} tests • Home collection',
+        subtitle: '${selectedTests.length} tests',
         place: l.location,
         fee: total,
         tests: selectedTests,
@@ -58,8 +58,25 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
     );
   }
 
-  List<LabTest> _tests() {
-    var tests = labTests.take(12).toList();
+
+  /// This lab's real catalogue (audit Patient 10): the backend
+  /// lab_tests for THIS lab once the production catalog has
+  /// loaded — the screen used to show the same first 12 mock
+  /// tests at mock prices for every lab, and nothing past #12
+  /// could ever be booked. The mock list remains only as the
+  /// offline/demo fallback before the catalog loads.
+  List<LabTest> _catalogue(BuildContext context) {
+    // The shared catalogue list is replaced with backend rows
+    // by AppState.loadProductionCatalog; rows carry labId when
+    // they come from the backend.
+    if (labTests.any((t) => t.labId != null)) {
+      return labTests.where((t) => t.labId == widget.lab.id).toList();
+    }
+    return labTests;
+  }
+
+  List<LabTest> _tests(BuildContext context) {
+    var tests = _catalogue(context);
     if (_category != 'All') {
       tests = tests.where((t) => t.category == _category).toList();
     }
@@ -91,19 +108,18 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
       return const GuestGate(message: 'Please login to view details');
     }
     final l = widget.lab;
-    final tests = _tests();
+    final tests = _tests(context);
     // The booked set is derived from the FULL catalogue, not the
     // filtered/searched list (audit fix 2026-10-19): tests the patient
     // selected stay selected — and stay in the Book count, total and
     // booking — even when a category/search change hides them.
-    final selectedTests = labTests
-        .take(12)
+    final selectedTests = _catalogue(context)
         .where((t) => _selected.contains(t.id))
         .toList();
     final total = selectedTests.fold<double>(0, (s, t) => s + t.price);
     final categories = [
       'All',
-      ...{for (final t in labTests.take(12)) t.category}
+      ...{for (final t in _catalogue(context)) t.category}
     ];
 
     return Scaffold(
@@ -497,9 +513,21 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
                                 icon: Icons.access_time,
                                 text: 'Report in ${t.turnaround}'),
                             const SizedBox(width: 10),
-                            RStat(
-                                icon: Icons.home_outlined,
-                                text: 'Home collection'),
+                            // Real per-test flags (Patient 10:
+                            // home collection used to be printed
+                            // on every card whether true or not).
+                            if (t.homeCollection)
+                              RStat(
+                                  icon: Icons.home_outlined,
+                                  text: t.homeCollectionFee > 0
+                                      ? 'Home +${inr(t.homeCollectionFee)}'
+                                      : 'Home collection'),
+                            if (t.requiresFasting) ...[
+                              const SizedBox(width: 10),
+                              RStat(
+                                  icon: Icons.no_food_outlined,
+                                  text: 'Fasting needed'),
+                            ],
                             const Spacer(),
                             Icon(
                                 expanded

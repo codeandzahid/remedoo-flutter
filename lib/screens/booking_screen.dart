@@ -71,6 +71,9 @@ class _BookingScreenState extends State<BookingScreen> {
   final _notes = TextEditingController();
   final _department = TextEditingController();
   bool _video = false;
+  // Lab collection choice (audit Patient 11).
+  String _collectionType = 'walk_in';
+  final _collectionAddress = TextEditingController();
   final _payerUpi = TextEditingController();
   late List<DateTime> _days;
   String? _bookingForMemberId; // null = for self
@@ -91,6 +94,15 @@ class _BookingScreenState extends State<BookingScreen> {
     if (widget.kind == 'doctor') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         AppStateScope.of(context).loadBlockedSlots(widget.refId);
+      });
+    }
+    // Prefill the home-collection address from the profile.
+    if (widget.kind == 'lab') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final addr = AppStateScope.of(context).userAddress;
+        if (mounted && addr != null && addr.isNotEmpty) {
+          _collectionAddress.text = addr;
+        }
       });
     }
   }
@@ -298,6 +310,7 @@ class _BookingScreenState extends State<BookingScreen> {
   void dispose() {
     _notes.dispose();
     _department.dispose();
+    _collectionAddress.dispose();
     _payerUpi.dispose();
     super.dispose();
   }
@@ -547,6 +560,11 @@ class _BookingScreenState extends State<BookingScreen> {
             ? null
             : _department.text.trim(),
         isVideoConsultation: _video,
+        collectionType: widget.kind == 'lab' ? _collectionType : null,
+        collectionAddress: widget.kind == 'lab' &&
+                _collectionType == 'home'
+            ? _collectionAddress.text.trim()
+            : null,
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Appointment booked successfully!')),
@@ -649,6 +667,55 @@ class _BookingScreenState extends State<BookingScreen> {
           value: _video,
           onChanged: (v) => setState(() => _video = v),
         ),
+      ],
+      // Lab bookings: walk-in or home collection (Patient 11).
+      // Home collection is only offered when at least one chosen
+      // test supports it.
+      if (widget.kind == 'lab' &&
+          (widget.tests?.any((t) => t.homeCollection) ?? false)) ...[
+        const SizedBox(height: 14),
+        _sectionTitle(Icons.home_outlined, 'Sample Collection'),
+        const SizedBox(height: 8),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(
+              value: 'walk_in',
+              label: Text('Visit lab'),
+              icon: Icon(Icons.directions_walk, size: 18),
+            ),
+            ButtonSegment(
+              value: 'home',
+              label: Text('Home collection'),
+              icon: Icon(Icons.home_outlined, size: 18),
+            ),
+          ],
+          selected: {_collectionType},
+          onSelectionChanged: (s) =>
+              setState(() => _collectionType = s.first),
+        ),
+        if (_collectionType == 'home') ...[
+          const SizedBox(height: 10),
+          RTextField(
+            label: 'Collection address',
+            hint: 'Where the sample should be collected from',
+            controller: _collectionAddress,
+            maxLines: 2,
+          ),
+          if ((widget.tests?.fold<double>(
+                      0, (sum, t) => sum + t.homeCollectionFee) ??
+                  0) >
+              0)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Home collection fee applies per test (shown on the lab\'s test list).',
+                style: TextStyle(
+                    fontSize: 12,
+                    color:
+                        Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+        ],
       ],
       const SizedBox(height: 14),
       _prescriptionCard(),

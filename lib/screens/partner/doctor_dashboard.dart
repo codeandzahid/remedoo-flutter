@@ -7,6 +7,7 @@ import '../../theme.dart';
 import '../../utils/working_hours.dart';
 import '../../widgets/prescription_form.dart';
 import '../../widgets/provider_payments.dart';
+import '../../widgets/provider_wallet_card.dart';
 import '../../widgets/upi_setup_dialog.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/working_hours_editor.dart';
@@ -789,6 +790,12 @@ class _PaymentsTab extends StatelessWidget {
           providerType: 'doctor',
           providerId: '${profile?['id'] ?? ''}',
           providerName: '${profile?['name'] ?? ''}',
+        ),
+        const SizedBox(height: 16),
+        ProviderWalletCard(
+          repo: repo,
+          providerType: 'doctor',
+          providerId: '${profile?['id'] ?? ''}',
         ),
         const SizedBox(height: 16),
       ],

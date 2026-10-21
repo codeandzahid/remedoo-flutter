@@ -5,6 +5,9 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/provider_payments.dart';
 import '../../widgets/provider_profile_form.dart';
+import '../../widgets/lab_catalogue_manager.dart';
+import '../../widgets/lab_samples_manager.dart';
+import '../../widgets/provider_wallet_card.dart';
 import '../../widgets/upi_setup_dialog.dart';
 import '../../widgets/widgets.dart';
 
@@ -221,6 +224,16 @@ class _LabDashboardState extends State<LabDashboard> {
           providerType: 'lab',
           providerId: '${_profile?['id'] ?? ''}',
           providerName: '${_profile?['name'] ?? ''}',
+        ),
+        const SizedBox(height: 16),
+        LabCatalogueManager(repo: _repo),
+        const SizedBox(height: 16),
+        LabSamplesManager(repo: _repo, bookings: _bookings),
+        const SizedBox(height: 16),
+        ProviderWalletCard(
+          repo: _repo,
+          providerType: 'lab',
+          providerId: '${_profile?['id'] ?? ''}',
         ),
         const SizedBox(height: 16),
         Row(
