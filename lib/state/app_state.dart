@@ -51,7 +51,10 @@ class AppState extends ChangeNotifier {
   String _email = '';
   String _phone = '';
   String _gender = 'Male';
-  String _address = 'Bakura, Srinagar, J&K 190006';
+  // No fabricated default (form-pages audit M9): the old literal
+  // demo address posed as the patient's own address in checkout
+  // prefill. Empty until the profile actually carries one.
+  String _address = '';
 
   User? _supaUser;
 
@@ -845,6 +848,18 @@ class AppState extends ChangeNotifier {
       if (g.isNotEmpty) _gender = g;
       final av = '${prof['avatar_url'] ?? ''}';
       if (av.isNotEmpty) _avatarUrl = av;
+      // Address + preferences round-trip too (form-pages audit
+      // M9/M10): profiles.address, dark_mode and
+      // notification_preferences were never read back, so a saved
+      // address vanished and every toggle reset on restart.
+      final addr = '${prof['address'] ?? ''}';
+      if (addr.isNotEmpty) _address = addr;
+      _darkMode = prof['dark_mode'] == true;
+      final np = prof['notification_preferences'];
+      if (np is Map) {
+        _emailNotif = np['email'] != false;
+        _pushNotif = np['push'] != false;
+      }
     }
     // Signup-completion gate (see RootGate): a session whose profile
     // has no name anywhere never finished signup Step 2.
@@ -1148,6 +1163,7 @@ class AppState extends ChangeNotifier {
           : null,
       paymentRef: appt.paymentRef,
       customerUpi: appt.customerUpi,
+      familyMemberId: appt.bookingForMemberId,
       // Store the method the patient actually picked — without this
       // every row silently took the column default 'at_clinic'.
       paymentMethod: dbPaymentMethod(appt.payment),
@@ -1172,7 +1188,9 @@ class AppState extends ChangeNotifier {
       deliveryFee: order.deliveryFee,
       total: order.total,
       address: order.address,
-      payment: order.payment,
+      // Canonical stored value ('online' | 'cod'), never the
+      // display label — the repository maps anything else to COD.
+      payment: order.paymentMethod ?? order.payment,
       notes: order.notes.isEmpty ? null : order.notes,
       paymentRef: order.paymentRef,
       customerUpi: order.customerUpi,
@@ -1195,7 +1213,12 @@ class AppState extends ChangeNotifier {
 
   void _syncSaveProfile() {
     if (_supaUser == null) return;
-    _repo.saveProfile({'full_name': _name, 'phone': _phone});
+    _repo.saveProfile({
+      'full_name': _name,
+      'phone': _phone,
+      'gender': _gender,
+      if (_address.isNotEmpty) 'address': _address,
+    });
   }
 
   void saveProfile({
@@ -1226,18 +1249,35 @@ class AppState extends ChangeNotifier {
   String get language => _language;
   bool get maintenanceMode => _maintenanceMode;
 
+  /// Persists the preference toggles to profiles (form-pages audit
+  /// M10: they used to be memory-only setters, so dark mode and the
+  /// notification switches reset on every restart).
+  void _syncPreferences() {
+    if (_supaUser == null) return;
+    _repo.saveProfile({
+      'dark_mode': _darkMode,
+      'notification_preferences': {
+        'email': _emailNotif,
+        'push': _pushNotif,
+      },
+    });
+  }
+
   void toggleDarkMode() {
     _darkMode = !_darkMode;
+    _syncPreferences();
     notifyListeners();
   }
 
   void toggleEmailNotif() {
     _emailNotif = !_emailNotif;
+    _syncPreferences();
     notifyListeners();
   }
 
   void togglePushNotif() {
     _pushNotif = !_pushNotif;
+    _syncPreferences();
     notifyListeners();
   }
 
@@ -1409,10 +1449,17 @@ class AppState extends ChangeNotifier {
   }
 
   void rescheduleAppointment(String id, DateTime date, String timeLabel) {
-    final appt = appointments.where((a) => a.id == id).firstOrNull;
-    if (appt == null) return;
-    final updated = Appointment(
-      id: 'A${DateTime.now().millisecondsSinceEpoch}',
+    final idx = appointments.indexWhere((a) => a.id == id);
+    if (idx < 0) return;
+    final appt = appointments[idx];
+    // Move the SAME appointment (form-pages audit M2): the old code
+    // cancelled locally and fabricated a new local-only appointment
+    // with a synthetic id — the backend never heard about it, the
+    // provider kept the old slot, and member/prescription/payment
+    // fields were dropped. Now every field is preserved, the id is
+    // unchanged, and the new slot is written to the backend row.
+    final moved = Appointment(
+      id: appt.id,
       doctorName: appt.doctorName,
       specialty: appt.specialty,
       place: appt.place,
@@ -1421,11 +1468,34 @@ class AppState extends ChangeNotifier {
       fee: appt.fee,
       payment: appt.payment,
       kind: appt.kind,
+      refId: appt.refId,
       notes: appt.notes,
       tests: appt.tests,
+      status: appt.status,
+      bookingForMemberId: appt.bookingForMemberId,
+      bookingForName: appt.bookingForName,
+      prescriptionPath: appt.prescriptionPath,
+      prescriptionName: appt.prescriptionName,
+      remoteStatus: appt.remoteStatus,
+      paymentRef: appt.paymentRef,
+      customerUpi: appt.customerUpi,
+      refundStatus: appt.refundStatus,
+      refundAmount: appt.refundAmount,
+      refundAt: appt.refundAt,
+      refundUtr: appt.refundUtr,
+      refundRequestedAt: appt.refundRequestedAt,
     );
-    appt.status = 'cancelled';
-    appointments.add(updated);
+    appointments[idx] = moved;
+    if (_supaUser != null) {
+      final remoteId = _remoteAppointmentIds[id] ?? id;
+      unawaited(_repo.updateAppointmentSlot(remoteId, date, timeLabel));
+    }
+    addNotification(
+      title: 'Appointment rescheduled',
+      message:
+          '${appt.doctorName} moved to ${date.day}/${date.month}/${date.year} at $timeLabel',
+      category: 'appointments',
+    );
     notifyListeners();
   }
 
@@ -2776,6 +2846,10 @@ class AppState extends ChangeNotifier {
     final fields = <String, dynamic>{};
     if (name != null) fields['full_name'] = name;
     if (phone != null) fields['phone'] = phone;
+    // Address used to be accepted here and then silently dropped
+    // from the payload (form-pages audit M9) — profiles.address
+    // exists (schema_part_03) and now round-trips.
+    if (address != null) fields['address'] = address;
     if (gender != null && gender.isNotEmpty) fields['gender'] = gender;
     if (fields.isNotEmpty) {
       saved = await _repo.saveProfile(fields);

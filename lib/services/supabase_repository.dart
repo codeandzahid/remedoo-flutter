@@ -260,6 +260,11 @@ class SupabaseRepository {
     String? prescriptionUrl,
     String? paymentRef,
     String? customerUpi,
+    // The family member this booking is for (appointments.
+    // family_member_id). It used to be dropped on the floor: the
+    // patient's "Booking for" choice never reached the insert and
+    // was lost on reload (form-pages audit M7).
+    String? familyMemberId,
     // Canonical appointments.payment_method value ('online' |
     // 'at_clinic', schema_part_02). Used to default to the column
     // default 'at_clinic' for EVERY booking, so a patient who paid
@@ -284,6 +289,8 @@ class SupabaseRepository {
         'status': 'pending',
         'payment_method': paymentMethod,
         'notes': notes,
+        if (familyMemberId != null && familyMemberId.isNotEmpty)
+          'family_member_id': familyMemberId,
         // So the provider panel can open the patient's uploaded
         // prescription (the column exists; it was never written).
         if (prescriptionUrl != null && prescriptionUrl.isNotEmpty)
@@ -489,6 +496,28 @@ class SupabaseRepository {
       return true;
     } catch (e) {
       debugPrint('cancelAppointment failed: $e');
+      return false;
+    }
+  }
+
+  /// Moves an existing appointment to a new date/time in the
+  /// backend (form-pages audit M2: reschedule used to be local-only,
+  /// leaving the provider with the old slot). Patient-scoped like
+  /// [cancelAppointment]. Returns false when the write failed.
+  Future<bool> updateAppointmentSlot(
+      String id, DateTime date, String timeLabel) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return false;
+    try {
+      await _db.from('appointments').update({
+        'appointment_date':
+            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+        'appointment_time':
+            timeLabel.length >= 5 ? timeLabel.substring(0, 5) : timeLabel,
+      }).eq('id', id).eq('patient_id', uid);
+      return true;
+    } catch (e) {
+      debugPrint('updateAppointmentSlot failed: $e');
       return false;
     }
   }
@@ -849,13 +878,21 @@ class SupabaseRepository {
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
+    // Canonicalise the payment method: callers may hand us the
+    // display label ('Pay Online') — the stored value must be
+    // 'online' | 'cod' (form-pages audit M1: an exact 'online' test
+    // here silently stored every online order as COD + pending).
+    final method =
+        payment.toLowerCase().contains('online') ? 'online' : 'cod';
     try {
       final order = await _db.from('orders').insert({
         'user_id': uid,
         'pharmacy_id': pharmacyId,
         'status': 'placed',
-        'payment_method': payment == 'online' ? 'online' : 'cod',
-        'payment_status': 'pending',
+        'payment_method': method,
+        // An online order is only placed after its payment session
+        // succeeded, matching the local MedOrder.paymentStatus.
+        'payment_status': method == 'online' ? 'paid' : 'pending',
         'subtotal': subtotal,
         'delivery_fee': deliveryFee,
         'total': total,
