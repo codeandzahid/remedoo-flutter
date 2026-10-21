@@ -83,22 +83,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(existing == null ? 'Add Address' : 'Edit Address'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: labelCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Label', hintText: 'Home, Office…'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: addrCtrl,
-              maxLines: 3,
-              decoration:
-                  const InputDecoration(labelText: 'Full address'),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RTextField(
+                controller: labelCtrl,
+                label: 'Label',
+                hint: 'Home, Office…',
+              ),
+              const SizedBox(height: 10),
+              RTextField(
+                controller: addrCtrl,
+                maxLines: 3,
+                label: 'Full address',
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(

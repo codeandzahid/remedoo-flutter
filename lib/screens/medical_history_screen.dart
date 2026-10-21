@@ -282,11 +282,10 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
                   onChanged: (v) => setD(() => kind = v ?? 'Other'),
                 ),
                 const SizedBox(height: 10),
-                TextField(
+                RTextField(
                   controller: titleCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Title',
-                      hintText: 'e.g. Allergic to penicillin'),
+                  label: 'Title',
+                  hint: 'e.g. Allergic to penicillin',
                 ),
                 const SizedBox(height: 10),
                 Align(
@@ -308,11 +307,10 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                TextField(
+                RTextField(
                   controller: notesCtrl,
                   maxLines: 2,
-                  decoration: const InputDecoration(
-                      labelText: 'Notes (optional)'),
+                  label: 'Notes (optional)',
                 ),
               ],
             ),

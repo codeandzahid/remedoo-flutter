@@ -2352,6 +2352,13 @@ class RTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final Widget? prefixIcon;
 
+  /// Inline validation text (audit-76 Batch 10: the support
+  /// ticket form needed errorText, which kept it on a raw
+  /// TextField while every other form uses this widget).
+  final String? errorText;
+  final int? minLines;
+  final TextInputAction? textInputAction;
+
   const RTextField({
     super.key,
     this.label,
@@ -2365,6 +2372,9 @@ class RTextField extends StatelessWidget {
     this.onChanged,
     this.suffixIcon,
     this.prefixIcon,
+    this.errorText,
+    this.minLines,
+    this.textInputAction,
   });
 
   @override
@@ -2395,11 +2405,14 @@ class RTextField extends StatelessWidget {
           obscureText: obscureText,
           keyboardType: keyboardType,
           maxLines: maxLines,
+          minLines: minLines,
+          textInputAction: textInputAction,
           onChanged: onChanged,
           style: const TextStyle(
               fontFamily: RemedooTheme.fontFamily, fontSize: 14),
           decoration: InputDecoration(
             hintText: hint,
+            errorText: errorText,
             suffixIcon: suffixIcon,
             prefixIcon: prefixIcon,
           ),

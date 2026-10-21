@@ -1,0 +1,96 @@
+// Audit-76 Batch 10 tests: template consistency remainder
+// (M28 / Patient gap 23) — patient forms on the shared
+// RTextField, scrolling dialog bodies, panelist structured
+// inputs as dropdowns — plus the final verification items
+// (hospital fee at all entry points, doctor View Prescription,
+// Remedoo Pay editors merge-safety).
+
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+
+String _src(String path) => File(path).readAsStringSync();
+
+void main() {
+  group('Patient forms use the shared field style (Patient 23)', () {
+    test('RTextField supports inline errors now', () {
+      final w = _src('lib/widgets/widgets.dart');
+      expect(w.contains('final String? errorText;'), isTrue);
+      expect(w.contains('errorText: errorText'), isTrue);
+    });
+
+    test('vitals add + edit use RTextField; edit dialog scrolls', () {
+      final s = _src('lib/screens/vitals_screen.dart');
+      expect(s.contains(' TextField('), isFalse);
+      expect(s.contains('SingleChildScrollView'), isTrue);
+    });
+
+    test('lab report upload dialog uses RTextField and scrolls', () {
+      final s = _src('lib/screens/lab_reports_screen.dart');
+      expect(s.contains("label: 'Report name'"), isTrue);
+      // The only raw TextField left is the dark header search.
+      expect(s.contains("hintText: 'Search tests or labs…'"), isTrue);
+    });
+
+    test('medical history + address dialogs use RTextField', () {
+      final h = _src('lib/screens/medical_history_screen.dart');
+      expect(h.contains(' TextField('), isFalse);
+      final p = _src('lib/screens/profile_screen.dart');
+      expect(p.contains("label: 'Full address'"), isTrue);
+    });
+
+    test('support ticket form fields use RTextField with errors', () {
+      final s = _src('lib/screens/new_query_sheet.dart');
+      expect(s.contains('RTextField('), isTrue);
+      expect(s.contains('errorText: _subjectError'), isTrue);
+      expect(s.contains('errorText: _messageError'), isTrue);
+    });
+  });
+
+  group('Panelist structured inputs are dropdowns (M28)', () {
+    test('pharmacy medicine category + unit are dropdowns', () {
+      final s = _src('lib/widgets/pharmacy_medicines_manager.dart');
+      expect(s.contains("labelText: 'Category'"), isTrue);
+      expect(s.contains('DropdownButtonFormField<String>'), isTrue);
+      expect(s.contains("'strip', 'bottle', 'tablet'"), isTrue);
+      expect(s.contains('controller: category'), isFalse);
+      expect(s.contains('controller: unit'), isFalse);
+    });
+
+    test('lab test category + sample type are dropdowns', () {
+      final s = _src('lib/widgets/lab_catalogue_manager.dart');
+      expect(s.contains("'Blood', 'Urine', 'Swab', 'Stool', 'Other'"),
+          isTrue);
+      expect(s.contains('controller: sampleType'), isFalse);
+      expect(s.contains('controller: category'), isFalse);
+    });
+  });
+
+  group('Final verification items', () {
+    test('hospital fee comes from the backend at all entry points',
+        () {
+      expect(_src('lib/screens/hospital_detail_screen.dart')
+          .contains('fee: h.fee'), isTrue);
+      expect(_src('lib/screens/emergency_screen.dart')
+          .contains('fee: h.fee'), isTrue);
+    });
+
+    test('doctor View Prescription opens the file (Panelist 8)', () {
+      final s = _src('lib/screens/partner/doctor_dashboard.dart');
+      expect(s.contains("label: 'View Prescription'"), isTrue);
+      expect(s.contains('launchUrl'), isTrue);
+    });
+
+    test('Remedoo Pay editors both preserve the merged config '
+        '(Admin gap 18)', () {
+      final pay = _src('lib/screens/admin/admin_remedoo_pay_screen.dart');
+      // Starts from the full loaded config and only overwrites
+      // the fields it owns, so key_id / test_mode survive.
+      expect(pay.contains('Map<String, dynamic>.from(_fullConfig)'),
+          isTrue);
+      final settings =
+          _src('lib/screens/admin/admin_app_settings_screen.dart');
+      expect(settings.contains('..addAll(patch)'), isTrue);
+    });
+  });
+}

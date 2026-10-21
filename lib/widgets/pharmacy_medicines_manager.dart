@@ -51,12 +51,26 @@ class _PharmacyMedicinesManagerState
     final name = TextEditingController(text: '${e['name'] ?? ''}');
     final generic =
         TextEditingController(text: '${e['generic_name'] ?? ''}');
-    final category =
-        TextEditingController(text: '${e['category'] ?? 'General'}');
+    // Structured values are dropdowns, not free text (audit
+    // M28: the panelist surface had no structured inputs at
+    // all). Existing off-list values are kept as an option so
+    // editing never silently rewrites them.
+    var category = '${e['category'] ?? 'General'}';
+    const medCategories = [
+      'General', 'Tablet', 'Syrup', 'Injection', 'Cream',
+      'Drops', 'Inhaler', 'Supplement', 'First Aid', 'Other',
+    ];
+    if (!medCategories.contains(category)) {
+      medCategories.add(category);
+    }
     final price = TextEditingController(text: '${e['price'] ?? ''}');
     final discount = TextEditingController(
         text: '${e['discount_percent'] ?? ''}');
-    final unit = TextEditingController(text: '${e['unit'] ?? 'strip'}');
+    var unit = '${e['unit'] ?? 'strip'}';
+    const medUnits = [
+      'strip', 'bottle', 'tablet', 'syrup', 'tube', 'pack', 'piece',
+    ];
+    if (!medUnits.contains(unit)) medUnits.add(unit);
     final stock = TextEditingController(
         text: '${e['stock_quantity'] ?? '0'}');
     final manufacturer =
@@ -84,10 +98,16 @@ class _PharmacyMedicinesManagerState
                     controller: generic,
                     decoration: const InputDecoration(
                         labelText: 'Generic / salt name')),
-                TextField(
-                    controller: category,
-                    decoration:
-                        const InputDecoration(labelText: 'Category')),
+                DropdownButtonFormField<String>(
+                  initialValue: category,
+                  decoration:
+                      const InputDecoration(labelText: 'Category'),
+                  items: [
+                    for (final c in medCategories)
+                      DropdownMenuItem(value: c, child: Text(c)),
+                  ],
+                  onChanged: (v) => category = v ?? 'General',
+                ),
                 TextField(
                     controller: price,
                     keyboardType: TextInputType.number,
@@ -98,10 +118,15 @@ class _PharmacyMedicinesManagerState
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                         labelText: 'Discount %')),
-                TextField(
-                    controller: unit,
-                    decoration: const InputDecoration(
-                        labelText: 'Unit (strip, bottle…)')),
+                DropdownButtonFormField<String>(
+                  initialValue: unit,
+                  decoration: const InputDecoration(labelText: 'Unit'),
+                  items: [
+                    for (final u in medUnits)
+                      DropdownMenuItem(value: u, child: Text(u)),
+                  ],
+                  onChanged: (v) => unit = v ?? 'strip',
+                ),
                 TextField(
                     controller: stock,
                     keyboardType: TextInputType.number,
@@ -150,12 +175,10 @@ class _PharmacyMedicinesManagerState
       if (existing != null) 'id': '${existing['id']}',
       'name': name.text.trim(),
       'generic_name': generic.text.trim(),
-      'category': category.text.trim().isEmpty
-          ? 'General'
-          : category.text.trim(),
+      'category': category,
       'price': double.parse(price.text.trim()),
       'discount_percent': double.tryParse(discount.text.trim()) ?? 0,
-      'unit': unit.text.trim(),
+      'unit': unit,
       'stock_quantity': qty,
       'in_stock': qty > 0,
       'manufacturer': manufacturer.text.trim(),

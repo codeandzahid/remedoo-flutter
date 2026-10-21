@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
+import '../widgets/widgets.dart';
 import '../theme.dart';
 
 /// Professional "Submit a New Query" bottom sheet.
@@ -193,18 +194,11 @@ class _NewQuerySheetState extends State<NewQuerySheet> {
             style:
                 TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
-        TextField(
+        RTextField(
           controller: _subject,
           textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            hintText: 'e.g. Payment deducted but booking failed',
-            errorText: _subjectError,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 13),
-          ),
+          hint: 'e.g. Payment deducted but booking failed',
+          errorText: _subjectError,
           onChanged: (_) {
             if (_subjectError != null) {
               setState(() => _subjectError = null);
@@ -218,22 +212,13 @@ class _NewQuerySheetState extends State<NewQuerySheet> {
             style:
                 TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
-        TextField(
+        RTextField(
           controller: _message,
           minLines: 4,
           maxLines: 6,
-          decoration: InputDecoration(
-            hintText:
-                'Tell us what happened, step by step. Include dates, '
-                'order or appointment details if relevant…',
-            errorText: _messageError,
-            alignLabelWithHint: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 13),
-          ),
+          hint: 'Tell us what happened, step by step. Include dates, '
+              'order or appointment details if relevant…',
+          errorText: _messageError,
           onChanged: (_) {
             if (_messageError != null) {
               setState(() => _messageError = null);

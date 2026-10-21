@@ -49,13 +49,22 @@ class _LabCatalogueManagerState extends State<LabCatalogueManager> {
   Future<void> _editTest([Map<String, dynamic>? existing]) async {
     final e = existing ?? {};
     final name = TextEditingController(text: '${e['name'] ?? ''}');
-    final category =
-        TextEditingController(text: '${e['category'] ?? 'General'}');
+    var category = '${e['category'] ?? 'General'}';
+    const testCategories = [
+      'General', 'Blood', 'Urine', 'Imaging', 'Cardiac',
+      'Diabetes', 'Thyroid', 'Vitamins', 'Infection', 'Hormones',
+    ];
+    if (!testCategories.contains(category)) {
+      testCategories.add(category);
+    }
     final price = TextEditingController(text: '${e['price'] ?? ''}');
     final discount = TextEditingController(
         text: '${e['discount_percent'] ?? ''}');
-    final sampleType =
-        TextEditingController(text: '${e['sample_type'] ?? 'Blood'}');
+    var sampleType = '${e['sample_type'] ?? 'Blood'}';
+    const sampleTypes = ['Blood', 'Urine', 'Swab', 'Stool', 'Other'];
+    if (!sampleTypes.contains(sampleType)) {
+      sampleTypes.add(sampleType);
+    }
     final turnaround = TextEditingController(
         text: '${e['turnaround_time'] ?? '24 hours'}');
     final homeFee = TextEditingController(
@@ -78,10 +87,16 @@ class _LabCatalogueManagerState extends State<LabCatalogueManager> {
                     controller: name,
                     decoration:
                         const InputDecoration(labelText: 'Test name *')),
-                TextField(
-                    controller: category,
-                    decoration:
-                        const InputDecoration(labelText: 'Category')),
+                DropdownButtonFormField<String>(
+                  initialValue: category,
+                  decoration:
+                      const InputDecoration(labelText: 'Category'),
+                  items: [
+                    for (final c in testCategories)
+                      DropdownMenuItem(value: c, child: Text(c)),
+                  ],
+                  onChanged: (v) => category = v ?? 'General',
+                ),
                 TextField(
                     controller: price,
                     keyboardType: TextInputType.number,
@@ -92,10 +107,16 @@ class _LabCatalogueManagerState extends State<LabCatalogueManager> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                         labelText: 'Discount %')),
-                TextField(
-                    controller: sampleType,
-                    decoration: const InputDecoration(
-                        labelText: 'Sample type')),
+                DropdownButtonFormField<String>(
+                  initialValue: sampleType,
+                  decoration:
+                      const InputDecoration(labelText: 'Sample type'),
+                  items: [
+                    for (final s in sampleTypes)
+                      DropdownMenuItem(value: s, child: Text(s)),
+                  ],
+                  onChanged: (v) => sampleType = v ?? 'Blood',
+                ),
                 TextField(
                     controller: turnaround,
                     decoration: const InputDecoration(
@@ -150,12 +171,10 @@ class _LabCatalogueManagerState extends State<LabCatalogueManager> {
     final ok = await widget.repo.upsertOwnLabTest({
       if (existing != null) 'id': '${existing['id']}',
       'name': name.text.trim(),
-      'category': category.text.trim().isEmpty
-          ? 'General'
-          : category.text.trim(),
+      'category': category,
       'price': double.parse(price.text.trim()),
       'discount_percent': double.tryParse(discount.text.trim()) ?? 0,
-      'sample_type': sampleType.text.trim(),
+      'sample_type': sampleType,
       'turnaround_time': turnaround.text.trim(),
       'home_collection_fee':
           double.tryParse(homeFee.text.trim()) ?? 0,

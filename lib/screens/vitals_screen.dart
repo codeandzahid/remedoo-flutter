@@ -66,30 +66,30 @@ class _VitalsScreenState extends State<VitalsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Edit ${_typeName(v.type)}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: v1,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                  labelText: v.type == 'bp'
-                      ? 'Systolic (top)'
-                      : v.type == 'sugar'
-                          ? 'Sugar (mg/dL)'
-                          : 'Weight (kg)'),
-            ),
-            if (v.type == 'bp') ...[
-              const SizedBox(height: 10),
-              TextField(
-                controller: v2,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                    labelText: 'Diastolic (bottom)'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RTextField(
+                controller: v1,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                label: v.type == 'bp'
+                    ? 'Systolic (top)'
+                    : v.type == 'sugar'
+                        ? 'Sugar (mg/dL)'
+                        : 'Weight (kg)',
               ),
+              if (v.type == 'bp') ...[
+                const SizedBox(height: 10),
+                RTextField(
+                  controller: v2,
+                  keyboardType: TextInputType.number,
+                  label: 'Diastolic (bottom)',
+                ),
+              ],
             ],
-          ],
+          ),
         ),
         actions: [
           TextButton(
@@ -221,37 +221,33 @@ class _VitalsScreenState extends State<VitalsScreen> {
                           Row(
                             children: [
                               Expanded(
-                                child: TextField(
+                                child: RTextField(
                                   controller: _v1,
                                   keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Systolic (top)',
-                                      hintText: '120'),
+                                  label: 'Systolic (top)',
+                                  hint: '120',
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: TextField(
+                                child: RTextField(
                                   controller: _v2,
                                   keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Diastolic (bottom)',
-                                      hintText: '80'),
+                                  label: 'Diastolic (bottom)',
+                                  hint: '80',
                                 ),
                               ),
                             ],
                           )
                         else
-                          TextField(
+                          RTextField(
                             controller: _v1,
                             keyboardType: const TextInputType.numberWithOptions(
                                 decimal: true),
-                            decoration: InputDecoration(
-                              labelText: _type == 'sugar'
-                                  ? 'Sugar (mg/dL)'
-                                  : 'Weight (kg)',
-                              hintText: _type == 'sugar' ? '98' : '70',
-                            ),
+                            label: _type == 'sugar'
+                                ? 'Sugar (mg/dL)'
+                                : 'Weight (kg)',
+                            hint: _type == 'sugar' ? '98' : '70',
                           ),
                         const SizedBox(height: 16),
                         RButton(

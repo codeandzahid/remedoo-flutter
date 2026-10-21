@@ -204,21 +204,21 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Upload Report'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration:
-                  const InputDecoration(labelText: 'Report name'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: sourceCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Lab / doctor (optional)'),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RTextField(
+                controller: nameCtrl,
+                label: 'Report name',
+              ),
+              const SizedBox(height: 10),
+              RTextField(
+                controller: sourceCtrl,
+                label: 'Lab / doctor (optional)',
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
