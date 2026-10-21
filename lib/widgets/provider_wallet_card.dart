@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_repository.dart';
 import '../theme.dart';
 import 'widgets.dart';
+import 'form_kit.dart';
 
 /// Provider wallet + payout surface (form-pages audit
 /// Panelist 11 / M20: provider_wallets, provider_earnings and
@@ -91,31 +92,11 @@ class _ProviderWalletCardState extends State<ProviderWalletCard> {
                   style: const TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: amount,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Amount (₹)',
-                    errorText: error,
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
+                RKitField(controller: amount, label: 'Amount (₹)', keyboardType: TextInputType.number, errorText: error),
                 const SizedBox(height: 10),
-                TextField(
-                  controller: upi,
-                  decoration: const InputDecoration(
-                    labelText: 'Your UPI ID',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+                RKitField(controller: upi, label: 'Your UPI ID'),
                 const SizedBox(height: 10),
-                TextField(
-                  controller: name,
-                  decoration: const InputDecoration(
-                    labelText: 'Name on the UPI account',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+                RKitField(controller: name, label: 'Name on the UPI account'),
               ],
             ),
           ),

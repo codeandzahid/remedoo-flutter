@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/supabase_repository.dart';
 import 'widgets.dart';
+import 'form_kit.dart';
 
 /// Lab sample-collection workflow (form-pages audit Panelist 2 /
 /// Patient 11: lab_sample_collections was never touched and
@@ -84,16 +85,11 @@ class _LabSamplesManagerState extends State<LabSamplesManager> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: testName,
-                  decoration: const InputDecoration(
-                      labelText: 'Test name(s) *'),
-                ),
+                RKitField(controller: testName, label: 'Test name(s) *'),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: type,
-                  decoration: const InputDecoration(
-                      labelText: 'Collection type'),
+                RKitDropdown<String>(
+                  label: 'Collection type',
+                  value: type,
                   items: const [
                     DropdownMenuItem(
                         value: 'walk_in', child: Text('Walk-in')),
@@ -104,11 +100,7 @@ class _LabSamplesManagerState extends State<LabSamplesManager> {
                   onChanged: (v) =>
                       setD(() => type = v ?? 'walk_in'),
                 ),
-                TextField(
-                  controller: collector,
-                  decoration: const InputDecoration(
-                      labelText: 'Collector name (optional)'),
-                ),
+                RKitField(controller: collector, label: 'Collector name (optional)'),
               ],
             ),
           ),

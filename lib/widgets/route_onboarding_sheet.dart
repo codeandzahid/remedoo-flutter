@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../state/app_state.dart';
 import '../widgets/widgets.dart';
+import 'form_kit.dart';
 
 /// Razorpay Route onboarding: provider adds bank details so patient
 /// payments are automatically split directly to their bank account.
@@ -170,29 +171,29 @@ class _RouteOnboardingSheetState extends State<RouteOnboardingSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            RTextField(
+            RKitField(
               label: 'Beneficiary Name',
               hint: 'Name as per bank records',
               controller: _beneficiaryName,
             ),
             const SizedBox(height: 12),
-            RTextField(
+            RKitField(
               label: 'Bank Account Number',
               hint: 'Enter account number',
               controller: _accountNumber,
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 12),
-            RTextField(
+            RKitField(
               label: 'Confirm Account Number',
               hint: 'Re-enter account number',
               controller: _confirmAccount,
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 12),
-            RTextField(
+            RKitField(
               label: 'IFSC Code',
-              hint: 'e.g. HDFC0001234',
+              hint: 'Enter the IFSC code',
               controller: _ifsc,
             ),
             if (_error != null) ...[

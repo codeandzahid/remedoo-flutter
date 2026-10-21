@@ -67,10 +67,9 @@ class _CommissionScreenState extends State<CommissionScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<String>(
-                  initialValue: provider,
-                  decoration:
-                      const InputDecoration(labelText: 'Provider type'),
+                RKitDropdown<String>(
+                  label: 'Provider type',
+                  value: provider,
                   items: const [
                     DropdownMenuItem(
                         value: 'doctor', child: Text('Doctor')),
@@ -83,10 +82,9 @@ class _CommissionScreenState extends State<CommissionScreen> {
                   onChanged: (v) =>
                       setD(() => provider = v ?? 'doctor'),
                 ),
-                DropdownButtonFormField<String>(
-                  initialValue: service,
-                  decoration:
-                      const InputDecoration(labelText: 'Service type'),
+                RKitDropdown<String>(
+                  label: 'Service type',
+                  value: service,
                   items: const [
                     DropdownMenuItem(
                         value: 'appointment',
@@ -101,18 +99,8 @@ class _CommissionScreenState extends State<CommissionScreen> {
                   onChanged: (v) =>
                       setD(() => service = v ?? 'appointment'),
                 ),
-                TextField(
-                  controller: percent,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                      labelText: 'Commission %'),
-                ),
-                TextField(
-                  controller: flat,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                      labelText: 'Flat fee (₹)'),
-                ),
+                RKitField(controller: percent, label: 'Commission %', keyboardType: TextInputType.number),
+                RKitField(controller: flat, label: 'Flat fee (₹)', keyboardType: TextInputType.number),
               ],
             ),
           ),
@@ -517,20 +505,11 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                    controller: name,
-                    decoration:
-                        const InputDecoration(labelText: 'Name')),
-                TextField(
-                  controller: description,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                      labelText: 'Description'),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: provider,
-                  decoration: const InputDecoration(
-                      labelText: 'Provider type'),
+                RKitField(controller: name, label: 'Name'),
+                RKitField(controller: description, label: 'Description', maxLines: 2),
+                RKitDropdown<String>(
+                  label: 'Provider type',
+                  value: provider,
                   items: const [
                     DropdownMenuItem(
                         value: 'doctor', child: Text('Doctor')),
@@ -544,26 +523,11 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                   onChanged: (v) =>
                       setD(() => provider = v ?? 'doctor'),
                 ),
-                TextField(
-                  controller: price,
-                  keyboardType: TextInputType.number,
-                  decoration:
-                      const InputDecoration(labelText: 'Price (₹)'),
-                ),
-                TextField(
-                  controller: days,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                      labelText: 'Duration (days)'),
-                ),
-                TextField(
-                  controller: features,
-                  decoration: const InputDecoration(
-                      labelText: 'Features (comma separated)'),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Active'),
+                RKitField(controller: price, label: 'Price (₹)', keyboardType: TextInputType.number),
+                RKitField(controller: days, label: 'Duration (days)', keyboardType: TextInputType.number),
+                RKitField(controller: features, label: 'Features (comma separated)'),
+                RFormSwitchTile(
+                  title: 'Active',
                   value: active,
                   onChanged: (v) => setD(() => active = v),
                 ),
@@ -1054,14 +1018,10 @@ class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                    controller: name,
-                    decoration:
-                        const InputDecoration(labelText: 'Name')),
-                DropdownButtonFormField<String>(
-                  initialValue: type,
-                  decoration:
-                      const InputDecoration(labelText: 'Type'),
+                RKitField(controller: name, label: 'Name'),
+                RKitDropdown<String>(
+                  label: 'Type',
+                  value: type,
                   items: const [
                     DropdownMenuItem(
                         value: 'city', child: Text('City')),
@@ -1072,10 +1032,9 @@ class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
                   ],
                   onChanged: (v) => setD(() => type = v ?? 'city'),
                 ),
-                DropdownButtonFormField<String?>(
-                  initialValue: parentId,
-                  decoration:
-                      const InputDecoration(labelText: 'Parent area'),
+                RKitDropdown<String?>(
+                  label: 'Parent area',
+                  value: parentId,
                   items: [
                     const DropdownMenuItem<String?>(
                         value: null, child: Text('None (top level)')),
@@ -1087,27 +1046,11 @@ class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
                   ],
                   onChanged: (v) => setD(() => parentId = v),
                 ),
-                TextField(
-                  controller: lat,
-                  keyboardType: TextInputType.number,
-                  decoration:
-                      const InputDecoration(labelText: 'Latitude'),
-                ),
-                TextField(
-                  controller: lng,
-                  keyboardType: TextInputType.number,
-                  decoration:
-                      const InputDecoration(labelText: 'Longitude'),
-                ),
-                TextField(
-                  controller: radius,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                      labelText: 'Radius (km)'),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Active'),
+                RKitField(controller: lat, label: 'Latitude', keyboardType: TextInputType.number),
+                RKitField(controller: lng, label: 'Longitude', keyboardType: TextInputType.number),
+                RKitField(controller: radius, label: 'Radius (km)', keyboardType: TextInputType.number),
+                RFormSwitchTile(
+                  title: 'Active',
                   value: active,
                   onChanged: (v) => setD(() => active = v),
                 ),
@@ -1466,10 +1409,9 @@ class _BroadcastsScreenState extends State<BroadcastsScreen> {
                     controller: _message,
                     maxLines: 4),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _audience,
-                  decoration: const InputDecoration(
-                      labelText: 'Audience', isDense: true),
+                RKitDropdown<String>(
+                  label: 'Audience',
+                  value: _audience,
                   items: const [
                     DropdownMenuItem(
                         value: 'all', child: Text('Everyone')),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_repository.dart';
 import 'widgets.dart';
+import 'form_kit.dart';
 
 /// Hospital structure manager (form-pages audit Panelist 4:
 /// departments, operation_theaters and hospital_equipment had
@@ -81,16 +82,14 @@ class _HospitalUnitsManagerState extends State<HospitalUnitsManager> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (final f in textFields)
-                  TextField(
+                  RKitField(
                     controller: ctrls[f],
-                    decoration: InputDecoration(
-                        labelText: _labelFor(f)),
+                    label: _labelFor(f),
                   ),
                 for (final entry in dropdowns.entries)
-                  DropdownButtonFormField<String>(
-                    initialValue: drops[entry.key],
-                    decoration:
-                        InputDecoration(labelText: _labelFor(entry.key)),
+                  RKitDropdown<String>(
+                    label: _labelFor(entry.key),
+                    value: drops[entry.key],
                     items: [
                       for (final v in entry.value)
                         DropdownMenuItem(value: v, child: Text(v)),
@@ -102,10 +101,13 @@ class _HospitalUnitsManagerState extends State<HospitalUnitsManager> {
             ),
           ),
           actions: [
-            TextButton(
+            OutlinedButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancel')),
             FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: RFormBrand.blue,
+                    foregroundColor: Colors.white),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text('Save')),
           ],
@@ -244,16 +246,14 @@ class _HospitalUnitsManagerState extends State<HospitalUnitsManager> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Ambulance service enabled'),
+                RFormSwitchTile(
+                  title: 'Ambulance service enabled',
                   value: enabled,
                   onChanged: (v) => setD(() => enabled = v),
                 ),
-                DropdownButtonFormField<String>(
-                  initialValue: type,
-                  decoration:
-                      const InputDecoration(labelText: 'Service type'),
+                RKitDropdown<String>(
+                  label: 'Service type',
+                  value: type,
                   items: const [
                     DropdownMenuItem(
                         value: 'free', child: Text('Free')),
@@ -272,19 +272,22 @@ class _HospitalUnitsManagerState extends State<HospitalUnitsManager> {
                   ('Night surcharge (₹)', night),
                   ('Minimum charge (₹)', minimum),
                 ])
-                  TextField(
+                  RKitField(
                     controller: ctrl,
                     keyboardType: TextInputType.number,
-                    decoration: InputDecoration(labelText: label),
+                    label: label,
                   ),
               ],
             ),
           ),
           actions: [
-            TextButton(
+            OutlinedButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancel')),
             FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: RFormBrand.blue,
+                    foregroundColor: Colors.white),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text('Save')),
           ],

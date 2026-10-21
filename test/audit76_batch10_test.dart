@@ -58,8 +58,10 @@ void main() {
   group('Panelist structured inputs are dropdowns (M28)', () {
     test('pharmacy medicine category + unit are dropdowns', () {
       final s = _src('lib/widgets/pharmacy_medicines_manager.dart');
-      expect(s.contains("labelText: 'Category'"), isTrue);
-      expect(s.contains('DropdownButtonFormField<String>'), isTrue);
+      // UI redesign: the dropdowns wear the shared kit widget now
+      // (stacked label) — same options, same local state.
+      expect(s.contains("label: 'Category'"), isTrue);
+      expect(s.contains('RKitDropdown<String>'), isTrue);
       expect(s.contains("'strip', 'bottle', 'tablet'"), isTrue);
       expect(s.contains('controller: category'), isFalse);
       expect(s.contains('controller: unit'), isFalse);

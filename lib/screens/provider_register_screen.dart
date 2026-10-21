@@ -9,6 +9,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/email_otp_field.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import 'pending_approval_screen.dart';
 
 IconData _roleIcon(String role) {
@@ -479,12 +480,9 @@ class _ProviderRegisterScreenState
                         children: [
                           if (widget.providerType.toLowerCase() ==
                               'doctor') ...[
-                            DropdownButtonFormField<String>(
-                              initialValue: _specialization,
-                              decoration: const InputDecoration(
-                                labelText: 'Specialization *',
-                                border: OutlineInputBorder(),
-                              ),
+                            RKitDropdown<String>(
+                              label: 'Specialization *',
+                              value: _specialization,
                               items: [
                                 for (final s in specialties)
                                   DropdownMenuItem(
@@ -515,15 +513,13 @@ class _ProviderRegisterScreenState
                               'hospital') ...[
                             _RequiredField(
                               label: 'Total beds',
-                              hint: 'e.g. 120',
+                              hint: 'Enter total beds',
                               controller: _beds,
                               keyboardType: TextInputType.number,
                               icon: Icons.bed_outlined,
                             ),
-                            SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text(
-                                  'ICU available'),
+                            RFormSwitchTile(
+                              title: 'ICU available',
                               value: _icu,
                               onChanged: (v) =>
                                   setState(() => _icu = v),
@@ -724,7 +720,7 @@ class _RequiredField extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        RTextField(
+        RKitField(
           hint: hint,
           controller: controller,
           keyboardType: keyboardType,

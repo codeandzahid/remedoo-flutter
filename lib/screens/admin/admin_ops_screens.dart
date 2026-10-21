@@ -195,13 +195,7 @@ class _AdminRefundsScreenState
           title: Text(status == 'rejected'
               ? 'Reject refund'
               : 'Complete refund'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              hintText: 'Admin note (optional)',
-              border: OutlineInputBorder(),
-            ),
-          ),
+          content: RKitField(controller: controller, hint: 'Admin note (optional)'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -287,23 +281,12 @@ class _AdminAmbulanceScreenState
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                    controller: vehicle,
-                    decoration: const InputDecoration(
-                        labelText: 'Vehicle number *')),
-                TextField(
-                    controller: driver,
-                    decoration: const InputDecoration(
-                        labelText: 'Driver name')),
-                TextField(
-                    controller: phone,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                        labelText: 'Driver phone')),
-                DropdownButtonFormField<String>(
-                  initialValue: type,
-                  decoration:
-                      const InputDecoration(labelText: 'Type'),
+                RKitField(controller: vehicle, label: 'Vehicle number *'),
+                RKitField(controller: driver, label: 'Driver name'),
+                RKitField(controller: phone, label: 'Driver phone', keyboardType: TextInputType.phone),
+                RKitDropdown<String>(
+                  label: 'Type',
+                  value: type,
                   items: const [
                     DropdownMenuItem(
                         value: 'BLS',
@@ -318,11 +301,9 @@ class _AdminAmbulanceScreenState
                   ],
                   onChanged: (v) => setD(() => type = v ?? 'BLS'),
                 ),
-                DropdownButtonFormField<String>(
-                  initialValue:
-                      _statuses.contains(status) ? status : 'available',
-                  decoration:
-                      const InputDecoration(labelText: 'Status'),
+                RKitDropdown<String>(
+                  label: 'Status',
+                  value: _statuses.contains(status) ? status : 'available',
                   items: [
                     for (final s in _statuses)
                       DropdownMenuItem(
@@ -332,10 +313,7 @@ class _AdminAmbulanceScreenState
                   onChanged: (v) =>
                       setD(() => status = v ?? 'available'),
                 ),
-                TextField(
-                    controller: equipment,
-                    decoration: const InputDecoration(
-                        labelText: 'Equipment details')),
+                RKitField(controller: equipment, label: 'Equipment details'),
               ],
             ),
           ),
@@ -619,14 +597,7 @@ class _AdminInventoryScreenState
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Stock for ${m['name'] ?? 'medicine'}'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: const InputDecoration(
-              labelText: 'Quantity in stock',
-              border: OutlineInputBorder()),
-        ),
+        content: RKitField(controller: ctrl, label: 'Quantity in stock', keyboardType: TextInputType.number, autofocus: true),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),

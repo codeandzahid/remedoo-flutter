@@ -10,6 +10,7 @@ import '../../widgets/provider_payments.dart';
 import '../../widgets/provider_wallet_card.dart';
 import '../../widgets/upi_setup_dialog.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 import '../../widgets/working_hours_editor.dart';
 
 /// Dashboard for logged-in doctors.
@@ -679,16 +680,16 @@ class _ProfileTabState extends State<_ProfileTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              RTextField(controller: _name, label: 'Full name'),
+              RKitField(controller: _name, label: 'Full name'),
               const SizedBox(height: 12),
-              RTextField(
+              RKitField(
                   controller: _specialization,
                   label: 'Specialty (e.g. Cardiology)'),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: RTextField(
+                    child: RKitField(
                       controller: _fee,
                       label: 'Consultation fee (₹)',
                       keyboardType: TextInputType.number,
@@ -696,7 +697,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: RTextField(
+                    child: RKitField(
                       controller: _experience,
                       label: 'Experience (years)',
                       keyboardType: TextInputType.number,
@@ -705,13 +706,13 @@ class _ProfileTabState extends State<_ProfileTab> {
                 ],
               ),
               const SizedBox(height: 12),
-              RTextField(
+              RKitField(
                 controller: _phone,
                 label: 'Phone number',
                 keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 12),
-              RTextField(
+              RKitField(
                 controller: _bio,
                 label: 'About you',
                 maxLines: 3,
@@ -971,9 +972,8 @@ class _AvailabilityCardState extends State<_AvailabilityCard> {
                     if (picked != null) setD(() => date = picked);
                   },
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Full day'),
+                RFormSwitchTile(
+                  title: 'Full day',
                   value: fullDay,
                   onChanged: (v) => setD(() => fullDay = v),
                 ),
@@ -998,11 +998,7 @@ class _AvailabilityCardState extends State<_AvailabilityCard> {
                       ),
                     ],
                   ),
-                TextField(
-                  controller: reason,
-                  decoration: const InputDecoration(
-                      labelText: 'Reason (optional)'),
-                ),
+                RKitField(controller: reason, label: 'Reason (optional)'),
               ],
             ),
           ),

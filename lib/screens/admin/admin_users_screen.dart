@@ -64,38 +64,18 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                    controller: name,
-                    decoration:
-                        const InputDecoration(labelText: 'Full name')),
-                TextField(
-                    controller: phone,
-                    decoration:
-                        const InputDecoration(labelText: 'Phone')),
-                TextField(
-                    controller: address,
-                    decoration:
-                        const InputDecoration(labelText: 'Address')),
-                TextField(
-                    controller: language,
-                    decoration: const InputDecoration(
-                        labelText: 'Language code (en, hi, ur, ks)')),
-                TextField(
-                    controller: upi,
-                    decoration:
-                        const InputDecoration(labelText: 'UPI ID')),
-                TextField(
-                  controller: dob,
-                  decoration: const InputDecoration(
-                      labelText: 'Date of birth (YYYY-MM-DD)'),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: const ['male', 'female', 'other']
+                RKitField(controller: name, label: 'Full name'),
+                RKitField(controller: phone, label: 'Phone'),
+                RKitField(controller: address, label: 'Address'),
+                RKitField(controller: language, label: 'Language code (en, hi, ur, ks)'),
+                RKitField(controller: upi, label: 'UPI ID'),
+                RKitField(controller: dob, label: 'Date of birth (YYYY-MM-DD)'),
+                RKitDropdown<String>(
+                  label: 'Gender',
+                  value: const ['male', 'female', 'other']
                           .contains(gender)
                       ? gender
                       : null,
-                  decoration:
-                      const InputDecoration(labelText: 'Gender'),
                   items: const [
                     DropdownMenuItem(value: null, child: Text('—')),
                     DropdownMenuItem(value: 'male', child: Text('male')),
@@ -106,10 +86,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   ],
                   onChanged: (v) => setD(() => gender = v ?? ''),
                 ),
-                DropdownButtonFormField<String>(
-                  initialValue: status,
-                  decoration: const InputDecoration(
-                      labelText: 'Account status'),
+                RKitDropdown<String>(
+                  label: 'Account status',
+                  value: status,
                   items: const [
                     DropdownMenuItem(
                         value: 'active', child: Text('active')),

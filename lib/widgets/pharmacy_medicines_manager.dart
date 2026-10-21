@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_repository.dart';
 import 'widgets.dart';
+import 'form_kit.dart';
 
 /// Pharmacy medicines + stock manager (form-pages audit
 /// Panelist 3: the medicines table had no panel form at all —
@@ -90,74 +91,44 @@ class _PharmacyMedicinesManagerState
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                    controller: name,
-                    decoration: const InputDecoration(
-                        labelText: 'Medicine name *')),
-                TextField(
-                    controller: generic,
-                    decoration: const InputDecoration(
-                        labelText: 'Generic / salt name')),
-                DropdownButtonFormField<String>(
-                  initialValue: category,
-                  decoration:
-                      const InputDecoration(labelText: 'Category'),
+                RKitField(controller: name, label: 'Medicine name *'),
+                RKitField(controller: generic, label: 'Generic / salt name'),
+                RKitDropdown<String>(
+                  label: 'Category',
+                  value: category,
                   items: [
                     for (final c in medCategories)
                       DropdownMenuItem(value: c, child: Text(c)),
                   ],
                   onChanged: (v) => category = v ?? 'General',
                 ),
-                TextField(
-                    controller: price,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: 'Price (₹) *')),
-                TextField(
-                    controller: discount,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: 'Discount %')),
-                DropdownButtonFormField<String>(
-                  initialValue: unit,
-                  decoration: const InputDecoration(labelText: 'Unit'),
+                RKitField(controller: price, keyboardType: TextInputType.number, label: 'Price (₹) *'),
+                RKitField(controller: discount, keyboardType: TextInputType.number, label: 'Discount %'),
+                RKitDropdown<String>(
+                  label: 'Unit',
+                  value: unit,
                   items: [
                     for (final u in medUnits)
                       DropdownMenuItem(value: u, child: Text(u)),
                   ],
                   onChanged: (v) => unit = v ?? 'strip',
                 ),
-                TextField(
-                    controller: stock,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: 'Stock quantity')),
-                TextField(
-                    controller: manufacturer,
-                    decoration: const InputDecoration(
-                        labelText: 'Manufacturer')),
-                TextField(
-                    controller: batch,
-                    decoration: const InputDecoration(
-                        labelText: 'Batch number')),
-                TextField(
-                    controller: description,
-                    decoration: const InputDecoration(
-                        labelText: 'Description')),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Prescription required'),
-                  value: rx,
-                  onChanged: (v) => setD(() => rx = v),
-                ),
+                RKitField(controller: stock, keyboardType: TextInputType.number, label: 'Stock quantity'),
+                RKitField(controller: manufacturer, label: 'Manufacturer'),
+                RKitField(controller: batch, label: 'Batch number'),
+                RKitField(controller: description, label: 'Description'),
+                RFormSwitchTile(title: 'Prescription required', value: rx, onChanged: (v) => setD(() => rx = v)),
               ],
             ),
           ),
           actions: [
-            TextButton(
+            OutlinedButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancel')),
             FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: RFormBrand.blue,
+                    foregroundColor: Colors.white),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text('Save')),
           ],

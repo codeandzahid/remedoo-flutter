@@ -4,6 +4,7 @@ import '../../models.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 /// Admin reviews moderation (form-pages audit Admin 8 / M6).
 ///
@@ -37,14 +38,7 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Admin notes'),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'Internal note about this review',
-            border: OutlineInputBorder(),
-          ),
-        ),
+        content: RKitField(controller: controller, hint: 'Internal note about this review', maxLines: 3),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),

@@ -831,12 +831,9 @@ class _AdminAppSettingsScreenState
                     builder: (ctx) {
                       final state = AppStateScope.of(ctx);
                       final pharmacies = state.activePharmacies;
-                      return DropdownButtonFormField<String>(
+                      return RKitDropdown<String>(
+                        label: 'Single vendor pharmacy',
                         value: _singleVendorPharmacyId,
-                        decoration: const InputDecoration(
-                          labelText: 'Single vendor pharmacy',
-                          isDense: true,
-                        ),
                         items: [
                           for (final p in pharmacies)
                             DropdownMenuItem(

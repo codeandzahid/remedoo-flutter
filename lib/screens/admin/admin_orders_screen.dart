@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 String _fmtDate(String? iso) {
   if (iso == null || iso.isEmpty) return '';
@@ -210,15 +211,11 @@ class _AdminOrdersScreenState
             Row(
               children: [
                 Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue:
-                        _statuses.contains('${o['status']}')
+                  child: RKitDropdown<String>(
+                    label: 'Status',
+                    value: _statuses.contains('${o['status']}')
                             ? '${o['status']}'
                             : null,
-                    decoration: const InputDecoration(
-                      labelText: 'Status',
-                      isDense: true,
-                    ),
                     items: _statuses
                         .map((s) => DropdownMenuItem(
                             value: s,

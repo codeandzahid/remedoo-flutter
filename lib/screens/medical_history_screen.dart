@@ -267,9 +267,9 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<String>(
-                  initialValue: kind,
-                  decoration: const InputDecoration(labelText: 'Type'),
+                RKitDropdown<String>(
+                  label: 'Type',
+                  value: kind,
                   items: const [
                     'Allergy',
                     'Condition',

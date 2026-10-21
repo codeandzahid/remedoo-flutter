@@ -301,11 +301,9 @@ class FamilyScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue:
-                      _genders.contains(gender) ? gender : null,
-                  decoration: const InputDecoration(
-                      labelText: 'Gender', isDense: true),
+                RKitDropdown<String>(
+                  label: 'Gender',
+                  value: _genders.contains(gender) ? gender : null,
                   items: _genders
                       .map((g) =>
                           DropdownMenuItem(value: g, child: Text(g)))
@@ -313,11 +311,9 @@ class FamilyScreen extends StatelessWidget {
                   onChanged: (v) => setLocal(() => gender = v),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue:
-                      _bloodGroups.contains(blood) ? blood : null,
-                  decoration: const InputDecoration(
-                      labelText: 'Blood group', isDense: true),
+                RKitDropdown<String>(
+                  label: 'Blood group',
+                  value: _bloodGroups.contains(blood) ? blood : null,
                   items: _bloodGroups
                       .map((g) =>
                           DropdownMenuItem(value: g, child: Text(g)))

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import 'form_kit.dart';
 
 /// UPI setup popup shown after a provider's account is verified.
 /// Guides them to add their UPI ID so patients can pay them directly.
@@ -131,9 +132,9 @@ class _UpiSetupDialogState
                       'Enter it below and tap Save. Patients will see a "Pay via UPI" option at checkout.',
                 ),
                 const SizedBox(height: 18),
-                RTextField(
+                RKitField(
                   label: 'Your UPI ID',
-                  hint: 'yourname@okhdfcbank',
+                  hint: 'name@bank',
                   controller: _upiId,
                   prefixIcon: const Icon(
                       Icons.account_balance_outlined,
@@ -156,7 +157,7 @@ class _UpiSetupDialogState
                   ),
                 ),
                 const SizedBox(height: 10),
-                RTextField(
+                RKitField(
                   label: 'Name on your UPI account',
                   hint: 'As it appears in your bank app',
                   controller: _upiName,

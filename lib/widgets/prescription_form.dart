@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_repository.dart';
 import 'widgets.dart';
+import 'form_kit.dart';
 
 /// Doctor prescription sheet (form-pages audit M3): the
 /// prescriptions + prescription_items tables and doctor-insert
@@ -237,7 +238,7 @@ class _PrescriptionSheetState extends State<PrescriptionSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RTextField(controller: _diagnosis, label: 'Diagnosis'),
+        RKitField(controller: _diagnosis, label: 'Diagnosis'),
         const SizedBox(height: 10),
         for (var i = 0; i < _items.length; i++) ...[
           Row(
@@ -254,34 +255,34 @@ class _PrescriptionSheetState extends State<PrescriptionSheet> {
                 ),
             ],
           ),
-          RTextField(
+          RKitField(
               controller: _items[i].name, label: 'Medicine name *'),
           const SizedBox(height: 8),
-          RTextField(
+          RKitField(
               controller: _items[i].generic,
               label: 'Generic name (optional)'),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: RTextField(
+                child: RKitField(
                     controller: _items[i].dosage, label: 'Dosage *'),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: RTextField(
+                child: RKitField(
                     controller: _items[i].frequency,
                     label: 'Frequency *'),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: RTextField(
+                child: RKitField(
                     controller: _items[i].duration, label: 'Duration *'),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          RTextField(
+          RKitField(
               controller: _items[i].instructions,
               label: 'Instructions (optional)'),
           const SizedBox(height: 12),
@@ -294,7 +295,7 @@ class _PrescriptionSheetState extends State<PrescriptionSheet> {
             label: const Text('Add medicine'),
           ),
         ),
-        RTextField(
+        RKitField(
             controller: _notes, label: 'Notes for the patient (optional)'),
         if (_error != null) ...[
           const SizedBox(height: 10),

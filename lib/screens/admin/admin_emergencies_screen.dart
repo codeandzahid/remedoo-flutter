@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 String _fmtDate(String? iso) {
   if (iso == null || iso.isEmpty) return '';
@@ -120,13 +121,9 @@ class _AdminEmergenciesScreenState
                     color: scheme.onSurfaceVariant),
               ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue:
-                  _flow.contains(status) ? status : null,
-              decoration: const InputDecoration(
-                labelText: 'Status',
-                isDense: true,
-              ),
+            RKitDropdown<String>(
+                  label: 'Status',
+                  value: _flow.contains(status) ? status : null,
               items: _flow
                   .map((s) => DropdownMenuItem(
                       value: s,
@@ -151,12 +148,9 @@ class _AdminEmergenciesScreenState
             // assigned vehicle used to be display-only text —
             // dispatch was a status word with no way to choose
             // WHICH ambulance goes).
-            DropdownButtonFormField<String>(
-              initialValue: r['assigned_ambulance_id']?.toString(),
-              decoration: const InputDecoration(
-                labelText: 'Assign ambulance',
-                isDense: true,
-              ),
+            RKitDropdown<String>(
+                  label: 'Assign ambulance',
+                  value: r['assigned_ambulance_id']?.toString(),
               items: [
                 const DropdownMenuItem(
                     value: null, child: Text('Not assigned')),

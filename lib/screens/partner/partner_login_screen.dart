@@ -8,6 +8,7 @@ import '../forgot_password_screen.dart';
 import '../provider_type_screen.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 /// Provider sign-in for the Remedoo Partner app.
 /// Backed by Supabase Auth + the `user_roles` table.
@@ -155,13 +156,13 @@ class _PartnerLoginScreenState extends State<PartnerLoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          RTextField(
+                          RKitField(
                             controller: _email,
                             label: 'Email',
                             keyboardType: TextInputType.emailAddress,
                           ),
                           const SizedBox(height: 12),
-                          RTextField(
+                          RKitField(
                             controller: _password,
                             label: 'Password',
                             obscureText: _obscure,

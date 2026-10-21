@@ -208,6 +208,7 @@ InputDecoration rKitDecoration(
   IconData? icon,
   Widget? suffixIcon,
   Widget? prefixIcon,
+  String? counterText,
 }) {
   final scheme = Theme.of(context).colorScheme;
   OutlineInputBorder side(Color c, double w) => OutlineInputBorder(
@@ -217,6 +218,7 @@ InputDecoration rKitDecoration(
   return InputDecoration(
     hintText: hint,
     errorText: errorText,
+    counterText: counterText,
     hintStyle: const TextStyle(color: RFormBrand.muted, fontSize: 14),
     filled: true,
     // Ambient fill wins (patient theme card colour, or the active
@@ -260,6 +262,8 @@ class RKitField extends StatelessWidget {
   final Widget? prefixIcon;
   final String? errorText;
   final TextInputAction? textInputAction;
+  final int? maxLength;
+  final bool autofocus;
 
   const RKitField({
     super.key,
@@ -278,6 +282,8 @@ class RKitField extends StatelessWidget {
     this.prefixIcon,
     this.errorText,
     this.textInputAction,
+    this.maxLength,
+    this.autofocus = false,
   });
 
   @override
@@ -309,6 +315,8 @@ class RKitField extends StatelessWidget {
           keyboardType: keyboardType,
           maxLines: maxLines,
           minLines: minLines,
+          maxLength: maxLength,
+          autofocus: autofocus,
           textInputAction: textInputAction,
           onChanged: onChanged,
           style: const TextStyle(fontSize: 14.5),
@@ -319,6 +327,9 @@ class RKitField extends StatelessWidget {
             icon: icon,
             suffixIcon: suffixIcon,
             prefixIcon: prefixIcon,
+            // Length-counted fields (OTP, UTR) keep their counter
+            // hidden, as the raw fields did before the kit.
+            counterText: maxLength != null ? '' : null,
           ),
         ),
       ],

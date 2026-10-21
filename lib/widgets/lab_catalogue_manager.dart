@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_repository.dart';
 import 'widgets.dart';
+import 'form_kit.dart';
 
 /// Lab test catalogue + packages manager (form-pages audit
 /// Panelist 2 / M11: lab_tests and lab_test_packages had full
@@ -83,79 +84,44 @@ class _LabCatalogueManagerState extends State<LabCatalogueManager> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                    controller: name,
-                    decoration:
-                        const InputDecoration(labelText: 'Test name *')),
-                DropdownButtonFormField<String>(
-                  initialValue: category,
-                  decoration:
-                      const InputDecoration(labelText: 'Category'),
+                RKitField(controller: name, label: 'Test name *'),
+                RKitDropdown<String>(
+                  label: 'Category',
+                  value: category,
                   items: [
                     for (final c in testCategories)
                       DropdownMenuItem(value: c, child: Text(c)),
                   ],
                   onChanged: (v) => category = v ?? 'General',
                 ),
-                TextField(
-                    controller: price,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: 'Price (₹) *')),
-                TextField(
-                    controller: discount,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: 'Discount %')),
-                DropdownButtonFormField<String>(
-                  initialValue: sampleType,
-                  decoration:
-                      const InputDecoration(labelText: 'Sample type'),
+                RKitField(controller: price, keyboardType: TextInputType.number, label: 'Price (₹) *'),
+                RKitField(controller: discount, keyboardType: TextInputType.number, label: 'Discount %'),
+                RKitDropdown<String>(
+                  label: 'Sample type',
+                  value: sampleType,
                   items: [
                     for (final s in sampleTypes)
                       DropdownMenuItem(value: s, child: Text(s)),
                   ],
                   onChanged: (v) => sampleType = v ?? 'Blood',
                 ),
-                TextField(
-                    controller: turnaround,
-                    decoration: const InputDecoration(
-                        labelText: 'Turnaround time')),
-                TextField(
-                    controller: homeFee,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: 'Home collection fee (₹)')),
-                TextField(
-                    controller: description,
-                    decoration: const InputDecoration(
-                        labelText: 'Description')),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Requires fasting'),
-                  value: fasting,
-                  onChanged: (v) => setD(() => fasting = v),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Home collection available'),
-                  value: home,
-                  onChanged: (v) => setD(() => home = v),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Popular test'),
-                  value: popular,
-                  onChanged: (v) => setD(() => popular = v),
-                ),
+                RKitField(controller: turnaround, label: 'Turnaround time'),
+                RKitField(controller: homeFee, keyboardType: TextInputType.number, label: 'Home collection fee (₹)'),
+                RKitField(controller: description, label: 'Description'),
+                RFormSwitchTile(title: 'Requires fasting', value: fasting, onChanged: (v) => setD(() => fasting = v)),
+                RFormSwitchTile(title: 'Home collection available', value: home, onChanged: (v) => setD(() => home = v)),
+                RFormSwitchTile(title: 'Popular test', value: popular, onChanged: (v) => setD(() => popular = v)),
               ],
             ),
           ),
           actions: [
-            TextButton(
+            OutlinedButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancel')),
             FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: RFormBrand.blue,
+                    foregroundColor: Colors.white),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text('Save')),
           ],
@@ -213,24 +179,10 @@ class _LabCatalogueManagerState extends State<LabCatalogueManager> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextField(
-                    controller: name,
-                    decoration: const InputDecoration(
-                        labelText: 'Package name *')),
-                TextField(
-                    controller: price,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: 'Package price (₹) *')),
-                TextField(
-                    controller: discount,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: 'Discount %')),
-                TextField(
-                    controller: description,
-                    decoration: const InputDecoration(
-                        labelText: 'Description')),
+                RKitField(controller: name, label: 'Package name *'),
+                RKitField(controller: price, keyboardType: TextInputType.number, label: 'Package price (₹) *'),
+                RKitField(controller: discount, keyboardType: TextInputType.number, label: 'Discount %'),
+                RKitField(controller: description, label: 'Description'),
                 const SizedBox(height: 8),
                 const Text('Tests included',
                     style: TextStyle(fontWeight: FontWeight.w600)),
@@ -248,20 +200,18 @@ class _LabCatalogueManagerState extends State<LabCatalogueManager> {
                       }
                     }),
                   ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Active (patients can book it)'),
-                  value: active,
-                  onChanged: (v) => setD(() => active = v),
-                ),
+                RFormSwitchTile(title: 'Active (patients can book it)', value: active, onChanged: (v) => setD(() => active = v)),
               ],
             ),
           ),
           actions: [
-            TextButton(
+            OutlinedButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancel')),
             FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: RFormBrand.blue,
+                    foregroundColor: Colors.white),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text('Save')),
           ],

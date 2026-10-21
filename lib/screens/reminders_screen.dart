@@ -382,10 +382,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  DropdownButtonFormField<String>(
-                    initialValue: repeat,
-                    decoration:
-                        const InputDecoration(labelText: 'Repeat'),
+                  RKitDropdown<String>(
+                  label: 'Repeat',
+                  value: repeat,
                     items: const ['Daily', 'Weekly', 'Once']
                         .map((o) => DropdownMenuItem(
                             value: o, child: Text(o)))

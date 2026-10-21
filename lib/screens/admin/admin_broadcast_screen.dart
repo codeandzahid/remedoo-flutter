@@ -118,12 +118,9 @@ class _AdminBroadcastScreenState
                     maxLines: 4,
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: _audience,
-                    decoration: const InputDecoration(
-                      labelText: 'Audience',
-                      isDense: true,
-                    ),
+                  RKitDropdown<String>(
+                  label: 'Audience',
+                  value: _audience,
                     items: const [
                       DropdownMenuItem(
                           value: 'all',
@@ -236,20 +233,11 @@ class _AdminBroadcastScreenState
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                    controller: title,
-                    decoration:
-                        const InputDecoration(labelText: 'Title')),
-                TextField(
-                  controller: message,
-                  maxLines: 4,
-                  decoration:
-                      const InputDecoration(labelText: 'Message'),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: audience,
-                  decoration:
-                      const InputDecoration(labelText: 'Audience'),
+                RKitField(controller: title, label: 'Title'),
+                RKitField(controller: message, label: 'Message', maxLines: 4),
+                RKitDropdown<String>(
+                  label: 'Audience',
+                  value: audience,
                   items: const [
                     DropdownMenuItem(
                         value: 'all', child: Text('Everyone')),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 String _fmtDate(String? iso) {
   if (iso == null || iso.isEmpty) return '';
@@ -281,46 +282,23 @@ class _AdminAppointmentsScreenState
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: date,
-                  decoration: const InputDecoration(
-                      labelText: 'Date (YYYY-MM-DD)'),
-                ),
-                TextField(
-                  controller: time,
-                  decoration: const InputDecoration(
-                      labelText: 'Time (HH:MM)'),
-                ),
-                TextField(
-                  controller: token,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                      labelText: 'Token number'),
-                ),
-                TextField(
-                  controller: department,
-                  decoration:
-                      const InputDecoration(labelText: 'Department'),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Video consultation'),
+                RKitField(controller: date, label: 'Date (YYYY-MM-DD)'),
+                RKitField(controller: time, label: 'Time (HH:MM)'),
+                RKitField(controller: token, label: 'Token number', keyboardType: TextInputType.number),
+                RKitField(controller: department, label: 'Department'),
+                RFormSwitchTile(
+                  title: 'Video consultation',
                   value: video,
                   onChanged: (v) => setD(() => video = v),
                 ),
-                TextField(
-                  controller: meetingLink,
-                  decoration: const InputDecoration(
-                      labelText: 'Video meeting link'),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: const ['pending', 'paid', 'refunded',
+                RKitField(controller: meetingLink, label: 'Video meeting link'),
+                RKitDropdown<String>(
+                  label: 'Payment status',
+                  value: const ['pending', 'paid', 'refunded',
                           'failed']
                       .contains(payStatus)
                       ? payStatus
                       : 'pending',
-                  decoration: const InputDecoration(
-                      labelText: 'Payment status'),
                   items: const [
                     DropdownMenuItem(
                         value: 'pending', child: Text('pending')),
@@ -333,12 +311,7 @@ class _AdminAppointmentsScreenState
                   onChanged: (v) =>
                       setD(() => payStatus = v ?? 'pending'),
                 ),
-                TextField(
-                  controller: notes,
-                  maxLines: 2,
-                  decoration:
-                      const InputDecoration(labelText: 'Notes'),
-                ),
+                RKitField(controller: notes, label: 'Notes', maxLines: 2),
               ],
             ),
           ),

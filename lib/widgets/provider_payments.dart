@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../utils/refunds.dart';
 import 'route_onboarding_sheet.dart';
 import 'widgets.dart';
+import 'form_kit.dart';
 
 /// Shared email-OTP gate: sends a 6-digit code to the signed-in
 /// user's own account email and returns true only when the correct
@@ -54,16 +55,12 @@ Future<bool> requireEmailOtp(
               style: const TextStyle(fontSize: 13.5),
             ),
             const SizedBox(height: 14),
-            TextField(
+            RKitField(
               controller: ctrl,
+              label: '6-digit code',
               keyboardType: TextInputType.number,
               maxLength: 6,
               autofocus: true,
-              decoration: const InputDecoration(
-                labelText: '6-digit code',
-                border: OutlineInputBorder(),
-                counterText: '',
-              ),
             ),
           ],
         ),
@@ -221,15 +218,11 @@ Future<String?> showRefundDialog(
                   ),
                 ],
                 const SizedBox(height: 14),
-                TextField(
+                RKitField(
                   controller: ctrl,
+                  label: 'Refund UTR / UPI reference number',
                   keyboardType: TextInputType.number,
                   maxLength: 22,
-                  decoration: const InputDecoration(
-                    labelText: 'Refund UTR / UPI reference number',
-                    border: OutlineInputBorder(),
-                    counterText: '',
-                  ),
                   onChanged: (v) =>
                       setLocal(() => valid = isValidRefundUtr(v)),
                 ),
@@ -438,28 +431,26 @@ class _ProviderUpiSettingsCardState extends State<ProviderUpiSettingsCard> {
             ),
           ),
           const SizedBox(height: 12),
-          RTextField(
+          RKitField(
             controller: _upiId,
-            label: 'Your UPI ID (e.g. name@okhdfcbank)',
+            label: 'Your UPI ID',
+            hint: 'name@bank',
+            icon: Icons.account_balance_wallet_outlined,
           ),
           const SizedBox(height: 10),
-          RTextField(
+          RKitField(
             controller: _upiName,
             label: 'Name on your UPI account (optional)',
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Accept online UPI payments'),
-            subtitle: const Text(
-                'Customers pay you online when booking'),
+          RFormSwitchTile(
+            title: 'Accept online UPI payments',
+            subtitle: 'Customers pay you online when booking',
             value: _upiEnabled,
             onChanged: (v) => setState(() => _upiEnabled = v),
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Pay in person'),
-            subtitle:
-                const Text('Customers can choose to pay you directly'),
+          RFormSwitchTile(
+            title: 'Pay in person',
+            subtitle: 'Customers can choose to pay you directly',
             value: _payInClinic,
             onChanged: (v) => setState(() => _payInClinic = v),
           ),
@@ -637,13 +628,10 @@ Future<String?> promptActionReason(
           children: [
             Text(message),
             const SizedBox(height: 12),
-            TextField(
+            RKitField(
               controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Reason (optional)',
-                hintText: 'The patient will see this',
-                border: OutlineInputBorder(),
-              ),
+              label: 'Reason (optional)',
+              hint: 'The patient will see this',
               maxLines: 2,
             ),
           ],
@@ -684,13 +672,10 @@ Future<({String notes, String? followUpIso})?> promptCompletionDetails(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
+              RKitField(
                 controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'Consultation notes (optional)',
-                  hintText: 'What was checked / advised',
-                  border: OutlineInputBorder(),
-                ),
+                label: 'Consultation notes (optional)',
+                hint: 'What was checked / advised',
                 maxLines: 3,
               ),
               const SizedBox(height: 8),

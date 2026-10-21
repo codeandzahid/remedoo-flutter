@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_repository.dart';
 import '../utils/working_hours.dart';
 import 'widgets.dart';
+import 'form_kit.dart';
 import 'working_hours_editor.dart';
 
 /// Profile form for hospital / lab / pharmacy partners
@@ -120,32 +121,31 @@ class _ProviderProfileFormState extends State<ProviderProfileForm> {
             subtitle: 'What patients see about you',
           ),
           const SizedBox(height: 12),
-          RTextField(controller: _name, label: 'Name'),
+          RKitField(controller: _name, label: 'Name'),
           const SizedBox(height: 12),
-          RTextField(
+          RKitField(
             controller: _phone,
             label: 'Phone',
             keyboardType: TextInputType.phone,
           ),
           const SizedBox(height: 12),
-          RTextField(controller: _location, label: 'Location / address'),
+          RKitField(controller: _location, label: 'Location / address'),
           if (_isHospital) ...[
             const SizedBox(height: 12),
-            RTextField(
+            RKitField(
               controller: _beds,
               label: 'Total beds',
               keyboardType: TextInputType.number,
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('ICU available'),
+            RFormSwitchTile(
+              title: 'ICU available',
               value: _icu,
               onChanged: (v) => setState(() => _icu = v),
             ),
           ],
           if (_isLab) ...[
             const SizedBox(height: 12),
-            RTextField(
+            RKitField(
               controller: _services,
               label: 'Services / tests offered',
               hint: 'Blood Test, X-Ray, MRI — comma separated',
