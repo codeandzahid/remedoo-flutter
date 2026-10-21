@@ -60,21 +60,9 @@ class _AdminSupportChatScreenState
     _profile = widget.profile;
     _loadProfile();
     _loadMessages(markRead: true);
-    _markOpenedIfQueued();
     _poll = Timer.periodic(const Duration(seconds: 8), (_) {
       _loadMessages(markRead: true, silent: true);
     });
-  }
-
-  /// Opening a queued chat moves it out of the queue: status
-  /// open -> opened, so the user sees "Opened" on their side.
-  Future<void> _markOpenedIfQueued() async {
-    if (_status != 'open') return;
-    final ok = await AppStateScope.of(context)
-        .updateSupportTicket(_ticketId, {'status': 'opened'});
-    if (ok && mounted) {
-      setState(() => widget.ticket['status'] = 'opened');
-    }
   }
 
   @override
@@ -351,7 +339,6 @@ class _AdminSupportChatScreenState
               children: [
                 for (final s in const [
                   'open',
-                  'opened',
                   'in_progress',
                   'resolved',
                   'closed'

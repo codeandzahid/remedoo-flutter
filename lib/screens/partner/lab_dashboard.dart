@@ -413,6 +413,7 @@ class _LabDashboardState extends State<LabDashboard> {
                 ],
               ),
             ],
+            AppointmentRefundButton(repo: _repo, appointment: b),
           ],
         ),
       ),

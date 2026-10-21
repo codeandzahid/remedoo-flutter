@@ -838,6 +838,10 @@ class AppState extends ChangeNotifier {
         ..clear()
         ..addAll(frows.map(_familyFromRow));
     }
+    // Own reviews + refunds from the backend (audit M6/M8) so they
+    // survive restarts and the tracker shows real records.
+    unawaited(loadMyReviews());
+    unawaited(loadMyRefunds());
     final prof = await _repo.fetchProfile();
     if (prof != null) {
       final n = '${prof['full_name'] ?? ''}';
@@ -1434,6 +1438,13 @@ class AppState extends ChangeNotifier {
           refundStatus: 'requested',
           refundAmount: appt.fee,
         ));
+        // A refunds-table row too, so the patient tracker and the
+        // admin queue see this refund (audit M8).
+        unawaited(_repo.createRefundRequest(
+          appointmentId: remoteId,
+          amount: appt.fee,
+          reason: 'Appointment cancelled by patient',
+        ));
         final ref = appt.paymentRef;
         if (ref != null && ref.isNotEmpty) {
           unawaited(_repo.updateSessionRefundByRef(ref, 'requested'));
@@ -1696,6 +1707,15 @@ class AppState extends ChangeNotifier {
         refundStatus: 'requested',
         refundAmount: order.total,
       ));
+      // A refunds-table row too, so the patient tracker and the
+      // admin queue see this refund (audit M8).
+      if (_supaUser != null) {
+        unawaited(_repo.createRefundRequest(
+          orderId: remoteId,
+          amount: order.total,
+          reason: 'Order cancelled by patient',
+        ));
+      }
       final ref = order.paymentRef;
       if (ref != null && ref.isNotEmpty) {
         unawaited(_repo.updateSessionRefundByRef(ref, 'requested'));
@@ -2137,6 +2157,102 @@ class AppState extends ChangeNotifier {
       comment: comment,
     );
     notifyListeners();
+    // Persist to the reviews table (audit M6) — the row links the
+    // appointment's provider so it can surface for moderation and,
+    // later, on provider profiles. Local-only when signed out.
+    if (_supaUser == null) return;
+    final appt =
+        appointments.where((a) => a.id == appointmentId).firstOrNull;
+    if (appt == null || appt.refId.isEmpty) return;
+    unawaited(_repo
+        .submitReview(
+      providerId: appt.refId,
+      providerType: appt.kind,
+      rating: stars,
+      comment: comment.isEmpty ? null : comment,
+      appointmentId: _remoteAppointmentIds[appointmentId],
+    )
+        .then((rowId) {
+      if (rowId == null) return;
+      final current = reviews[appointmentId];
+      if (current == null) return;
+      reviews[appointmentId] = Review(
+        appointmentId: current.appointmentId,
+        stars: current.stars,
+        comment: current.comment,
+        hidden: current.hidden,
+        id: rowId,
+        providerId: appt.refId,
+        providerType: appt.kind,
+        adminNotes: current.adminNotes,
+      );
+      notifyListeners();
+    }));
+  }
+
+  /// Loads the signed-in patient's own backend reviews into the
+  /// local map, so a review survives a restart and canReview stays
+  /// honest (audit M6).
+  Future<void> loadMyReviews() async {
+    final uid = _supaUser?.id;
+    if (uid == null) return;
+    final rows = await _repo.fetchReviews(userId: uid);
+    for (final r in rows) {
+      final apptId = '${r['appointment_id'] ?? ''}';
+      if (apptId.isEmpty || apptId == 'null') continue;
+      reviews[apptId] = Review(
+        appointmentId: apptId,
+        stars: (r['rating'] as num?)?.toInt() ?? 0,
+        comment: '${r['comment'] ?? ''}',
+        hidden: '${r['status']}' == 'hidden',
+        id: '${r['id']}',
+        providerId: '${r['provider_id'] ?? ''}',
+        providerType: '${r['provider_type'] ?? ''}',
+        adminNotes: '${r['admin_notes'] ?? ''}',
+      );
+    }
+    notifyListeners();
+  }
+
+  // ---------- Reviews admin ----------
+
+  /// Backend reviews for Admin > Reviews (audit Admin 8: the screen
+  /// used to read only the in-memory map of THIS device's reviews).
+  final List<Review> adminReviews = [];
+
+  Future<void> loadAdminReviews() async {
+    final rows = await _repo.fetchReviews();
+    adminReviews
+      ..clear()
+      ..addAll(rows.map((r) => Review(
+            appointmentId: '${r['appointment_id'] ?? ''}',
+            stars: (r['rating'] as num?)?.toInt() ?? 0,
+            comment: '${r['comment'] ?? ''}',
+            hidden: '${r['status']}' == 'hidden',
+            id: '${r['id']}',
+            providerId: '${r['provider_id'] ?? ''}',
+            providerType: '${r['provider_type'] ?? ''}',
+            adminNotes: '${r['admin_notes'] ?? ''}',
+          )));
+    notifyListeners();
+  }
+
+  Future<void> setAdminReviewHidden(Review review, bool hidden) async {
+    review.hidden = hidden;
+    final local = reviews[review.appointmentId];
+    if (local != null && local.id == review.id) local.hidden = hidden;
+    notifyListeners();
+    final id = review.id;
+    if (id != null) {
+      await _repo.setReviewStatus(id, hidden ? 'hidden' : 'approved');
+    }
+  }
+
+  Future<void> setAdminReviewNotes(Review review, String notes) async {
+    review.adminNotes = notes;
+    notifyListeners();
+    final id = review.id;
+    if (id != null) await _repo.setReviewAdminNotes(id, notes);
   }
 
   // ---------- Provider application ----------
@@ -2720,22 +2836,74 @@ class AppState extends ChangeNotifier {
 
   List<Map<String, dynamic>> get refunds => _refunds;
 
+  /// Stored refund statuses are the schema vocabulary
+  /// requested|processing|completed|rejected. Rows written by the
+  /// older admin build may carry 'approved'/'processed' — both mean
+  /// the middle step (audit M8).
+  static String normaliseRefundStatus(String? s) {
+    switch (s) {
+      case 'approved':
+      case 'processed':
+        return 'processing';
+      case 'processing':
+      case 'completed':
+      case 'rejected':
+        return s!;
+      default:
+        return 'requested';
+    }
+  }
+
   Future<void> loadRefunds() async {
+    final rows = await _repo.fetchRefunds();
     _refunds
       ..clear()
-      ..addAll(await _repo.fetchRefunds());
+      ..addAll(rows.map((r) => {
+            ...r,
+            'status': normaliseRefundStatus('${r['status'] ?? ''}'),
+          }));
     notifyListeners();
   }
 
-  Future<bool> updateRefund(String id, String status) async {
-    final ok = await _repo.updateRefund(id, status);
+  Future<bool> updateRefund(String id, String status,
+      {String? adminNotes}) async {
+    final ok =
+        await _repo.updateRefund(id, status, adminNotes: adminNotes);
     if (ok) {
       for (final r in _refunds) {
-        if ('${r['id']}' == id) r['status'] = status;
+        if ('${r['id']}' == id) {
+          r['status'] = status;
+          if (adminNotes != null) r['admin_notes'] = adminNotes;
+        }
       }
       notifyListeners();
     }
     return ok;
+  }
+
+  /// Loads the signed-in patient's own refunds-table rows into the
+  /// list the Refund Tracking screen reads (audit M8: it used to
+  /// read only a local list nothing ever wrote to).
+  Future<void> loadMyRefunds() async {
+    if (_supaUser == null) return;
+    final rows = await _repo.fetchMyRefunds();
+    if (rows.isEmpty) return;
+    refundRequests
+      ..removeWhere((r) => rows.any((x) => '${x['id']}' == r.id))
+      ..addAll(rows.map((r) => RefundRequest(
+            id: '${r['id']}',
+            orderId: '${r['order_id'] ?? ''}',
+            appointmentId: '${r['appointment_id'] ?? ''}'.isEmpty
+                ? null
+                : '${r['appointment_id']}',
+            amount: (r['amount'] as num?)?.toDouble() ?? 0,
+            reason: '${r['reason'] ?? ''}',
+            date: DateTime.tryParse('${r['created_at'] ?? ''}') ??
+                DateTime.now(),
+            status: normaliseRefundStatus('${r['status'] ?? ''}'),
+          )));
+    refundRequests.sort((a, b) => b.date.compareTo(a.date));
+    notifyListeners();
   }
 
   final List<Map<String, dynamic>> _emergencyRequests = [];
@@ -3120,20 +3288,31 @@ class AppState extends ChangeNotifier {
 
   void requestRefund({
     required String orderId,
+    String? appointmentId,
     required double amount,
     required String reason,
   }) {
-    refundRequests.insert(
-      0,
-      RefundRequest(
-        id: 'RF${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-        orderId: orderId,
+    final local = RefundRequest(
+      id: 'RF${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+      orderId: orderId,
+      appointmentId: appointmentId,
+      amount: amount,
+      reason: reason,
+      date: DateTime.now(),
+    );
+    refundRequests.insert(0, local);
+    notifyListeners();
+    // Persist so the admin queue and the tracker agree (audit M8).
+    if (_supaUser != null) {
+      unawaited(_repo
+          .createRefundRequest(
+        orderId: orderId.isEmpty ? null : orderId,
+        appointmentId: appointmentId,
         amount: amount,
         reason: reason,
-        date: DateTime.now(),
-      ),
-    );
-    notifyListeners();
+      )
+          .then((_) => loadMyRefunds()));
+    }
   }
 
   // ---------- Reviews admin ----------
@@ -3143,6 +3322,11 @@ class AppState extends ChangeNotifier {
     if (r != null) {
       r.hidden = !r.hidden;
       notifyListeners();
+      final id = r.id;
+      if (id != null) {
+        unawaited(
+            _repo.setReviewStatus(id, r.hidden ? 'hidden' : 'approved'));
+      }
     }
   }
 

@@ -9,39 +9,55 @@ import '../widgets/widgets.dart';
 import '../app_navigator.dart';
 
 /// Refund status: cards with per-refund timelines.
-class RefundTrackingScreen extends StatelessWidget {
+///
+/// Reads the patient's real refund records — the `refunds` table
+/// rows merged into state.refundRequests by loadMyRefunds
+/// (form-pages audit M8: this screen used to read only a local
+/// list nothing ever populated). Statuses are the schema
+/// vocabulary requested|processing|completed|rejected.
+class RefundTrackingScreen extends StatefulWidget {
   const RefundTrackingScreen({super.key});
 
+  @override
+  State<RefundTrackingScreen> createState() =>
+      _RefundTrackingScreenState();
+}
+
+class _RefundTrackingScreenState extends State<RefundTrackingScreen> {
   static const _steps = [
     'Requested',
-    'Approved',
-    'Processed',
+    'Processing',
     'Completed',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppStateScope.of(context).loadMyRefunds();
+    });
+  }
+
   int _doneIndex(String status) {
-    switch (status) {
+    switch (AppState.normaliseRefundStatus(status)) {
       case 'requested':
         return 0;
-      case 'approved':
+      case 'processing':
         return 1;
-      case 'processed':
-        return 2;
       case 'completed':
-        return 3;
+        return 2;
       default:
         return -1; // rejected / unknown
     }
   }
 
   Color _statusColor(String status, ColorScheme scheme) {
-    switch (status) {
+    switch (AppState.normaliseRefundStatus(status)) {
       case 'completed':
         return RemedooTheme.success;
       case 'requested':
         return RemedooTheme.warning;
-      case 'approved':
-      case 'processed':
+      case 'processing':
         return scheme.primary;
       default:
         return RemedooTheme.destructive;
@@ -56,15 +72,12 @@ class RefundTrackingScreen extends StatelessWidget {
       body: Column(
         children: [
           RGradientHeader(
-            padding:
-                const EdgeInsets.fromLTRB(12, 8, 20, 20),
+            padding: const EdgeInsets.fromLTRB(12, 8, 20, 20),
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back,
-                      color: Colors.white),
-                  onPressed: () =>
-                      goBack(context),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => goBack(context),
                 ),
                 const SizedBox(width: 4),
                 const Text('Refund Status',
@@ -82,16 +95,18 @@ class RefundTrackingScreen extends StatelessWidget {
                   ? const REmptyState(
                       icon: Icons.replay,
                       title: 'No refunds',
-                      subtitle:
-                          'Refund requests will appear here.',
+                      subtitle: 'Refund requests will appear here.',
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(
-                          20, 16, 20, 24),
-                      itemCount: list.length,
-                      itemBuilder: (_, i) => StaggerItem(
-                        index: i % 6,
-                        child: _card(context, list[i]),
+                  : RefreshIndicator(
+                      onRefresh: () => state.loadMyRefunds(),
+                      child: ListView.builder(
+                        padding:
+                            const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                        itemCount: list.length,
+                        itemBuilder: (_, i) => StaggerItem(
+                          index: i % 6,
+                          child: _card(context, list[i]),
+                        ),
                       ),
                     ),
             ),
@@ -105,6 +120,7 @@ class RefundTrackingScreen extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final done = _doneIndex(r.status);
     final color = _statusColor(r.status, scheme);
+    final statusLabel = AppState.normaliseRefundStatus(r.status);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       child: RCard(
@@ -120,28 +136,28 @@ class RefundTrackingScreen extends StatelessWidget {
                     color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child:
-                      Icon(Icons.replay, color: color, size: 21),
+                  child: Icon(Icons.replay, color: color, size: 21),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(inr(r.amount),
                           style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 17)),
+                              fontWeight: FontWeight.w800, fontSize: 17)),
                       const SizedBox(height: 2),
-                      Text('Order ${r.orderId}',
+                      Text(
+                          r.appointmentId != null
+                              ? 'Appointment ${r.appointmentId}'
+                              : 'Order ${r.orderId}',
                           style: TextStyle(
                               fontSize: 12,
                               color: scheme.onSurfaceVariant)),
                     ],
                   ),
                 ),
-                StatusChip(status: r.status),
+                StatusChip(status: statusLabel),
               ],
             ),
             const SizedBox(height: 10),
@@ -149,8 +165,7 @@ class RefundTrackingScreen extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    fontSize: 13,
-                    color: scheme.onSurfaceVariant)),
+                    fontSize: 13, color: scheme.onSurfaceVariant)),
             const SizedBox(height: 12),
             if (done >= 0)
               Row(
@@ -165,14 +180,10 @@ class RefundTrackingScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: isDone
                                 ? RemedooTheme.success
-                                : scheme
-                                    .surfaceContainerHighest,
+                                : scheme.surfaceContainerHighest,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(
-                              isDone
-                                  ? Icons.check
-                                  : Icons.circle,
+                          child: Icon(isDone ? Icons.check : Icons.circle,
                               size: 14,
                               color: isDone
                                   ? Colors.white
@@ -199,15 +210,14 @@ class RefundTrackingScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: RemedooTheme.destructive
-                      .withValues(alpha: 0.08),
+                  color:
+                      RemedooTheme.destructive.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   'This refund request was rejected. Please contact support if you need help.',
                   style: TextStyle(
-                      fontSize: 13,
-                      color: scheme.onSurfaceVariant),
+                      fontSize: 13, color: scheme.onSurfaceVariant),
                 ),
               ),
           ],

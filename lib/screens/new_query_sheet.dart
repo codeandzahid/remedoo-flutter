@@ -29,23 +29,27 @@ class NewQuerySheet extends StatefulWidget {
 }
 
 class _NewQuerySheetState extends State<NewQuerySheet> {
-  static const _categories = <(String, IconData)>[
-    ('Appointment', Icons.calendar_month_outlined),
-    ('Order', Icons.shopping_bag_outlined),
-    ('Payment', Icons.payments_outlined),
-    ('Refund', Icons.replay_outlined),
-    ('Account', Icons.person_outline),
-    ('Other', Icons.help_outline),
+  /// Stored values are the support_tickets.category vocabulary
+  /// (schema_part_02): general|payment|appointment|order|technical.
+  /// The old form stored display labels like Refund / Account,
+  /// which the schema never lists (form-pages audit M24).
+  static const _categories = <(String, String, IconData)>[
+    ('appointment', 'Appointment', Icons.calendar_month_outlined),
+    ('order', 'Order', Icons.shopping_bag_outlined),
+    ('payment', 'Payment', Icons.payments_outlined),
+    ('technical', 'Technical', Icons.build_outlined),
+    ('general', 'General', Icons.help_outline),
   ];
   static const _priorities = <(String, String, Color)>[
     ('low', 'Low', Color(0xFF2E9E5B)),
     ('medium', 'Medium', Color(0xFFE8912D)),
     ('high', 'High', Color(0xFFD64545)),
+    ('urgent', 'Urgent', Color(0xFF8E24AA)),
   ];
 
   final _subject = TextEditingController();
   final _message = TextEditingController();
-  String _category = 'Appointment';
+  String _category = 'appointment';
   String _priority = 'medium';
   String? _subjectError;
   String? _messageError;
@@ -179,7 +183,7 @@ class _NewQuerySheetState extends State<NewQuerySheet> {
           mainAxisSpacing: 10,
           childAspectRatio: 1.55,
           children: [
-            for (final c in _categories) _categoryCard(c.$1, c.$2),
+            for (final c in _categories) _categoryCard(c.$1, c.$2, c.$3),
           ],
         ),
         const SizedBox(height: 20),
@@ -308,11 +312,11 @@ class _NewQuerySheetState extends State<NewQuerySheet> {
     );
   }
 
-  Widget _categoryCard(String label, IconData icon) {
+  Widget _categoryCard(String value, String label, IconData icon) {
     final scheme = Theme.of(context).colorScheme;
-    final selected = _category == label;
+    final selected = _category == value;
     return InkWell(
-      onTap: () => setState(() => _category = label),
+      onTap: () => setState(() => _category = value),
       borderRadius: BorderRadius.circular(14),
       child: Container(
         decoration: BoxDecoration(

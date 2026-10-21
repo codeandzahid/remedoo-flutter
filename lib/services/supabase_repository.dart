@@ -582,7 +582,7 @@ class SupabaseRepository {
     try {
       final row =
           await _db.from('support_tickets').select().eq('id', id).single();
-      return Map<String, dynamic>.from(row);
+      return normaliseTicketRow(Map<String, dynamic>.from(row));
     } catch (e) {
       debugPrint('fetchTicketById failed: $e');
       return null;
@@ -854,7 +854,9 @@ class SupabaseRepository {
           .select()
           .eq('user_id', uid)
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(rows);
+      return (rows as List)
+          .map((r) => normaliseTicketRow(Map<String, dynamic>.from(r)))
+          .toList();
     } catch (e) {
       debugPrint('fetchUserTickets failed: $e');
       return const [];
@@ -1962,6 +1964,16 @@ class SupabaseRepository {
     }
   }
 
+  /// The stored ticket vocabulary is open|in_progress|resolved|
+  /// closed (schema_part_02). An older admin build also wrote a
+  /// fifth value 'opened' on first view (form-pages audit M24) —
+  /// reads normalise it back to 'open' so no ticket hides from
+  /// filters or counts, and nothing writes it any more.
+  static Map<String, dynamic> normaliseTicketRow(Map<String, dynamic> r) {
+    if ('${r['status']}' == 'opened') r['status'] = 'open';
+    return r;
+  }
+
   /// Admin list of support tickets, newest first.
   Future<List<Map<String, dynamic>>> fetchSupportTickets() async {
     if (!_ready) return const [];
@@ -1971,7 +1983,9 @@ class SupabaseRepository {
           .select('*')
           .order('created_at', ascending: false)
           .limit(200);
-      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      return rows
+          .map((r) => normaliseTicketRow(Map<String, dynamic>.from(r)))
+          .toList();
     } catch (e) {
       debugPrint('fetchSupportTickets failed: $e');
       return const [];
@@ -1991,6 +2005,125 @@ class SupabaseRepository {
     }
   }
 
+  // ---------------------------------------------------------------- reviews
+
+  /// Persists a patient review (form-pages audit M6: reviews used
+  /// to live only in an in-memory map). Returns the new row id.
+  Future<String?> submitReview({
+    required String providerId,
+    required String providerType,
+    required int rating,
+    String? comment,
+    String? appointmentId,
+  }) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return null;
+    try {
+      final row = await _db.from('reviews').insert({
+        'user_id': uid,
+        'provider_id': providerId,
+        'provider_type': providerType,
+        'rating': rating,
+        'comment': comment,
+        if (appointmentId != null && appointmentId.isNotEmpty)
+          'appointment_id': appointmentId,
+      }).select('id');
+      return row.isNotEmpty ? '${row.first['id']}' : null;
+    } catch (e) {
+      debugPrint('submitReview failed: $e');
+      return null;
+    }
+  }
+
+  /// Every review, newest first (admin moderation + patient reload).
+  Future<List<Map<String, dynamic>>> fetchReviews({String? userId}) async {
+    if (!_ready) return const [];
+    try {
+      var q = _db.from('reviews').select('*');
+      if (userId != null) q = q.eq('user_id', userId);
+      final rows = await q.order('created_at', ascending: false).limit(500);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchReviews failed: $e');
+      return const [];
+    }
+  }
+
+  /// Admin moderation: reviews.status is 'approved' (visible) or
+  /// 'hidden' (schema_part_03 moderation columns).
+  Future<bool> setReviewStatus(String id, String status) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('reviews').update({'status': status}).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('setReviewStatus failed: $e');
+      return false;
+    }
+  }
+
+  Future<bool> setReviewAdminNotes(String id, String notes) async {
+    if (!_ready) return false;
+    try {
+      await _db
+          .from('reviews')
+          .update({'admin_notes': notes}).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('setReviewAdminNotes failed: $e');
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------- refunds
+
+  /// Creates a refunds-table row for the signed-in patient
+  /// (form-pages audit M8: nothing ever inserted into refunds, so
+  /// the patient tracker and the admin queue both stayed empty for
+  /// real cancel-refunds).
+  Future<String?> createRefundRequest({
+    String? orderId,
+    String? appointmentId,
+    required double amount,
+    required String reason,
+  }) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return null;
+    try {
+      final row = await _db.from('refunds').insert({
+        'user_id': uid,
+        if (orderId != null && orderId.isNotEmpty) 'order_id': orderId,
+        if (appointmentId != null && appointmentId.isNotEmpty)
+          'appointment_id': appointmentId,
+        'amount': amount,
+        'reason': reason,
+        'status': 'requested',
+      }).select('id');
+      return row.isNotEmpty ? '${row.first['id']}' : null;
+    } catch (e) {
+      debugPrint('createRefundRequest failed: $e');
+      return null;
+    }
+  }
+
+  /// The signed-in patient's own refund rows, newest first.
+  Future<List<Map<String, dynamic>>> fetchMyRefunds() async {
+    final uid = _uid;
+    if (!_ready || uid == null) return const [];
+    try {
+      final rows = await _db
+          .from('refunds')
+          .select('*')
+          .eq('user_id', uid)
+          .order('created_at', ascending: false)
+          .limit(100);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchMyRefunds failed: $e');
+      return const [];
+    }
+  }
+
   /// Admin list of refunds, newest first.
   Future<List<Map<String, dynamic>>> fetchRefunds() async {
     if (!_ready) return const [];
@@ -2007,11 +2140,21 @@ class SupabaseRepository {
     }
   }
 
-  /// Admin update of a refund status.
-  Future<bool> updateRefund(String id, String status) async {
+  /// Admin update of a refund status. The stored vocabulary is the
+  /// schema's requested|processing|completed|rejected — the admin
+  /// screen used to write 'approved', which the schema never lists
+  /// (form-pages audit M8). Completing stamps processed_at; an
+  /// admin note can ride along.
+  Future<bool> updateRefund(String id, String status,
+      {String? adminNotes}) async {
     if (!_ready) return false;
     try {
-      await _db.from('refunds').update({'status': status}).eq('id', id);
+      await _db.from('refunds').update({
+        'status': status,
+        ?'admin_notes': adminNotes,
+        if (status == 'completed')
+          'processed_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', id);
       return true;
     } catch (e) {
       debugPrint('updateRefund failed: $e');

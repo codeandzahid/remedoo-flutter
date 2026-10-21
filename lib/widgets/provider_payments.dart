@@ -469,6 +469,108 @@ class _ProviderUpiSettingsCardState extends State<ProviderUpiSettingsCard> {
   }
 }
 
+/// Refund action for a provider appointment / booking card whose
+/// row carries refund_status 'requested' (form-pages audit
+/// Panelist 13: only pharmacy order cards had a refund entry
+/// point, so a doctor / hospital / lab whose patient cancelled a
+/// paid booking had no way to act on the request from the card).
+/// Mirrors the pharmacy flow: UPI dialog → mark refunded with the
+/// UTR → the payment session follows by payment_ref.
+class AppointmentRefundButton extends StatefulWidget {
+  final Map<String, dynamic> appointment;
+  final SupabaseRepository? repo;
+
+  const AppointmentRefundButton({
+    super.key,
+    required this.appointment,
+    this.repo,
+  });
+
+  @override
+  State<AppointmentRefundButton> createState() =>
+      _AppointmentRefundButtonState();
+}
+
+class _AppointmentRefundButtonState
+    extends State<AppointmentRefundButton> {
+  bool _busy = false;
+  bool _done = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = widget.appointment;
+    if (_done || '${a['refund_status'] ?? ''}' == 'refunded') {
+      return const Padding(
+        padding: EdgeInsets.only(top: 10),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle, size: 16, color: Colors.green),
+            SizedBox(width: 6),
+            Text('Refund sent to the patient',
+                style: TextStyle(fontSize: 12)),
+          ],
+        ),
+      );
+    }
+    if ('${a['refund_status'] ?? ''}' != 'requested') {
+      return const SizedBox.shrink();
+    }
+    final amount = (a['refund_amount'] as num?)?.toDouble() ??
+        (a['fee'] as num?)?.toDouble() ??
+        (a['consultation_fee'] as num?)?.toDouble() ??
+        0;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: RButton(
+        label: _busy ? 'Working…' : 'Refund patient ${inr(amount)}',
+        icon: Icons.replay,
+        small: true,
+        variant: RButtonVariant.danger,
+        fullWidth: true,
+        onPressed: _busy ? null : () => _refund(amount),
+      ),
+    );
+  }
+
+  Future<void> _refund(double amount) async {
+    final a = widget.appointment;
+    final repo = widget.repo ?? SupabaseRepository.instance;
+    final ref = '${a['payment_ref'] ?? ''}'.trim();
+    final utr = await showRefundDialog(
+      context,
+      amount: amount,
+      customerUpi: '${a['customer_upi'] ?? ''}'.trim().isEmpty
+          ? null
+          : '${a['customer_upi']}',
+      customerName: '${a['patient_name'] ?? ''}',
+      ref: ref.isNotEmpty ? ref : '${a['id'] ?? ''}',
+    );
+    if (utr == null || !mounted) return;
+    setState(() => _busy = true);
+    final ok = await repo.updateAppointmentRefund(
+      id: '${a['id']}',
+      refundStatus: 'refunded',
+      refundUtr: utr,
+    );
+    if (ok && ref.isNotEmpty) {
+      await repo.updateSessionRefundByRef(ref, 'refunded',
+          refundUtr: utr);
+    }
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _done = ok;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Refund marked as done.'
+            : 'Could not update. Try again.'),
+      ),
+    );
+  }
+}
+
 /// The provider's own Remedoo Pay payments (RLS returns only their
 /// rows). Money lands in the provider's own bank, so when auto-confirm
 /// can't see it, the provider confirms receipt here with one tap.
@@ -499,12 +601,27 @@ class _ProviderOnlinePaymentsState extends State<ProviderOnlinePayments> {
 
   Future<void> _load() async {
     final rows = await widget.repo.fetchRemedooPaySessions(limit: 30);
+    // Join the row that carries each payment_ref so a requested
+    // refund surfaces on its session. This used to fetch ONLY
+    // pharmacy orders (audit Panelist 13) — a doctor / hospital /
+    // lab payment never joined, so its refund never appeared here.
+    // Each fetcher resolves the signed-in provider's own rows, so
+    // the other types simply return empty.
     final orders = await widget.repo.fetchPharmacyOrders();
+    final doctorAppts = await widget.repo.fetchDoctorAppointments();
+    final hospitalAppts =
+        await widget.repo.fetchHospitalAppointments();
+    final labBookings = await widget.repo.fetchLabBookings();
     if (!mounted) return;
     setState(() {
       _sessions = rows;
       _ordersByRef = {
-        for (final o in orders)
+        for (final o in [
+          ...orders,
+          ...doctorAppts,
+          ...hospitalAppts,
+          ...labBookings,
+        ])
           if ('${o['payment_ref'] ?? ''}'.isNotEmpty)
             '${o['payment_ref']}': o,
       };

@@ -1,0 +1,62 @@
+-- =====================================================================
+-- SUPABASE CHANGE — OCTOBER 30, 2026 (prepared 2026-10-20, NOT APPLIED)
+-- =====================================================================
+-- Supabase emailed southkhanday@gmail.com on 2026-10-20 ("Final notice:
+-- new tables in 'public' need grants from October 30"):
+--
+--   From October 30, Supabase stops automatically granting Data API
+--   access to NEW tables in the "public" schema for existing projects.
+--   Existing tables are NOT affected — they keep their current grants.
+--   Any table created in "public" from Oct 30 onwards needs an explicit
+--   GRANT before supabase-js / PostgREST / GraphQL can reach it, or the
+--   API returns "permission denied".
+--   This also applies to migrations that RECREATE the schema: new
+--   projects, preview branches and local "supabase db reset".
+--
+-- Why this matters for Remedoo: most files in this folder create tables
+-- with NO grant statements (audit 2026-10-20: admin_panel_backend.sql,
+-- admin_staff_permissions.sql, razorpay_route.sql, schema_part_01-04.sql,
+-- secure_settings.sql, theme_packs.sql, upi_utr_verification.sql create
+-- tables and contain no GRANT). They worked only because of the automatic
+-- grants that end on Oct 30. Two concrete risks:
+--   1. The NEXT new Remedoo table (e.g. another pay/session table) created
+--      after Oct 30 without grants = app gets "permission denied" even
+--      though the table and its RLS policies are correct.
+--   2. A FRESH Supabase project built from schema_part_*.sql (the planned
+--      Remedoo v2 restart uses a fresh project) would have NO API access
+--      to any table until the companion grants in PART B below are run.
+--
+-- GRANTs only make a table REACHABLE through the API. Row-level security
+-- still decides which rows each role can see/change — keep enabling RLS
+-- and writing policies on every new table exactly as before.
+-- =====================================================================
+
+
+-- ---------------------------------------------------------------------
+-- PART A — TEMPLATE: copy into every future migration that creates a
+-- table, in the SAME file, right after the CREATE TABLE + policies.
+-- Adjust the anon line: give anon only what logged-out users truly need
+-- (many Remedoo tables should have NO anon grant at all — delete that
+-- line for private/admin tables like staff_permissions).
+-- ---------------------------------------------------------------------
+
+-- grant select on public.YOUR_TABLE to anon;
+-- grant select, insert, update, delete on public.YOUR_TABLE to authenticated;
+-- grant select, insert, update, delete on public.YOUR_TABLE to service_role;
+-- -- if the table has a serial/identity sequence that inserts rely on:
+-- grant usage, select on all sequences in schema public to authenticated, service_role;
+
+
+-- ---------------------------------------------------------------------
+-- PART B — FRESH-PROJECT / DB-RESET COMPANION (one-time).
+-- Run ONLY on a brand-new project or right after a full schema reset,
+-- after all schema_part_* files have been applied, to restore the API
+-- grants the old automatic behaviour used to provide. Do NOT run this
+-- on the current live project — its existing tables already have their
+-- grants and nothing needs changing there before Oct 30.
+-- ---------------------------------------------------------------------
+
+-- grant select on all tables in schema public to anon;
+-- grant select, insert, update, delete on all tables in schema public to authenticated;
+-- grant select, insert, update, delete on all tables in schema public to service_role;
+-- grant usage, select on all sequences in schema public to anon, authenticated, service_role;

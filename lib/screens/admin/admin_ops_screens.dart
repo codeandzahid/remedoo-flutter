@@ -120,6 +120,23 @@ class _AdminRefundsScreenState
                 style: TextStyle(
                     fontSize: 12,
                     color: scheme.onSurfaceVariant)),
+            if (r['appointment_id'] != null)
+              Text(
+                  'Appointment ${(r['appointment_id'] as String).length > 8 ? (r['appointment_id'] as String).substring(0, 8) : r['appointment_id']}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant)),
+            if (r['user_id'] != null)
+              Text('Patient ${r['user_id']}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant)),
+            if ('${r['admin_notes'] ?? ''}'.isNotEmpty)
+              Text('Admin note: ${r['admin_notes']}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: scheme.onSurfaceVariant)),
             if (status == 'requested') ...[
               const SizedBox(height: 12),
               Row(
@@ -131,7 +148,8 @@ class _AdminRefundsScreenState
                       variant: RButtonVariant.danger,
                       onPressed: () =>
                           _decide(context, state, id,
-                              'rejected'),
+                              'rejected',
+                              askNote: true),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -141,12 +159,12 @@ class _AdminRefundsScreenState
                       small: true,
                       onPressed: () =>
                           _decide(context, state, id,
-                              'approved'),
+                              'processing'),
                     ),
                   ),
                 ],
               ),
-            ] else if (status == 'approved') ...[
+            ] else if (status == 'processing') ...[
               const SizedBox(height: 12),
               RButton(
                 label: 'Mark Completed',
@@ -154,7 +172,8 @@ class _AdminRefundsScreenState
                 small: true,
                 onPressed: () =>
                     _decide(context, state, id,
-                        'completed'),
+                        'completed',
+                        askNote: true),
               ),
             ],
           ],
@@ -164,8 +183,42 @@ class _AdminRefundsScreenState
   }
 
   Future<void> _decide(BuildContext context, AppState state,
-      String id, String status) async {
-    final ok = await state.updateRefund(id, status);
+      String id, String status,
+      {bool askNote = false}) async {
+    String? note;
+    if (askNote) {
+      final controller = TextEditingController();
+      note = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(status == 'rejected'
+              ? 'Reject refund'
+              : 'Complete refund'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              hintText: 'Admin note (optional)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      );
+      controller.dispose();
+      if (note == null || !context.mounted) return;
+    }
+    final ok = await state.updateRefund(id, status,
+        adminNotes: (note ?? '').isEmpty ? null : note);
     if (context.mounted && !ok) {
       _snack(context, 'Update failed. Try again.');
     }

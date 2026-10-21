@@ -412,6 +412,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                 ],
               ),
             ],
+            AppointmentRefundButton(repo: _repo, appointment: a),
           ],
         ),
       ),

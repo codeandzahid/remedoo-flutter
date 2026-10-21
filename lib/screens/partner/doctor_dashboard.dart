@@ -515,6 +515,7 @@ class _AppointmentsTab extends StatelessWidget {
                 ),
               ],
             ],
+            AppointmentRefundButton(appointment: a),
           ],
         ),
       ),

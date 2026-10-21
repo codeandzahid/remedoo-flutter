@@ -644,11 +644,27 @@ class Review {
   final String comment;
   bool hidden;
 
+  /// Backend row id (reviews table) once persisted; null for a
+  /// local-only review (form-pages audit M6: reviews used to live
+  /// only in an in-memory map and vanished on restart).
+  final String? id;
+
+  /// Who was reviewed (reviews.provider_id / provider_type).
+  final String? providerId;
+  final String? providerType;
+
+  /// Moderation note written from Admin > Reviews.
+  String adminNotes;
+
   Review({
     required this.appointmentId,
     required this.stars,
     required this.comment,
     this.hidden = false,
+    this.id,
+    this.providerId,
+    this.providerType,
+    this.adminNotes = '',
   });
 }
 
@@ -698,14 +714,16 @@ class SosAlert {
 class RefundRequest {
   final String id;
   final String orderId;
+  final String? appointmentId;
   final double amount;
   final String reason;
   final DateTime date;
-  String status; // requested, approved, rejected, completed
+  String status; // requested, processing, rejected, completed
 
   RefundRequest({
     required this.id,
     required this.orderId,
+    this.appointmentId,
     required this.amount,
     required this.reason,
     required this.date,
