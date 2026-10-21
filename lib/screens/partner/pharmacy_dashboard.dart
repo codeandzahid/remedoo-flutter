@@ -22,6 +22,7 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
   String? _error;
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _orders = [];
+  List<Map<String, dynamic>> _reviews = [];
 
   SupabaseRepository get _repo =>
       AppStateScope.of(context).supabaseRepository;
@@ -40,10 +41,13 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
     try {
       final profile = await _repo.fetchOwnProviderRecord('pharmacies');
       final orders = await _repo.fetchPharmacyOrders();
+      final reviews =
+          await _repo.fetchProviderReviews('pharmacy', 'pharmacies');
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _orders = orders;
+        _reviews = reviews;
         _loading = false;
       });
     } catch (e) {
@@ -70,6 +74,17 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
   }
 
   Future<void> _setStatus(Map<String, dynamic> o, String status) async {
+    // Cancelling an order asks first (audit Panelist 17).
+    if (status == 'cancelled') {
+      final confirmed = await confirmDialog(
+        context,
+        title: 'Cancel this order?',
+        message:
+            'The patient will be told the order was cancelled. Any online payment they made will need a refund.',
+        confirmLabel: 'Cancel order',
+      );
+      if (!confirmed || !mounted) return;
+    }
     final ok = await _repo.updateOrderStatus('${o['id']}', status);
     if (!mounted) return;
     if (ok) {
@@ -355,6 +370,8 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
           const SizedBox(height: 12),
           ...done.take(10).map((o) => _orderCard(context, o)),
         ],
+        const SizedBox(height: 24),
+        ProviderReviewsList(reviews: _reviews),
         const SizedBox(height: 16),
       ],
     );

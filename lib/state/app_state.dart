@@ -14,6 +14,7 @@ import '../services/auth_service.dart';
 import '../services/supabase_repository.dart';
 import '../services/payment_service.dart';
 import '../theme.dart';
+import '../utils/working_hours.dart';
 import '../widgets/admin_style.dart';
 import '../widgets/existing_user_lookup.dart';
 
@@ -1084,6 +1085,8 @@ class AppState extends ChangeNotifier {
       remoteStatus: st,
       paymentRef: _strOrNull(r['payment_ref']),
       customerUpi: _strOrNull(r['customer_upi']),
+      department: _strOrNull(r['department']),
+      isVideoConsultation: r['is_video_consultation'] == true,
       prescriptionPath: _strOrNull(r['prescription_url']),
       refundStatus: _strOrNull(r['refund_status']),
       refundAmount: (r['refund_amount'] as num?)?.toDouble(),
@@ -1217,6 +1220,8 @@ class AppState extends ChangeNotifier {
       // Store the method the patient actually picked — without this
       // every row silently took the column default 'at_clinic'.
       paymentMethod: dbPaymentMethod(appt.payment),
+      department: appt.department,
+      isVideoConsultation: appt.isVideoConsultation,
     )
         .then((remoteId) {
       if (remoteId != null) _remoteAppointmentIds[appt.id] = remoteId;
@@ -1407,6 +1412,8 @@ class AppState extends ChangeNotifier {
     String? prescriptionName,
     String? paymentRef,
     String? customerUpi,
+    String? department,
+    bool isVideoConsultation = false,
   }) {
     final appt = Appointment(
       id: 'A${DateTime.now().millisecondsSinceEpoch}',
@@ -1427,6 +1434,8 @@ class AppState extends ChangeNotifier {
       prescriptionName: prescriptionName,
       paymentRef: paymentRef,
       customerUpi: customerUpi,
+      department: department,
+      isVideoConsultation: isVideoConsultation,
     );
     appointments.add(appt);
     _takenSlots.add(_slotKey(title, date, timeLabel));
@@ -1578,37 +1587,89 @@ class AppState extends ChangeNotifier {
 
   /// Generate real time slots for a provider based on their working hours
   /// and consultation duration. Filters out already-booked slots.
+  /// Blocked slots per doctor id, loaded by the booking flow
+  /// (audit M14): doctor_blocked_slots filtered out of the
+  /// offered slots below.
+  final Map<String, List<Map<String, dynamic>>> _blockedSlotsByDoctor =
+      {};
+
+  Future<void> loadBlockedSlots(String doctorId) async {
+    if (doctorId.isEmpty) return;
+    final rows = await _repo.fetchBlockedSlots(doctorId,
+        fromIso: DateTime.now().toIso8601String().substring(0, 10));
+    _blockedSlotsByDoctor[doctorId] = rows;
+    notifyListeners();
+  }
+
   List<String> doctorSlotsFor(String providerId, String title, DateTime day) {
-    // Find the doctor to get real duration
+    // Resolve the provider's real availability (audit M14 /
+    // Patient 12: slots used to be a synthetic 09:00–17:00 grid
+    // for every provider, ignoring working_hours, vacation_dates
+    // and doctor_blocked_slots entirely).
     int duration = 30; // default
+    Map<String, dynamic>? hoursRaw;
+    List<String> vacation = const [];
     if (providerId.isNotEmpty) {
       final doc = doctors.where((d) => d.id == providerId).firstOrNull;
-      if (doc != null && doc.consultationDuration > 0) {
-        duration = doc.consultationDuration;
+      if (doc != null) {
+        if (doc.consultationDuration > 0) {
+          duration = doc.consultationDuration;
+        }
+        hoursRaw = doc.workingHours;
+        vacation = doc.vacationDates;
+      } else {
+        final hosp =
+            activeHospitals.where((h) => h.id == providerId).firstOrNull;
+        if (hosp != null) {
+          hoursRaw = hosp.workingHours;
+        } else {
+          final lab =
+              activeLabs.where((l) => l.id == providerId).firstOrNull;
+          if (lab != null) hoursRaw = lab.workingHours;
+        }
       }
     }
 
+    final List<String> base;
+    if (hoursRaw != null) {
+      base = slotsForDate(
+        parseWorkingHours(hoursRaw),
+        day,
+        durationMinutes: duration,
+        vacationDates: vacation,
+      );
+    } else {
+      // No structured hours on the record (demo data / legacy
+      // rows): keep the standard grid so nothing regresses.
+      base = [
+        for (var h = 9; h < 17; h++)
+          for (var m = 0; m < 60; m += duration)
+            '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}',
+      ];
+    }
+
+    final dateIso = day.toIso8601String().substring(0, 10);
+    final blocks = (_blockedSlotsByDoctor[providerId] ?? const [])
+        .where((b) => '${b['blocked_date'] ?? ''}'.startsWith(dateIso))
+        .toList();
+
     final out = <String>[];
-    // Standard working hours 9 AM to 5 PM
-    for (var h = 9; h < 17; h++) {
-      for (var m = 0; m < 60; m += duration) {
-        final label =
-            '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
-        // Skip slots already taken (from real bookings)
-        final taken = _takenSlots.contains(_slotKey(title, day, label));
-        // Also check against actual appointments in the list. A
-        // pending booking holds its slot too (it is awaiting
-        // approval, not free) — it blocked the slot before the D5
-        // status-mapping fix and must keep doing so.
-        final booked = appointments.any((a) =>
-            a.doctorName == title &&
-            a.date.year == day.year &&
-            a.date.month == day.month &&
-            a.date.day == day.day &&
-            a.timeLabel == label &&
-            (a.status == 'upcoming' || a.status == 'pending'));
-        if (!taken && !booked) out.add(label);
-      }
+    for (final label in base) {
+      if (blocks.any((b) => slotBlocked(label, b))) continue;
+      // Skip slots already taken (from real bookings)
+      final taken = _takenSlots.contains(_slotKey(title, day, label));
+      // Also check against actual appointments in the list. A
+      // pending booking holds its slot too (it is awaiting
+      // approval, not free) — it blocked the slot before the D5
+      // status-mapping fix and must keep doing so.
+      final booked = appointments.any((a) =>
+          a.doctorName == title &&
+          a.date.year == day.year &&
+          a.date.month == day.month &&
+          a.date.day == day.day &&
+          a.timeLabel == label &&
+          (a.status == 'upcoming' || a.status == 'pending'));
+      if (!taken && !booked) out.add(label);
     }
     return out;
   }

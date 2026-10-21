@@ -21,6 +21,7 @@ class _LabDashboardState extends State<LabDashboard> {
   String? _error;
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _bookings = [];
+  List<Map<String, dynamic>> _reviews = [];
 
   SupabaseRepository get _repo =>
       AppStateScope.of(context).supabaseRepository;
@@ -39,10 +40,12 @@ class _LabDashboardState extends State<LabDashboard> {
     try {
       final profile = await _repo.fetchOwnProviderRecord('labs');
       final bookings = await _repo.fetchLabBookings();
+      final reviews = await _repo.fetchProviderReviews('lab', 'labs');
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _bookings = bookings;
+        _reviews = reviews;
         _loading = false;
       });
     } catch (e) {
@@ -69,7 +72,21 @@ class _LabDashboardState extends State<LabDashboard> {
   }
 
   Future<void> _setStatus(Map<String, dynamic> b, String status) async {
-    final ok = await _repo.updateAppointmentStatus('${b['id']}', status);
+    // Destructive actions confirm first with a reason (audit
+    // Panelist 17).
+    String? reason;
+    if (status == 'cancelled') {
+      reason = await promptActionReason(
+        context,
+        title: 'Cancel this booking?',
+        message:
+            'The patient will be notified that the booking was not approved.',
+        confirmLabel: 'Cancel booking',
+      );
+      if (reason == null || !mounted) return;
+    }
+    final ok = await _repo.updateAppointmentStatus('${b['id']}', status,
+        rejectionReason: reason);
     if (!mounted) return;
     if (ok) {
       setState(() {
@@ -251,6 +268,8 @@ class _LabDashboardState extends State<LabDashboard> {
           )
         else
           ...upcoming.take(20).map((b) => _bookingCard(context, b)),
+        const SizedBox(height: 24),
+        ProviderReviewsList(reviews: _reviews),
         const SizedBox(height: 16),
       ],
     );
@@ -346,7 +365,7 @@ class _LabDashboardState extends State<LabDashboard> {
                       ),
                       if ('${b['notes'] ?? ''}'.isNotEmpty)
                         Text(
-                          'Tests: ${b['notes']}',
+                          'Note: ${b['notes']}',
                           style: TextStyle(
                             fontSize: 12,
                             color: scheme.onSurfaceVariant,

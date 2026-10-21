@@ -69,6 +69,8 @@ class _BookingScreenState extends State<BookingScreen> {
   late String _time;
   late String _payment;
   final _notes = TextEditingController();
+  final _department = TextEditingController();
+  bool _video = false;
   final _payerUpi = TextEditingController();
   late List<DateTime> _days;
   String? _bookingForMemberId; // null = for self
@@ -84,6 +86,13 @@ class _BookingScreenState extends State<BookingScreen> {
     _time = widget.prefill?.timeLabel ?? '10:00';
     _payment = widget.prefill?.payment ?? 'Pay Online';
     if (widget.prefill != null) _notes.text = widget.prefill!.notes;
+    // Load the doctor's blocked slots so they can be filtered
+    // out of the offered times (audit M14).
+    if (widget.kind == 'doctor') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        AppStateScope.of(context).loadBlockedSlots(widget.refId);
+      });
+    }
   }
 
   String? _prescriptionPath;
@@ -288,6 +297,7 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   void dispose() {
     _notes.dispose();
+    _department.dispose();
     _payerUpi.dispose();
     super.dispose();
   }
@@ -533,6 +543,10 @@ class _BookingScreenState extends State<BookingScreen> {
         customerUpi: _payerUpi.text.trim().isEmpty
             ? null
             : _payerUpi.text.trim(),
+        department: _department.text.trim().isEmpty
+            ? null
+            : _department.text.trim(),
+        isVideoConsultation: _video,
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Appointment booked successfully!')),
@@ -614,6 +628,28 @@ class _BookingScreenState extends State<BookingScreen> {
         controller: _notes,
         maxLines: 2,
       ),
+      const SizedBox(height: 14),
+      RTextField(
+        label: 'Department (optional)',
+        hint: 'e.g. Cardiology, General Medicine',
+        controller: _department,
+      ),
+      if (widget.kind == 'doctor' &&
+          (st.activeDoctors
+                  .where((d) => d.id == widget.refId)
+                  .firstOrNull
+                  ?.videoConsultationEnabled ??
+              false)) ...[
+        const SizedBox(height: 6),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Video consultation'),
+          subtitle: const Text(
+              'Meet the doctor on a video call instead of visiting'),
+          value: _video,
+          onChanged: (v) => setState(() => _video = v),
+        ),
+      ],
       const SizedBox(height: 14),
       _prescriptionCard(),
       const SizedBox(height: 14),
@@ -827,9 +863,59 @@ class _BookingScreenState extends State<BookingScreen> {
       height: 72,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: _days.length,
+        // One extra tile: the calendar, so dates beyond the
+        // 7-day strip can be picked (audit Patient 12).
+        itemCount: _days.length + 1,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
+          if (i == _days.length) {
+            return InkWell(
+              onTap: () async {
+                final now = DateTime.now();
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime(now.year, now.month, now.day),
+                  lastDate: now.add(const Duration(days: 90)),
+                );
+                if (picked == null) return;
+                setState(() {
+                  final day =
+                      DateTime(picked.year, picked.month, picked.day);
+                  if (!_days.any((d) =>
+                      d.year == day.year &&
+                      d.month == day.month &&
+                      d.day == day.day)) {
+                    _days = [..._days, day]
+                      ..sort((a, b) => a.compareTo(b));
+                  }
+                  _date = day;
+                });
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: 66,
+                decoration: BoxDecoration(
+                  color: scheme.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: Theme.of(context).dividerColor),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.calendar_month_outlined,
+                        size: 20, color: scheme.primary),
+                    const SizedBox(height: 2),
+                    Text('More',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            );
+          }
           final d = _days[i];
           final sel = d.day == _date.day && d.month == _date.month;
           return InkWell(
@@ -872,6 +958,21 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _timePicker(List<String> slots) {
     final scheme = Theme.of(context).colorScheme;
+    if (slots.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          'No slots on this date — the provider is closed, on leave, '
+          'or fully booked. Please pick another date.',
+          style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+        ),
+      );
+    }
     return Wrap(
       spacing: 8,
       runSpacing: 8,

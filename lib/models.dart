@@ -27,6 +27,16 @@ class Doctor {
   /// provided).
   final String phone;
 
+  /// Structured working_hours JSONB + vacation_dates from the
+  /// doctors table (audit M14: booking used synthetic 9–5 slots
+  /// for everyone). Null/empty = fall back to standard hours.
+  final Map<String, dynamic>? workingHours;
+  final List<String> vacationDates;
+
+  /// doctors.video_consultation_enabled — the booking form only
+  /// offers a video consult when the doctor does (audit Patient 13).
+  final bool videoConsultationEnabled;
+
   const Doctor({
     required this.id,
     required this.name,
@@ -46,6 +56,9 @@ class Doctor {
     this.upiEnabled = false,
     this.consultationDuration = 30,
     this.phone = '',
+    this.workingHours,
+    this.vacationDates = const [],
+    this.videoConsultationEnabled = false,
   });
 }
 
@@ -71,6 +84,9 @@ class Hospital {
   /// hardcode ₹300 (form-pages audit Patient 19).
   final double fee;
 
+  /// Structured working_hours JSONB (audit M14).
+  final Map<String, dynamic>? workingHours;
+
   /// Real contact numbers from the hospitals table ('' when the
   /// hospital has not provided one — call actions hide rather than
   /// dial a placeholder).
@@ -94,6 +110,7 @@ class Hospital {
     this.payInClinicEnabled = false,
     this.upiEnabled = false,
     this.fee = 0,
+    this.workingHours,
     this.phone = '',
     this.emergencyContact = '',
   });
@@ -119,6 +136,9 @@ class Lab {
   /// Real contact number from the labs table ('' when not provided).
   final String phone;
 
+  /// Structured working_hours JSONB (audit M14).
+  final Map<String, dynamic>? workingHours;
+
   const Lab({
     required this.id,
     required this.name,
@@ -136,6 +156,7 @@ class Lab {
     this.payInClinicEnabled = false,
     this.upiEnabled = false,
     this.phone = '',
+    this.workingHours,
   });
 }
 
@@ -336,6 +357,12 @@ class Appointment {
   final String? paymentRef;
   final String? customerUpi;
 
+  /// Department + video-consult choice (appointments.department /
+  /// is_video_consultation) — the booking form never collected
+  /// them (form-pages audit Patient 13).
+  final String? department;
+  final bool isVideoConsultation;
+
   /// Refund tracking after a paid-online appointment is cancelled.
   String? refundStatus;
   double? refundAmount;
@@ -364,6 +391,8 @@ class Appointment {
     this.remoteStatus,
     this.paymentRef,
     this.customerUpi,
+    this.department,
+    this.isVideoConsultation = false,
     this.refundStatus,
     this.refundAmount,
     this.refundAt,

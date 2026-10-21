@@ -68,6 +68,14 @@ class SupabaseRepository {
       consultationDuration:
           (r['consultation_duration'] as num?)?.toInt() ?? 30,
       phone: '${r['phone'] ?? ''}',
+      workingHours: r['working_hours'] is Map
+          ? Map<String, dynamic>.from(r['working_hours'] as Map)
+          : null,
+      vacationDates: r['vacation_dates'] is List
+          ? (r['vacation_dates'] as List).map((e) => '$e').toList()
+          : const [],
+      videoConsultationEnabled:
+          r['video_consultation_enabled'] == true,
     );
   }
 
@@ -107,6 +115,9 @@ class SupabaseRepository {
       payInClinicEnabled: r['pay_in_clinic_enabled'] == true,
       upiEnabled: r['upi_enabled'] == true,
       fee: (r['consultation_fee'] as num?)?.toDouble() ?? 0,
+      workingHours: r['working_hours'] is Map
+          ? Map<String, dynamic>.from(r['working_hours'] as Map)
+          : null,
       phone: '${r['phone'] ?? ''}',
       emergencyContact: '${r['emergency_contact'] ?? ''}',
     );
@@ -147,6 +158,9 @@ class SupabaseRepository {
       payInClinicEnabled: r['pay_in_clinic_enabled'] == true,
       upiEnabled: r['upi_enabled'] == true,
       phone: '${r['phone'] ?? ''}',
+      workingHours: r['working_hours'] is Map
+          ? Map<String, dynamic>.from(r['working_hours'] as Map)
+          : null,
     );
   }
 
@@ -271,6 +285,11 @@ class SupabaseRepository {
     // default 'at_clinic' for EVERY booking, so a patient who paid
     // online was stored as pay-at-clinic.
     String paymentMethod = 'at_clinic',
+    // Department + video-consult choice (audit Patient 13:
+    // appointments.department / is_video_consultation existed but
+    // the booking form never wrote them).
+    String? department,
+    bool isVideoConsultation = false,
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
@@ -292,6 +311,9 @@ class SupabaseRepository {
         'notes': notes,
         if (familyMemberId != null && familyMemberId.isNotEmpty)
           'family_member_id': familyMemberId,
+        if (department != null && department.isNotEmpty)
+          'department': department,
+        'is_video_consultation': isVideoConsultation,
         // So the provider panel can open the patient's uploaded
         // prescription (the column exists; it was never written).
         if (prescriptionUrl != null && prescriptionUrl.isNotEmpty)
@@ -523,10 +545,24 @@ class SupabaseRepository {
     }
   }
 
-  Future<bool> updateAppointmentStatus(String id, String status) async {
+  Future<bool> updateAppointmentStatus(String id, String status,
+      {String? rejectionReason,
+      String? consultationNotes,
+      String? followUpDate}) async {
     if (!_ready) return false;
     try {
-      await _db.from('appointments').update({'status': status}).eq('id', id);
+      await _db.from('appointments').update({
+        'status': status,
+        // Panelist destructive/complete actions carry their
+        // context (audit Panelist 17: these columns existed but
+        // no panel ever wrote them).
+        if (rejectionReason != null && rejectionReason.isNotEmpty)
+          'rejection_reason': rejectionReason,
+        if (consultationNotes != null && consultationNotes.isNotEmpty)
+          'consultation_notes': consultationNotes,
+        if (followUpDate != null && followUpDate.isNotEmpty)
+          'follow_up_date': followUpDate,
+      }).eq('id', id);
       return true;
     } catch (e) {
       debugPrint('updateAppointmentStatus failed: $e');
@@ -792,6 +828,87 @@ class SupabaseRepository {
       return true;
     } catch (e) {
       debugPrint('setOrderPrescriptionVerified failed: $e');
+      return false;
+    }
+  }
+
+  /// Doctor blocked slots from [fromIso] onwards, as seen by a
+  /// patient booking (audit M14 / Panelist 5: the table had zero
+  /// Dart references). Reads go through the
+  /// doctor_blocked_slots_for RPC because RLS only lets the
+  /// doctor read the raw rows; the RPC exposes date/times only.
+  /// Until that migration is applied this returns empty and the
+  /// booking flow simply offers working-hours slots.
+  Future<List<Map<String, dynamic>>> fetchBlockedSlots(
+      String doctorId, {String? fromIso}) async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db.rpc('doctor_blocked_slots_for', params: {
+        'p_doctor_id': doctorId,
+        'p_from': fromIso,
+      });
+      if (rows is List) return rows.cast<Map<String, dynamic>>();
+      return const [];
+    } catch (e) {
+      debugPrint('fetchBlockedSlots failed: $e');
+      return const [];
+    }
+  }
+
+  /// The signed-in doctor's own blocked slots, with reasons —
+  /// the management list in the doctor panel.
+  Future<List<Map<String, dynamic>>> fetchOwnBlockedSlots() async {
+    if (!_ready) return const [];
+    try {
+      final doctor = await fetchOwnProviderRecord('doctors');
+      if (doctor == null) return const [];
+      final rows = await _db
+          .from('doctor_blocked_slots')
+          .select()
+          .eq('doctor_id', doctor['id'])
+          .order('blocked_date');
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchOwnBlockedSlots failed: $e');
+      return const [];
+    }
+  }
+
+  /// Adds a blocked slot for the signed-in doctor's own record.
+  Future<String?> addBlockedSlot({
+    required String dateIso,
+    String? startTime,
+    String? endTime,
+    bool isFullDay = false,
+    String? reason,
+  }) async {
+    if (!_ready) return null;
+    try {
+      final doctor = await fetchOwnProviderRecord('doctors');
+      if (doctor == null) return null;
+      final rows = await _db.from('doctor_blocked_slots').insert({
+        'doctor_id': doctor['id'],
+        'blocked_date': dateIso,
+        'start_time': startTime,
+        'end_time': endTime,
+        'is_full_day': isFullDay,
+        'reason': reason,
+      }).select('id');
+      if (rows.isNotEmpty) return '${rows.first['id']}';
+      return null;
+    } catch (e) {
+      debugPrint('addBlockedSlot failed: $e');
+      return null;
+    }
+  }
+
+  Future<bool> deleteBlockedSlot(String id) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('doctor_blocked_slots').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('deleteBlockedSlot failed: $e');
       return false;
     }
   }

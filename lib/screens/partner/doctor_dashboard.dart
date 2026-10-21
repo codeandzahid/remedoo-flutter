@@ -4,9 +4,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../utils/working_hours.dart';
 import '../../widgets/prescription_form.dart';
 import '../../widgets/provider_payments.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/working_hours_editor.dart';
 
 /// Dashboard for logged-in doctors.
 /// Tabs: Appointments, Profile, Payments, Reviews.
@@ -75,7 +77,30 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   }
 
   Future<void> _setStatus(Map<String, dynamic> a, String status) async {
-    final ok = await _repo.updateAppointmentStatus('${a['id']}', status);
+    // Destructive and completion actions confirm first and carry
+    // their context (audit Panelist 17).
+    String? reason;
+    String? consultNotes;
+    String? followUp;
+    if (status == 'cancelled') {
+      reason = await promptActionReason(
+        context,
+        title: 'Cancel this appointment?',
+        message:
+            'The patient will be notified that the appointment was not approved.',
+        confirmLabel: 'Cancel appointment',
+      );
+      if (reason == null || !mounted) return;
+    } else if (status == 'completed') {
+      final details = await promptCompletionDetails(context);
+      if (details == null || !mounted) return;
+      consultNotes = details.notes;
+      followUp = details.followUpIso;
+    }
+    final ok = await _repo.updateAppointmentStatus('${a['id']}', status,
+        rejectionReason: reason,
+        consultationNotes: consultNotes,
+        followUpDate: followUp);
     if (!mounted) return;
     if (ok) {
       setState(() {
@@ -98,7 +123,8 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
             userId: patientId,
             title: 'Appointment Not Approved',
             message:
-                'Your appointment request for ${a['appointment_date'] ?? ''} was not approved by the doctor. Please try another slot.',
+                'Your appointment request for ${a['appointment_date'] ?? ''} was not approved by the doctor. Please try another slot.'
+                '${reason != null && reason.isNotEmpty ? ' Reason: $reason' : ''}',
             type: 'appointment',
           );
         }
@@ -563,7 +589,7 @@ class _ProfileTabState extends State<_ProfileTab> {
   late final TextEditingController _experience;
   late final TextEditingController _phone;
   late final TextEditingController _bio;
-  late final TextEditingController _hours;
+  late Map<String, DayHours> _hoursValue;
   bool _saving = false;
 
   @override
@@ -583,11 +609,9 @@ class _ProfileTabState extends State<_ProfileTab> {
             : '');
     _phone = TextEditingController(text: '${p['phone'] ?? ''}');
     _bio = TextEditingController(text: '${p['bio'] ?? ''}');
-    final wh = p['working_hours'];
-    _hours = TextEditingController(
-        text: wh is Map
-            ? wh.entries.map((e) => '${e.key}: ${e.value}').join('\n')
-            : '${wh ?? ''}');
+    // Structured hours (audit M4): parsed from the stored JSONB,
+    // never flattened into a text note.
+    _hoursValue = parseWorkingHours(p['working_hours']);
   }
 
   @override
@@ -598,7 +622,6 @@ class _ProfileTabState extends State<_ProfileTab> {
     _experience.dispose();
     _phone.dispose();
     _bio.dispose();
-    _hours.dispose();
     super.dispose();
   }
 
@@ -614,9 +637,11 @@ class _ProfileTabState extends State<_ProfileTab> {
     if (fee != null) values['consultation_fee'] = fee;
     final exp = int.tryParse(_experience.text.trim());
     if (exp != null) values['experience_years'] = exp;
-    if (_hours.text.trim().isNotEmpty) {
-      values['working_hours'] = {'note': _hours.text.trim()};
-    }
+    // The structured schedule is written back as structured
+    // JSONB (audit M4: this used to overwrite the schedule with
+    // a free-text note map, destroying what the booking flow
+    // reads).
+    values['working_hours'] = workingHoursToJson(_hoursValue);
     final ok = await widget.repo.updateOwnProviderRecord('doctors', values);
     if (!mounted) return;
     setState(() => _saving = false);
@@ -683,10 +708,16 @@ class _ProfileTabState extends State<_ProfileTab> {
                 maxLines: 3,
               ),
               const SizedBox(height: 12),
-              RTextField(
-                controller: _hours,
-                label: 'Working hours (e.g. Mon–Fri 9am–5pm)',
-                maxLines: 2,
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Working hours',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 4),
+              WorkingHoursEditor(
+                initial: _hoursValue,
+                onChanged: (v) => _hoursValue = v,
               ),
               const SizedBox(height: 20),
               RButton(
@@ -698,6 +729,12 @@ class _ProfileTabState extends State<_ProfileTab> {
           ),
         ),
         const SizedBox(height: 16),
+        _AvailabilityCard(
+          repo: widget.repo,
+          profile: widget.profile,
+          onSaved: widget.onSaved,
+        ),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -705,7 +742,11 @@ class _ProfileTabState extends State<_ProfileTab> {
 
 // ==================== PAYMENTS TAB ====================
 
-class _PaymentsTab extends StatefulWidget {
+/// Doctor payments use the SHARED provider payments card
+/// (form-pages audit Panelist 15: this tab used to carry a
+/// diverged duplicate of the form that lacked the shared card's
+/// empty-UPI-ID guard, so UPI could be switched on with no ID).
+class _PaymentsTab extends StatelessWidget {
   final Map<String, dynamic>? profile;
   final SupabaseRepository repo;
   final Future<void> Function() onSaved;
@@ -717,88 +758,7 @@ class _PaymentsTab extends StatefulWidget {
   });
 
   @override
-  State<_PaymentsTab> createState() => _PaymentsTabState();
-}
-
-class _PaymentsTabState extends State<_PaymentsTab> {
-  late final TextEditingController _upiId;
-  late final TextEditingController _upiName;
-  late bool _upiEnabled;
-  late bool _payInClinic;
-  bool _saving = false;
-
-  static final _upiRegex = RegExp(r'^[\w.\-]{2,}@[a-zA-Z]{2,}$');
-
-  @override
-  void initState() {
-    super.initState();
-    final p = widget.profile ?? {};
-    _upiId = TextEditingController(text: '${p['upi_id'] ?? ''}');
-    _upiName = TextEditingController(text: '${p['upi_payee_name'] ?? ''}');
-    _upiEnabled = p['upi_enabled'] == true;
-    _payInClinic = p['pay_in_clinic_enabled'] == true;
-  }
-
-  @override
-  void dispose() {
-    _upiId.dispose();
-    _upiName.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final id = _upiId.text.trim();
-    if (_upiEnabled && id.isNotEmpty && !_upiRegex.hasMatch(id)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(
-                'Enter a valid UPI ID (e.g. yourname@okhdfcbank).')),
-      );
-      return;
-    }
-    // Owner's rule: activating a payment option (or changing the UPI
-    // ID) needs the email code first.
-    if (paymentChangeNeedsOtp(
-      profile: widget.profile,
-      upiEnabled: _upiEnabled,
-      payInClinic: _payInClinic,
-      upiId: id,
-    )) {
-      final verified = await requirePaymentOtp(context);
-      if (!verified) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content:
-                    Text('Not saved — email code was not verified.')),
-          );
-        }
-        return;
-      }
-    }
-    setState(() => _saving = true);
-    final ok = await widget.repo.updateOwnProviderRecord('doctors', {
-      'upi_id': id.isEmpty ? null : id,
-      'upi_payee_name':
-          _upiName.text.trim().isEmpty ? null : _upiName.text.trim(),
-      'upi_enabled': _upiEnabled,
-      'pay_in_clinic_enabled': _payInClinic,
-    });
-    if (!mounted) return;
-    setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(ok
-            ? 'Payment settings saved.'
-            : 'Could not save. Try again.'),
-      ),
-    );
-    if (ok) widget.onSaved();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -808,90 +768,14 @@ class _PaymentsTabState extends State<_PaymentsTab> {
               'How patients pay you — money goes straight to your account',
         ),
         const SizedBox(height: 12),
-        RCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (!_upiEnabled && !_payInClinic) ...[
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color:
-                        RemedooTheme.warning.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.warning_amber,
-                          size: 18, color: RemedooTheme.warning),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'No payment option is ON. Turn on at least one below — patients cannot pay you until you activate one.',
-                          style: TextStyle(fontSize: 12.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              Text(
-                'Your UPI ID',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Open GPay, PhonePe, or Paytm to find your UPI ID (looks like name@okhdfcbank).',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              RTextField(
-                controller: _upiId,
-                label: 'UPI ID',
-              ),
-              const SizedBox(height: 8),
-              RTextField(
-                controller: _upiName,
-                label: 'Name on your UPI account (optional)',
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Accept UPI payments'),
-                subtitle: const Text(
-                    'Patients see a "Pay via UPI" option when booking'),
-                value: _upiEnabled,
-                onChanged: (v) =>
-                    setState(() => _upiEnabled = v),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Pay in clinic'),
-                subtitle: const Text(
-                    'Patients can choose to pay at your clinic'),
-                value: _payInClinic,
-                onChanged: (v) =>
-                    setState(() => _payInClinic = v),
-              ),
-              const SizedBox(height: 12),
-              RButton(
-                label: _saving ? 'Saving…' : 'Save payment settings',
-                fullWidth: true,
-                onPressed: _saving ? null : _save,
-              ),
-            ],
-          ),
+        ProviderUpiSettingsCard(
+          table: 'doctors',
+          profile: profile,
+          repo: repo,
+          onSaved: onSaved,
         ),
         const SizedBox(height: 16),
-        ProviderOnlinePayments(repo: widget.repo),
+        ProviderOnlinePayments(repo: repo),
         const SizedBox(height: 16),
       ],
     );
@@ -983,6 +867,274 @@ class _ReviewsTab extends StatelessWidget {
           }),
         const SizedBox(height: 16),
       ],
+    );
+  }
+}
+
+// ==================== AVAILABILITY ====================
+
+/// Blocked slots + vacation days (form-pages audit Panelist 5 /
+/// M14): doctor_blocked_slots and doctors.vacation_dates existed
+/// in the schema with zero app references, so a doctor could not
+/// stop patients booking a time they could not keep. Blocked
+/// slots are filtered out of the booking flow's offered times.
+class _AvailabilityCard extends StatefulWidget {
+  final SupabaseRepository repo;
+  final Map<String, dynamic>? profile;
+  final Future<void> Function() onSaved;
+
+  const _AvailabilityCard({
+    required this.repo,
+    required this.profile,
+    required this.onSaved,
+  });
+
+  @override
+  State<_AvailabilityCard> createState() => _AvailabilityCardState();
+}
+
+class _AvailabilityCardState extends State<_AvailabilityCard> {
+  List<Map<String, dynamic>> _blocks = [];
+  List<String> _vacation = [];
+  bool _loading = true;
+  bool _savingVacation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final v = widget.profile?['vacation_dates'];
+    if (v is List) _vacation = v.map((e) => '$e').toList()..sort();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final rows = await widget.repo.fetchOwnBlockedSlots();
+    if (!mounted) return;
+    setState(() {
+      _blocks = rows;
+      _loading = false;
+    });
+  }
+
+  Future<void> _addBlock() async {
+    var date = DateTime.now().add(const Duration(days: 1));
+    var fullDay = true;
+    var start = const TimeOfDay(hour: 9, minute: 0);
+    var end = const TimeOfDay(hour: 13, minute: 0);
+    final reason = TextEditingController();
+    String fmt(TimeOfDay t) =>
+        '${t.hour.toString().padLeft(2, '0')}:'
+        '${t.minute.toString().padLeft(2, '0')}';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Block time off'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.calendar_month_outlined,
+                      size: 18),
+                  label: Text(
+                      'Date: ${date.day}/${date.month}/${date.year}'),
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: date,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now()
+                          .add(const Duration(days: 365)),
+                    );
+                    if (picked != null) setD(() => date = picked);
+                  },
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Full day'),
+                  value: fullDay,
+                  onChanged: (v) => setD(() => fullDay = v),
+                ),
+                if (!fullDay)
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () async {
+                          final p = await showTimePicker(
+                              context: ctx, initialTime: start);
+                          if (p != null) setD(() => start = p);
+                        },
+                        child: Text('From ${fmt(start)}'),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final p = await showTimePicker(
+                              context: ctx, initialTime: end);
+                          if (p != null) setD(() => end = p);
+                        },
+                        child: Text('To ${fmt(end)}'),
+                      ),
+                    ],
+                  ),
+                TextField(
+                  controller: reason,
+                  decoration: const InputDecoration(
+                      labelText: 'Reason (optional)'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Block'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved != true) return;
+    final id = await widget.repo.addBlockedSlot(
+      dateIso: date.toIso8601String().substring(0, 10),
+      startTime: fullDay ? null : '${fmt(start)}:00',
+      endTime: fullDay ? null : '${fmt(end)}:00',
+      isFullDay: fullDay,
+      reason: reason.text.trim().isEmpty ? null : reason.text.trim(),
+    );
+    reason.dispose();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(id != null
+            ? 'Time blocked. Patients will not be offered it.'
+            : 'Could not block. Try again.'),
+      ),
+    );
+    if (id != null) _load();
+  }
+
+  Future<void> _saveVacation() async {
+    setState(() => _savingVacation = true);
+    final ok = await widget.repo.updateOwnProviderRecord('doctors', {
+      'vacation_dates': _vacation,
+    });
+    if (!mounted) return;
+    setState(() => _savingVacation = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Leave days saved.'
+            : 'Could not save leave days. Try again.'),
+      ),
+    );
+    if (ok) widget.onSaved();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Availability — time off',
+              style:
+                  TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(
+            'Blocked times and leave days are removed from the '
+            'slots patients can book.',
+            style: TextStyle(
+                fontSize: 12, color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          if (_loading)
+            const Center(child: CircularProgressIndicator())
+          else if (_blocks.isEmpty)
+            Text('No blocked time.',
+                style: TextStyle(color: scheme.onSurfaceVariant))
+          else
+            for (final b in _blocks)
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.block_outlined, size: 20),
+                title: Text('${b['blocked_date'] ?? ''}'),
+                subtitle: Text(
+                  b['is_full_day'] == true
+                      ? 'Full day'
+                          '${'${b['reason'] ?? ''}'.isNotEmpty ? ' • ${b['reason']}' : ''}'
+                      : '${b['start_time'] ?? ''} – ${b['end_time'] ?? ''}'
+                          '${'${b['reason'] ?? ''}'.isNotEmpty ? ' • ${b['reason']}' : ''}',
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  onPressed: () async {
+                    final ok =
+                        await widget.repo.deleteBlockedSlot('${b['id']}');
+                    if (ok) _load();
+                  },
+                ),
+              ),
+          const SizedBox(height: 8),
+          RButton(
+            label: 'Block time off',
+            icon: Icons.add,
+            small: true,
+            variant: RButtonVariant.outline,
+            onPressed: _addBlock,
+          ),
+          const Divider(height: 28),
+          const Text('Leave days (vacation)',
+              style:
+                  TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final d in _vacation)
+                Chip(
+                  label: Text(d),
+                  onDeleted: () =>
+                      setState(() => _vacation.remove(d)),
+                ),
+              ActionChip(
+                avatar: const Icon(Icons.add, size: 16),
+                label: const Text('Add day'),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate:
+                        DateTime.now().add(const Duration(days: 7)),
+                    firstDate: DateTime.now(),
+                    lastDate:
+                        DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (picked == null) return;
+                  final iso =
+                      picked.toIso8601String().substring(0, 10);
+                  if (!_vacation.contains(iso)) {
+                    setState(() => _vacation = [..._vacation, iso]
+                      ..sort());
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          RButton(
+            label: _savingVacation ? 'Saving…' : 'Save leave days',
+            small: true,
+            onPressed: _savingVacation ? null : _saveVacation,
+          ),
+        ],
+      ),
     );
   }
 }

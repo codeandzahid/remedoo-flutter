@@ -21,6 +21,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
   String? _error;
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _appointments = [];
+  List<Map<String, dynamic>> _reviews = [];
 
   SupabaseRepository get _repo =>
       AppStateScope.of(context).supabaseRepository;
@@ -39,10 +40,13 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
     try {
       final profile = await _repo.fetchOwnProviderRecord('hospitals');
       final appointments = await _repo.fetchHospitalAppointments();
+      final reviews =
+          await _repo.fetchProviderReviews('hospital', 'hospitals');
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _appointments = appointments;
+        _reviews = reviews;
         _loading = false;
       });
     } catch (e) {
@@ -69,7 +73,30 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
   }
 
   Future<void> _setStatus(Map<String, dynamic> a, String status) async {
-    final ok = await _repo.updateAppointmentStatus('${a['id']}', status);
+    // Destructive and completion actions confirm first and carry
+    // their context (audit Panelist 17).
+    String? reason;
+    String? consultNotes;
+    String? followUp;
+    if (status == 'cancelled') {
+      reason = await promptActionReason(
+        context,
+        title: 'Cancel this appointment?',
+        message:
+            'The patient will be notified that the appointment was not approved.',
+        confirmLabel: 'Cancel appointment',
+      );
+      if (reason == null || !mounted) return;
+    } else if (status == 'completed') {
+      final details = await promptCompletionDetails(context);
+      if (details == null || !mounted) return;
+      consultNotes = details.notes;
+      followUp = details.followUpIso;
+    }
+    final ok = await _repo.updateAppointmentStatus('${a['id']}', status,
+        rejectionReason: reason,
+        consultationNotes: consultNotes,
+        followUpDate: followUp);
     if (!mounted) return;
     if (ok) {
       setState(() {
@@ -251,6 +278,8 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
           )
         else
           ...upcoming.take(20).map((a) => _appointmentCard(context, a)),
+        const SizedBox(height: 24),
+        ProviderReviewsList(reviews: _reviews),
         const SizedBox(height: 16),
       ],
     );

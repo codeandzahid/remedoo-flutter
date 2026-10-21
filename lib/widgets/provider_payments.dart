@@ -469,6 +469,222 @@ class _ProviderUpiSettingsCardState extends State<ProviderUpiSettingsCard> {
   }
 }
 
+/// Reviews section for the single-scroll partner dashboards
+/// (form-pages audit Panelist 21: only doctors could see their
+/// patient reviews; hospital / lab / pharmacy had no surface at
+/// all). Mirrors the doctor dashboard's Reviews tab content.
+class ProviderReviewsList extends StatelessWidget {
+  final List<Map<String, dynamic>> reviews;
+
+  const ProviderReviewsList({super.key, required this.reviews});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final avg = reviews.isEmpty
+        ? 0.0
+        : reviews
+                .map((r) => (r['rating'] as num?)?.toDouble() ?? 0)
+                .reduce((a, b) => a + b) /
+            reviews.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RSectionHeader(
+          title: 'Patient Reviews',
+          subtitle: reviews.isEmpty
+              ? 'What patients say about you'
+              : '${reviews.length} reviews · '
+                  '${avg.toStringAsFixed(1)} average',
+        ),
+        const SizedBox(height: 12),
+        if (reviews.isEmpty)
+          const REmptyState(
+            icon: Icons.star_outline,
+            title: 'No reviews yet',
+            subtitle:
+                'When patients rate you, their reviews appear here.',
+            compact: true,
+          )
+        else
+          for (final r in reviews)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: RCard(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        RStarRating(
+                            rating:
+                                ((r['rating'] as num?)?.toDouble() ??
+                                    0)),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${(r['rating'] as num?)?.toInt() ?? 0}/5',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${r['created_at'] ?? ''}'
+                              .toString()
+                              .split('T')
+                              .first,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if ('${r['comment'] ?? ''}'.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text('${r['comment']}',
+                          style: const TextStyle(fontSize: 14)),
+                    ],
+                    if ('${r['status'] ?? 'approved'}' != 'approved')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          'Status: ${r['status']}',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+/// Confirmation + optional reason for a destructive provider
+/// action (form-pages audit Panelist 17: Reject / Cancel on the
+/// partner cards fired instantly with no confirmation and no
+/// reason, and appointments.rejection_reason was never written).
+/// Returns null when the provider backs out; otherwise the
+/// reason text (possibly empty).
+Future<String?> promptActionReason(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+}) async {
+  final controller = TextEditingController();
+  final result = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                hintText: 'The patient will see this',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Keep it'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+          child: Text(confirmLabel),
+        ),
+      ],
+    ),
+  );
+  controller.dispose();
+  return result;
+}
+
+/// Completion details for a finished visit: consultation notes
+/// and an optional follow-up date (appointments.consultation_
+/// notes / follow_up_date — audit Panelist 17). Returns null
+/// when the provider backs out.
+Future<({String notes, String? followUpIso})?> promptCompletionDetails(
+  BuildContext context,
+) async {
+  final controller = TextEditingController();
+  DateTime? followUp;
+  final result = await showDialog<({String notes, String? followUpIso})>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setD) => AlertDialog(
+        title: const Text('Complete this visit?'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Consultation notes (optional)',
+                  hintText: 'What was checked / advised',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                icon: const Icon(Icons.event_outlined, size: 18),
+                label: Text(followUp == null
+                    ? 'Add a follow-up date (optional)'
+                    : 'Follow-up: ${followUp!.day}/${followUp!.month}/${followUp!.year}'),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: followUp ??
+                        DateTime.now().add(const Duration(days: 7)),
+                    firstDate: DateTime.now(),
+                    lastDate:
+                        DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (picked != null) setD(() => followUp = picked);
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, (
+                  notes: controller.text.trim(),
+                  followUpIso: followUp?.toIso8601String().substring(0, 10),
+                )),
+            child: const Text('Mark completed'),
+          ),
+        ],
+      ),
+    ),
+  );
+  controller.dispose();
+  return result;
+}
+
 /// Refund action for a provider appointment / booking card whose
 /// row carries refund_status 'requested' (form-pages audit
 /// Panelist 13: only pharmacy order cards had a refund entry
