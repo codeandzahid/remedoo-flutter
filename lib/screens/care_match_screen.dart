@@ -118,6 +118,48 @@ Set<String> relevantSpecialtiesForSymptom(String symptomText) {
   return out;
 }
 
+/// What the free-text "Anything else?" box can honestly steer
+/// (form-pages audit Patient 16: the field was collected and
+/// never read). The text joins the symptom text for specialty
+/// relevance, and explicit asks change the ranking: cheapest,
+/// nearest, or best rated. Anything else is surfaced back to the
+/// user as a note rather than silently dropped.
+class CareMatchPreferences {
+  final bool cheapest;
+  final bool nearest;
+  final bool bestRated;
+
+  const CareMatchPreferences({
+    this.cheapest = false,
+    this.nearest = false,
+    this.bestRated = false,
+  });
+
+  bool get anySort => cheapest || nearest || bestRated;
+
+  String get sortLabel => cheapest
+      ? 'lowest fee first, as you asked'
+      : nearest
+          ? 'nearest first, as you asked'
+          : 'best rated first, as you asked';
+}
+
+CareMatchPreferences careMatchPreferences(String notes) {
+  final t = notes.toLowerCase();
+  return CareMatchPreferences(
+    cheapest: t.contains('cheap') ||
+        t.contains('lowest fee') ||
+        t.contains('budget friendly') ||
+        t.contains('affordable'),
+    nearest: t.contains('nearest') ||
+        t.contains('near me') ||
+        t.contains('close to'),
+    bestRated: t.contains('best rated') ||
+        t.contains('top rated') ||
+        t.contains('highest rating'),
+  );
+}
+
 /// Smart Care Finder: symptom input + preferences → ranked matches.
 class CareMatchScreen extends StatefulWidget {
   final String initialSymptom;
@@ -253,6 +295,7 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                                   fontWeight: FontWeight.w700)),
                           const SizedBox(height: 8),
                           RTextField(
+                            label: 'Describe your symptoms',
                             hint:
                                 'e.g. Sharp stomach pain with nausea for two days, worse after meals',
                             controller: _symptom,
@@ -434,7 +477,14 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
     final budget = _budgetValue;
     final distance = _distanceValue;
     final symptomText = _symptom.text.trim();
-    final relevantSpecs = relevantSpecialtiesForSymptom(symptomText);
+    // The "Anything else?" text is read now (audit Patient 16):
+    // it joins the symptom text for specialty relevance and its
+    // explicit asks (cheapest / nearest / best rated) steer the
+    // ranking within relevant matches.
+    final notesText = _notes.text.trim();
+    final prefs = careMatchPreferences(notesText);
+    final relevantSpecs =
+        relevantSpecialtiesForSymptom('$symptomText $notesText');
     bool doctorRelevant(Doctor d) => relevantSpecs
         .any((s) => s.toLowerCase() == d.specialty.toLowerCase());
     Widget staggered(Widget card) =>
@@ -445,11 +495,19 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
               d.fee <= budget && d.distanceKm <= distance)
           .toList()
         ..sort((a, b) {
-          // Symptom-relevant specialties first, then rating,
-          // then distance. No invented percentages anywhere.
+          // Symptom-relevant specialties first, then the ranking
+          // the patient asked for in "Anything else?" (default:
+          // rating, then distance). No invented percentages.
           final ra = doctorRelevant(a) ? 0 : 1;
           final rb = doctorRelevant(b) ? 0 : 1;
           if (ra != rb) return ra.compareTo(rb);
+          if (prefs.cheapest) {
+            final byFee = a.fee.compareTo(b.fee);
+            if (byFee != 0) return byFee;
+          } else if (prefs.nearest) {
+            final byDist = a.distanceKm.compareTo(b.distanceKm);
+            if (byDist != 0) return byDist;
+          }
           final byRating = b.rating.compareTo(a.rating);
           if (byRating != 0) return byRating;
           return a.distanceKm.compareTo(b.distanceKm);
@@ -488,6 +546,10 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
             final ib = b.hasIcu ? 0 : 1;
             if (ia != ib) return ia.compareTo(ib);
           }
+          if (prefs.nearest) {
+            final byDist = a.distanceKm.compareTo(b.distanceKm);
+            if (byDist != 0) return byDist;
+          }
           final byRating = b.rating.compareTo(a.rating);
           if (byRating != 0) return byRating;
           return a.distanceKm.compareTo(b.distanceKm);
@@ -519,7 +581,7 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
     if (_careType == 'Anything suitable' || _careType == 'Lab test') {
       // Tests whose name/category shares a word with the symptom
       // text are the honest "related tests" signal.
-      final words = symptomText
+      final words = '$symptomText $notesText'
           .toLowerCase()
           .split(RegExp(r'[^a-z]+'))
           .where((w) => w.length > 3)
@@ -531,7 +593,9 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
       final ls = state.activeLabs
           .where((l) => l.distanceKm <= distance)
           .toList()
-        ..sort((a, b) => b.rating.compareTo(a.rating));
+        ..sort((a, b) => prefs.nearest
+            ? a.distanceKm.compareTo(b.distanceKm)
+            : b.rating.compareTo(a.rating));
       for (final l in ls.take(2)) {
         out.add(staggered(_matchCard(
           kind: 'Lab',
@@ -556,6 +620,24 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
           },
         )));
       }
+    }
+    if (notesText.isNotEmpty && out.isNotEmpty) {
+      out.insert(
+        0,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: RCard(
+            child: Text(
+              'Your note: "$notesText"'
+              '${prefs.anySort ? ' — sorted by ${prefs.sortLabel}.' : ' — used for specialty matching.'}',
+              style: TextStyle(
+                  fontSize: 12.5,
+                  color:
+                      Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ),
+      );
     }
     if (out.isEmpty) {
       out.add(RCard(

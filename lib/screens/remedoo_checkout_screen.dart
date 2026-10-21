@@ -500,6 +500,7 @@ class _RemedooCheckoutScreenState
             const SizedBox(height: 10),
           ],
           RTextField(
+            label: 'Delivery Address',
             hint: 'Enter your full address',
             controller: _address,
             maxLines: 2,
@@ -728,6 +729,7 @@ class _RemedooCheckoutScreenState
                   fontWeight: FontWeight.w800, fontSize: 14)),
           const SizedBox(height: 10),
           RTextField(
+            label: 'Notes',
             hint: 'Any special instructions…',
             controller: _notes,
             maxLines: 2,

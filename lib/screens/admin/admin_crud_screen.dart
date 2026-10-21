@@ -556,6 +556,10 @@ List<AdminField> adminTableFields(String table) {
             type: 'bool'),
         AdminField(key: 'phone', label: 'Phone'),
         AdminField(
+            key: 'consultation_fee',
+            label: 'Consultation Fee (₹)',
+            type: 'double'),
+        AdminField(
             key: 'rating', label: 'Rating', type: 'double'),
         AdminField(
             key: 'approval_status',

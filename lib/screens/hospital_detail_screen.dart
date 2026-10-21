@@ -50,7 +50,7 @@ class HospitalDetailScreen extends StatelessWidget {
         title: h.name,
         subtitle: 'General Consultation',
         place: h.location,
-        fee: 300,
+        fee: h.fee,
       ),
     );
   }
@@ -584,7 +584,7 @@ class HospitalDetailScreen extends StatelessWidget {
           Row(
             children: [
               const Expanded(child: Text('General Consultation')),
-              Text(inr(300),
+              Text(h.fee > 0 ? inr(h.fee) : 'Free',
                   style: TextStyle(
                       fontWeight: FontWeight.w800,
                       color: RemedooTheme.primary)),

@@ -50,6 +50,31 @@ Future<void> dialNumber(BuildContext context, String number) async {
   }
 }
 
+/// Fetches the device's current coordinates, asking for permission
+/// when needed. Returns null when location is unavailable or
+/// denied — callers (Emergency SOS) must never block on it.
+Future<(double, double)?> fetchCurrentCoordinates() async {
+  try {
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return null;
+    }
+    final pos = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 10),
+      ),
+    );
+    return (pos.latitude, pos.longitude);
+  } catch (_) {
+    return null;
+  }
+}
+
 /// Fetches the device's real location and reverse-geocodes it into a
 /// human-readable address string. Returns null when location is
 /// unavailable or permission is denied.

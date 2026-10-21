@@ -279,104 +279,158 @@ class _RemindersScreenState extends State<RemindersScreen> {
   /// chosen Repeat is stored as the reminder's repeat (it used to
   /// be stuffed into the notes field, so every reminder displayed
   /// "Daily" — audit fix 2026-10-19), and the date is pickable
-  /// instead of silently always being today.
+  /// instead of silently always being today. The time is picked
+  /// with a real time picker and a note can be added (audit
+  /// Patient 14: free-text unvalidated time, description column
+  /// never written).
   void _addDialog(BuildContext context, AppState state,
       {Reminder? existing}) {
     final title = TextEditingController(text: existing?.title ?? '');
-    final time =
-        TextEditingController(text: existing?.timeLabel ?? '09:00');
+    final notes = TextEditingController(text: existing?.notes ?? '');
     String repeat = existing?.repeat ?? 'Daily';
     DateTime date = existing?.date ?? DateTime.now();
-    void save() {
-      if (title.text.trim().isEmpty) return;
-      if (existing != null) {
-        state.updateReminder(
-          existing.id,
-          title: title.text.trim(),
-          date: date,
-          timeLabel: time.text.trim(),
-          repeat: repeat,
-        );
-      } else {
-        state.addReminder(
-          title: title.text.trim(),
-          date: date,
-          timeLabel: time.text.trim(),
-          notes: '',
-          repeat: repeat,
-        );
-      }
-      Navigator.pop(context);
+    TimeOfDay time = _parseTime(existing?.timeLabel) ??
+        const TimeOfDay(hour: 9, minute: 0);
+    String? error;
+
+    String label(TimeOfDay t) {
+      final ap = t.period == DayPeriod.pm ? 'PM' : 'AM';
+      final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+      return '$h:${t.minute.toString().padLeft(2, '0')} $ap';
     }
 
     showResponsiveDialog(
       context,
       (_) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          title: Text(existing == null ? 'Add Reminder' : 'Edit Reminder'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RTextField(
-                  label: 'Title',
-                  hint: 'Reminder title',
-                  controller: title),
-              const SizedBox(height: 12),
-              RTextField(
-                  label: 'Time (HH:MM)',
-                  hint: '09:00',
-                  controller: time),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  icon: const Icon(Icons.calendar_month_outlined,
-                      size: 18),
-                  label: Text(
-                      'Date: ${date.day}/${date.month}/${date.year}'),
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: ctx,
-                      initialDate: date,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime.now()
-                          .add(const Duration(days: 365 * 5)),
-                    );
-                    if (picked != null) setD(() => date = picked);
-                  },
-                ),
+        builder: (ctx, setD) {
+          void save() {
+            if (title.text.trim().isEmpty) {
+              setD(() => error = 'Please enter a title.');
+              return;
+            }
+            if (existing != null) {
+              state.updateReminder(
+                existing.id,
+                title: title.text.trim(),
+                date: date,
+                timeLabel: label(time),
+                notes: notes.text.trim(),
+                repeat: repeat,
+              );
+            } else {
+              state.addReminder(
+                title: title.text.trim(),
+                date: date,
+                timeLabel: label(time),
+                notes: notes.text.trim(),
+                repeat: repeat,
+              );
+            }
+            Navigator.pop(context);
+          }
+
+          return AlertDialog(
+            title:
+                Text(existing == null ? 'Add Reminder' : 'Edit Reminder'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RTextField(
+                      label: 'Title *',
+                      hint: 'Reminder title',
+                      controller: title),
+                  const SizedBox(height: 12),
+                  RTextField(
+                      label: 'Notes (optional)',
+                      hint: 'e.g. Take after food',
+                      controller: notes),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.schedule_outlined,
+                          size: 18),
+                      label: Text('Time: ${label(time)}'),
+                      onPressed: () async {
+                        final picked = await showTimePicker(
+                          context: ctx,
+                          initialTime: time,
+                        );
+                        if (picked != null) setD(() => time = picked);
+                      },
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.calendar_month_outlined,
+                          size: 18),
+                      label: Text(
+                          'Date: ${date.day}/${date.month}/${date.year}'),
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: date,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now()
+                              .add(const Duration(days: 365 * 5)),
+                        );
+                        if (picked != null) setD(() => date = picked);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    initialValue: repeat,
+                    decoration:
+                        const InputDecoration(labelText: 'Repeat'),
+                    items: const ['Daily', 'Weekly', 'Once']
+                        .map((o) => DropdownMenuItem(
+                            value: o, child: Text(o)))
+                        .toList(),
+                    onChanged: (v) =>
+                        setD(() => repeat = v ?? 'Daily'),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(error!,
+                          style: TextStyle(
+                              color:
+                                  Theme.of(ctx).colorScheme.error,
+                              fontSize: 13)),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 4),
-              DropdownButtonFormField<String>(
-                initialValue: repeat,
-                decoration: const InputDecoration(
-                    labelText: 'Repeat'),
-                items: const ['Daily', 'Weekly', 'Once']
-                    .map((o) => DropdownMenuItem(
-                        value: o, child: Text(o)))
-                    .toList(),
-                onChanged: (v) =>
-                    setD(() => repeat = v ?? 'Daily'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
             ),
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: save,
-              child: RButton(
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              RButton(
                 label: existing == null ? 'Add' : 'Save',
                 small: true,
                 onPressed: save,
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
+  }
+
+  /// Parses a stored time label ('9:00 AM', '09:00', '21:30') for
+  /// the time picker; null when it can't be understood.
+  static TimeOfDay? _parseTime(String? label) {
+    if (label == null) return null;
+    final db = AppState.reminderDbTime(label);
+    if (db == null) return null;
+    final parts = db.split(':');
+    return TimeOfDay(
+        hour: int.parse(parts[0]), minute: int.parse(parts[1]));
   }
 }

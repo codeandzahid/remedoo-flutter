@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../data/mock_data.dart';
 import '../models.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
@@ -44,7 +43,10 @@ class EmergencyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nearby = hospitals.take(4).toList();
+    // Nearby hospitals come from the live catalog (audit Patient
+    // 17: this read the raw mock list directly).
+    final state0 = AppStateScope.of(context);
+    final nearby = state0.activeHospitals.take(4).toList();
     // Quick contacts are admin-controlled (Settings > App Settings >
     // Emergency Numbers); fall back to the built-in list.
     final state = AppStateScope.of(context);
@@ -340,7 +342,7 @@ class EmergencyScreen extends StatelessWidget {
                             title: h.name,
                             subtitle: 'Emergency Consultation',
                             place: h.location,
-                            fee: 300,
+                            fee: h.fee,
                           ),
                         ),
                       );
@@ -375,13 +377,23 @@ class EmergencyScreen extends StatelessWidget {
             label: 'Call $primary',
             variant: RButtonVariant.danger,
             small: true,
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
+              // Create the emergency_requests record (with the
+              // device's location when it can be fetched quickly)
+              // so the admin board sees this SOS — the call itself
+              // is never blocked on it (audit Patient 17).
+              final coords = await fetchCurrentCoordinates();
+              state.reportSos(
+                latitude: coords?.$1,
+                longitude: coords?.$2,
+              );
+              if (!context.mounted) return;
               dialNumber(context, primary);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                     content: Text(
-                        'Dialing $primary…')),
+                        'Dialing $primary… SOS sent to the Remedoo team.')),
               );
             },
           ),

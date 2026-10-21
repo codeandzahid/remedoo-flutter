@@ -66,6 +66,11 @@ class Hospital {
   final bool payInClinicEnabled;
   final bool upiEnabled;
 
+  /// Consultation / booking fee from the hospitals table
+  /// (consultation_fee). The booking entry points used to
+  /// hardcode ₹300 (form-pages audit Patient 19).
+  final double fee;
+
   /// Real contact numbers from the hospitals table ('' when the
   /// hospital has not provided one — call actions hide rather than
   /// dial a placeholder).
@@ -88,6 +93,7 @@ class Hospital {
     this.upiId,
     this.payInClinicEnabled = false,
     this.upiEnabled = false,
+    this.fee = 0,
     this.phone = '',
     this.emergencyContact = '',
   });
@@ -412,13 +418,40 @@ class FamilyMember {
   final int age;
   final String? reason;
 
+  /// The rest of the family_members record (form-pages audit
+  /// Patient 9: the form used to collect name/relation/age only,
+  /// and age never survived a reload because date_of_birth was
+  /// never written).
+  final DateTime? dateOfBirth;
+  final String? gender;
+  final String? bloodGroup;
+  final String? allergies;
+  final String? chronicConditions;
+
   FamilyMember({
     required this.id,
     required this.name,
     required this.relation,
     required this.age,
     this.reason,
+    this.dateOfBirth,
+    this.gender,
+    this.bloodGroup,
+    this.allergies,
+    this.chronicConditions,
   });
+
+  /// Whole years between a date of birth and [now] — a bare year
+  /// subtraction overstates the age before this year's birthday.
+  static int ageFromDob(DateTime dob, [DateTime? now]) {
+    final n = now ?? DateTime.now();
+    var years = n.year - dob.year;
+    if (n.month < dob.month ||
+        (n.month == dob.month && n.day < dob.day)) {
+      years--;
+    }
+    return years < 0 ? 0 : years;
+  }
 }
 
 class Reminder {

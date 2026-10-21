@@ -123,8 +123,10 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _cartBody(AppState state) {
     final subtotal = state.cartTotal;
-    // Matches React Cart.tsx: free delivery above ₹500.
-    final delivery = subtotal > 500 ? 0.0 : 30.0;
+    // Same admin-configured delivery rule as the other checkout
+    // (audit Patient 25 — this screen hardcoded ₹30 / ₹500).
+    final delivery =
+        subtotal >= state.freeDeliveryThreshold ? 0.0 : state.deliveryFee;
     final total = subtotal + delivery;
     final requiresRx =
         state.cartLines.any((l) => l.medicine.rxRequired);
@@ -614,12 +616,14 @@ class _CartScreenState extends State<CartScreen> {
             const SizedBox(height: 10),
           ],
           RTextField(
+            label: 'Delivery Address',
             hint: 'Enter your full delivery address…',
             controller: _address,
             maxLines: 2,
           ),
           const SizedBox(height: 10),
           RTextField(
+            label: 'Special instructions (optional)',
             hint: 'Any special instructions? (optional)',
             controller: _instructions,
           ),
@@ -781,7 +785,8 @@ class _CartScreenState extends State<CartScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 2, bottom: 4),
               child: Text(
-                  'Free delivery on orders above ₹500',
+                  'Free delivery on orders above '
+                  '${inr(AppStateScope.of(context).freeDeliveryThreshold)}',
                   style: TextStyle(
                       fontSize: 11,
                       color: RemedooTheme.success)),
@@ -830,7 +835,8 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _bottomCta(AppState state) {
     final subtotal = state.cartTotal;
-    final delivery = subtotal > 500 ? 0.0 : 30.0;
+    final delivery =
+        subtotal >= state.freeDeliveryThreshold ? 0.0 : state.deliveryFee;
     final total = subtotal + delivery;
     return SafeArea(
       child: Container(

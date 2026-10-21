@@ -253,6 +253,10 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
     final titleCtrl = TextEditingController(text: existing?.title ?? '');
     final notesCtrl = TextEditingController(text: existing?.notes ?? '');
     var kind = existing?.kind ?? 'Allergy';
+    // The fact's own date (audit Patient 24: new facts used to be
+    // stamped "today", so a 2019 surgery displayed as happening
+    // today on the timeline).
+    var date = existing?.date ?? DateTime.now();
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -285,6 +289,25 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
                       hintText: 'e.g. Allergic to penicillin'),
                 ),
                 const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.calendar_month_outlined,
+                        size: 18),
+                    label: Text(
+                        'Date: ${date.day}/${date.month}/${date.year}'),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: date,
+                        firstDate: DateTime(1920),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) setD(() => date = picked);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 4),
                 TextField(
                   controller: notesCtrl,
                   maxLines: 2,
@@ -317,7 +340,7 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
         id: existing.id,
         kind: kind,
         title: title,
-        date: existing.date,
+        date: date,
         notes: notesCtrl.text.trim(),
       ));
       ScaffoldMessenger.of(context).showSnackBar(
@@ -327,7 +350,7 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
         id: 'H${DateTime.now().millisecondsSinceEpoch}',
         kind: kind,
         title: title,
-        date: DateTime.now(),
+        date: date,
         notes: notesCtrl.text.trim(),
       ));
       ScaffoldMessenger.of(context).showSnackBar(

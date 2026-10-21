@@ -140,11 +140,18 @@ class FamilyScreen extends StatelessWidget {
                           fontSize: 12,
                           color: scheme.onSurfaceVariant)),
                   const SizedBox(height: 6),
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
                       _chip(context, m.relation),
-                      const SizedBox(width: 6),
                       _chip(context, '${m.age} yrs'),
+                      if ((m.gender ?? '').isNotEmpty)
+                        _chip(context, m.gender!),
+                      if ((m.bloodGroup ?? '').isNotEmpty)
+                        _chip(context, 'Blood ${m.bloodGroup}'),
+                      if ((m.allergies ?? '').isNotEmpty)
+                        _chip(context, 'Allergy: ${m.allergies}'),
                     ],
                   ),
                 ],
@@ -213,72 +220,187 @@ class FamilyScreen extends StatelessWidget {
     );
   }
 
-  /// Add dialog, or edit dialog when [existing] is passed (edit
-  /// support added by the patient-panel audit fix, 2026-10-19).
+  static const _genders = ['Female', 'Male', 'Other'];
+  static const _bloodGroups = [
+    'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'
+  ];
+
+  /// Add dialog, or edit dialog when [existing] is passed.
+  ///
+  /// Collects the full family_members record (audit Patient 9):
+  /// date of birth (age derives from it, so age survives reload),
+  /// gender, blood group, allergies and chronic conditions.
+  /// Validation is visible (Patient 26): an empty name, a missing
+  /// relation or a missing date of birth shows an error in the
+  /// dialog instead of silently doing nothing or inventing age 30.
   void _addDialog(BuildContext context, AppState state,
       {FamilyMember? existing}) {
     final name = TextEditingController(text: existing?.name ?? '');
     final relation =
         TextEditingController(text: existing?.relation ?? '');
-    final age = TextEditingController(
-        text: existing == null ? '' : '${existing.age}');
+    final allergies =
+        TextEditingController(text: existing?.allergies ?? '');
+    final conditions =
+        TextEditingController(text: existing?.chronicConditions ?? '');
+    DateTime? dob = existing?.dateOfBirth;
+    String? gender = existing?.gender;
+    String? blood = existing?.bloodGroup;
+    String? error;
     showResponsiveDialog(
       context,
-      (_) => AlertDialog(
-        title: Text(
-            existing == null ? 'Add Family Member' : 'Edit Family Member'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RTextField(
-                label: 'Full name',
-                hint: 'Full name',
-                controller: name),
-            const SizedBox(height: 12),
-            RTextField(
-                label: 'Relation',
-                hint: 'Relation (e.g. Mother)',
-                controller: relation),
-            const SizedBox(height: 12),
-            RTextField(
-                label: 'Age',
-                hint: 'Age',
-                controller: age,
-                keyboardType: TextInputType.number),
+      (_) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(existing == null
+              ? 'Add Family Member'
+              : 'Edit Family Member'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RTextField(
+                    label: 'Full name *',
+                    hint: 'Full name',
+                    controller: name),
+                const SizedBox(height: 12),
+                RTextField(
+                    label: 'Relation *',
+                    hint: 'Relation (e.g. Mother)',
+                    controller: relation),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Date of birth *',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color:
+                              Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.cake_outlined, size: 18),
+                    label: Text(dob == null
+                        ? 'Select date of birth'
+                        : '${dob!.day}/${dob!.month}/${dob!.year}'
+                            ' (${FamilyMember.ageFromDob(dob!)} yrs)'),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: dob ??
+                            DateTime.now()
+                                .subtract(const Duration(days: 365 * 30)),
+                        firstDate: DateTime(1920),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setLocal(() => dob = picked);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue:
+                      _genders.contains(gender) ? gender : null,
+                  decoration: const InputDecoration(
+                      labelText: 'Gender', isDense: true),
+                  items: _genders
+                      .map((g) =>
+                          DropdownMenuItem(value: g, child: Text(g)))
+                      .toList(),
+                  onChanged: (v) => setLocal(() => gender = v),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue:
+                      _bloodGroups.contains(blood) ? blood : null,
+                  decoration: const InputDecoration(
+                      labelText: 'Blood group', isDense: true),
+                  items: _bloodGroups
+                      .map((g) =>
+                          DropdownMenuItem(value: g, child: Text(g)))
+                      .toList(),
+                  onChanged: (v) => setLocal(() => blood = v),
+                ),
+                const SizedBox(height: 12),
+                RTextField(
+                    label: 'Allergies',
+                    hint: 'e.g. Penicillin, peanuts',
+                    controller: allergies),
+                const SizedBox(height: 12),
+                RTextField(
+                    label: 'Chronic conditions',
+                    hint: 'e.g. Diabetes, asthma',
+                    controller: conditions),
+                if (error != null) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(error!,
+                        style: TextStyle(
+                            color: Theme.of(ctx).colorScheme.error,
+                            fontSize: 13)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            RButton(
+              label: existing == null ? 'Add' : 'Save',
+              small: true,
+              onPressed: () {
+                if (name.text.trim().isEmpty) {
+                  setLocal(() => error = 'Please enter a name.');
+                  return;
+                }
+                if (relation.text.trim().isEmpty) {
+                  setLocal(
+                      () => error = 'Please enter the relation.');
+                  return;
+                }
+                if (dob == null && existing?.dateOfBirth == null) {
+                  setLocal(() =>
+                      error = 'Please pick a date of birth.');
+                  return;
+                }
+                final chosenDob = dob ?? existing?.dateOfBirth;
+                if (existing != null) {
+                  state.updateFamilyMember(
+                    id: existing.id,
+                    name: name.text.trim(),
+                    relation: relation.text.trim(),
+                    age: existing.age,
+                    dateOfBirth: chosenDob,
+                    gender: gender,
+                    bloodGroup: blood,
+                    allergies: allergies.text,
+                    chronicConditions: conditions.text,
+                  );
+                } else {
+                  state.addFamilyMember(
+                    name: name.text.trim(),
+                    relation: relation.text.trim(),
+                    age: chosenDob != null
+                        ? FamilyMember.ageFromDob(chosenDob)
+                        : 0,
+                    dateOfBirth: chosenDob,
+                    gender: gender,
+                    bloodGroup: blood,
+                    allergies: allergies.text,
+                    chronicConditions: conditions.text,
+                  );
+                }
+                Navigator.pop(context);
+              },
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          RButton(
-            label: existing == null ? 'Add' : 'Save',
-            small: true,
-            onPressed: () {
-              if (name.text.trim().isEmpty) return;
-              final rel = relation.text.trim().isEmpty
-                  ? 'Family'
-                  : relation.text.trim();
-              final yrs = int.tryParse(age.text) ?? 30;
-              if (existing != null) {
-                state.updateFamilyMember(
-                  id: existing.id,
-                  name: name.text.trim(),
-                  relation: rel,
-                  age: yrs,
-                );
-              } else {
-                state.addFamilyMember(
-                  name: name.text.trim(),
-                  relation: rel,
-                  age: yrs,
-                );
-              }
-              Navigator.pop(context);
-            },
-          ),
-        ],
       ),
     );
   }

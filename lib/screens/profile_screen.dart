@@ -24,7 +24,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _address = TextEditingController();
+  final _upi = TextEditingController();
   String _gender = 'Male';
+  DateTime? _dob;
+  String _languageSel = 'English';
   bool _loaded = false;
   bool _showPassword = false;
   bool _locating = false;
@@ -35,6 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _email.dispose();
     _phone.dispose();
     _address.dispose();
+    _upi.dispose();
     super.dispose();
   }
 
@@ -157,6 +161,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _phone.text = state.userPhone ?? '';
       _address.text = state.userAddress ?? '';
       _gender = state.gender.isNotEmpty ? state.gender : 'Male';
+      _dob = state.dateOfBirth;
+      _languageSel = state.language;
+      _upi.text = state.patientUpiId;
       _loaded = true;
     }
     final scheme = Theme.of(context).colorScheme;
@@ -337,6 +344,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               _genderOption('Other', Icons.person_outline),
                             ],
                           ),
+                          const SizedBox(height: 18),
+                          // Date of birth, language and UPI ID —
+                          // all three live on profiles but had no
+                          // editor after signup (audit Patient 20).
+                          Row(
+                            children: [
+                              Icon(Icons.cake_outlined,
+                                  size: 14, color: scheme.primary),
+                              const SizedBox(width: 6),
+                              const Text('Date of Birth',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_month_outlined,
+                                  size: 18),
+                              label: Text(_dob == null
+                                  ? 'Select date of birth'
+                                  : '${_dob!.day}/${_dob!.month}/${_dob!.year}'),
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _dob ??
+                                      DateTime.now().subtract(
+                                          const Duration(days: 365 * 25)),
+                                  firstDate: DateTime(1920),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (picked != null) {
+                                  setState(() => _dob = picked);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          DropdownButtonFormField<String>(
+                            initialValue:
+                                AppState.languageCodes
+                                        .containsKey(_languageSel)
+                                    ? _languageSel
+                                    : 'English',
+                            decoration: const InputDecoration(
+                              labelText: 'Preferred Language',
+                              isDense: true,
+                            ),
+                            items: AppState.languageCodes.keys
+                                .map((l) => DropdownMenuItem(
+                                    value: l, child: Text(l)))
+                                .toList(),
+                            onChanged: (v) => setState(
+                                () => _languageSel = v ?? 'English'),
+                          ),
+                          const SizedBox(height: 18),
+                          RTextField(
+                            label: 'UPI ID (for refunds)',
+                            labelIcon: Icons.account_balance_wallet_outlined,
+                            hint: 'yourname@upi',
+                            controller: _upi,
+                          ),
                         ],
                       ),
                     ),
@@ -402,6 +473,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 12),
                           RTextField(
+                            label: 'Address',
                             hint:
                                 'Enter your address or use GPS to auto-detect...',
                             controller: _address,
@@ -532,6 +604,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           phone: _phone.text.trim(),
                           address: _address.text.trim(),
                           gender: _gender,
+                          dateOfBirth: _dob,
+                          language: _languageSel,
+                          upiId: _upi.text.trim(),
                         );
                         if (!context.mounted) return;
                         setState(() {});

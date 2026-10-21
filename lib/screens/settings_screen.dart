@@ -233,7 +233,7 @@ class SettingsScreen extends StatelessWidget {
                             'How we use it: only to provide the service — showing your bookings and orders to the doctor, hospital, lab or pharmacy you booked with, arranging delivery, and letting you manage your health records in the app.\n\n'
                             'Sharing: we share the details of a specific booking or order with that provider so they can serve you. We do not sell your personal or health data, and we do not share it for advertising.\n\n'
                             'Storage: account and booking data is stored with our backend provider (Supabase). Some records — uploaded reports, health readings, medical-history facts, addresses, reminders and your cart — are stored only on your device and are removed from the device when you log out.\n\n'
-                            'Your choices: you can edit or delete your addresses, family members, health facts, readings, reminders, uploaded reports and notifications inside the app at any time, and you can permanently delete your account from Settings.\n\n'
+                            'Your choices: you can edit or delete your addresses, family members, health facts, readings, reminders, uploaded reports and notifications inside the app at any time, and you can permanently delete your account from My Profile → Danger Zone.\n\n'
                             'Questions: reach us any time from Help & Support in Settings.')),
                     _linkData(
                         context,

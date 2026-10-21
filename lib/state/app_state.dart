@@ -57,6 +57,12 @@ class AppState extends ChangeNotifier {
   // prefill. Empty until the profile actually carries one.
   String _address = '';
 
+  /// Profile extras (audit Patient 20): date of birth and the
+  /// patient's own UPI ID (for refunds) — both live on profiles
+  /// but had no patient UI after signup.
+  DateTime? _dob;
+  String _patientUpiId = '';
+
   User? _supaUser;
 
   /// The signed-in Supabase user id, or null.
@@ -252,6 +258,26 @@ class AppState extends ChangeNotifier {
   String get phone => _phone;
   String get gender => _gender;
   String get address => _address;
+  DateTime? get dateOfBirth => _dob;
+  String get patientUpiId => _patientUpiId;
+
+  /// profiles.language stores a code ('en'); the UI shows names.
+  static const languageCodes = {
+    'English': 'en',
+    'Hindi': 'hi',
+    'Urdu': 'ur',
+    'Kashmiri': 'ks',
+  };
+
+  static String languageNameForCode(String code) {
+    for (final e in languageCodes.entries) {
+      if (e.value == code) return e.key;
+    }
+    return code.isEmpty ? 'English' : code;
+  }
+
+  static String languageCodeForName(String name) =>
+      languageCodes[name] ?? 'en';
 
   void markOnboardingSeen() {
     _seenOnboarding = true;
@@ -843,6 +869,8 @@ class AppState extends ChangeNotifier {
     // survive restarts and the tracker shows real records.
     unawaited(loadMyReviews());
     unawaited(loadMyRefunds());
+    // Own reminders from health_reminders (audit Patient 14).
+    unawaited(loadRemindersFromBackend());
     final prof = await _repo.fetchProfile();
     if (prof != null) {
       final n = '${prof['full_name'] ?? ''}';
@@ -865,6 +893,19 @@ class AppState extends ChangeNotifier {
         _emailNotif = np['email'] != false;
         _pushNotif = np['push'] != false;
       }
+      // Date of birth, language and the patient's own UPI ID
+      // round-trip too (form-pages audit Patient 20: none of the
+      // three could be viewed or edited after signup).
+      final dobRaw = '${prof['date_of_birth'] ?? ''}';
+      if (dobRaw.isNotEmpty && dobRaw != 'null') {
+        _dob = DateTime.tryParse(dobRaw);
+      }
+      final langCode = '${prof['language'] ?? ''}';
+      if (langCode.isNotEmpty && langCode != 'null') {
+        _language = languageNameForCode(langCode);
+      }
+      final pupi = '${prof['upi_id'] ?? ''}';
+      if (pupi.isNotEmpty && pupi != 'null') _patientUpiId = pupi;
     }
     // Signup-completion gate (see RootGate): a session whose profile
     // has no name anywhere never finished signup Step 2.
@@ -1130,20 +1171,22 @@ class AppState extends ChangeNotifier {
   }
 
   FamilyMember _familyFromRow(Map<String, dynamic> r) {
-    var age = 0;
-    final dob = '${r['date_of_birth'] ?? ''}';
+    DateTime? dob;
     try {
-      if (dob.isNotEmpty) {
-        final d = DateTime.parse(dob);
-        age = DateTime.now().year - d.year;
-      }
+      final raw = '${r['date_of_birth'] ?? ''}';
+      if (raw.isNotEmpty && raw != 'null') dob = DateTime.parse(raw);
     } catch (_) {}
     return FamilyMember(
       id: '${r['id']}',
       name: '${r['name'] ?? ''}',
       relation: '${r['relationship'] ?? ''}',
-      age: age,
+      age: dob != null ? FamilyMember.ageFromDob(dob) : 0,
       reason: r['reason']?.toString(),
+      dateOfBirth: dob,
+      gender: _strOrNull(r['gender']),
+      bloodGroup: _strOrNull(r['blood_group']),
+      allergies: _strOrNull(r['allergies']),
+      chronicConditions: _strOrNull(r['chronic_conditions']),
     );
   }
 
@@ -1292,6 +1335,11 @@ class AppState extends ChangeNotifier {
   void setLanguage(String v) {
     _language = v;
     notifyListeners();
+    // Persist the code to profiles.language (audit Patient 20:
+    // the language choice was memory-only).
+    if (_supaUser != null) {
+      unawaited(_repo.saveProfile({'language': languageCodeForName(v)}));
+    }
   }
 
   void setMaintenanceMode(bool v) {
@@ -1744,7 +1792,12 @@ class AppState extends ChangeNotifier {
     String? prescriptionUrl,
   }) {
     final subtotal = cartSubtotal;
-    final deliveryFee = subtotal >= 499 ? 0.0 : 30.0;
+    // One delivery rule for both checkouts (audit Patient 25):
+    // the admin-configured fee + free-delivery threshold — the
+    // cart used to hardcode ₹30 / free above ₹500 while the
+    // Remedoo checkout used the configured values.
+    final deliveryFee =
+        subtotal >= freeDeliveryThreshold ? 0.0 : this.deliveryFee;
     final pharmacyId = cartPharmacyId;
     final order = MedOrder(
       id: 'R${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
@@ -1881,23 +1934,71 @@ class AppState extends ChangeNotifier {
 
   final List<FamilyMember> family = [];
 
+  /// The full family_members payload for add/edit (audit Patient
+  /// 9): every column the form collects is written, so the record
+  /// — including age, via date_of_birth — survives a reload.
+  static Map<String, dynamic> familyPayload({
+    required String name,
+    required String relation,
+    DateTime? dateOfBirth,
+    String? gender,
+    String? bloodGroup,
+    String? allergies,
+    String? chronicConditions,
+  }) {
+    String? clean(String? v) {
+      final t = (v ?? '').trim();
+      return t.isEmpty ? null : t;
+    }
+
+    return {
+      'name': name,
+      'relationship': relation,
+      if (dateOfBirth != null)
+        'date_of_birth': dateOfBirth.toIso8601String().substring(0, 10),
+      'gender': clean(gender),
+      'blood_group': clean(bloodGroup),
+      'allergies': clean(allergies),
+      'chronic_conditions': clean(chronicConditions),
+    };
+  }
+
   void addFamilyMember({
     required String name,
     required String relation,
     required int age,
+    DateTime? dateOfBirth,
+    String? gender,
+    String? bloodGroup,
+    String? allergies,
+    String? chronicConditions,
   }) {
     final member = FamilyMember(
       id: 'F${DateTime.now().millisecondsSinceEpoch}',
       name: name,
       relation: relation,
-      age: age,
+      age: dateOfBirth != null
+          ? FamilyMember.ageFromDob(dateOfBirth)
+          : age,
+      dateOfBirth: dateOfBirth,
+      gender: gender,
+      bloodGroup: bloodGroup,
+      allergies: allergies,
+      chronicConditions: chronicConditions,
     );
     family.add(member);
     if (_supaUser != null) {
-      _repo.addFamilyMember({
-        'name': name,
-        'relationship': relation,
-      }).then((remoteId) {
+      _repo
+          .addFamilyMember(familyPayload(
+        name: name,
+        relation: relation,
+        dateOfBirth: dateOfBirth,
+        gender: gender,
+        bloodGroup: bloodGroup,
+        allergies: allergies,
+        chronicConditions: chronicConditions,
+      ))
+          .then((remoteId) {
         if (remoteId != null) _remoteFamilyIds[member.id] = remoteId;
       });
     }
@@ -1912,15 +2013,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Edits a family member in place (audit fix 2026-10-19 — the
-  /// list previously offered add/delete only). Age is a local-only
-  /// field, matching how add works (the backend row stores name +
-  /// relationship).
+  /// Edits a family member in place, writing the full record
+  /// (audit Patient 9 — the write path used to send name +
+  /// relationship only).
   void updateFamilyMember({
     required String id,
     required String name,
     required String relation,
     required int age,
+    DateTime? dateOfBirth,
+    String? gender,
+    String? bloodGroup,
+    String? allergies,
+    String? chronicConditions,
   }) {
     final i = family.indexWhere((f) => f.id == id);
     if (i < 0) return;
@@ -1928,14 +2033,28 @@ class AppState extends ChangeNotifier {
       id: id,
       name: name,
       relation: relation,
-      age: age,
+      age: dateOfBirth != null
+          ? FamilyMember.ageFromDob(dateOfBirth)
+          : age,
       reason: family[i].reason,
+      dateOfBirth: dateOfBirth ?? family[i].dateOfBirth,
+      gender: gender,
+      bloodGroup: bloodGroup,
+      allergies: allergies,
+      chronicConditions: chronicConditions,
     );
     if (_supaUser != null) {
-      unawaited(_repo.updateFamilyMember(_remoteFamilyIds[id] ?? id, {
-        'name': name,
-        'relationship': relation,
-      }));
+      unawaited(_repo.updateFamilyMember(
+          _remoteFamilyIds[id] ?? id,
+          familyPayload(
+            name: name,
+            relation: relation,
+            dateOfBirth: family[i].dateOfBirth,
+            gender: gender,
+            bloodGroup: bloodGroup,
+            allergies: allergies,
+            chronicConditions: chronicConditions,
+          )));
     }
     notifyListeners();
   }
@@ -1946,17 +2065,128 @@ class AppState extends ChangeNotifier {
 
   final List<Reminder> reminders = [];
 
+  /// Local reminder id → health_reminders row id.
+  final Map<String, String> _remoteReminderIds = {};
+
+  /// UI repeat vocabulary ↔ health_reminders.recurrence
+  /// (audit Patient 14: the two vocabularies were mismatched and
+  /// the table was never used at all).
+  static String reminderDbRecurrence(String uiRepeat) {
+    switch (uiRepeat) {
+      case 'Weekly':
+        return 'weekly';
+      case 'Once':
+        return 'none';
+      default:
+        return 'daily';
+    }
+  }
+
+  static String reminderUiRepeat(String? dbRecurrence) {
+    switch (dbRecurrence) {
+      case 'weekly':
+        return 'Weekly';
+      case 'none':
+      case 'once':
+        return 'Once';
+      default:
+        return 'Daily';
+    }
+  }
+
+  /// '9:05 PM' / '21:05' / '09:00' → 'HH:MM:00' for the TIME
+  /// column; null when the label can't be parsed.
+  static String? reminderDbTime(String label) {
+    final t = label.trim().toUpperCase();
+    final m =
+        RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)?$').firstMatch(t);
+    if (m == null) return null;
+    var h = int.parse(m.group(1)!);
+    final min = int.parse(m.group(2)!);
+    final ap = m.group(3);
+    if (ap == 'PM' && h < 12) h += 12;
+    if (ap == 'AM' && h == 12) h = 0;
+    if (h > 23 || min > 59) return null;
+    return '${h.toString().padLeft(2, '0')}:'
+        '${min.toString().padLeft(2, '0')}:00';
+  }
+
+  /// 'HH:MM:SS' from the TIME column → friendly 'h:MM AM/PM'.
+  static String reminderLabelFromDbTime(String? t) {
+    if (t == null || t.isEmpty) return '09:00 AM';
+    final parts = t.split(':');
+    final h = int.tryParse(parts.first) ?? 9;
+    final min = parts.length > 1 ? parts[1].padLeft(2, '0') : '00';
+    final ap = h >= 12 ? 'PM' : 'AM';
+    final h12 = h % 12 == 0 ? 12 : h % 12;
+    return '$h12:$min $ap';
+  }
+
+  static Map<String, dynamic> _reminderPayload(Reminder r) => {
+        'title': r.title,
+        'description': r.notes.isEmpty ? null : r.notes,
+        'reminder_date': r.date.toIso8601String().substring(0, 10),
+        'reminder_time': reminderDbTime(r.timeLabel),
+        'recurrence': reminderDbRecurrence(r.repeat),
+        'type': 'medicine',
+        'is_completed': r.done,
+      };
+
+  /// Reloads reminders from health_reminders and merges them with
+  /// any device-only entries, so reminders follow the account
+  /// across devices (audit Patient 14). The device copy stays as
+  /// the offline cache.
+  Future<void> loadRemindersFromBackend() async {
+    if (_supaUser == null) return;
+    final rows = await _repo.fetchReminders();
+    if (rows.isEmpty) return;
+    final previouslySynced = {..._remoteReminderIds};
+    final fromBackend = <Reminder>[];
+    _remoteReminderIds.clear();
+    for (final r in rows) {
+      final id = '${r['id']}';
+      DateTime date;
+      try {
+        date = DateTime.parse('${r['reminder_date']}');
+      } catch (_) {
+        date = DateTime.now();
+      }
+      fromBackend.add(Reminder(
+        id: id,
+        title: '${r['title'] ?? ''}',
+        date: date,
+        timeLabel: reminderLabelFromDbTime('${r['reminder_time'] ?? ''}'),
+        notes: '${r['description'] ?? ''}',
+        repeat: reminderUiRepeat('${r['recurrence'] ?? ''}'),
+        done: r['is_completed'] == true,
+      ));
+      _remoteReminderIds[id] = id;
+    }
+    final backendIds = fromBackend.map((e) => e.id).toSet();
+    final localOnly = reminders
+        .where((e) =>
+            !backendIds.contains(e.id) &&
+            !previouslySynced.containsKey(e.id))
+        .toList();
+    reminders
+      ..clear()
+      ..addAll([...fromBackend, ...localOnly]);
+    notifyListeners();
+    unawaited(_persistReminders());
+  }
+
   List<Reminder> get upcomingReminders =>
       reminders.where((r) => !r.done).toList();
   List<Reminder> get completedReminders =>
       reminders.where((r) => r.done).toList();
 
   /// Adds a reminder. Reminders persist on-device like the other
-  /// patient datasets (audit fix 2026-10-19) — they previously
-  /// vanished on reload, and the chosen [repeat] was discarded by
-  /// callers stuffing it into notes. There is no push-notification
-  /// scheduler in the stack, so reminders surface in-app (list +
-  /// due-today section) only; nothing here claims otherwise.
+  /// patient datasets (audit fix 2026-10-19) AND write through to
+  /// the health_reminders table when signed in (audit Patient 14)
+  /// — the table was previously ignored entirely. There is no
+  /// push-notification scheduler in the stack, so reminders
+  /// surface in-app (list + due-today section) only; nothing here
+  /// claims otherwise.
   void addReminder({
     required String title,
     required DateTime date,
@@ -1964,16 +2194,22 @@ class AppState extends ChangeNotifier {
     required String notes,
     String repeat = 'Daily',
   }) {
-    reminders.add(Reminder(
+    final reminder = Reminder(
       id: 'R${DateTime.now().millisecondsSinceEpoch}',
       title: title,
       date: date,
       timeLabel: timeLabel,
       notes: notes,
       repeat: repeat,
-    ));
+    );
+    reminders.add(reminder);
     notifyListeners();
     unawaited(_persistReminders());
+    if (_supaUser != null) {
+      _repo.createReminder(_reminderPayload(reminder)).then((remoteId) {
+        if (remoteId != null) _remoteReminderIds[reminder.id] = remoteId;
+      });
+    }
   }
 
   void updateReminder(
@@ -1998,6 +2234,11 @@ class AppState extends ChangeNotifier {
     );
     notifyListeners();
     unawaited(_persistReminders());
+    final remoteId = _remoteReminderIds[id] ?? id;
+    if (_supaUser != null) {
+      unawaited(
+          _repo.updateReminderRow(remoteId, _reminderPayload(reminders[i])));
+    }
   }
 
   void toggleReminder(String id) {
@@ -2006,12 +2247,23 @@ class AppState extends ChangeNotifier {
     r.done = !r.done;
     notifyListeners();
     unawaited(_persistReminders());
+    if (_supaUser != null) {
+      unawaited(_repo.updateReminderRow(_remoteReminderIds[id] ?? id, {
+        'is_completed': r.done,
+        'completed_at':
+            r.done ? DateTime.now().toUtc().toIso8601String() : null,
+      }));
+    }
   }
 
   void deleteReminder(String id) {
     reminders.removeWhere((r) => r.id == id);
     notifyListeners();
     unawaited(_persistReminders());
+    if (_supaUser != null) {
+      unawaited(_repo.deleteReminderRow(_remoteReminderIds[id] ?? id));
+      _remoteReminderIds.remove(id);
+    }
   }
 
   Future<void> _persistReminders() async {
@@ -3014,10 +3266,19 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> updateProfile(
-      {String? name, String? phone, String? address, String? gender}) async {
+      {String? name,
+      String? phone,
+      String? address,
+      String? gender,
+      DateTime? dateOfBirth,
+      String? language,
+      String? upiId}) async {
     if (name != null) _name = name;
     if (phone != null) _phone = phone;
     if (address != null) _address = address;
+    if (dateOfBirth != null) _dob = dateOfBirth;
+    if (language != null && language.isNotEmpty) _language = language;
+    if (upiId != null) _patientUpiId = upiId;
     // Gender used to be selectable in the UI but never saved
     // (audit fix 2026-10-19); profiles.gender exists in the
     // backend, so it now round-trips like the other fields.
@@ -3032,6 +3293,15 @@ class AppState extends ChangeNotifier {
     // exists (schema_part_03) and now round-trips.
     if (address != null) fields['address'] = address;
     if (gender != null && gender.isNotEmpty) fields['gender'] = gender;
+    // DOB / language / UPI round-trip too (audit Patient 20).
+    if (dateOfBirth != null) {
+      fields['date_of_birth'] =
+          dateOfBirth.toIso8601String().substring(0, 10);
+    }
+    if (language != null && language.isNotEmpty) {
+      fields['language'] = languageCodeForName(language);
+    }
+    if (upiId != null) fields['upi_id'] = upiId;
     if (fields.isNotEmpty) {
       saved = await _repo.saveProfile(fields);
     }
@@ -3284,6 +3554,33 @@ class AppState extends ChangeNotifier {
   // ---------- SOS alerts ----------
 
   final List<SosAlert> sosAlerts = [];
+
+  /// Records an SOS the patient just raised (audit Patient 17):
+  /// a local alert for any in-app surface plus the real
+  /// emergency_requests row (with coordinates when available) so
+  /// the admin Emergency board sees it. Fire-and-forget — the
+  /// emergency call itself never waits on this.
+  void reportSos({double? latitude, double? longitude}) {
+    sosAlerts.insert(
+      0,
+      SosAlert(
+        id: 'SOS${DateTime.now().millisecondsSinceEpoch}',
+        name: userName,
+        phone: phone,
+        location: latitude != null && longitude != null
+            ? '$latitude, $longitude'
+            : '',
+        time: DateTime.now(),
+      ),
+    );
+    notifyListeners();
+    if (_supaUser != null) {
+      unawaited(_repo.createEmergencyRequest(
+        latitude: latitude,
+        longitude: longitude,
+      ));
+    }
+  }
 
   void setSosStatus(String id, String status) {
     sosAlerts.where((a) => a.id == id).firstOrNull?.status = status;

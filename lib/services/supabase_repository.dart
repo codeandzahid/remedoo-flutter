@@ -106,6 +106,7 @@ class SupabaseRepository {
       upiId: r['upi_id']?.toString(),
       payInClinicEnabled: r['pay_in_clinic_enabled'] == true,
       upiEnabled: r['upi_enabled'] == true,
+      fee: (r['consultation_fee'] as num?)?.toDouble() ?? 0,
       phone: '${r['phone'] ?? ''}',
       emergencyContact: '${r['emergency_contact'] ?? ''}',
     );
@@ -1295,6 +1296,76 @@ class SupabaseRepository {
     }
   }
 
+  // --------------------------------------------------------------- reminders
+
+  /// Health reminders (schema_part_04): reminders used to be
+  /// device-local only (audit Patient 14). These mirror the family
+  /// methods so AppState can write through and reload.
+  Future<List<Map<String, dynamic>>> fetchReminders() async {
+    final uid = _uid;
+    if (!_ready || uid == null) return const [];
+    try {
+      final rows = await _db
+          .from('health_reminders')
+          .select()
+          .eq('user_id', uid)
+          .order('reminder_date');
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchReminders failed: $e');
+      return const [];
+    }
+  }
+
+  Future<String?> createReminder(Map<String, dynamic> fields) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return null;
+    try {
+      final rows = await _db
+          .from('health_reminders')
+          .insert({'user_id': uid, ...fields})
+          .select('id');
+      if (rows.isNotEmpty) return '${rows.first['id']}';
+      return null;
+    } catch (e) {
+      debugPrint('createReminder failed: $e');
+      return null;
+    }
+  }
+
+  Future<bool> updateReminderRow(
+      String id, Map<String, dynamic> fields) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return false;
+    try {
+      await _db
+          .from('health_reminders')
+          .update(fields)
+          .eq('id', id)
+          .eq('user_id', uid);
+      return true;
+    } catch (e) {
+      debugPrint('updateReminderRow failed: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteReminderRow(String id) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return false;
+    try {
+      await _db
+          .from('health_reminders')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', uid);
+      return true;
+    } catch (e) {
+      debugPrint('deleteReminderRow failed: $e');
+      return false;
+    }
+  }
+
   // ------------------------------------------------------------------ themes
 
   /// Fetches theme pack availability (admin-controlled). Rows carry
@@ -2265,6 +2336,32 @@ class SupabaseRepository {
     } catch (e) {
       debugPrint('updateRefund failed: $e');
       return false;
+    }
+  }
+
+  /// Creates an emergency_requests row for the signed-in patient
+  /// (form-pages audit Patient 17: SOS used to only dial — no
+  /// backend record was ever created, so the admin Emergency
+  /// board and ambulance assignment never saw the request).
+  /// Coordinates ride along when the device provided them.
+  Future<String?> createEmergencyRequest({
+    double? latitude,
+    double? longitude,
+  }) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return null;
+    try {
+      final rows = await _db.from('emergency_requests').insert({
+        'patient_id': uid,
+        'status': 'pending',
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+      }).select('id');
+      if (rows.isNotEmpty) return '${rows.first['id']}';
+      return null;
+    } catch (e) {
+      debugPrint('createEmergencyRequest failed: $e');
+      return null;
     }
   }
 
