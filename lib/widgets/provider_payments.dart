@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/supabase_repository.dart';
 import '../theme.dart';
 import '../utils/refunds.dart';
+import 'route_onboarding_sheet.dart';
 import 'widgets.dart';
 
 /// Shared email-OTP gate: sends a 6-digit code to the signed-in
@@ -41,26 +42,31 @@ Future<bool> requireEmailOtp(
     barrierDismissible: false,
     builder: (ctx) => AlertDialog(
       title: Text(title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
+      // Scrollable: on small screens / large text the fixed
+      // column overflowed (audit Panelist 22, suspected —
+      // verified: AlertDialog never scrolls its content).
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-          Text(
-            'We sent a 6-digit code to $email. $message',
-            style: const TextStyle(fontSize: 13.5),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: ctrl,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: '6-digit code',
-              border: OutlineInputBorder(),
-              counterText: '',
+            Text(
+              'We sent a 6-digit code to $email. $message',
+              style: const TextStyle(fontSize: 13.5),
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: '6-digit code',
+                border: OutlineInputBorder(),
+                counterText: '',
+              ),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -464,6 +470,49 @@ class _ProviderUpiSettingsCardState extends State<ProviderUpiSettingsCard> {
             onPressed: _saving ? null : _save,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Entry point to the Razorpay Route bank-details sheet from
+/// the provider's own app (form-pages audit Panelist 14: the
+/// sheet existed but was only reachable from an admin screen, so
+/// providers could never start their own onboarding). LINKING
+/// ONLY — Razorpay stays the inactive gateway; Remedoo Pay
+/// (provider UPI) remains how patients actually pay.
+class RouteOnboardingTile extends StatelessWidget {
+  final String providerType;
+  final String providerId;
+  final String providerName;
+
+  const RouteOnboardingTile({
+    super.key,
+    required this.providerType,
+    required this.providerId,
+    required this.providerName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RCard(
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.account_balance_outlined),
+        title: const Text('Bank account for payouts',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: const Text(
+            'Optional: add bank details for split payouts (Route). '
+            'Day-to-day patient payments use your UPI above.'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: providerId.isEmpty
+            ? null
+            : () => showRouteOnboarding(
+                  context,
+                  providerType: providerType,
+                  providerId: providerId,
+                  providerName: providerName,
+                ),
       ),
     );
   }

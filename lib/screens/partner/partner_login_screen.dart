@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import '../../services/auth_service.dart';
-import '../../services/supabase_config.dart';
 import '../../state/app_state.dart';
+import '../forgot_password_screen.dart';
+import '../provider_type_screen.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
 
@@ -25,7 +25,6 @@ class _PartnerLoginScreenState extends State<PartnerLoginScreen> {
   bool _obscure = true;
   bool _busy = false;
   String? _error;
-  String? _diag;
 
   static const _providerRoles = {'doctor', 'pharmacy', 'lab', 'hospital'};
 
@@ -34,36 +33,6 @@ class _PartnerLoginScreenState extends State<PartnerLoginScreen> {
     _email.dispose();
     _password.dispose();
     super.dispose();
-  }
-
-  Future<void> _testConnection() async {
-    setState(() {
-      _diag = 'Testing…';
-      _error = null;
-    });
-    final sb = StringBuffer();
-    try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 10);
-      final req = await client.headUrl(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/'));
-      req.headers.set('apikey', 'test');
-      final resp =
-          await req.close().timeout(const Duration(seconds: 10));
-      sb.writeln('Internet: OK (server replied ${resp.statusCode})');
-      client.close();
-    } catch (e) {
-      sb.writeln('Internet: FAILED');
-      sb.writeln('$e'.split('\n').first);
-    }
-    try {
-      final inited = AuthService.instance.isInitialized;
-      sb.writeln(
-          'App backend: ${inited ? 'ready' : 'NOT ready — restart app'}');
-    } catch (_) {
-      sb.writeln('App backend: error');
-    }
-    if (mounted) setState(() => _diag = sb.toString().trim());
   }
 
   Future<void> _signIn() async {
@@ -86,7 +55,7 @@ class _PartnerLoginScreenState extends State<PartnerLoginScreen> {
       setState(() {
         _busy = false;
         _error =
-            'Connection timed out. Check your internet and tap Test Connection below.';
+            'Connection timed out. Check your internet and try again.';
       });
       return;
     }
@@ -224,34 +193,42 @@ class _PartnerLoginScreenState extends State<PartnerLoginScreen> {
                             onPressed: _busy ? null : _signIn,
                           ),
                           const SizedBox(height: 8),
-                          TextButton(
-                            onPressed:
-                                _busy ? null : _testConnection,
-                            child: const Text(
-                              'Test Connection',
-                              style: TextStyle(fontSize: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const ForgotPasswordScreen()),
+                                      ),
+                              child: const Text(
+                                'Forgot password?',
+                                style: TextStyle(fontSize: 12.5),
+                              ),
                             ),
                           ),
-                          if (_diag != null) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: scheme.primary
-                                    .withValues(alpha: 0.08),
-                                borderRadius:
-                                    BorderRadius.circular(10),
-                              ),
-                              child: Text(_diag!,
-                                  style: TextStyle(
-                                      color: scheme.onSurface,
-                                      fontSize: 12)),
-                            ),
-                          ],
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                const ProviderTypeScreen()),
+                      ),
+                      child: const Text(
+                        'New provider? Register here',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       'Only approved providers can sign in here.',
                       textAlign: TextAlign.center,

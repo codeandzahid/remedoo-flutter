@@ -7,6 +7,7 @@ import '../../theme.dart';
 import '../../utils/working_hours.dart';
 import '../../widgets/prescription_form.dart';
 import '../../widgets/provider_payments.dart';
+import '../../widgets/upi_setup_dialog.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/working_hours_editor.dart';
 
@@ -23,6 +24,7 @@ class DoctorDashboard extends StatefulWidget {
 class _DoctorDashboardState extends State<DoctorDashboard> {
   int _tab = 0;
   bool _loading = true;
+  bool _upiPromptShown = false;
   String? _error;
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _appointments = [];
@@ -58,6 +60,12 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
       setState(() {
         _error = 'Could not load your data. Pull down to try again.';
         _loading = false;
+      });
+    }
+    if (mounted && !_upiPromptShown) {
+      _upiPromptShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) maybePromptUpiSetup(context, _profile);
       });
     }
   }
@@ -776,6 +784,12 @@ class _PaymentsTab extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         ProviderOnlinePayments(repo: repo),
+        const SizedBox(height: 16),
+        RouteOnboardingTile(
+          providerType: 'doctor',
+          providerId: '${profile?['id'] ?? ''}',
+          providerName: '${profile?['name'] ?? ''}',
+        ),
         const SizedBox(height: 16),
       ],
     );

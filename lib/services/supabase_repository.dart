@@ -670,6 +670,54 @@ class SupabaseRepository {
     }
   }
 
+  /// Uploads one provider registration document to the private
+  /// 'certificates' bucket (audit M5: registration used to keep
+  /// only the file name/size and throw the bytes away, so the
+  /// license_url / gst_url on the approved provider record could
+  /// never be set). Returns the storage path, or null on failure.
+  /// The bucket's policies scope objects to the uploader's own
+  /// folder; admins can read them for review.
+  Future<String?> uploadProviderDocument({
+    required String fileName,
+    required Uint8List bytes,
+  }) async {
+    if (!_ready || _uid == null) return null;
+    try {
+      final ext = fileName.split('.').last.toLowerCase();
+      final contentType = ext == 'pdf'
+          ? 'application/pdf'
+          : 'image/${ext == 'jpg' ? 'jpeg' : ext}';
+      final safeName =
+          fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      final path =
+          '$_uid/registration/${DateTime.now().millisecondsSinceEpoch}_$safeName';
+      await _db.storage.from('certificates').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: contentType),
+          );
+      return path;
+    } catch (e) {
+      debugPrint('uploadProviderDocument failed: $e');
+      return null;
+    }
+  }
+
+  /// Long-lived signed URL for a private-bucket object (admin
+  /// document review, approved-provider license links).
+  Future<String?> signedStorageUrl(String bucket, String path,
+      {int expiresInSeconds = 365 * 24 * 60 * 60}) async {
+    if (!_ready) return null;
+    try {
+      return await _db.storage
+          .from(bucket)
+          .createSignedUrl(path, expiresInSeconds);
+    } catch (e) {
+      debugPrint('signedStorageUrl failed: $e');
+      return null;
+    }
+  }
+
   /// Recent messages across many tickets (newest first) — used for
   /// WhatsApp-style chat lists: last-message previews + unread counts.
   Future<List<Map<String, dynamic>>> fetchMessagesForTickets(
@@ -1854,6 +1902,17 @@ class SupabaseRepository {
           .maybeSingle();
       return res == null ? null : '${res['id']}';
     } catch (e) {
+      // The details column arrives with the
+      // provider_application_details migration; until the owner
+      // applies it, submit without details rather than failing
+      // the whole registration.
+      if (app.containsKey('details')) {
+        debugPrint('submitProviderApplication retrying without '
+            'details: $e');
+        final trimmed = Map<String, dynamic>.from(app)
+          ..remove('details');
+        return submitProviderApplication(trimmed);
+      }
       debugPrint('submitProviderApplication failed: $e');
       return null;
     }
@@ -2564,10 +2623,20 @@ class SupabaseRepository {
   /// Sets the UPI ID on the provider record(s) linked to [userId].
   /// The caller loops the provider tables; returns true if no exception.
   Future<bool> setProviderUpiOnRecord(
-      String table, String userId, String upiId) async {
+      String table, String userId, String upiId,
+      {String? payeeName, bool enable = false}) async {
     if (!_ready) return false;
     try {
-      await _db.from(table).update({'upi_id': upiId}).eq('user_id', userId);
+      await _db.from(table).update({
+        'upi_id': upiId,
+        // The UPI setup dialog promises "patients can now pay
+        // you" (audit Panelist 19) — that is only true when the
+        // record's UPI toggle is actually switched on and the
+        // payee name is stored alongside the ID.
+        if (enable) 'upi_enabled': true,
+        if (payeeName != null && payeeName.isNotEmpty)
+          'upi_payee_name': payeeName,
+      }).eq('user_id', userId);
       return true;
     } catch (e) {
       debugPrint('setProviderUpiOnRecord($table) failed: $e');

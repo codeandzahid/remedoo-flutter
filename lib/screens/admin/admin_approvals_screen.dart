@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../state/app_state.dart';
 import '../../widgets/widgets.dart';
@@ -11,6 +12,53 @@ String _fmtDate(String? iso) {
   } catch (_) {
     return iso;
   }
+}
+
+/// One-line summary of a registration's details JSONB.
+String _detailsSummary(Map details) {
+  final parts = <String>[];
+  if ('${details['specialization'] ?? ''}'.isNotEmpty) {
+    parts.add('${details['specialization']}');
+  }
+  if (details['consultation_fee'] != null) {
+    parts.add('Fee ₹${details['consultation_fee']}');
+  }
+  if (details['experience_years'] != null) {
+    parts.add('${details['experience_years']} yrs exp');
+  }
+  if (details['beds'] != null) {
+    parts.add('${details['beds']} beds');
+  }
+  if (details['icu_available'] == true) parts.add('ICU');
+  final services = details['services'];
+  if (services is List && services.isNotEmpty) {
+    parts.add(services.join(', '));
+  }
+  return parts.join(' • ');
+}
+
+/// Opens one uploaded registration document via a signed URL
+/// into the private certificates bucket. Rows submitted before
+/// real uploads existed have no storage path — say so plainly.
+Future<void> _viewDoc(BuildContext context, AppState state,
+    Map<dynamic, dynamic> doc) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final path = '${doc['path'] ?? ''}';
+  if (path.isEmpty) {
+    messenger.showSnackBar(const SnackBar(
+        content: Text(
+            'This application was submitted before document uploads were stored — ask the provider to re-upload.')));
+    return;
+  }
+  final url = await state.supabaseRepository
+      .signedStorageUrl('certificates', path);
+  if (url == null) {
+    messenger.showSnackBar(const SnackBar(
+        content: Text('Could not open the document. Try again.')));
+    return;
+  }
+  await launchUrl(Uri.parse(url),
+      mode: LaunchMode.externalApplication);
 }
 
 /// Provider applications from Supabase with Approve / Reject.
@@ -160,6 +208,38 @@ class _AdminApprovalsScreenState
                 style: TextStyle(
                     fontSize: 12,
                     color: scheme.onSurfaceVariant)),
+            // Registration details + viewable documents (audit
+            // M5 / Panelist 18: reviewers used to see only a
+            // document COUNT — the files themselves were never
+            // uploaded, and approval dropped every detail).
+            if (a['details'] is Map &&
+                (a['details'] as Map).isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                _detailsSummary(a['details'] as Map),
+                style: TextStyle(
+                    fontSize: 12.5, color: scheme.onSurfaceVariant),
+              ),
+            ],
+            if (docs is List && docs.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final d in docs)
+                    if (d is Map)
+                      ActionChip(
+                        avatar: const Icon(Icons.description_outlined,
+                            size: 16),
+                        label: Text(
+                            '${d['kind'] ?? d['name'] ?? 'Document'}'),
+                        onPressed: () =>
+                            _viewDoc(context, state, d),
+                      ),
+                ],
+              ),
+            ],
             if (pending) ...[
               const SizedBox(height: 12),
               Row(

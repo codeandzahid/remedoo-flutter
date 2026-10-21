@@ -19,6 +19,7 @@ class UpiSetupDialog extends StatefulWidget {
 class _UpiSetupDialogState
     extends State<UpiSetupDialog> {
   final _upiId = TextEditingController();
+  final _upiName = TextEditingController();
   bool _busy = false;
   String? _error;
 
@@ -29,6 +30,7 @@ class _UpiSetupDialogState
   @override
   void dispose() {
     _upiId.dispose();
+    _upiName.dispose();
     super.dispose();
   }
 
@@ -43,8 +45,10 @@ class _UpiSetupDialogState
       _busy = true;
       _error = null;
     });
-    final ok = await AppStateScope.of(context)
-        .saveProviderUpiId(id);
+    final ok = await AppStateScope.of(context).saveProviderUpiId(
+      id,
+      payeeName: _upiName.text.trim(),
+    );
     if (!mounted) return;
     setState(() => _busy = false);
     if (ok) {
@@ -150,6 +154,14 @@ class _UpiSetupDialogState
                       }
                     },
                   ),
+                ),
+                const SizedBox(height: 10),
+                RTextField(
+                  label: 'Name on your UPI account',
+                  hint: 'As it appears in your bank app',
+                  controller: _upiName,
+                  prefixIcon: const Icon(Icons.badge_outlined,
+                      size: 18),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 10),
@@ -258,4 +270,18 @@ Future<bool> showUpiSetupDialog(
     builder: (_) => const UpiSetupDialog(),
   );
   return result ?? false;
+}
+
+/// Partner-app entry point (audit Panelist 19: the setup prompt
+/// only ever appeared inside the patient app, so a provider who
+/// used only the partner app was never asked — and their record
+/// kept upi_enabled off, so patients could not pay them online).
+/// Call after the dashboard loads its own provider record; shows
+/// the dialog only when that record has no UPI ID yet.
+Future<void> maybePromptUpiSetup(
+    BuildContext context, Map<String, dynamic>? profile) async {
+  if (profile == null) return;
+  if ('${profile['upi_id'] ?? ''}'.trim().isNotEmpty) return;
+  if (!context.mounted) return;
+  await showUpiSetupDialog(context);
 }

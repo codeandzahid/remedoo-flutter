@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../data/mock_data.dart' show specialties;
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
@@ -41,12 +44,16 @@ String _roleTitle(String role) {
 /// Maximum document size: 500 KB.
 const _maxDocBytes = 500 * 1024;
 
-/// A required document upload slot.
+/// A required document upload slot. The picked file's BYTES are
+/// kept (audit M5: registration used to record only name/size
+/// and throw the file away, so nothing could ever be reviewed
+/// or linked to the approved provider record).
 class _DocSlot {
   final String label;
   final String hint;
   PlatformFile? file;
   int fileSize = 0;
+  Uint8List? bytes;
 
   _DocSlot({required this.label, required this.hint});
 }
@@ -74,6 +81,15 @@ class _ProviderRegisterScreenState
   final _phone = TextEditingController();
   final _license = TextEditingController();
   final _address = TextEditingController();
+  // Role-specific practice details (audit Panelist 18: approval
+  // used to create a bare record because registration never
+  // collected these).
+  final _fee = TextEditingController();
+  final _experience = TextEditingController();
+  final _beds = TextEditingController();
+  final _services = TextEditingController();
+  String _specialization = specialties.first;
+  bool _icu = false;
   bool _busy = false;
   String? _error;
   bool _emailVerified = false;
@@ -113,6 +129,10 @@ class _ProviderRegisterScreenState
     _phone.dispose();
     _license.dispose();
     _address.dispose();
+    _fee.dispose();
+    _experience.dispose();
+    _beds.dispose();
+    _services.dispose();
     super.dispose();
   }
 
@@ -135,9 +155,13 @@ class _ProviderRegisterScreenState
       );
       return;
     }
+    // Keep the bytes: they are uploaded to storage at submit
+    // time (audit M5).
+    final bytes = await file.xFile.readAsBytes();
     setState(() {
       slot.file = file;
       slot.fileSize = size;
+      slot.bytes = bytes;
     });
   }
 
@@ -178,6 +202,25 @@ class _ProviderRegisterScreenState
       setState(() => _error = 'Address is required.');
       return;
     }
+    // Role-specific practice details are compulsory too
+    // (Panelist 18).
+    final roleCheck = widget.providerType.toLowerCase();
+    if (roleCheck == 'doctor' &&
+        double.tryParse(_fee.text.trim()) == null) {
+      setState(() =>
+          _error = 'Your consultation fee is required.');
+      return;
+    }
+    if (roleCheck == 'hospital' &&
+        int.tryParse(_beds.text.trim()) == null) {
+      setState(() => _error = 'Your total bed count is required.');
+      return;
+    }
+    if (roleCheck == 'lab' && _services.text.trim().isEmpty) {
+      setState(() =>
+          _error = 'List the services / tests you offer.');
+      return;
+    }
     // Validate all documents uploaded.
     for (final d in _docs) {
       if (d.file == null) {
@@ -190,23 +233,72 @@ class _ProviderRegisterScreenState
       _busy = true;
       _error = null;
     });
+    final state = AppStateScope.of(context);
+    final repo = state.supabaseRepository;
+    // Upload the documents for real (audit M5): the bytes go to
+    // the private certificates bucket and the application keeps
+    // the storage paths, so admin can review them and approval
+    // can link them onto the provider record.
+    final docRows = <Map<String, dynamic>>[];
+    for (final d in _docs) {
+      final bytes = d.bytes;
+      if (bytes == null) {
+        setState(() {
+          _busy = false;
+          _error =
+              'Please re-pick: ${d.label.replaceAll(' *', '')}';
+        });
+        return;
+      }
+      final path = await repo.uploadProviderDocument(
+          fileName: d.file?.name ?? 'document', bytes: bytes);
+      if (path == null) {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _error = 'Could not upload '
+              '${d.label.replaceAll(' *', '')}. Check your '
+              'connection and try again.';
+        });
+        return;
+      }
+      docRows.add({
+        'kind': d.label.replaceAll(' *', ''),
+        'name': d.file?.name ?? '',
+        'size': d.fileSize,
+        'path': path,
+      });
+    }
+    // Role-specific details ride in provider_applications.details
+    // and are mapped onto the provider record at approval.
+    final role = widget.providerType.toLowerCase();
+    final details = <String, dynamic>{
+      if (role == 'doctor') ...{
+        'specialization': _specialization,
+        'consultation_fee': double.tryParse(_fee.text.trim()),
+        'experience_years': int.tryParse(_experience.text.trim()),
+      },
+      if (role == 'hospital') ...{
+        'beds': int.tryParse(_beds.text.trim()),
+        'icu_available': _icu,
+      },
+      if (role == 'lab')
+        'services': _services.text
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList(),
+    };
     // Submit to the real backend so the admin panel can review it.
-    final ok = await AppStateScope.of(context)
-        .submitProviderApplicationDb({
+    final ok = await state.submitProviderApplicationDb({
       'provider_type': widget.providerType,
       'name': _name.text.trim(),
       'email': _email.text.trim(),
       'phone': _phone.text.trim(),
       'license_no': _license.text.trim(),
       'address': _address.text.trim(),
-      'documents': [
-        for (final d in _docs)
-          {
-            'kind': d.label.replaceAll(' *', ''),
-            'name': d.file?.name ?? '',
-            'size': d.fileSize,
-          },
-      ],
+      'documents': docRows,
+      'details': details,
     });
     if (!mounted) return;
     setState(() => _busy = false);
@@ -373,6 +465,88 @@ class _ProviderRegisterScreenState
                       ],
                     ),
                     const SizedBox(height: 14),
+                    // Practice details (Panelist 18): collected
+                    // now so approval creates a complete record.
+                    if (widget.providerType.toLowerCase() ==
+                            'doctor' ||
+                        widget.providerType.toLowerCase() ==
+                            'hospital' ||
+                        widget.providerType.toLowerCase() ==
+                            'lab')
+                      _SectionCard(
+                        title: 'Practice Details',
+                        icon: Icons.work_outline,
+                        children: [
+                          if (widget.providerType.toLowerCase() ==
+                              'doctor') ...[
+                            DropdownButtonFormField<String>(
+                              initialValue: _specialization,
+                              decoration: const InputDecoration(
+                                labelText: 'Specialization *',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: [
+                                for (final s in specialties)
+                                  DropdownMenuItem(
+                                      value: s, child: Text(s)),
+                              ],
+                              onChanged: (v) => setState(() =>
+                                  _specialization =
+                                      v ?? _specialization),
+                            ),
+                            const SizedBox(height: 12),
+                            _RequiredField(
+                              label: 'Consultation fee (₹)',
+                              hint: 'e.g. 500',
+                              controller: _fee,
+                              keyboardType: TextInputType.number,
+                              icon: Icons.payments_outlined,
+                            ),
+                            const SizedBox(height: 12),
+                            _RequiredField(
+                              label: 'Years of experience',
+                              hint: 'e.g. 8',
+                              controller: _experience,
+                              keyboardType: TextInputType.number,
+                              icon: Icons.timeline_outlined,
+                            ),
+                          ],
+                          if (widget.providerType.toLowerCase() ==
+                              'hospital') ...[
+                            _RequiredField(
+                              label: 'Total beds',
+                              hint: 'e.g. 120',
+                              controller: _beds,
+                              keyboardType: TextInputType.number,
+                              icon: Icons.bed_outlined,
+                            ),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text(
+                                  'ICU available'),
+                              value: _icu,
+                              onChanged: (v) =>
+                                  setState(() => _icu = v),
+                            ),
+                          ],
+                          if (widget.providerType.toLowerCase() ==
+                              'lab')
+                            _RequiredField(
+                              label: 'Services / tests offered',
+                              hint:
+                                  'Blood Test, X-Ray, MRI — comma separated',
+                              controller: _services,
+                              icon: Icons.science_outlined,
+                            ),
+                        ],
+                      ),
+                    if (widget.providerType.toLowerCase() ==
+                            'doctor' ||
+                        widget.providerType.toLowerCase() ==
+                            'hospital' ||
+                        widget.providerType.toLowerCase() ==
+                            'lab')
+                      const SizedBox(height: 14),
                     // Documents
                     _SectionCard(
                       title: 'Required Documents',

@@ -4,6 +4,8 @@ import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/provider_payments.dart';
+import '../../widgets/provider_profile_form.dart';
+import '../../widgets/upi_setup_dialog.dart';
 import '../../widgets/widgets.dart';
 
 /// Dashboard for logged-in hospitals.
@@ -18,6 +20,7 @@ class HospitalDashboard extends StatefulWidget {
 
 class _HospitalDashboardState extends State<HospitalDashboard> {
   bool _loading = true;
+  bool _upiPromptShown = false;
   String? _error;
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _appointments = [];
@@ -54,6 +57,13 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
       setState(() {
         _error = 'Could not load your data. Pull down to try again.';
         _loading = false;
+      });
+    }
+ 
+    if (mounted && !_upiPromptShown) {
+      _upiPromptShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) maybePromptUpiSetup(context, _profile);
       });
     }
   }
@@ -201,6 +211,13 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
           ),
         ),
         const SizedBox(height: 16),
+        ProviderProfileForm(
+          table: 'hospitals',
+          profile: _profile,
+          repo: _repo,
+          onSaved: _load,
+        ),
+        const SizedBox(height: 16),
         ProviderUpiSettingsCard(
           table: 'hospitals',
           profile: _profile,
@@ -209,6 +226,12 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
         ),
         const SizedBox(height: 16),
         ProviderOnlinePayments(repo: _repo),
+        const SizedBox(height: 16),
+        RouteOnboardingTile(
+          providerType: 'hospital',
+          providerId: '${_profile?['id'] ?? ''}',
+          providerName: '${_profile?['name'] ?? ''}',
+        ),
         const SizedBox(height: 16),
         Row(
           children: [

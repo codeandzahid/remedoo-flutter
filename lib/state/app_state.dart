@@ -2997,13 +2997,71 @@ class AppState extends ChangeNotifier {
         'phone': app['phone'],
         'user_id': app['user_id'],
         'approval_status': 'approved',
-        'admin_note':
-            'License: ${app['license_no'] ?? ''} (via application $id)',
+        // The address lives in the admin note (audit Panelist 18:
+        // it used to be stuffed into doctors.bio, so a doctor's
+        // public "about" text was their street address).
+        'admin_note': 'License: ${app['license_no'] ?? ''} '
+            '(via application $id) • Address: ${app['address'] ?? ''}',
       };
-      if (table == 'doctors') {
-        row['bio'] = app['address'];
-      } else {
+      if (table != 'doctors') {
         row['location'] = app['address'];
+      }
+      // Role-specific details collected at registration
+      // (Panelist 18: specialisation / fee / services / beds now
+      // land on the created record instead of being dropped).
+      final details = app['details'];
+      if (details is Map) {
+        if (table == 'doctors') {
+          if ('${details['specialization'] ?? ''}'.isNotEmpty) {
+            row['specialization'] = details['specialization'];
+          }
+          final fee = (details['consultation_fee'] as num?) ??
+              double.tryParse('${details['consultation_fee'] ?? ''}');
+          if (fee != null) row['consultation_fee'] = fee;
+          final exp = (details['experience_years'] as num?)?.toInt() ??
+              int.tryParse('${details['experience_years'] ?? ''}');
+          if (exp != null) row['experience_years'] = exp;
+        } else if (table == 'hospitals') {
+          final beds = (details['beds'] as num?)?.toInt() ??
+              int.tryParse('${details['beds'] ?? ''}');
+          if (beds != null) {
+            row['total_beds'] = beds;
+            row['beds'] = beds;
+          }
+          if (details['icu_available'] is bool) {
+            row['icu_available'] = details['icu_available'];
+          }
+        } else if (table == 'labs') {
+          final services = details['services'];
+          if (services is List && services.isNotEmpty) {
+            row['services'] = services;
+          }
+        }
+      }
+      // Registration documents (audit M5): the license document
+      // becomes license_url, the rest additional_docs_urls —
+      // long-lived signed URLs into the private certificates
+      // bucket, from the paths captured at submission.
+      final docs = app['documents'];
+      if (docs is List) {
+        String? licenseUrl;
+        final extra = <String>[];
+        for (final d in docs) {
+          if (d is! Map) continue;
+          final path = '${d['path'] ?? ''}';
+          if (path.isEmpty) continue;
+          final url =
+              await _repo.signedStorageUrl('certificates', path);
+          if (url == null) continue;
+          final kind = '${d['kind'] ?? ''}'.toLowerCase();
+          if (licenseUrl == null && kind.contains('license')) {
+            licenseUrl = url;
+          } else {
+            extra.add(url);
+          }
+        }
+        if (licenseUrl != null) row['license_url'] = licenseUrl;
+        if (extra.isNotEmpty) row['additional_docs_urls'] = extra;
       }
       final newId = await _repo.adminUpsert(table, row);
       if (newId == null) return false;
@@ -3295,7 +3353,7 @@ class AppState extends ChangeNotifier {
   /// Saves the provider's UPI ID. Returns true on success.
   /// The UPI ID is stored in the user's profile and on the provider's own
   /// catalog record (so patients paying that provider use the right ID).
-  Future<bool> saveProviderUpiId(String upiId) async {
+  Future<bool> saveProviderUpiId(String upiId, {String? payeeName}) async {
     // Save to profiles table
     final saved = await _repo.saveProfile({'upi_id': upiId});
     if (saved) {
@@ -3305,7 +3363,8 @@ class AppState extends ChangeNotifier {
       final uid = _supaUser?.id;
       if (uid != null) {
         for (final table in _appTypeToTable.values) {
-          await _repo.setProviderUpiOnRecord(table, uid, upiId);
+          await _repo.setProviderUpiOnRecord(table, uid, upiId,
+              payeeName: payeeName, enable: true);
         }
       }
       notifyListeners();
