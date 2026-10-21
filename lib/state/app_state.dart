@@ -14,6 +14,7 @@ import '../services/supabase_repository.dart';
 import '../services/payment_service.dart';
 import '../theme.dart';
 import '../widgets/admin_style.dart';
+import '../widgets/existing_user_lookup.dart';
 
 /// Inherited access to the single AppState for the whole app.
 class AppStateScope extends InheritedNotifier<AppState> {
@@ -2163,6 +2164,32 @@ class AppState extends ChangeNotifier {
 
   /// Whether the signed-in user holds the admin role.
   bool get isAdmin => _isAdmin;
+
+  Future<FormUserRecord?> Function(String value)? _userLookupForTest;
+
+  /// Test-only: replaces the backend patient lookup used by the
+  /// admin/panel form autofill popup (widget tests run without
+  /// Supabase). Pass null to restore the real lookup.
+  @visibleForTesting
+  void debugSetUserLookup(
+          Future<FormUserRecord?> Function(String value)? lookup) =>
+      _userLookupForTest = lookup;
+
+  /// Existing-patient lookup behind the admin/panel form autofill
+  /// popup (owner order, 2026-10-21): a complete email or mobile
+  /// number exactly matching a PATIENT account returns that
+  /// patient's saved form details; anything else — no match, a
+  /// provider/admin/staff account, the RPC not applied yet —
+  /// returns null and no popup is offered. The role gate (caller
+  /// must be admin/staff/provider) and the patient-only rule are
+  /// enforced inside the SECURITY DEFINER RPC itself; see
+  /// supabase/migration/lookup_user_for_form.sql.
+  Future<FormUserRecord?> lookupUserForForm(String value) async {
+    final test = _userLookupForTest;
+    if (test != null) return test(value);
+    final row = await _repo.lookupUserForForm(value);
+    return row == null ? null : FormUserRecord.fromRow(row);
+  }
 
   Future<void> checkAdminRole() async {
     _isAdmin = await _repo.isCurrentUserAdmin();

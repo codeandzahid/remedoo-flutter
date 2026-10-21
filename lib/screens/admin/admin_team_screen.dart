@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/existing_user_lookup.dart';
 import '../../widgets/widgets.dart';
 
 /// Assignable admin sections for staff accounts (key -> label).
@@ -416,7 +417,17 @@ class _CreateStaffDialogState extends State<_CreateStaffDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    // Existing-patient autofill (owner order, 2026-10-21): when the
+    // typed email exactly matches a patient account, offer their
+    // saved details; Fill puts their name into the form.
+    return ExistingUserLookup(
+      trigger: _email,
+      onFill: (record) {
+        if (record.fullName.isNotEmpty) {
+          setState(() => _name.text = record.fullName);
+        }
+      },
+      child: AlertDialog(
       title: const Text('Add staff account'),
       content: SizedBox(
         width: 440,
@@ -484,6 +495,7 @@ class _CreateStaffDialogState extends State<_CreateStaffDialog> {
           child: const Text('Create account'),
         ),
       ],
+      ),
     );
   }
 }

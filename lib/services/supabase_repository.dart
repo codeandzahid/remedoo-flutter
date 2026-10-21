@@ -785,6 +785,37 @@ class SupabaseRepository {
     }
   }
 
+  /// Existing-patient lookup for admin/panel form autofill (owner
+  /// order, 2026-10-21): when an admin or panelist types a complete
+  /// email or mobile number in a form, the `lookup_user_for_form`
+  /// RPC (supabase/migration/lookup_user_for_form.sql) returns the
+  /// matching patient's form details on an exact match, or nothing.
+  ///
+  /// The function is SECURITY DEFINER and enforces both gates in
+  /// the database: the CALLER must hold an admin/staff/provider
+  /// role, and the MATCH is patient accounts only — a provider,
+  /// admin or staff email/mobile returns no row, so panelist data
+  /// is never offered by this feature.
+  ///
+  /// Fails soft: any error (offline, or the migration not applied
+  /// yet) returns null and the form simply never pops up.
+  Future<Map<String, dynamic>?> lookupUserForForm(String value) async {
+    if (!_ready) return null;
+    try {
+      final rows = await _db.rpc(
+        'lookup_user_for_form',
+        params: {'lookup_value': value.trim()},
+      );
+      if (rows is List && rows.isNotEmpty) {
+        return Map<String, dynamic>.from(rows.first as Map);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('lookupUserForForm failed: $e');
+      return null;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> fetchUserTickets() async {
     final uid = _uid;
     if (!_ready || uid == null) return const [];

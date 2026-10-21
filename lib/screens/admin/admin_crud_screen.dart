@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/existing_user_lookup.dart';
 import '../../widgets/widgets.dart';
 
 /// Field types for [AdminField]: 'text', 'int', 'double', 'bool', 'fk'.
@@ -324,7 +325,8 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
     showResponsiveDialog(
       context,
       (_) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
+        builder: (ctx, setD) {
+          final dialog = AlertDialog(
           title: Text(
               '${row == null ? 'Add' : 'Edit'} ${widget.singular}',
               style: const TextStyle(
@@ -453,7 +455,35 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
               },
             ),
           ],
-        ),
+          );
+          // Existing-patient autofill (owner order, 2026-10-21):
+          // when the typed Phone exactly matches a patient account,
+          // ExistingUserLookup offers their saved details; Fill maps
+          // name / phone / address onto the fields these catalog
+          // forms have (address lands in Location where present).
+          // Tables without a phone field (lab tests, medicines)
+          // keep the plain dialog.
+          final phoneCtrl = ctrls['phone'];
+          if (phoneCtrl == null) return dialog;
+          return ExistingUserLookup(
+            trigger: phoneCtrl,
+            onFill: (record) {
+              final nameCtrl = ctrls['name'];
+              if (nameCtrl != null && record.fullName.isNotEmpty) {
+                nameCtrl.text = record.fullName;
+              }
+              if (record.phone.isNotEmpty) {
+                phoneCtrl.text = record.phone;
+              }
+              final locationCtrl = ctrls['location'];
+              if (locationCtrl != null && record.address.isNotEmpty) {
+                locationCtrl.text = record.address;
+              }
+              setD(() {});
+            },
+            child: dialog,
+          );
+        },
       ),
     );
   }
