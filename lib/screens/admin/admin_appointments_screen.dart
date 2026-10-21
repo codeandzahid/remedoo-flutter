@@ -37,6 +37,48 @@ String _fmtDate(String? iso) {
   );
 }
 
+/// Everything the admin appointment detail view shows for one row.
+/// Names resolve exactly like the list ([adminAppointmentNames]);
+/// specialty and fee come from the embedded doctor record — the
+/// appointments table has neither column (the patient's receipt
+/// derives them the same way, in AppState's row mapper). Contact
+/// fields are the 'patient_email' / 'patient_phone' values the
+/// repository stamps onto the row from the patient's profile.
+({
+  String patient,
+  String email,
+  String phone,
+  String provider,
+  String specialty,
+  String date,
+  String time,
+  String status,
+  String payment,
+  double? fee,
+  String notes,
+  String bookedOn,
+}) adminAppointmentDetail(Map<String, dynamic> a) {
+  final names = adminAppointmentNames(a);
+  final doc = a['doctors'];
+  final docMap = doc is Map ? doc : const <String, dynamic>{};
+  var time = '${a['appointment_time'] ?? ''}'.trim();
+  if (time.length > 5) time = time.substring(0, 5);
+  return (
+    patient: names.patient,
+    email: '${a['patient_email'] ?? ''}'.trim(),
+    phone: '${a['patient_phone'] ?? ''}'.trim(),
+    provider: names.provider,
+    specialty: '${docMap['specialization'] ?? ''}'.trim(),
+    date: _fmtDate(a['appointment_date']?.toString()),
+    time: time,
+    status: '${a['status'] ?? ''}'.trim(),
+    payment: AppState.paymentLabelFor(a['payment_method']),
+    fee: (docMap['consultation_fee'] as num?)?.toDouble(),
+    notes: '${a['notes'] ?? ''}'.trim(),
+    bookedOn: _fmtDate(a['created_at']?.toString()),
+  );
+}
+
 /// Admin appointments: real Supabase appointments, filterable.
 class AdminAppointmentsScreen extends StatefulWidget {
   const AdminAppointmentsScreen({super.key});
@@ -141,6 +183,7 @@ class _AdminAppointmentsScreenState
         padding: const EdgeInsets.symmetric(
             horizontal: 8, vertical: 6),
         child: ListTile(
+          onTap: () => _showDetail(a),
           leading: InitialsAvatar(name: names.patient, radius: 22),
           title: Text(names.patient,
               maxLines: 1,
@@ -187,6 +230,24 @@ class _AdminAppointmentsScreenState
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Record detail for one booking, in the admin panel's usual
+  /// dialog form (orders and users present records the same way).
+  /// The dialog re-reads its row from state on every build, so the
+  /// status and actions it shows stay current after an action
+  /// lands; its buttons run this screen's own approve / reject /
+  /// cancel handlers, unchanged.
+  void _showDetail(Map<String, dynamic> a) {
+    showDialog(
+      context: context,
+      builder: (_) => _AppointmentDetailDialog(
+        initialRow: a,
+        onApprove: _approve,
+        onReject: _reject,
+        onCancel: _confirmCancel,
       ),
     );
   }
@@ -271,6 +332,137 @@ class _AdminAppointmentsScreenState
           content: Text(done
               ? 'Appointment rejected. Patient notified.'
               : 'Could not reject. Try again.')),
+    );
+  }
+}
+
+/// Detail view for one admin appointment row. Stateless on purpose:
+/// it resolves its row from [AppState.adminAppointments] by id on
+/// every build (falling back to the row it was opened with), and
+/// AppStateScope is an InheritedNotifier, so when an action updates
+/// the row this dialog rebuilds with the new status — and the list
+/// behind it reads the same rows, so both stay in step. The actions
+/// mirror the list's rules exactly (approve/reject while pending,
+/// cancel while neither cancelled nor completed) and are the list's
+/// own handlers, passed in by the screen.
+class _AppointmentDetailDialog extends StatelessWidget {
+  final Map<String, dynamic> initialRow;
+  final ValueChanged<Map<String, dynamic>> onApprove;
+  final ValueChanged<Map<String, dynamic>> onReject;
+  final ValueChanged<Map<String, dynamic>> onCancel;
+
+  const _AppointmentDetailDialog({
+    required this.initialRow,
+    required this.onApprove,
+    required this.onReject,
+    required this.onCancel,
+  });
+
+  Widget _field(BuildContext context, String label, String value) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 118,
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 12, color: scheme.onSurfaceVariant)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppStateScope.of(context);
+    final id = '${initialRow['id']}';
+    var row = initialRow;
+    for (final r in state.adminAppointments) {
+      if ('${r['id']}' == id) {
+        row = r;
+        break;
+      }
+    }
+    final d = adminAppointmentDetail(row);
+    final status = d.status;
+    return AlertDialog(
+      title: const Text('Appointment details',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  InitialsAvatar(name: d.patient, radius: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(d.patient,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700)),
+                  ),
+                  StatusChip(status: status),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (d.email.isNotEmpty) _field(context, 'Email', d.email),
+              if (d.phone.isNotEmpty) _field(context, 'Phone', d.phone),
+              _field(context, 'Provider', d.provider),
+              if (d.specialty.isNotEmpty)
+                _field(context, 'Specialty', d.specialty),
+              _field(context, 'Date', d.date.isEmpty ? '—' : d.date),
+              if (d.time.isNotEmpty) _field(context, 'Time', d.time),
+              if (d.fee != null)
+                _field(context, 'Consultation fee',
+                    '₹${d.fee!.toStringAsFixed(0)}'),
+              _field(context, 'Payment', d.payment),
+              if (d.notes.isNotEmpty)
+                _field(context, 'Reason / notes', d.notes),
+              if (d.bookedOn.isNotEmpty)
+                _field(context, 'Booked on', d.bookedOn),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+        if (status == 'pending') ...[
+          RButton(
+            label: 'Reject',
+            small: true,
+            variant: RButtonVariant.danger,
+            onPressed: () => onReject(row),
+          ),
+          RButton(
+            label: 'Approve',
+            small: true,
+            onPressed: () => onApprove(row),
+          ),
+        ] else if (status != 'cancelled' && status != 'completed')
+          RButton(
+            label: 'Cancel appointment',
+            small: true,
+            variant: RButtonVariant.danger,
+            onPressed: () => onCancel(row),
+          ),
+      ],
     );
   }
 }

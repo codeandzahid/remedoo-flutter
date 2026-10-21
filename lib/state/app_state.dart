@@ -876,6 +876,11 @@ class AppState extends ChangeNotifier {
   static String _paymentLabel(dynamic dbValue) =>
       '$dbValue' == 'online' ? 'Pay Online' : 'At Clinic';
 
+  /// [_paymentLabel] for surfaces outside the appointment mapper
+  /// (the admin appointment detail view shows the same label the
+  /// patient's receipt shows for the stored value).
+  static String paymentLabelFor(dynamic dbValue) => _paymentLabel(dbValue);
+
   /// Stored appointments.payment_method for a display payment label
   /// (inverse of [_paymentLabel]).
   static String dbPaymentMethod(String paymentLabel) =>
@@ -2521,7 +2526,8 @@ class AppState extends ChangeNotifier {
 
   Future<bool> updateAdminAppointment(
       String id, Map<String, dynamic> fields) async {
-    final ok = await _repo.adminUpdateAppointment(id, fields);
+    final ok = _adminWritesLocalForTest ||
+        await _repo.adminUpdateAppointment(id, fields);
     if (ok) {
       for (final a in _adminAppointments) {
         if ('${a['id']}' == id) a.addAll(fields);
@@ -2529,6 +2535,26 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
     return ok;
+  }
+
+  bool _adminWritesLocalForTest = false;
+
+  /// Test-only: admin appointment writes apply locally without the
+  /// backend round-trip (widget tests run without Supabase). The
+  /// fields merged into the row are exactly the ones the backend
+  /// write would have carried.
+  @visibleForTesting
+  void debugSetAdminWritesLocal(bool value) =>
+      _adminWritesLocalForTest = value;
+
+  /// Test-only: replaces the admin appointments list (the real load
+  /// path fetches from Supabase).
+  @visibleForTesting
+  void debugSeedAdminAppointments(List<Map<String, dynamic>> rows) {
+    _adminAppointments
+      ..clear()
+      ..addAll(rows);
+    notifyListeners();
   }
 
   final List<Map<String, dynamic>> _supportTickets = [];

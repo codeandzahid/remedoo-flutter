@@ -1855,15 +1855,19 @@ class SupabaseRepository {
     try {
       final rows = await _db
           .from('appointments')
+          // The doctors embed carries specialization + fee as well
+          // (same embed as the patient fetch): appointments has no
+          // fee column of its own, and the admin detail view reads
+          // specialty and fee from the doctor's record.
           .select(
-              '*, doctors(name), hospitals(name), labs(name), pharmacies(name)')
+              '*, doctors(name, specialization, consultation_fee), hospitals(name), labs(name), pharmacies(name)')
           .order('created_at', ascending: false)
           .limit(200);
       final list = rows.map((r) => Map<String, dynamic>.from(r)).toList();
       try {
         final profs = await _db
             .from('profiles')
-            .select('user_id, full_name, email')
+            .select('user_id, full_name, email, phone')
             .limit(500);
         final byId = <String, Map<String, dynamic>>{
           for (final p in profs) '${p['user_id']}': p,
@@ -1873,6 +1877,11 @@ class SupabaseRepository {
           if (p == null) continue;
           final name = '${p['full_name'] ?? ''}'.trim();
           r['patient_name'] = name.isNotEmpty ? name : '${p['email'] ?? ''}';
+          // Contact fields for the admin detail view (display-only,
+          // like the name — the appointments row itself has no FK to
+          // profiles to embed).
+          r['patient_email'] = '${p['email'] ?? ''}';
+          r['patient_phone'] = '${p['phone'] ?? ''}';
         }
       } catch (_) {
         // Names are display-only; a profiles hiccup must not empty
