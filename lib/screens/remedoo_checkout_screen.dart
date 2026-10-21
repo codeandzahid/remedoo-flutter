@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -33,6 +34,8 @@ class _RemedooCheckoutScreenState
   String _payment = 'Cash on Delivery';
 
   String? _rxFileName;
+  Uint8List? _rxBytes;
+  String? _rxPath;
   bool _locating = false;
   bool _addressPrefilled = false;
 
@@ -195,10 +198,28 @@ class _RemedooCheckoutScreenState
       final paid = await _payOnline(state, total, paymentRef);
       if (!paid || !mounted) return;
     }
+    // Upload the picked prescription for real (audit M3) — same
+    // rule as the cart checkout: an Rx order whose upload fails
+    // stops here instead of shipping a filename-only promise.
+    String? prescriptionUrl;
+    if (_rxFileName != null) {
+      prescriptionUrl = await state.uploadOrderPrescription(
+          _rxBytes, _rxPath, _rxFileName!);
+      if (!mounted) return;
+      if (prescriptionUrl == null && hasRx) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Prescription upload failed. Check your connection and try again.')),
+        );
+        return;
+      }
+    }
     state.placeOrder(
       address: _address.text.trim(),
       payment: _payment,
       paymentRef: paymentRef,
+      prescriptionUrl: prescriptionUrl,
       customerUpi: _payerUpi.text.trim().isEmpty
           ? null
           : _payerUpi.text.trim(),
@@ -566,8 +587,16 @@ class _RemedooCheckoutScreenState
                 );
                 if (files.isEmpty) return;
                 final file = files.first;
+                Uint8List? data;
+                try {
+                  data = await file.readAsBytes();
+                } catch (_) {}
                 if (!context.mounted) return;
-                setState(() => _rxFileName = file.name);
+                setState(() {
+                  _rxFileName = file.name;
+                  _rxBytes = data;
+                  _rxPath = file.path;
+                });
                 messenger.showSnackBar(
                   SnackBar(
                       content: Text(

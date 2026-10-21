@@ -777,6 +777,107 @@ class SupabaseRepository {
     return uploadPrescriptionData(null, localPath, fileName);
   }
 
+  /// Pharmacy-side verification of an order's uploaded prescription
+  /// (orders.prescription_verified_by / _at, schema_part_04).
+  Future<bool> setOrderPrescriptionVerified(String orderId) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return false;
+    try {
+      await _db.from('orders').update({
+        'prescription_verified_by': uid,
+        'prescription_verified_at':
+            DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', orderId);
+      return true;
+    } catch (e) {
+      debugPrint('setOrderPrescriptionVerified failed: $e');
+      return false;
+    }
+  }
+
+  /// Creates a doctor's prescription for an appointment
+  /// (prescriptions + prescription_items, schema_part_02) — the
+  /// doctor panel had no creation form at all (audit M3). The
+  /// doctor row and the patient come from the appointment itself,
+  /// which is what the RLS insert policy checks.
+  Future<String?> createPrescription({
+    required String appointmentId,
+    String? diagnosis,
+    String? notes,
+    required List<Map<String, String>> items,
+  }) async {
+    if (!_ready) return null;
+    try {
+      final doctor = await fetchOwnProviderRecord('doctors');
+      if (doctor == null) return null;
+      final appt = await _db
+          .from('appointments')
+          .select('user_id')
+          .eq('id', appointmentId)
+          .single();
+      final patientId = '${appt['user_id'] ?? ''}';
+      if (patientId.isEmpty) return null;
+      final row = await _db.from('prescriptions').insert({
+        'appointment_id': appointmentId,
+        'doctor_id': doctor['id'],
+        'patient_id': patientId,
+        if (diagnosis != null && diagnosis.isNotEmpty)
+          'diagnosis': diagnosis,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      }).select('id');
+      if (row.isEmpty) return null;
+      final prescriptionId = '${row.first['id']}';
+      if (items.isNotEmpty) {
+        await _db.from('prescription_items').insert([
+          for (var i = 0; i < items.length; i++)
+            {
+              'prescription_id': prescriptionId,
+              'medicine_name': items[i]['medicine_name'] ?? '',
+              'generic_name': items[i]['generic_name'],
+              'dosage': items[i]['dosage'] ?? '',
+              'frequency': items[i]['frequency'] ?? '',
+              'duration': items[i]['duration'] ?? '',
+              'instructions': items[i]['instructions'],
+              'sort_order': i,
+            },
+        ]);
+      }
+      return prescriptionId;
+    } catch (e) {
+      debugPrint('createPrescription failed: $e');
+      return null;
+    }
+  }
+
+  /// The prescription written for one appointment, with its items,
+  /// or null when none exists yet.
+  Future<Map<String, dynamic>?> fetchPrescriptionForAppointment(
+      String appointmentId) async {
+    if (!_ready) return null;
+    try {
+      final rows = await _db
+          .from('prescriptions')
+          .select()
+          .eq('appointment_id', appointmentId)
+          .order('created_at', ascending: false)
+          .limit(1);
+      if (rows.isEmpty) return null;
+      final p = Map<String, dynamic>.from(rows.first as Map);
+      final items = await _db
+          .from('prescription_items')
+          .select()
+          .eq('prescription_id', '${p['id']}')
+          .order('sort_order');
+      p['items'] = items
+          .map((r) => Map<String, dynamic>.from(r as Map))
+          .toList();
+      return p;
+    } catch (e) {
+      debugPrint('fetchPrescriptionForAppointment failed: $e');
+      return null;
+    }
+  }
+
   /// Uploads a profile photo to the public `avatars` bucket and
   /// returns its public URL (2026-10-19).
   Future<String?> uploadAvatar(Uint8List bytes, String fileName) async {
@@ -877,6 +978,7 @@ class SupabaseRepository {
     String? notes,
     String? paymentRef,
     String? customerUpi,
+    String? prescriptionUrl,
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
@@ -900,6 +1002,10 @@ class SupabaseRepository {
         'total': total,
         'delivery_address': address,
         'notes': notes,
+        // The uploaded prescription file (audit M3): without this
+        // the pharmacy received an Rx order with nothing to check.
+        if (prescriptionUrl != null && prescriptionUrl.isNotEmpty)
+          'prescription_url': prescriptionUrl,
       }).select('id');
       if (order.isEmpty) return null;
       final orderId = '${order.first['id']}';
@@ -2151,7 +2257,7 @@ class SupabaseRepository {
     try {
       await _db.from('refunds').update({
         'status': status,
-        ?'admin_notes': adminNotes,
+        'admin_notes': ?adminNotes,
         if (status == 'completed')
           'processed_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', id);

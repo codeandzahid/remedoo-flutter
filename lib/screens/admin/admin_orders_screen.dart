@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../state/app_state.dart';
 import '../../theme.dart';
@@ -151,6 +152,60 @@ class _AdminOrdersScreenState
                 style: TextStyle(
                     fontSize: 12,
                     color: scheme.onSurfaceVariant)),
+            // Payment / money / prescription / refund detail
+            // (audit Admin orders: the card used to show only
+            // address, total, item count and date).
+            const SizedBox(height: 6),
+            Text(
+              'Payment: ${o['payment_method'] ?? '—'}'
+              ' • ${o['payment_status'] ?? '—'}'
+              ' • Subtotal ${inr((o['subtotal'] as num?)?.toDouble() ?? 0)}'
+              ' • Delivery ${inr((o['delivery_fee'] as num?)?.toDouble() ?? 0)}',
+              style: TextStyle(
+                  fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+            if ('${o['notes'] ?? ''}'.isNotEmpty)
+              Text('Note: ${o['notes']}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant)),
+            if ('${o['estimated_delivery'] ?? ''}'.isNotEmpty)
+              Text(
+                  'Estimated delivery: ${_fmtDate('${o['estimated_delivery']}')}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant)),
+            if ('${o['customer_upi'] ?? ''}'.isNotEmpty)
+              Text('Customer UPI: ${o['customer_upi']}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant)),
+            if ('${o['refund_status'] ?? ''}'.isNotEmpty)
+              Text(
+                'Refund: ${o['refund_status']}'
+                '${'${o['refund_utr'] ?? ''}'.isNotEmpty ? ' • UTR ${o['refund_utr']}' : ''}'
+                '${'${o['refund_at'] ?? ''}'.isNotEmpty ? ' • ${_fmtDate('${o['refund_at']}')}' : ''}',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurfaceVariant),
+              ),
+            if ('${o['prescription_url'] ?? ''}'.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: RButton(
+                  label: 'View prescription',
+                  icon: Icons.description_outlined,
+                  small: true,
+                  variant: RButtonVariant.outline,
+                  onPressed: () => launchUrl(
+                    Uri.parse('${o['prescription_url']}'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
@@ -89,6 +90,30 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
   /// Panelist refund for a cancelled paid-online order (owner
   /// order 2026-10-19): opens the shared refund dialog (UPI deep
   /// link + mandatory refund UTR) and marks the order refunded.
+  Future<void> _verifyPrescription(Map<String, dynamic> o) async {
+    final ok = await _repo.setOrderPrescriptionVerified('${o['id']}');
+    if (!mounted) return;
+    if (ok) {
+      setState(() {
+        final i = _orders.indexWhere((x) => '${x['id']}' == '${o['id']}');
+        if (i >= 0) {
+          _orders[i] = {
+            ..._orders[i],
+            'prescription_verified_at':
+                DateTime.now().toUtc().toIso8601String(),
+          };
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Prescription marked verified.')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not verify. Try again.')),
+      );
+    }
+  }
+
   Future<void> _refundOrder(Map<String, dynamic> o) async {
     final amount = (o['refund_amount'] as num?)?.toDouble() ??
         (o['total'] as num?)?.toDouble() ??
@@ -462,6 +487,52 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
                       color: scheme.onSurfaceVariant),
                 ),
               ),
+            // The uploaded prescription (audit M3): the pharmacy
+            // can open the actual file and record verification
+            // (orders.prescription_verified_by/_at) instead of
+            // fulfilling an Rx order blind.
+            if ('${o['prescription_url'] ?? ''}'.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: RButton(
+                      label: 'View prescription',
+                      icon: Icons.description_outlined,
+                      small: true,
+                      variant: RButtonVariant.outline,
+                      onPressed: () => launchUrl(
+                        Uri.parse('${o['prescription_url']}'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if ('${o['prescription_verified_at'] ?? ''}'.isEmpty)
+                    Expanded(
+                      child: RButton(
+                        label: 'Verify prescription',
+                        icon: Icons.verified_outlined,
+                        small: true,
+                        onPressed: () => _verifyPrescription(o),
+                      ),
+                    )
+                  else
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified,
+                            size: 16, color: Colors.green),
+                        SizedBox(width: 4),
+                        Text('Prescription verified',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                ],
+              ),
+            ],
             // Step-by-step action buttons
             if (status == 'placed') ...[
               const SizedBox(height: 12),

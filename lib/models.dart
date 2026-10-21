@@ -241,6 +241,12 @@ class MedOrder {
   final String? paymentRef;
   final String? customerUpi;
 
+  /// Signed URL of the prescription file uploaded at checkout
+  /// (orders.prescription_url). Null when no file was attached —
+  /// the file used to be filename-only and never uploaded
+  /// (form-pages audit M3).
+  final String? prescriptionUrl;
+
   /// Refund tracking after a paid-online order is cancelled:
   /// refundStatus 'requested' | 'refunded' (null = no refund).
   String? refundStatus;
@@ -266,6 +272,7 @@ class MedOrder {
     this.paymentStatus,
     this.paymentRef,
     this.customerUpi,
+    this.prescriptionUrl,
     this.refundStatus,
     this.refundAmount,
     this.refundAt,

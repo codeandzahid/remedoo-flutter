@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
@@ -1042,6 +1043,7 @@ class AppState extends ChangeNotifier {
       remoteStatus: st,
       paymentRef: _strOrNull(r['payment_ref']),
       customerUpi: _strOrNull(r['customer_upi']),
+      prescriptionPath: _strOrNull(r['prescription_url']),
       refundStatus: _strOrNull(r['refund_status']),
       refundAmount: (r['refund_amount'] as num?)?.toDouble(),
       refundAt: _dateOrNull(r['refund_at']),
@@ -1118,6 +1120,7 @@ class AppState extends ChangeNotifier {
       paymentStatus: _strOrNull(r['payment_status']),
       paymentRef: _strOrNull(r['payment_ref']),
       customerUpi: _strOrNull(r['customer_upi']),
+      prescriptionUrl: _strOrNull(r['prescription_url']),
       refundStatus: _strOrNull(r['refund_status']),
       refundAmount: (r['refund_amount'] as num?)?.toDouble(),
       refundAt: _dateOrNull(r['refund_at']),
@@ -1198,6 +1201,7 @@ class AppState extends ChangeNotifier {
       notes: order.notes.isEmpty ? null : order.notes,
       paymentRef: order.paymentRef,
       customerUpi: order.customerUpi,
+      prescriptionUrl: order.prescriptionUrl,
     )
         .then((remoteId) {
       if (remoteId != null) _remoteOrderIds[order.id] = remoteId;
@@ -1724,12 +1728,20 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Uploads the prescription file picked at checkout so the
+  /// order can carry its real URL (audit M3 — checkouts used to
+  /// keep only the file name and never uploaded anything).
+  Future<String?> uploadOrderPrescription(
+          Uint8List? bytes, String? path, String fileName) =>
+      _repo.uploadPrescriptionData(bytes, path, fileName);
+
   MedOrder placeOrder({
     required String address,
     required String payment,
     String? paymentRef,
     String? customerUpi,
     String? notes,
+    String? prescriptionUrl,
   }) {
     final subtotal = cartSubtotal;
     final deliveryFee = subtotal >= 499 ? 0.0 : 30.0;
@@ -1752,6 +1764,7 @@ class AppState extends ChangeNotifier {
           payment.toLowerCase().contains('online') ? 'paid' : 'pending',
       paymentRef: paymentRef,
       customerUpi: customerUpi,
+      prescriptionUrl: prescriptionUrl,
     );
     orders.insert(0, order);
     cart.clear();

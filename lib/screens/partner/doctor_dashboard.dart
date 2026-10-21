@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/prescription_form.dart';
 import '../../widgets/provider_payments.dart';
 import '../../widgets/widgets.dart';
 
@@ -494,7 +496,9 @@ class _AppointmentsTab extends StatelessWidget {
                   ),
                 ],
               ),
-              // View uploaded prescription if attached
+              // View uploaded prescription if attached — opens the
+              // actual file (audit M3: this used to show the raw
+              // URL in a SnackBar).
               if ('${a['prescription_url'] ?? ''}'.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 RButton(
@@ -503,17 +507,29 @@ class _AppointmentsTab extends StatelessWidget {
                   small: true,
                   variant: RButtonVariant.outline,
                   fullWidth: true,
-                  onPressed: () {
-                    final url = '${a['prescription_url']}';
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Prescription: $url'),
-                        duration: const Duration(seconds: 5),
-                      ),
-                    );
-                  },
+                  onPressed: () => launchUrl(
+                    Uri.parse('${a['prescription_url']}'),
+                    mode: LaunchMode.externalApplication,
+                  ),
                 ),
               ],
+            ],
+            // The doctor's own prescription for a finished visit
+            // (prescriptions + prescription_items, audit M3).
+            if (status == 'completed') ...[
+              const SizedBox(height: 10),
+              RButton(
+                label: 'Prescription',
+                icon: Icons.medication_outlined,
+                small: true,
+                variant: RButtonVariant.outline,
+                fullWidth: true,
+                onPressed: () => PrescriptionSheet.show(
+                  context,
+                  appointmentId: '${a['id']}',
+                  patientName: '${a['patient_name'] ?? 'Patient'}',
+                ),
+              ),
             ],
             AppointmentRefundButton(appointment: a),
           ],
