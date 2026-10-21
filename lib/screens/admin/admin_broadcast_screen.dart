@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 String _fmtDate(String? iso) {
   if (iso == null || iso.isEmpty) return '';
@@ -104,13 +105,13 @@ class _AdminBroadcastScreenState
                       subtitle:
                           'Published in-app to the selected audience.'),
                   const SizedBox(height: 16),
-                  RTextField(
+                  RKitField(
                     label: 'Title',
                     hint: 'e.g. Monsoon health camp',
                     controller: _title,
                   ),
                   const SizedBox(height: 12),
-                  RTextField(
+                  RKitField(
                     label: 'Message',
                     hint: 'Write your message…',
                     controller: _message,

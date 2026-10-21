@@ -219,7 +219,11 @@ InputDecoration rKitDecoration(
     errorText: errorText,
     hintStyle: const TextStyle(color: RFormBrand.muted, fontSize: 14),
     filled: true,
-    fillColor: scheme.surface,
+    // Ambient fill wins (patient theme card colour, or the active
+    // admin style's input fill) so the kit sits naturally on every
+    // surface; the kit owns the shape, borders and focus ring.
+    fillColor:
+        Theme.of(context).inputDecorationTheme.fillColor ?? scheme.surface,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     prefixIcon: prefixIcon ??
         (icon != null

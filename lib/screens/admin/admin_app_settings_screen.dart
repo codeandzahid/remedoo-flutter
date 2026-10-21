@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 /// App Settings: maintenance mode, delivery fees, emergency numbers and
 /// support contact. All values live in the Supabase `app_config` table and
@@ -628,24 +629,24 @@ class _AdminAppSettingsScreenState
                 contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 4),
-              RTextField(
+              RKitField(
                   label: keyLabel, hint: keyHint, controller: keyController),
               if (urlController != null) ...[
                 const SizedBox(height: 8),
-                RTextField(
+                RKitField(
                     label: urlLabel ?? 'Server URL',
                     hint: urlHint ?? '',
                     controller: urlController),
               ],
               const SizedBox(height: 8),
-              RTextField(
+              RKitField(
                   label: secretLabel,
                   hint: secretHint,
                   controller: secretController,
                   obscureText: true),
               if (showWebhook) ...[
                 const SizedBox(height: 8),
-                RTextField(
+                RKitField(
                     label: 'Webhook Secret (optional)',
                     hint: 'From Razorpay dashboard > Webhooks',
                     controller: _razorpayWebhookSecret,
@@ -739,7 +740,7 @@ class _AdminAppSettingsScreenState
                   contentPadding: EdgeInsets.zero,
                 ),
                 const SizedBox(height: 8),
-                RTextField(
+                RKitField(
                     label: 'Maintenance message',
                     controller: _maintMsg),
                 const SizedBox(height: 12),
@@ -768,7 +769,7 @@ class _AdminAppSettingsScreenState
                 Row(
                   children: [
                     Expanded(
-                      child: RTextField(
+                      child: RKitField(
                         label: 'Delivery fee (₹)',
                         controller: _deliveryFee,
                         keyboardType: TextInputType.number,
@@ -776,7 +777,7 @@ class _AdminAppSettingsScreenState
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: RTextField(
+                      child: RKitField(
                         label: 'Free above (₹)',
                         controller: _freeThreshold,
                         keyboardType: TextInputType.number,
@@ -785,7 +786,7 @@ class _AdminAppSettingsScreenState
                   ],
                 ),
                 const SizedBox(height: 12),
-                RTextField(
+                RKitField(
                   label: 'Currency code',
                   hint: 'INR',
                   controller: _feesCurrency,
@@ -903,7 +904,7 @@ class _AdminAppSettingsScreenState
                   ),
                 ),
                 const SizedBox(height: 8),
-                RTextField(
+                RKitField(
                     label: 'SOS alert message',
                     controller: _sosMsg),
                 const SizedBox(height: 12),
@@ -938,17 +939,17 @@ class _AdminAppSettingsScreenState
           RCard(
             child: Column(
               children: [
-                RTextField(
+                RKitField(
                     label: 'Support phone',
                     controller: _supportPhone,
                     keyboardType: TextInputType.phone),
                 const SizedBox(height: 12),
-                RTextField(
+                RKitField(
                     label: 'Support email',
                     controller: _supportEmail,
                     keyboardType: TextInputType.emailAddress),
                 const SizedBox(height: 12),
-                RTextField(
+                RKitField(
                     label: 'Support hours',
                     controller: _supportHours),
                 const SizedBox(height: 12),
@@ -1115,12 +1116,12 @@ class _AdminAppSettingsScreenState
             urlHint: 'e.g. https://pay.yourdomain.com',
             extraChildren: [
               const SizedBox(height: 8),
-              RTextField(
+              RKitField(
                   label: 'Your UPI ID',
                   hint: 'e.g. yourname@okhdfcbank — payments come here',
                   controller: _youpiVpa),
               const SizedBox(height: 8),
-              RTextField(
+              RKitField(
                   label: 'Payee Name',
                   hint: 'Name customers see on the payment page',
                   controller: _youpiPayeeName),
@@ -1241,11 +1242,11 @@ class _NumberRowState extends State<_NumberRow> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Expanded(flex: 2, child: RTextField(label: 'Label', controller: _label)),
+          Expanded(flex: 2, child: RKitField(label: 'Label', controller: _label)),
           const SizedBox(width: 8),
           Expanded(
             flex: 2,
-            child: RTextField(
+            child: RKitField(
                 label: 'Number',
                 controller: _number,
                 keyboardType: TextInputType.phone),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 // Operations screens backed by Supabase:
 // refunds, ambulance fleet, pharmacy inventory.
@@ -514,7 +515,7 @@ class _AdminInventoryScreenState
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: RTextField(
+          child: RKitField(
             hint: 'Search medicines…',
             prefixIcon: const Icon(Icons.search),
             onChanged: (v) =>

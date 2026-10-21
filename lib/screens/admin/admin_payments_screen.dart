@@ -4,6 +4,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/route_onboarding_sheet.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 void _snack(BuildContext context, String msg) {
   ScaffoldMessenger.of(context)
@@ -296,7 +297,7 @@ class _ProviderPaymentsTabState
         title: const Text('Provider UPI ID',
             style: TextStyle(
                 fontSize: 18, fontWeight: FontWeight.w800)),
-        content: RTextField(
+        content: RKitField(
           controller: ctrl,
           hint: 'e.g. clinic@upi',
           label: 'UPI ID',

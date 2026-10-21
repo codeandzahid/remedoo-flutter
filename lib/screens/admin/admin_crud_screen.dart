@@ -8,6 +8,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/existing_user_lookup.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 /// Field types for [AdminField]: 'text', 'textarea', 'int',
 /// 'double', 'bool', 'fk', 'dropdown', 'date', 'array', 'json',
@@ -353,11 +354,13 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
         builder: (ctx, setD) {
           Widget fieldWidget(AdminField f) {
             if (f.type == 'bool') {
-              return SwitchListTile(
-                value: bools[f.key]!,
-                onChanged: (v) => setD(() => bools[f.key] = v),
-                title: Text(f.label),
-                contentPadding: EdgeInsets.zero,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: RFormSwitchTile(
+                  title: f.label,
+                  value: bools[f.key]!,
+                  onChanged: (v) => setD(() => bools[f.key] = v),
+                ),
               );
             }
             if (f.type == 'fk' || f.type == 'dropdown') {
@@ -368,14 +371,9 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
               final value = isFk ? fkValues[f.key] : dropValues[f.key];
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                // No OutlineInputBorder override: the control
-                // inherits the Remidy admin input theme like
-                // every other field (audit Admin gap 25).
-                child: DropdownButtonFormField<String>(
-                  initialValue: value,
-                  decoration: InputDecoration(
-                    labelText: '${f.label}${f.required ? ' *' : ''}',
-                  ),
+                child: RKitDropdown<String>(
+                  label: '${f.label}${f.required ? ' *' : ''}',
+                  value: value,
                   items: [
                     if (!f.required)
                       const DropdownMenuItem(
@@ -404,7 +402,7 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
             if (f.type == 'date') {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: RTextField(
+                child: RKitField(
                   label: '${f.label}${f.required ? ' *' : ''}',
                   controller: ctrls[f.key],
                   hint: 'YYYY-MM-DD',
@@ -432,7 +430,7 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
             }
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: RTextField(
+              child: RKitField(
                 label: '${f.label}${f.required ? ' *' : ''}',
                 controller: ctrls[f.key],
                 hint: f.type == 'array'
@@ -450,28 +448,37 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
             );
           }
 
-          final dialog = AlertDialog(
-            title: Text('${row == null ? 'Add' : 'Edit'} ${widget.singular}',
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w800)),
-            content: SizedBox(
-              width: 420,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: fields.map(fieldWidget).toList(),
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              RButton(
-                label: 'Save',
-                small: true,
-                onPressed: () async {
+          final dialog = Dialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  RFormHeaderBand(
+                    title:
+                        '${row == null ? 'Add' : 'Edit'} ${widget.singular}',
+                    icon: Icons.edit_note_outlined,
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding:
+                          const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: fields.map(fieldWidget).toList(),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                    child: RFormActions(
+                      onCancel: () => Navigator.pop(context),
+                      primaryLabel: 'Save',
+                      onPrimary: () async {
                   void fail(String msg) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(msg)),
@@ -574,9 +581,12 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                             ? '${widget.singular} saved.'
                             : 'Save failed. Please try again.')),
                   );
-                },
+                      },
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           );
           // Existing-patient autofill (owner order, 2026-10-21):
           // when the typed Phone exactly matches a patient account,

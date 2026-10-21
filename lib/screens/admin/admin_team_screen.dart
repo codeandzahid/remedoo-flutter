@@ -4,6 +4,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/existing_user_lookup.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 /// Assignable admin sections for staff accounts (key -> label).
 /// 'team' is deliberately absent: only the super admin manages staff.
@@ -419,27 +420,37 @@ class _AccessDialogState extends State<_AccessDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: SizedBox(
-        width: 420,
-        child: SingleChildScrollView(
-          child: _SectionPicker(
-            initial: widget.initial,
-            onChanged: (s) => _picked = s,
-          ),
+    return Dialog(
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            RFormHeaderBand(
+                title: widget.title, icon: Icons.lock_outline),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                child: _SectionPicker(
+                  initial: widget.initial,
+                  onChanged: (s) => _picked = s,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: RFormActions(
+                onCancel: () => Navigator.of(context).pop(),
+                onPrimary: () => Navigator.of(context).pop(_picked),
+                primaryLabel: 'Save access',
+              ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_picked),
-          child: const Text('Save access'),
-        ),
-      ],
     );
   }
 }
@@ -477,46 +488,63 @@ class _CreateStaffDialogState extends State<_CreateStaffDialog> {
           setState(() => _name.text = record.fullName);
         }
       },
-      child: AlertDialog(
-      title: const Text('Add staff account'),
-      content: SizedBox(
-        width: 440,
-        child: SingleChildScrollView(
+      child: Dialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              RTextField(controller: _name, label: 'Full name'),
-              const SizedBox(height: 10),
-              RTextField(controller: _email, label: 'Email (login)'),
-              const SizedBox(height: 10),
-              RTextField(
-                controller: _password,
-                label: 'Password (min 8 characters)',
-                obscureText: true,
+              const RFormHeaderBand(
+                title: 'Add staff account',
+                icon: Icons.person_add_outlined,
               ),
-              const SizedBox(height: 14),
-              const Text(
-                'Which sections can this person open?',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      RKitField(
+                          controller: _name,
+                          label: 'Full name',
+                          icon: Icons.person_outline),
+                      const SizedBox(height: 14),
+                      RKitField(
+                          controller: _email,
+                          label: 'Email (login)',
+                          icon: Icons.mail_outline),
+                      const SizedBox(height: 14),
+                      RKitField(
+                        controller: _password,
+                        label: 'Password (min 8 characters)',
+                        icon: Icons.lock_outline,
+                        obscureText: true,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Which sections can this person open?',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      _SectionPicker(
+                        initial: const {},
+                        onChanged: (s) => _picked = s,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              _SectionPicker(
-                initial: const {},
-                onChanged: (s) => _picked = s,
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: RFormActions(
+                  onCancel: () => Navigator.of(context).pop(),
+                  primaryLabel: 'Create account',
+                  onPrimary: () {
             final name = _name.text.trim();
             final email = _email.text.trim();
             final password = _password.text;
@@ -541,10 +569,12 @@ class _CreateStaffDialogState extends State<_CreateStaffDialog> {
               'password': password,
               'sections': _picked.toList(),
             });
-          },
-          child: const Text('Create account'),
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
-      ],
       ),
     );
   }

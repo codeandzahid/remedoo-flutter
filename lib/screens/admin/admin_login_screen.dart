@@ -9,6 +9,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/admin_style.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 /// Admin sign-in backed by Supabase Auth + the `user_roles` table.
 /// Only accounts with the `admin` role can enter the admin panel.
@@ -219,7 +220,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          RTextField(
+                          RKitField(
                             label: 'Email',
                             hint: 'admin@remedoo.app',
                             controller: _email,
@@ -230,7 +231,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                                 color: scheme.onSurfaceVariant),
                           ),
                           const SizedBox(height: 16),
-                          RTextField(
+                          RKitField(
                             label: 'Password',
                             hint: '••••••••',
                             controller: _password,

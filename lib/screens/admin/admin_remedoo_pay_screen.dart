@@ -10,6 +10,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../utils/refunds.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 void _snack(BuildContext context, String msg) {
   ScaffoldMessenger.of(context)
@@ -431,17 +432,17 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
                           fontSize: 14, fontWeight: FontWeight.w600)),
                   contentPadding: EdgeInsets.zero,
                 ),
-                RTextField(
+                RKitField(
                     label: 'Your UPI ID',
                     hint: 'e.g. yourname@okhdfcbank',
                     controller: _vpa),
                 const SizedBox(height: 10),
-                RTextField(
+                RKitField(
                     label: 'Payee Name',
                     hint: 'Name customers see on the payment page',
                     controller: _payeeName),
                 const SizedBox(height: 10),
-                RTextField(
+                RKitField(
                     label: 'Server URL',
                     hint: 'https://remedoo-pay.southkhanday.workers.dev',
                     controller: _serverUrl),
@@ -536,12 +537,12 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
                         color: scheme.onSurfaceVariant,
                         height: 1.5)),
                 const SizedBox(height: 12),
-                RTextField(
+                RKitField(
                     label: 'Google Client ID',
                     hint: '…apps.googleusercontent.com',
                     controller: _gmailClientId),
                 const SizedBox(height: 10),
-                RTextField(
+                RKitField(
                     label: 'Google Client Secret',
                     hint: 'From the same Google Cloud OAuth client',
                     controller: _gmailClientSecret,

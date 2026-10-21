@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 /// Real user list from Supabase profiles with role management.
 class AdminUsersScreen extends StatefulWidget {
@@ -226,7 +227,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: RTextField(
+          child: RKitField(
             hint: 'Search name, email or phone…',
             prefixIcon: const Icon(Icons.search),
             onChanged: (v) => setState(() => _query = v),

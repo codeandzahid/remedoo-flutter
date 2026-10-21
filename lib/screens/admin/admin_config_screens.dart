@@ -4,6 +4,7 @@ import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/form_kit.dart';
 
 // Configuration screens — every setting persists in the Supabase
 // `app_config` table and applies across the website and app.
@@ -271,7 +272,7 @@ class _CommissionRowState extends State<_CommissionRow> {
             Row(
               children: [
                 Expanded(
-                  child: RTextField(
+                  child: RKitField(
                     label: 'Commission %',
                     controller: _percent,
                     keyboardType: TextInputType.number,
@@ -279,7 +280,7 @@ class _CommissionRowState extends State<_CommissionRow> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: RTextField(
+                  child: RKitField(
                     label: 'Flat fee (₹)',
                     controller: _flat,
                     keyboardType: TextInputType.number,
@@ -369,9 +370,9 @@ class _PlanListScreenState extends State<_PlanListScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            RTextField(label: 'Name', controller: name),
+            RKitField(label: 'Name', controller: name),
             const SizedBox(height: 10),
-            RTextField(
+            RKitField(
                 label: 'Price (₹)',
                 controller: price,
                 keyboardType: TextInputType.number),
@@ -810,9 +811,9 @@ class _BrandingScreenState extends State<BrandingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                RTextField(label: 'App name', controller: _name),
+                RKitField(label: 'App name', controller: _name),
                 const SizedBox(height: 12),
-                RTextField(label: 'Tagline', controller: _tagline),
+                RKitField(label: 'Tagline', controller: _tagline),
                 const SizedBox(height: 16),
                 RButton(
                     label: 'Save branding',
@@ -1458,9 +1459,9 @@ class _BroadcastsScreenState extends State<BroadcastsScreen> {
           RCard(
             child: Column(
               children: [
-                RTextField(label: 'Title', controller: _title),
+                RKitField(label: 'Title', controller: _title),
                 const SizedBox(height: 12),
-                RTextField(
+                RKitField(
                     label: 'Message',
                     controller: _message,
                     maxLines: 4),
