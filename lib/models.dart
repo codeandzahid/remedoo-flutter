@@ -274,6 +274,13 @@ class MedOrder {
   /// (form-pages audit M3).
   final String? prescriptionUrl;
 
+  /// Coupon applied at checkout (Patient gap 18):
+  /// [discountAmount] is already subtracted from [total];
+  /// [couponCode] is the code the patient entered. Both come
+  /// from orders.discount_amount / orders.coupon_code.
+  final double discountAmount;
+  final String? couponCode;
+
   /// Refund tracking after a paid-online order is cancelled:
   /// refundStatus 'requested' | 'refunded' (null = no refund).
   String? refundStatus;
@@ -300,6 +307,8 @@ class MedOrder {
     this.paymentRef,
     this.customerUpi,
     this.prescriptionUrl,
+    this.discountAmount = 0,
+    this.couponCode,
     this.refundStatus,
     this.refundAmount,
     this.refundAt,

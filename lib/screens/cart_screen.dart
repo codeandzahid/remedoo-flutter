@@ -10,7 +10,9 @@ import '../responsive/responsive.dart';
 import '../services/payment_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/coupons.dart';
 import '../utils/device_actions.dart';
+import '../widgets/coupon_field.dart';
 import '../widgets/widgets.dart';
 import 'remedoo_pharmacy_screen.dart';
 import 'payment_failure_screen.dart';
@@ -31,6 +33,7 @@ class _CartScreenState extends State<CartScreen> {
   final _instructions = TextEditingController();
   final _payerUpi = TextEditingController();
   String _payment = 'Cash on Delivery';
+  Map<String, dynamic>? _coupon;
   String? _rxFileName;
   Uint8List? _rxBytes;
   String? _rxPath;
@@ -121,13 +124,21 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  /// Live coupon discount for a subtotal (Patient gap 18):
+  /// re-evaluated on every build so cart changes re-price it.
+  double _couponDiscount(double subtotal) {
+    if (_coupon == null) return 0;
+    final v = evaluateCoupon(_coupon!, subtotal, appliesTo: 'pharmacy');
+    return v.ok ? v.discount : 0;
+  }
+
   Widget _cartBody(AppState state) {
     final subtotal = state.cartTotal;
     // Same admin-configured delivery rule as the other checkout
     // (audit Patient 25 — this screen hardcoded ₹30 / ₹500).
     final delivery =
         subtotal >= state.freeDeliveryThreshold ? 0.0 : state.deliveryFee;
-    final total = subtotal + delivery;
+    final total = subtotal + delivery - _couponDiscount(subtotal);
     final requiresRx =
         state.cartLines.any((l) => l.medicine.rxRequired);
     return MaxWidthBox(
@@ -147,6 +158,11 @@ class _CartScreenState extends State<CartScreen> {
                 _addressCard(),
                 const SizedBox(height: 12),
                 _paymentCard(),
+                const SizedBox(height: 12),
+                CouponField(
+                  subtotal: subtotal,
+                  onChanged: (c) => setState(() => _coupon = c),
+                ),
                 if (context.isCompact) ...[
                   const SizedBox(height: 12),
                   _billCard(subtotal, delivery, total),
@@ -221,6 +237,7 @@ class _CartScreenState extends State<CartScreen> {
         return;
       }
     }
+    final discount = _couponDiscount(state.cartTotal);
     state.placeOrder(
       address: _address.text.trim(),
       payment: _payment,
@@ -232,7 +249,15 @@ class _CartScreenState extends State<CartScreen> {
       notes: _instructions.text.trim().isEmpty
           ? null
           : _instructions.text.trim(),
+      couponCode: discount > 0 ? '${_coupon?['code'] ?? ''}' : null,
+      couponDiscount: discount,
     );
+    if (discount > 0 && _coupon != null) {
+      unawaited(state.supabaseRepository.recordCouponUsage(
+        couponId: '${_coupon!['id']}',
+        discountApplied: discount,
+      ));
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Order placed successfully!')),
     );
@@ -791,6 +816,14 @@ class _CartScreenState extends State<CartScreen> {
                       fontSize: 11,
                       color: RemedooTheme.success)),
             ),
+          if (_couponDiscount(subtotal) > 0)
+            _billRow(
+              'Coupon ${_coupon?['code'] ?? ''}',
+              '−${inr(_couponDiscount(subtotal))}',
+              scheme,
+              valueColor: RemedooTheme.success,
+              valueBold: true,
+            ),
           Divider(height: 16, color: Theme.of(context).dividerColor),
           Row(
             children: [
@@ -837,7 +870,7 @@ class _CartScreenState extends State<CartScreen> {
     final subtotal = state.cartTotal;
     final delivery =
         subtotal >= state.freeDeliveryThreshold ? 0.0 : state.deliveryFee;
-    final total = subtotal + delivery;
+    final total = subtotal + delivery - _couponDiscount(subtotal);
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),

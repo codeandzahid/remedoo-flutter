@@ -37,6 +37,11 @@ const kExportDatasets = <(String, String, IconData)>[
   ('Lab Samples', 'lab_sample_collections', Icons.science_outlined),
   ('Deliveries', 'delivery_orders', Icons.delivery_dining),
   ('Subscription Plans', 'subscription_plans', Icons.workspace_premium),
+  ('Legal Pages', 'legal_pages', Icons.gavel),
+  ('Home Slider', 'slider_media', Icons.view_carousel),
+  ('Ads', 'ads', Icons.ads_click),
+  ('App Config', 'app_config', Icons.tune),
+  ('Support Messages', 'support_ticket_messages', Icons.forum),
 ];
 
 String _csvCell(dynamic v) {

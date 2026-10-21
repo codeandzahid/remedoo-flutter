@@ -1168,6 +1168,8 @@ class AppState extends ChangeNotifier {
       paymentRef: _strOrNull(r['payment_ref']),
       customerUpi: _strOrNull(r['customer_upi']),
       prescriptionUrl: _strOrNull(r['prescription_url']),
+      discountAmount: (r['discount_amount'] as num?)?.toDouble() ?? 0,
+      couponCode: _strOrNull(r['coupon_code']),
       refundStatus: _strOrNull(r['refund_status']),
       refundAmount: (r['refund_amount'] as num?)?.toDouble(),
       refundAt: _dateOrNull(r['refund_at']),
@@ -1271,6 +1273,8 @@ class AppState extends ChangeNotifier {
       paymentRef: order.paymentRef,
       customerUpi: order.customerUpi,
       prescriptionUrl: order.prescriptionUrl,
+      discountAmount: order.discountAmount,
+      couponCode: order.couponCode,
     )
         .then((remoteId) {
       if (remoteId != null) _remoteOrderIds[order.id] = remoteId;
@@ -1876,6 +1880,8 @@ class AppState extends ChangeNotifier {
     String? customerUpi,
     String? notes,
     String? prescriptionUrl,
+    String? couponCode,
+    double couponDiscount = 0,
   }) {
     final subtotal = cartSubtotal;
     // One delivery rule for both checkouts (audit Patient 25):
@@ -1891,7 +1897,11 @@ class AppState extends ChangeNotifier {
       items: List.of(cart),
       subtotal: subtotal,
       deliveryFee: deliveryFee,
-      total: subtotal + deliveryFee,
+      total: (subtotal + deliveryFee - couponDiscount)
+          .clamp(0, double.infinity)
+          .toDouble(),
+      discountAmount: couponDiscount,
+      couponCode: couponDiscount > 0 ? couponCode : null,
       address: address,
       payment: payment,
       placedAt: DateTime.now(),

@@ -115,6 +115,24 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // 2026-10-18: try every style one by one, live).
       _NavItem('Settings', 'Panel Style', Icons.style,
           (s) => AdminStyleScreen(state: s)),
+      // Audit-76 Batch 9 (Admin gap 1 / M15): tables that had no
+      // admin UI at all. Appended last (with matching _permKeys)
+      // so existing nav indexes stay stable. The section names
+      // join the existing Catalog / Content / Settings groups.
+      _NavItem('Catalog', 'Coupons', Icons.local_offer,
+          (_) => const AdminTableScreen(table: 'coupons', title: 'Coupons', singular: 'Coupon')),
+      _NavItem('Content', 'FAQs', Icons.help_outline,
+          (_) => const AdminTableScreen(table: 'faqs', title: 'FAQs', singular: 'FAQ')),
+      _NavItem('Content', 'Legal Pages', Icons.gavel,
+          (_) => const AdminTableScreen(table: 'legal_pages', title: 'Legal Pages', singular: 'Legal Page')),
+      _NavItem('Content', 'Home Slider', Icons.view_carousel,
+          (_) => const AdminTableScreen(table: 'slider_media', title: 'Home Slider', singular: 'Slide')),
+      _NavItem('Content', 'Ads', Icons.ads_click,
+          (_) => const AdminTableScreen(table: 'ads', title: 'Ads', singular: 'Ad')),
+      _NavItem('Settings', 'Platform Settings', Icons.tune,
+          (_) => const AdminTableScreen(table: 'platform_settings', title: 'Platform Settings', singular: 'Setting')),
+      _NavItem('Content', 'Broadcasts', Icons.campaign_outlined,
+          (_) => const BroadcastsScreen()),
     ];
 
 /// Permission key per nav item, aligned with [_items] by index.
@@ -129,6 +147,8 @@ const _permKeys = [
   'commission', 'subscriptions', 'corporate', 'packages',
   'service_areas', 'featured', 'revenue', 'analytics', 'users',
   'remedoo_pay', 'team', 'export_data', 'panel_style',
+  'coupons', 'faqs', 'legal_pages', 'slider_media', 'ads',
+  'platform_settings', 'broadcasts',
 ];
 
 /// Admin console shell: light sidebar nav (desktop) / drawer (phone, tablet),

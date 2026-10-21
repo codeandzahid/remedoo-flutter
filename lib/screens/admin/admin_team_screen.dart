@@ -40,6 +40,13 @@ const kStaffSectionOptions = <(String, String)>[
   ('remedoo_pay', 'Remedoo Pay'),
   ('export_data', 'Export Data'),
   ('panel_style', 'Panel Style'),
+  ('coupons', 'Coupons'),
+  ('faqs', 'FAQs'),
+  ('legal_pages', 'Legal Pages'),
+  ('slider_media', 'Home Slider'),
+  ('ads', 'Ads'),
+  ('platform_settings', 'Platform Settings'),
+  ('broadcasts', 'Broadcasts'),
 ];
 
 String staffSectionLabel(String key) {

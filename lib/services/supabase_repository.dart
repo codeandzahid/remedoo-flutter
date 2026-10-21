@@ -1183,6 +1183,8 @@ class SupabaseRepository {
     String? paymentRef,
     String? customerUpi,
     String? prescriptionUrl,
+    double discountAmount = 0,
+    String? couponCode,
   }) async {
     final uid = _uid;
     if (!_ready || uid == null) return null;
@@ -1193,7 +1195,7 @@ class SupabaseRepository {
     final method =
         payment.toLowerCase().contains('online') ? 'online' : 'cod';
     try {
-      final order = await _db.from('orders').insert({
+      final payload = <String, dynamic>{
         'user_id': uid,
         'pharmacy_id': pharmacyId,
         'status': 'placed',
@@ -1210,7 +1212,22 @@ class SupabaseRepository {
         // the pharmacy received an Rx order with nothing to check.
         if (prescriptionUrl != null && prescriptionUrl.isNotEmpty)
           'prescription_url': prescriptionUrl,
-      }).select('id');
+        // Coupon (Patient gap 18): stored on the order when one
+        // was applied; the columns arrive with orders_coupon.sql.
+        if (discountAmount > 0) 'discount_amount': discountAmount,
+        if (discountAmount > 0 && couponCode != null)
+          'coupon_code': couponCode,
+      };
+      List<dynamic> order;
+      try {
+        order = await _db.from('orders').insert(payload).select('id');
+      } catch (_) {
+        // Pre-migration database: drop the coupon columns and
+        // retry so the order itself never fails over a coupon.
+        payload.remove('discount_amount');
+        payload.remove('coupon_code');
+        order = await _db.from('orders').insert(payload).select('id');
+      }
       if (order.isEmpty) return null;
       final orderId = '${order.first['id']}';
       await _patchPaymentInfo('orders', orderId,
@@ -2227,6 +2244,90 @@ class SupabaseRepository {
     } catch (e) {
       debugPrint('updateAnnouncement failed: $e');
       return false;
+    }
+  }
+
+  /// Records a row in broadcast_notifications (audit Admin
+  /// gap 1: the table existed with no UI and no writer). The
+  /// in-app delivery itself goes through announcements — this
+  /// row is the sent-broadcast audit log, stamped with the
+  /// sender.
+  Future<bool> sendBroadcast(
+      {required String title,
+      required String message,
+      required String audience}) async {
+    if (!_ready || _uid == null) return false;
+    try {
+      await _db.from('broadcast_notifications').insert({
+        'title': title,
+        'message': message,
+        'target_audience': audience,
+        'sent_by': _uid,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('sendBroadcast failed: $e');
+      return false;
+    }
+  }
+
+  // ============================================================
+  // Audit-76 Batch 9: coupons (Patient gap 18 — the coupons and
+  // coupon_usage tables existed but neither checkout had a
+  // coupon field, so coupons were unusable end-to-end).
+  // ============================================================
+
+  /// Validates a coupon [code] against an order subtotal.
+  /// Returns a result map: {ok: bool, message: String,
+  /// coupon: row, discount: double}. Pure validation rules live
+  /// in [evaluateCoupon] so they can be unit-tested.
+  Future<Map<String, dynamic>> fetchCouponByCode(String code) async {
+    if (!_ready) return {'ok': false, 'message': 'Offline.'};
+    try {
+      final rows = await _db
+          .from('coupons')
+          .select()
+          .eq('code', code.trim().toUpperCase())
+          .limit(1);
+      if (rows.isEmpty) {
+        return {'ok': false, 'message': 'Coupon not found.'};
+      }
+      return {'ok': true, 'coupon': Map<String, dynamic>.from(rows.first)};
+    } catch (e) {
+      debugPrint('fetchCouponByCode failed: $e');
+      return {'ok': false, 'message': 'Could not check the coupon.'};
+    }
+  }
+
+  /// Records one coupon use and bumps the used counter
+  /// (read-modify-write; the counter is advisory).
+  Future<void> recordCouponUsage({
+    required String couponId,
+    String? orderId,
+    String? appointmentId,
+    required double discountApplied,
+  }) async {
+    if (!_ready || _uid == null) return;
+    try {
+      await _db.from('coupon_usage').insert({
+        'coupon_id': couponId,
+        'user_id': _uid,
+        'order_id': orderId,
+        'appointment_id': appointmentId,
+        'discount_applied': discountApplied,
+      });
+      final rows = await _db
+          .from('coupons')
+          .select('used_count')
+          .eq('id', couponId)
+          .limit(1);
+      if (rows.isNotEmpty) {
+        await _db.from('coupons').update({
+          'used_count': ((rows.first['used_count'] as num?) ?? 0) + 1,
+        }).eq('id', couponId);
+      }
+    } catch (e) {
+      debugPrint('recordCouponUsage failed: $e');
     }
   }
 

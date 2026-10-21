@@ -9,7 +9,9 @@ import '../responsive/responsive.dart';
 import '../services/payment_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/coupons.dart';
 import '../utils/device_actions.dart';
+import '../widgets/coupon_field.dart';
 import '../widgets/widgets.dart';
 import 'payment_failure_screen.dart';
 import '../app_navigator.dart';
@@ -32,6 +34,7 @@ class _RemedooCheckoutScreenState
   final _notes = TextEditingController();
   final _payerUpi = TextEditingController();
   String _payment = 'Cash on Delivery';
+  Map<String, dynamic>? _coupon;
 
   String? _rxFileName;
   Uint8List? _rxBytes;
@@ -62,6 +65,13 @@ class _RemedooCheckoutScreenState
     super.dispose();
   }
 
+  /// Live coupon discount for a subtotal (Patient gap 18).
+  double _couponDiscount(double subtotal) {
+    if (_coupon == null) return 0;
+    final v = evaluateCoupon(_coupon!, subtotal, appliesTo: 'pharmacy');
+    return v.ok ? v.discount : 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
@@ -71,7 +81,7 @@ class _RemedooCheckoutScreenState
     final delivery = subtotal >= state.freeDeliveryThreshold
         ? 0.0
         : state.deliveryFee;
-    final total = subtotal + delivery;
+    final total = subtotal + delivery - _couponDiscount(subtotal);
     final hasRx =
         state.cartLines.any((l) => l.medicine.rxRequired);
     if (state.cartLines.isEmpty) {
@@ -121,6 +131,12 @@ class _RemedooCheckoutScreenState
                         ],
                         const SizedBox(height: 12),
                         _paymentCard(),
+                        const SizedBox(height: 12),
+                        CouponField(
+                          subtotal: subtotal,
+                          onChanged: (c) =>
+                              setState(() => _coupon = c),
+                        ),
                         const SizedBox(height: 12),
                         _notesCard(),
                       ],
@@ -193,7 +209,7 @@ class _RemedooCheckoutScreenState
       final delivery = subtotal >= state.freeDeliveryThreshold
           ? 0.0
           : state.deliveryFee;
-      final total = subtotal + delivery;
+      final total = subtotal + delivery - _couponDiscount(subtotal);
       paymentRef = 'ORD${DateTime.now().millisecondsSinceEpoch}';
       final paid = await _payOnline(state, total, paymentRef);
       if (!paid || !mounted) return;
@@ -215,6 +231,7 @@ class _RemedooCheckoutScreenState
         return;
       }
     }
+    final discount = _couponDiscount(state.cartTotal);
     state.placeOrder(
       address: _address.text.trim(),
       payment: _payment,
@@ -224,7 +241,15 @@ class _RemedooCheckoutScreenState
           ? null
           : _payerUpi.text.trim(),
       notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+      couponCode: discount > 0 ? '${_coupon?['code'] ?? ''}' : null,
+      couponDiscount: discount,
     );
+    if (discount > 0 && _coupon != null) {
+      unawaited(state.supabaseRepository.recordCouponUsage(
+        couponId: '${_coupon!['id']}',
+        discountApplied: discount,
+      ));
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Order placed successfully!')),
     );
@@ -401,6 +426,14 @@ class _RemedooCheckoutScreenState
                 : null,
             valueBold: delivery == 0,
           ),
+          if (_couponDiscount(subtotal) > 0)
+            _row(
+              'Coupon ${_coupon?['code'] ?? ''}',
+              '−${inr(_couponDiscount(subtotal))}',
+              scheme,
+              valueColor: RemedooTheme.success,
+              valueBold: true,
+            ),
           if (delivery > 0)
             Padding(
               padding: const EdgeInsets.only(top: 2),

@@ -958,6 +958,111 @@ List<AdminField> adminTableFields(String table) {
         AdminField(key: 'description', label: 'Description', type: 'textarea'),
         AdminField(key: 'image_url', label: 'Photo URL', type: 'url'),
       ];
+    // Audit-76 Batch 9 (Admin gap 1 / M15): whole backend tables
+    // that had NO admin UI at all — they could only be managed by
+    // writing SQL. Each now gets a full CRUD spec.
+    case 'coupons':
+      return const [
+        AdminField(key: 'code', label: 'Code', required: true),
+        AdminField(
+            key: 'description', label: 'Description', type: 'textarea'),
+        AdminField(
+            key: 'discount_type',
+            label: 'Discount Type',
+            type: 'dropdown',
+            options: ['percentage', 'flat'],
+            defaultValue: 'percentage'),
+        AdminField(
+            key: 'discount_value',
+            label: 'Discount Value',
+            type: 'double',
+            required: true,
+            min: 0),
+        AdminField(
+            key: 'min_order_amount',
+            label: 'Min Order Amount (₹)',
+            type: 'double',
+            min: 0),
+        AdminField(
+            key: 'max_discount_amount',
+            label: 'Max Discount (₹)',
+            type: 'double',
+            min: 0),
+        AdminField(
+            key: 'usage_limit', label: 'Usage Limit', type: 'int', min: 0),
+        AdminField(
+            key: 'applicable_for',
+            label: 'Applies To',
+            type: 'dropdown',
+            options: ['all', 'pharmacy', 'lab', 'doctor', 'hospital'],
+            defaultValue: 'all'),
+        AdminField(key: 'valid_from', label: 'Valid From', type: 'date'),
+        AdminField(key: 'valid_until', label: 'Valid Until', type: 'date'),
+        AdminField(key: 'is_active', label: 'Active', type: 'bool'),
+      ];
+    case 'faqs':
+      return const [
+        AdminField(
+            key: 'question', label: 'Question', required: true, type: 'textarea'),
+        AdminField(
+            key: 'answer', label: 'Answer', required: true, type: 'textarea'),
+        AdminField(
+            key: 'category', label: 'Category', defaultValue: 'general'),
+        AdminField(key: 'sort_order', label: 'Sort Order', type: 'int'),
+        AdminField(key: 'is_active', label: 'Active', type: 'bool'),
+      ];
+    case 'legal_pages':
+      return const [
+        AdminField(key: 'slug', label: 'Slug', required: true),
+        AdminField(key: 'title', label: 'Title', required: true),
+        AdminField(
+            key: 'content', label: 'Content', type: 'textarea'),
+      ];
+    case 'slider_media':
+      return const [
+        AdminField(
+            key: 'type',
+            label: 'Type',
+            type: 'dropdown',
+            options: ['image', 'video'],
+            defaultValue: 'image'),
+        AdminField(key: 'url', label: 'Media URL', required: true, type: 'url'),
+        AdminField(key: 'target_link', label: 'Target Link', type: 'url'),
+        AdminField(key: 'title', label: 'Title'),
+        AdminField(
+            key: 'description', label: 'Description', type: 'textarea'),
+        AdminField(key: 'sort_order', label: 'Sort Order', type: 'int'),
+        AdminField(key: 'active', label: 'Active', type: 'bool'),
+      ];
+    case 'ads':
+      return const [
+        AdminField(
+            key: 'type',
+            label: 'Type',
+            type: 'dropdown',
+            options: ['banner', 'interstitial'],
+            defaultValue: 'banner'),
+        AdminField(
+            key: 'content_url', label: 'Content URL', required: true, type: 'url'),
+        AdminField(key: 'target_link', label: 'Target Link', type: 'url'),
+        AdminField(key: 'placement', label: 'Placement'),
+        AdminField(key: 'title', label: 'Title'),
+        AdminField(key: 'active', label: 'Active', type: 'bool'),
+      ];
+    case 'platform_settings':
+      return const [
+        AdminField(key: 'key', label: 'Key', required: true),
+        AdminField(key: 'value', label: 'Value', type: 'textarea'),
+        AdminField(key: 'label', label: 'Label', required: true),
+        AdminField(
+            key: 'category', label: 'Category', defaultValue: 'general'),
+        AdminField(
+            key: 'type',
+            label: 'Value Type',
+            type: 'dropdown',
+            options: ['text', 'number', 'boolean', 'json'],
+            defaultValue: 'text'),
+      ];
     default:
       return const [
         AdminField(key: 'name', label: 'Name', required: true),
@@ -967,7 +1072,8 @@ List<AdminField> adminTableFields(String table) {
 
 /// Display title for a row.
 String adminTableTitle(String table, Map<String, dynamic> r) {
-  final name = '${r['name'] ?? r['title'] ?? r['id'] ?? 'Item'}';
+  final name =
+      '${r['name'] ?? r['code'] ?? r['question'] ?? r['title'] ?? r['label'] ?? r['slug'] ?? r['key'] ?? r['url'] ?? r['content_url'] ?? r['id'] ?? 'Item'}';
   return name;
 }
 
@@ -988,6 +1094,20 @@ String adminTableSubtitle(String table, Map<String, dynamic> r) {
       final price = r['price'];
       return '${r['category'] ?? ''}${price != null ? ' · ₹$price' : ''}'
           .trim();
+    case 'coupons':
+      return '${r['discount_type'] ?? 'percentage'} ${r['discount_value'] ?? 0}'
+          '${r['is_active'] == true ? '' : ' · inactive'}';
+    case 'faqs':
+      return '${r['category'] ?? 'general'}'
+          '${r['is_active'] == true ? '' : ' · inactive'}';
+    case 'legal_pages':
+      return '${r['slug'] ?? ''}';
+    case 'slider_media':
+    case 'ads':
+      return '${r['type'] ?? ''}'
+          '${r['active'] == true ? '' : ' · inactive'}';
+    case 'platform_settings':
+      return '${r['category'] ?? 'general'} · ${r['value'] ?? ''}';
     default:
       return '${r['location'] ?? ''}';
   }
