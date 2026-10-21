@@ -14,6 +14,7 @@ import '../utils/coupons.dart';
 import '../utils/device_actions.dart';
 import '../widgets/coupon_field.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import 'remedoo_pharmacy_screen.dart';
 import 'payment_failure_screen.dart';
 import '../app_navigator.dart';
@@ -158,6 +159,15 @@ class _CartScreenState extends State<CartScreen> {
                 _addressCard(),
                 const SizedBox(height: 12),
                 _paymentCard(),
+                if (_payment == 'Pay Online') ...[
+                  const SizedBox(height: 12),
+                  RKitField(
+                    controller: _payerUpi,
+                    label: 'Your UPI ID (for refunds, optional)',
+                    icon: Icons.account_balance_wallet_outlined,
+                    hint: 'name@bank',
+                  ),
+                ],
                 const SizedBox(height: 12),
                 CouponField(
                   subtotal: subtotal,
@@ -640,14 +650,14 @@ class _CartScreenState extends State<CartScreen> {
             ),
             const SizedBox(height: 10),
           ],
-          RTextField(
+          RKitField(
             label: 'Delivery Address',
             hint: 'Enter your full delivery address…',
             controller: _address,
             maxLines: 2,
           ),
           const SizedBox(height: 10),
-          RTextField(
+          RKitField(
             label: 'Special instructions (optional)',
             hint: 'Any special instructions? (optional)',
             controller: _instructions,
@@ -689,7 +699,7 @@ class _CartScreenState extends State<CartScreen> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Material(
                 color: selected
-                    ? scheme.primary.withValues(alpha: 0.06)
+                    ? RFormBrand.blue.withValues(alpha: 0.06)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
@@ -701,7 +711,7 @@ class _CartScreenState extends State<CartScreen> {
                     decoration: BoxDecoration(
                       border: Border.all(
                         color: selected
-                            ? scheme.primary
+                            ? RFormBrand.blue
                             : Theme.of(context).dividerColor,
                         width: selected ? 1.5 : 1,
                       ),
@@ -716,7 +726,7 @@ class _CartScreenState extends State<CartScreen> {
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: selected
-                                  ? scheme.primary
+                                  ? RFormBrand.blue
                                   : scheme.onSurfaceVariant,
                               width: 2,
                             ),
@@ -728,7 +738,7 @@ class _CartScreenState extends State<CartScreen> {
                                     height: 10,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: scheme.primary,
+                                      color: RFormBrand.blue,
                                     ),
                                   ),
                                 )
@@ -773,14 +783,6 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ],
             ),
-          if (_payment == 'Pay Online') ...[
-            const SizedBox(height: 6),
-            RTextField(
-              controller: _payerUpi,
-              label: 'Your UPI ID (for refunds, optional)',
-              hint: 'yourname@okhdfcbank',
-            ),
-          ],
         ],
       ),
     );

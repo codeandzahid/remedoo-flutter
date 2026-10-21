@@ -4,6 +4,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 
 /// "Forgot Password": request a reset link (React ForgotPassword.tsx).
 class ForgotPasswordScreen extends StatefulWidget {
@@ -175,7 +176,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           crossAxisAlignment:
                               CrossAxisAlignment.stretch,
                           children: [
-                            RTextField(
+                            RKitField(
                               label: 'Email',
                               hint: 'your@email.com',
                               controller: _email,

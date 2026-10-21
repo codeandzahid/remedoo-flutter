@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
-import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import '../theme.dart';
 
 /// Professional "Submit a New Query" bottom sheet.
@@ -194,7 +194,7 @@ class _NewQuerySheetState extends State<NewQuerySheet> {
             style:
                 TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
-        RTextField(
+        RKitField(
           controller: _subject,
           textInputAction: TextInputAction.next,
           hint: 'e.g. Payment deducted but booking failed',
@@ -212,7 +212,7 @@ class _NewQuerySheetState extends State<NewQuerySheet> {
             style:
                 TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
-        RTextField(
+        RKitField(
           controller: _message,
           minLines: 4,
           maxLines: 6,

@@ -9,6 +9,7 @@ import '../state/app_state.dart';
 import '../app_navigator.dart';
 import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import 'login_screen.dart';
 
 /// My Profile: avatar, name/email, phone, gender, address, password section.
@@ -76,60 +77,153 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// when one is passed (2026-10-19; edit support added by the
   /// patient-panel audit fix the same day).
   Future<void> _addAddress(AppState state, {SavedAddress? existing}) async {
-    final labelCtrl =
-        TextEditingController(text: existing?.label ?? 'Home');
-    final addrCtrl = TextEditingController(text: existing?.address ?? '');
+    // UI redesign: the dialog grows up — quick Label chips
+    // (Home / Office / Other) and separate House/Street, City and
+    // PIN fields. The saved-address book still stores ONE composed
+    // text, so the parts are joined on save exactly like before;
+    // on edit the stored text is split back only when it parses
+    // safely (trailing 6-digit PIN), otherwise it stays whole in
+    // the street field.
+    const chipLabels = ['Home', 'Office', 'Other'];
+    var label = existing?.label ?? 'Home';
+    var customLabel = chipLabels.contains(label) ? '' : label;
+    if (!chipLabels.contains(label)) label = 'Other';
+    var street = existing?.address ?? '';
+    var city = '';
+    var pin = '';
+    if (existing != null) {
+      final parts =
+          street.split(',').map((e) => e.trim()).toList();
+      if (parts.length >= 3 &&
+          RegExp(r'^\d{6}$').hasMatch(parts.last)) {
+        pin = parts.removeLast();
+        city = parts.removeLast();
+        street = parts.join(', ');
+      }
+    }
+    final labelCtrl = TextEditingController(text: customLabel);
+    final streetCtrl = TextEditingController(text: street);
+    final cityCtrl = TextEditingController(text: city);
+    final pinCtrl = TextEditingController(text: pin);
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(existing == null ? 'Add Address' : 'Edit Address'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RTextField(
-                controller: labelCtrl,
-                label: 'Label',
-                hint: 'Home, Office…',
-              ),
-              const SizedBox(height: 10),
-              RTextField(
-                controller: addrCtrl,
-                maxLines: 3,
-                label: 'Full address',
-              ),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => Dialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                RFormHeaderBand(
+                  title:
+                      existing == null ? 'Add Address' : 'Edit Address',
+                  icon: Icons.location_on_outlined,
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Label',
+                            style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        RLabelChips(
+                          options: chipLabels,
+                          selected: label,
+                          onSelected: (v) => setDlg(() => label = v),
+                        ),
+                        if (label == 'Other') ...[
+                          const SizedBox(height: 14),
+                          RKitField(
+                            controller: labelCtrl,
+                            label: 'Custom label',
+                            hint: 'e.g. Clinic, Farmhouse',
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        RKitField(
+                          controller: streetCtrl,
+                          label: 'House / Street',
+                          icon: Icons.signpost_outlined,
+                          hint: 'House no, street, area',
+                          maxLines: 2,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: RKitField(
+                                controller: cityCtrl,
+                                label: 'City',
+                                icon: Icons.location_city_outlined,
+                                hint: 'Your city',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: RKitField(
+                                controller: pinCtrl,
+                                label: 'PIN code',
+                                icon: Icons.pin_outlined,
+                                hint: '6-digit PIN',
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: RFormActions(
+                    onCancel: () => Navigator.pop(ctx, false),
+                    onPrimary: () => Navigator.pop(ctx, true),
+                    primaryLabel: 'Save',
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Save')),
-        ],
       ),
     );
     if (saved != true || !mounted) return;
-    final addr = addrCtrl.text.trim();
+    final addr = [
+      streetCtrl.text.trim(),
+      cityCtrl.text.trim(),
+      pinCtrl.text.trim(),
+    ].where((e) => e.isNotEmpty).join(', ');
     if (addr.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please enter the address.')));
       return;
     }
-    final label =
-        labelCtrl.text.trim().isEmpty ? 'Home' : labelCtrl.text.trim();
+    final finalLabel =
+        label == 'Other' && labelCtrl.text.trim().isNotEmpty
+            ? labelCtrl.text.trim()
+            : label;
     if (existing != null) {
       state.updateSavedAddress(SavedAddress(
         id: existing.id,
-        label: label,
+        label: finalLabel,
         address: addr,
       ));
     } else {
       state.addSavedAddress(SavedAddress(
         id: 'A${DateTime.now().millisecondsSinceEpoch}',
-        label: label,
+        label: finalLabel,
         address: addr,
       ));
     }
@@ -293,16 +387,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          RTextField(
+                          RKitField(
                             label: 'Full Name',
                             labelIcon: Icons.person_outline,
-                            hint: 'Your full name',
+                            icon: Icons.person_outline,
+                            hint: 'Enter your full name',
                             controller: _name,
                           ),
                           const SizedBox(height: 18),
-                          RTextField(
+                          RKitField(
                             label: 'Email',
                             labelIcon: Icons.mail_outline,
+                            icon: Icons.mail_outline,
                             controller: _email,
                             enabled: false,
                           ),
@@ -316,10 +412,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 18),
-                          RTextField(
+                          RKitField(
                             label: 'Phone',
                             labelIcon: Icons.phone_outlined,
-                            hint: '+91 98765 43210',
+                            icon: Icons.phone_outlined,
+                            hint: 'Enter your phone number',
                             controller: _phone,
                             keyboardType: TextInputType.phone,
                           ),
@@ -385,16 +482,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 18),
-                          DropdownButtonFormField<String>(
-                            initialValue:
-                                AppState.languageCodes
-                                        .containsKey(_languageSel)
-                                    ? _languageSel
-                                    : 'English',
-                            decoration: const InputDecoration(
-                              labelText: 'Preferred Language',
-                              isDense: true,
-                            ),
+                          RKitDropdown<String>(
+                            label: 'Preferred Language',
+                            labelIcon: Icons.language_outlined,
+                            icon: Icons.language_outlined,
+                            value: AppState.languageCodes
+                                    .containsKey(_languageSel)
+                                ? _languageSel
+                                : 'English',
                             items: AppState.languageCodes.keys
                                 .map((l) => DropdownMenuItem(
                                     value: l, child: Text(l)))
@@ -403,10 +498,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 () => _languageSel = v ?? 'English'),
                           ),
                           const SizedBox(height: 18),
-                          RTextField(
+                          RKitField(
                             label: 'UPI ID (for refunds)',
                             labelIcon: Icons.account_balance_wallet_outlined,
-                            hint: 'yourname@upi',
+                            icon: Icons.account_balance_wallet_outlined,
+                            hint: 'name@bank',
                             controller: _upi,
                           ),
                         ],
@@ -473,8 +569,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          RTextField(
+                          RKitField(
                             label: 'Address',
+                            icon: Icons.location_on_outlined,
                             hint:
                                 'Enter your address or use GPS to auto-detect...',
                             controller: _address,
@@ -593,11 +690,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    RButton(
-                      label: 'Save Changes',
-                      icon: Icons.save_outlined,
-                      fullWidth: true,
-                      onPressed: () async {
+                    SizedBox(
+                      height: 52,
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: RFormBrand.blue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        icon: const Icon(Icons.save_outlined, size: 19),
+                        label: const Text('Save Changes',
+                            style: TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w700)),
+                        onPressed: () async {
                         final messenger =
                             ScaffoldMessenger.of(context);
                         final ok = await state.updateProfile(
@@ -617,7 +725,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ? 'Profile saved!'
                                   : 'Saved locally; cloud sync failed.')),
                         );
-                      },
+                        },
+                      ),
                     ),
                     const SizedBox(height: 16),
                     // Change password (expandable).
@@ -785,12 +894,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 color: scheme.onSurfaceVariant),
                           ),
                           const SizedBox(height: 12),
-                          RButton(
-                            label: 'Delete My Account',
-                            icon: Icons.delete_forever_outlined,
-                            variant: RButtonVariant.danger,
-                            fullWidth: true,
-                            onPressed: () => _deleteAccount(state),
+                          SizedBox(
+                            height: 48,
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: RemedooTheme.destructive,
+                                side: BorderSide(
+                                    color: RemedooTheme.destructive
+                                        .withValues(alpha: 0.55),
+                                    width: 1.2),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(999),
+                                ),
+                              ),
+                              icon: const Icon(
+                                  Icons.delete_forever_outlined,
+                                  size: 18),
+                              label: const Text('Delete My Account',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600)),
+                              onPressed: () => _deleteAccount(state),
+                            ),
                           ),
                         ],
                       ),
@@ -851,7 +978,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: selected
-                      ? scheme.primary
+                      ? RFormBrand.blue
                       : Theme.of(context).dividerColor,
                   width: 2,
                 ),
@@ -861,9 +988,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Container(
                         width: 10,
                         height: 10,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: scheme.primary,
+                          color: RFormBrand.blue,
                         ),
                       ),
                     )

@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import 'signup_screen.dart';
 import 'admin/admin_login_screen.dart';
 import 'forgot_password_screen.dart';
@@ -165,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          RTextField(
+                          RKitField(
                             label: 'Email',
                             hint: 'you@example.com',
                             controller: _email,
@@ -175,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 size: 18),
                           ),
                           const SizedBox(height: 14),
-                          RTextField(
+                          RKitField(
                             label: 'Password',
                             hint: 'Enter your password',
                             controller: _password,

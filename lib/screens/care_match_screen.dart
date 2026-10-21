@@ -7,6 +7,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import 'doctor_detail_screen.dart';
 import 'hospital_detail_screen.dart';
 import 'lab_detail_screen.dart';
@@ -294,7 +295,7 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700)),
                           const SizedBox(height: 8),
-                          RTextField(
+                          RKitField(
                             label: 'Describe your symptoms',
                             hint:
                                 'e.g. Sharp stomach pain with nausea for two days, worse after meals',
@@ -355,7 +356,7 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                           Row(
                             children: [
                               Expanded(
-                                child: RTextField(
+                                child: RKitField(
                                   label: 'Budget (₹)',
                                   hint: 'e.g. 500',
                                   controller: _budget,
@@ -365,7 +366,7 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: RTextField(
+                                child: RKitField(
                                   label: 'Max distance (km)',
                                   hint: 'e.g. 10',
                                   controller: _distance,
@@ -376,7 +377,7 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                             ],
                           ),
                           const SizedBox(height: 14),
-                          RTextField(
+                          RKitField(
                             label: 'Anything else? (optional)',
                             hint:
                                 'e.g. prefer a female doctor, home sample collection',

@@ -97,6 +97,17 @@ void main() {
         ),
         state));
     await tester.pumpAndSettle();
+    // UI redesign: nothing is pre-selected — pick date + time first.
+    await tester.tap(find.byKey(const ValueKey('booking-date-0')));
+    await tester.pumpAndSettle();
+    // The time chips are the ones labelled in 12-hour AM/PM.
+    final timeChip = find.byWidgetPredicate((w) =>
+        w is ChoiceChip &&
+        w.label is Text &&
+        ((w.label as Text).data?.contains(RegExp(r'AM|PM')) ?? false));
+    expect(timeChip.evaluate().isNotEmpty, isTrue);
+    await tester.tap(timeChip.first);
+    await tester.pumpAndSettle();
 
     // The page's vertical list (the date strip has its own horizontal one).
     final pageList = find.byWidgetPredicate(
@@ -165,6 +176,17 @@ void main() {
           fee: d.fee,
         ),
         state));
+    await tester.pumpAndSettle();
+    // UI redesign: nothing is pre-selected — pick date + time first.
+    await tester.tap(find.byKey(const ValueKey('booking-date-0')));
+    await tester.pumpAndSettle();
+    // The time chips are the ones labelled in 12-hour AM/PM.
+    final timeChip = find.byWidgetPredicate((w) =>
+        w is ChoiceChip &&
+        w.label is Text &&
+        ((w.label as Text).data?.contains(RegExp(r'AM|PM')) ?? false));
+    expect(timeChip.evaluate().isNotEmpty, isTrue);
+    await tester.tap(timeChip.first);
     await tester.pumpAndSettle();
 
     final pageList = find.byWidgetPredicate(

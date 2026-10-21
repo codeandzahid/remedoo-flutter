@@ -6,6 +6,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import '../app_navigator.dart';
 
 /// Health reminders with Upcoming / Completed segmented filter.
@@ -336,12 +337,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  RTextField(
+                  RKitField(
                       label: 'Title *',
                       hint: 'Reminder title',
                       controller: title),
                   const SizedBox(height: 12),
-                  RTextField(
+                  RKitField(
                       label: 'Notes (optional)',
                       hint: 'e.g. Take after food',
                       controller: notes),

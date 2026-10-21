@@ -4,6 +4,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 
 /// Set a new password after opening a password-recovery link
 /// (React ResetPassword.tsx). The recovery link creates a Supabase session;
@@ -128,7 +129,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      RTextField(
+                      RKitField(
                         label: 'New Password',
                         hint: 'Min. 8 characters',
                         controller: _p1,
@@ -148,7 +149,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      RTextField(
+                      RKitField(
                         label: 'Confirm Password',
                         hint: 'Repeat your password',
                         controller: _p2,

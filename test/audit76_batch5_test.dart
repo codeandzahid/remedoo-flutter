@@ -136,7 +136,9 @@ void main() {
     test('Patient 12/13: booking carries department and video flag',
         () {
       final booking = read('lib/screens/booking_screen.dart');
-      expect(booking.contains('department: _department.text'), isTrue);
+      // UI redesign: Department is a dropdown of real specialties;
+      // the payload now carries the selection, not free text.
+      expect(booking.contains('department: _departmentSel'), isTrue);
       expect(booking.contains('isVideoConsultation: _video'), isTrue);
       final state = read('lib/state/app_state.dart');
       expect(state.contains('department: appt.department'), isTrue);

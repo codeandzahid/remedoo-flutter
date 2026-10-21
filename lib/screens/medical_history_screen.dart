@@ -6,6 +6,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import '../app_navigator.dart';
 
 /// Medical History: unified expandable timeline with type filters.
@@ -282,7 +283,7 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
                   onChanged: (v) => setD(() => kind = v ?? 'Other'),
                 ),
                 const SizedBox(height: 10),
-                RTextField(
+                RKitField(
                   controller: titleCtrl,
                   label: 'Title',
                   hint: 'e.g. Allergic to penicillin',
@@ -307,7 +308,7 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                RTextField(
+                RKitField(
                   controller: notesCtrl,
                   maxLines: 2,
                   label: 'Notes (optional)',

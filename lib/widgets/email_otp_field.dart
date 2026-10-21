@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../theme.dart';
 import 'widgets.dart';
+import 'form_kit.dart';
 
 /// Locked card showing a verified email address (not editable).
 class VerifiedEmailCard extends StatelessWidget {  final String email;
@@ -233,7 +234,7 @@ class _EmailOtpFieldState extends State<EmailOtpField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        RTextField(
+        RKitField(
           label: widget.label,
           hint: widget.hint,
           controller: widget.controller,
@@ -272,7 +273,7 @@ class _EmailOtpFieldState extends State<EmailOtpField> {
           ),
         ] else ...[
           const SizedBox(height: 10),
-          RTextField(
+          RKitField(
             label: 'Enter OTP',
             hint: 'Enter the code',
             controller: _otp,

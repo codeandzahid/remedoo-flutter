@@ -5,6 +5,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import 'profile_screen.dart';
 import 'appointments_screen.dart';
 import 'family_screen.dart';
@@ -127,8 +128,9 @@ class SettingsScreen extends StatelessWidget {
                           icon: Icons.dark_mode_outlined,
                           label: 'Dark Mode',
                           trailing: Switch(
+                            activeThumbColor: Colors.white,
+                            activeTrackColor: RFormBrand.blue,
                             value: state.darkMode,
-                            activeThumbColor: scheme.primary,
                             onChanged: state.setDarkMode,
                           ),
                         ),
@@ -137,8 +139,9 @@ class SettingsScreen extends StatelessWidget {
                           icon: Icons.notifications_outlined,
                           label: 'Email Notifications',
                           trailing: Switch(
+                            activeThumbColor: Colors.white,
+                            activeTrackColor: RFormBrand.blue,
                             value: state.emailNotif,
-                            activeThumbColor: scheme.primary,
                             onChanged: (_) =>
                                 state.toggleEmailNotif(),
                           ),
@@ -149,8 +152,9 @@ class SettingsScreen extends StatelessWidget {
                           label: 'Push Notifications',
                           last: true,
                           trailing: Switch(
+                            activeThumbColor: Colors.white,
+                            activeTrackColor: RFormBrand.blue,
                             value: state.pushNotif,
-                            activeThumbColor: scheme.primary,
                             onChanged: (_) =>
                                 state.togglePushNotif(),
                           ),

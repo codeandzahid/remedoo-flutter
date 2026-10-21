@@ -102,8 +102,14 @@ void main() {
       fee: d.fee,
     )));
     await tester.pumpAndSettle();
-    // Pick first available time slot
-    final chips = find.byType(ChoiceChip);
+    // UI redesign: nothing is pre-selected — pick a date first,
+    // then the first available time slot.
+    await tester.tap(find.byKey(const ValueKey('booking-date-0')));
+    await tester.pumpAndSettle();
+    final chips = find.byWidgetPredicate((w) =>
+        w is ChoiceChip &&
+        w.label is Text &&
+        ((w.label as Text).data?.contains(RegExp(r'AM|PM')) ?? false));
     expect(chips.evaluate().isNotEmpty, isTrue);
     await tester.tap(chips.first);
     await tester.pumpAndSettle();
@@ -211,6 +217,17 @@ void main() {
               place: 'Test Clinic',
               fee: 500,
             ))));
+    await tester.pumpAndSettle();
+    // UI redesign: nothing is pre-selected — pick date + time first.
+    await tester.tap(find.byKey(const ValueKey('booking-date-0')));
+    await tester.pumpAndSettle();
+    // The time chips are the ones labelled in 12-hour AM/PM.
+    final timeChip = find.byWidgetPredicate((w) =>
+        w is ChoiceChip &&
+        w.label is Text &&
+        ((w.label as Text).data?.contains(RegExp(r'AM|PM')) ?? false));
+    expect(timeChip.evaluate().isNotEmpty, isTrue);
+    await tester.tap(timeChip.first);
     await tester.pumpAndSettle();
     final confirm = find.textContaining('Confirm Booking');
     expect(confirm, findsOneWidget);

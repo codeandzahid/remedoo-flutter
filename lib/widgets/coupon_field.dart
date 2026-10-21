@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_repository.dart';
 import '../utils/coupons.dart';
 import 'widgets.dart';
+import 'form_kit.dart';
 
 /// Coupon code entry for the patient checkouts (audit-76
 /// Batch 9, Patient gap 18). Validates against the real
@@ -119,7 +120,7 @@ class _CouponFieldState extends State<CouponField> {
           Row(
             children: [
               Expanded(
-                child: RTextField(
+                child: RKitField(
                   label: 'Coupon code',
                   hint: 'e.g. SAVE10',
                   controller: _code,

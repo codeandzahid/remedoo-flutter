@@ -6,6 +6,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import '../app_navigator.dart';
 
 /// Family members management.
@@ -257,12 +258,12 @@ class FamilyScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                RTextField(
+                RKitField(
                     label: 'Full name *',
                     hint: 'Full name',
                     controller: name),
                 const SizedBox(height: 12),
-                RTextField(
+                RKitField(
                     label: 'Relation *',
                     hint: 'Relation (e.g. Mother)',
                     controller: relation),
@@ -324,12 +325,12 @@ class FamilyScreen extends StatelessWidget {
                   onChanged: (v) => setLocal(() => blood = v),
                 ),
                 const SizedBox(height: 12),
-                RTextField(
+                RKitField(
                     label: 'Allergies',
                     hint: 'e.g. Penicillin, peanuts',
                     controller: allergies),
                 const SizedBox(height: 12),
-                RTextField(
+                RKitField(
                     label: 'Chronic conditions',
                     hint: 'e.g. Diabetes, asthma',
                     controller: conditions),

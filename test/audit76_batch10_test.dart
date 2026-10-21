@@ -19,29 +19,37 @@ void main() {
       expect(w.contains('errorText: errorText'), isTrue);
     });
 
-    test('vitals add + edit use RTextField; edit dialog scrolls', () {
+    test('vitals add + edit use the shared field; dialog scrolls',
+        () {
       final s = _src('lib/screens/vitals_screen.dart');
       expect(s.contains(' TextField('), isFalse);
       expect(s.contains('SingleChildScrollView'), isTrue);
     });
 
-    test('lab report upload dialog uses RTextField and scrolls', () {
+    test('lab report upload dialog uses the shared field', () {
       final s = _src('lib/screens/lab_reports_screen.dart');
       expect(s.contains("label: 'Report name'"), isTrue);
       // The only raw TextField left is the dark header search.
       expect(s.contains("hintText: 'Search tests or labs…'"), isTrue);
     });
 
-    test('medical history + address dialogs use RTextField', () {
+    test('medical history + address dialogs use the shared field', () {
       final h = _src('lib/screens/medical_history_screen.dart');
       expect(h.contains(' TextField('), isFalse);
+      // UI redesign: the address dialog grew House/Street, City and
+      // PIN fields (composed into the same stored text) — the old
+      // single 'Full address' field pin moved with it.
       final p = _src('lib/screens/profile_screen.dart');
-      expect(p.contains("label: 'Full address'"), isTrue);
+      expect(p.contains("label: 'House / Street'"), isTrue);
+      expect(p.contains("label: 'PIN code'"), isTrue);
+      expect(p.contains('RLabelChips'), isTrue);
     });
 
-    test('support ticket form fields use RTextField with errors', () {
+    test('support ticket form fields use the kit field with errors',
+        () {
       final s = _src('lib/screens/new_query_sheet.dart');
-      expect(s.contains('RTextField('), isTrue);
+      // UI redesign: RTextField was superseded by the kit field.
+      expect(s.contains('RKitField('), isTrue);
       expect(s.contains('errorText: _subjectError'), isTrue);
       expect(s.contains('errorText: _messageError'), isTrue);
     });

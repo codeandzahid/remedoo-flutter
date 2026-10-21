@@ -6,6 +6,7 @@ import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 
 /// Health Numbers (2026-10-19): the patient logs BP, sugar and weight
 /// readings; stored on-device with the account session (cleared at
@@ -70,7 +71,7 @@ class _VitalsScreenState extends State<VitalsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              RTextField(
+              RKitField(
                 controller: v1,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
@@ -82,7 +83,7 @@ class _VitalsScreenState extends State<VitalsScreen> {
               ),
               if (v.type == 'bp') ...[
                 const SizedBox(height: 10),
-                RTextField(
+                RKitField(
                   controller: v2,
                   keyboardType: TextInputType.number,
                   label: 'Diastolic (bottom)',
@@ -221,7 +222,7 @@ class _VitalsScreenState extends State<VitalsScreen> {
                           Row(
                             children: [
                               Expanded(
-                                child: RTextField(
+                                child: RKitField(
                                   controller: _v1,
                                   keyboardType: TextInputType.number,
                                   label: 'Systolic (top)',
@@ -230,7 +231,7 @@ class _VitalsScreenState extends State<VitalsScreen> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: RTextField(
+                                child: RKitField(
                                   controller: _v2,
                                   keyboardType: TextInputType.number,
                                   label: 'Diastolic (bottom)',
@@ -240,7 +241,7 @@ class _VitalsScreenState extends State<VitalsScreen> {
                             ],
                           )
                         else
-                          RTextField(
+                          RKitField(
                             controller: _v1,
                             keyboardType: const TextInputType.numberWithOptions(
                                 decimal: true),

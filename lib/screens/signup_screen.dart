@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/email_otp_field.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 
 /// Whether a Step 2 submit result means the account is finished and
 /// the form should hand over to the app: the submit succeeded, OR it
@@ -416,7 +417,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               done: false,
                             ),
                             const SizedBox(height: 12),
-                            RTextField(
+                            RKitField(
                               label: 'Full Name',
                               hint: 'Your full name',
                               controller: _name,
@@ -425,7 +426,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   size: 18),
                             ),
                             const SizedBox(height: 14),
-                            RTextField(
+                            RKitField(
                               label: 'Mobile Number (optional)',
                               hint: '+91 XXXXX XXXXX',
                               controller: _phone,
@@ -439,7 +440,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             const SizedBox(height: 14),
                             _dobField(scheme),
                             const SizedBox(height: 14),
-                            RTextField(
+                            RKitField(
                               label: 'Password',
                               hint: 'At least 8 characters',
                               controller: _password,

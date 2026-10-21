@@ -11,6 +11,7 @@ import '../services/payment_service.dart';
 import '../services/supabase_repository.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import 'appointments_screen.dart';
 import '../app_navigator.dart';
 
@@ -65,11 +66,17 @@ const _months = [
 ];
 
 class _BookingScreenState extends State<BookingScreen> {
-  late DateTime _date;
-  late String _time;
+  // UI redesign: no pre-selected date/time — both start empty so
+  // the form never looks already filled. A reschedule prefill (an
+  // explicit upstream choice) still selects its own slot.
+  DateTime? _date;
+  String? _time;
   late String _payment;
   final _notes = TextEditingController();
-  final _department = TextEditingController();
+  // Department is a dropdown of real specialties (was free text);
+  // pre-filled with the provider's own when known.
+  String? _departmentSel;
+  bool _deptInit = false;
   bool _video = false;
   // Lab collection choice (audit Patient 11).
   String _collectionType = 'walk_in';
@@ -83,10 +90,10 @@ class _BookingScreenState extends State<BookingScreen> {
     super.initState();
     final now = DateTime.now();
     _days = List.generate(7, (i) => now.add(Duration(days: i)));
-    _date = widget.prefill != null
-        ? DateTime(now.year, now.month, now.day)
-        : _days.first;
-    _time = widget.prefill?.timeLabel ?? '10:00';
+    if (widget.prefill != null) {
+      _date = DateTime(now.year, now.month, now.day);
+      _time = widget.prefill!.timeLabel;
+    }
     _payment = widget.prefill?.payment ?? 'Pay Online';
     if (widget.prefill != null) _notes.text = widget.prefill!.notes;
     // Load the doctor's blocked slots so they can be filtered
@@ -309,7 +316,6 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   void dispose() {
     _notes.dispose();
-    _department.dispose();
     _collectionAddress.dispose();
     _payerUpi.dispose();
     super.dispose();
@@ -414,6 +420,13 @@ class _BookingScreenState extends State<BookingScreen> {
 
   void _confirm(bool isReschedule) async {
     if (!checkLogin(context, 'Please login to book appointments')) return;
+    if (_date == null || _time == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Please pick a date and a time first.')),
+      );
+      return;
+    }
     // Owner's rule: no active payment option on the panelist means
     // no booking (the button is disabled too — this is the backstop).
     if (!isReschedule && _payment == 'Not Available') {
@@ -465,7 +478,7 @@ class _BookingScreenState extends State<BookingScreen> {
           title: const Text('Final Confirmation'),
           content: Text(
             'Book appointment with ${widget.title}\n'
-            'on ${_date.day}/${_date.month}/${_date.year} at $_time?\n\n'
+            'on ${_date!.day}/${_date!.month}/${_date!.year} at ${rTime12(_time!)}?\n\n'
             'This will send a request to the doctor for approval.',
           ),
           actions: [
@@ -486,8 +499,8 @@ class _BookingScreenState extends State<BookingScreen> {
     if (isReschedule) {
       state.rescheduleAppointment(
         widget.prefill!.id,
-        _date,
-        _time,
+        _date!,
+        _time!,
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Appointment rescheduled!')),
@@ -538,8 +551,8 @@ class _BookingScreenState extends State<BookingScreen> {
         subtitle: widget.subtitle,
         place: widget.place,
         fee: widget.fee,
-        date: _date,
-        timeLabel: _time,
+        date: _date!,
+        timeLabel: _time!,
         payment: _payment,
         notes: _notes.text.trim(),
         tests: widget.tests ?? const [],
@@ -556,9 +569,7 @@ class _BookingScreenState extends State<BookingScreen> {
         customerUpi: _payerUpi.text.trim().isEmpty
             ? null
             : _payerUpi.text.trim(),
-        department: _department.text.trim().isEmpty
-            ? null
-            : _department.text.trim(),
+        department: _departmentSel,
         isVideoConsultation: _video,
         collectionType: widget.kind == 'lab' ? _collectionType : null,
         collectionAddress: widget.kind == 'lab' &&
@@ -580,7 +591,27 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   Widget build(BuildContext context) {
     final st = AppStateScope.of(context);
-    final slots = st.doctorSlotsFor(widget.refId, widget.title, _date);
+    final slots = _date == null
+        ? const <String>[]
+        : st.doctorSlotsFor(widget.refId, widget.title, _date!);
+    // Department dropdown options: the real specialties in the
+    // catalogue, pre-filled with this provider's own when known.
+    final deptOptions = <String>{
+      for (final d in st.activeDoctors)
+        if (d.specialty.trim().isNotEmpty) d.specialty.trim(),
+    }.toList()
+      ..sort();
+    if (!_deptInit) {
+      _deptInit = true;
+      if (widget.kind == 'doctor') {
+        final own = st.activeDoctors
+            .where((d) => d.id == widget.refId)
+            .firstOrNull
+            ?.specialty
+            .trim();
+        if (own != null && own.isNotEmpty) _departmentSel = own;
+      }
+    }
     final isReschedule = widget.prefill != null;
     final prov = _provider(st);
     final payInClinic = prov?.payInClinicEnabled ?? false;
@@ -638,20 +669,52 @@ class _BookingScreenState extends State<BookingScreen> {
       const SizedBox(height: 14),
       _sectionTitle(Icons.schedule, 'Select Time'),
       const SizedBox(height: 10),
-      _timePicker(slots),
+      if (_date == null)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            'Pick a date first — available times will appear here.',
+            style: TextStyle(
+                fontSize: 13,
+                color:
+                    Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+        )
+      else
+        _timePicker(slots),
       const SizedBox(height: 14),
-      RTextField(
+      RKitField(
         label: 'Notes (optional)',
+        icon: Icons.notes_outlined,
         hint: 'Anything the doctor should know…',
         controller: _notes,
         maxLines: 2,
       ),
       const SizedBox(height: 14),
-      RTextField(
-        label: 'Department (optional)',
-        hint: 'e.g. Cardiology, General Medicine',
-        controller: _department,
-      ),
+      if (deptOptions.isNotEmpty)
+        RKitDropdown<String>(
+          label: 'Department (optional)',
+          labelIcon: Icons.local_hospital_outlined,
+          icon: Icons.local_hospital_outlined,
+          value: _departmentSel != null &&
+                  deptOptions.contains(_departmentSel)
+              ? _departmentSel
+              : null,
+          hint: 'Choose a department',
+          items: deptOptions
+              .map((d) =>
+                  DropdownMenuItem(value: d, child: Text(d)))
+              .toList(),
+          onChanged: (v) => setState(() => _departmentSel = v),
+        ),
       if (widget.kind == 'doctor' &&
           (st.activeDoctors
                   .where((d) => d.id == widget.refId)
@@ -659,11 +722,11 @@ class _BookingScreenState extends State<BookingScreen> {
                   ?.videoConsultationEnabled ??
               false)) ...[
         const SizedBox(height: 6),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Video consultation'),
-          subtitle: const Text(
-              'Meet the doctor on a video call instead of visiting'),
+        RFormSwitchTile(
+          icon: Icons.videocam_outlined,
+          title: 'Video consultation',
+          subtitle:
+              'Meet the doctor on a video call instead of visiting',
           value: _video,
           onChanged: (v) => setState(() => _video = v),
         ),
@@ -695,8 +758,9 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
         if (_collectionType == 'home') ...[
           const SizedBox(height: 10),
-          RTextField(
+          RKitField(
             label: 'Collection address',
+            icon: Icons.home_outlined,
             hint: 'Where the sample should be collected from',
             controller: _collectionAddress,
             maxLines: 2,
@@ -729,14 +793,6 @@ class _BookingScreenState extends State<BookingScreen> {
                 '${PaymentService.instance.gatewayDisplayName}',
             Icons.credit_card,
             badge: 'Secure'),
-        if (_payment == 'Pay Online') ...[
-          const SizedBox(height: 10),
-          RTextField(
-            label: 'Your UPI ID (for refunds, optional)',
-            hint: 'yourname@okhdfcbank',
-            controller: _payerUpi,
-          ),
-        ],
         if (payInClinic) const SizedBox(height: 10),
       ] else ...[
         Container(
@@ -769,13 +825,36 @@ class _BookingScreenState extends State<BookingScreen> {
       if (payInClinic)
         _payCard('At Clinic', 'Pay when you visit',
             Icons.payments_outlined),
+      // UPI-for-refunds sits BELOW the payment option cards so the
+      // option group is never split (UI redesign).
+      if (onlineAvailable && _payment == 'Pay Online') ...[
+        const SizedBox(height: 14),
+        RKitField(
+          label: 'Your UPI ID (for refunds, optional)',
+          icon: Icons.account_balance_wallet_outlined,
+          hint: 'name@bank',
+          controller: _payerUpi,
+        ),
+      ],
     ];
 
     final summary = _summaryCard();
     // Orange pill via the theme's FilledButton style (kept as FilledButton:
     // widget tests tap this exact widget type).
     final confirm = FilledButton(
-      onPressed: bookingBlocked ? null : () => _confirm(isReschedule),
+      style: FilledButton.styleFrom(
+        backgroundColor: RFormBrand.blue,
+        foregroundColor: Colors.white,
+        minimumSize: const Size.fromHeight(52),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+        ),
+        textStyle:
+            const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+      ),
+      onPressed: bookingBlocked || _date == null || _time == null
+          ? null
+          : () => _confirm(isReschedule),
       child: Text(bookingBlocked
           ? 'Booking Not Available'
           : isReschedule
@@ -822,19 +901,38 @@ class _BookingScreenState extends State<BookingScreen> {
                       ],
                     ),
                   )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: DetailSplit(
-                      main: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ...sections,
-                          const SizedBox(height: 24),
-                          confirm,
-                        ],
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: MaxWidthBox(
+                            maxWidth: 640,
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.stretch,
+                              children: [
+                                ...sections,
+                                const SizedBox(height: 24),
+                                confirm,
+                                const SizedBox(height: 16),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                      side: summary,
-                    ),
+                      // Sticky summary: the side column does not
+                      // scroll with the form (UI redesign).
+                      SizedBox(
+                        width: 360,
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(
+                              0, 16, 16, 16),
+                          child: summary,
+                        ),
+                      ),
+                    ],
                   ),
           ),
         ],
@@ -941,7 +1039,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 final now = DateTime.now();
                 final picked = await showDatePicker(
                   context: context,
-                  initialDate: _date,
+                  initialDate: _date ?? now,
                   firstDate: DateTime(now.year, now.month, now.day),
                   lastDate: now.add(const Duration(days: 90)),
                 );
@@ -957,6 +1055,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       ..sort((a, b) => a.compareTo(b));
                   }
                   _date = day;
+                  _time = null;
                 });
               },
               borderRadius: BorderRadius.circular(14),
@@ -984,18 +1083,25 @@ class _BookingScreenState extends State<BookingScreen> {
             );
           }
           final d = _days[i];
-          final sel = d.day == _date.day && d.month == _date.month;
+          final sel = _date != null &&
+              d.day == _date!.day &&
+              d.month == _date!.month &&
+              d.year == _date!.year;
           return InkWell(
-            onTap: () => setState(() => _date = d),
+            key: ValueKey('booking-date-$i'),
+            onTap: () => setState(() {
+              _date = d;
+              _time = null;
+            }),
             borderRadius: BorderRadius.circular(14),
             child: Container(
               width: 66,
               decoration: BoxDecoration(
-                color: sel ? scheme.primary : scheme.surface,
+                color: sel ? RFormBrand.blue : scheme.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                     color: sel
-                        ? scheme.primary
+                        ? RFormBrand.blue
                         : Theme.of(context).dividerColor),
               ),
               child: Column(
@@ -1046,18 +1152,18 @@ class _BookingScreenState extends State<BookingScreen> {
       children: slots.map((s) {
         final sel = s == _time;
         return ChoiceChip(
-          label: Text(s),
+          label: Text(rTime12(s)),
           labelPadding:
               const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           selected: sel,
           onSelected: (_) => setState(() => _time = s),
-          selectedColor: scheme.primary,
+          selectedColor: RFormBrand.blue,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
           side: BorderSide(
             color:
-                sel ? scheme.primary : Theme.of(context).dividerColor,
+                sel ? RFormBrand.blue : Theme.of(context).dividerColor,
           ),
           labelStyle: TextStyle(
               color: sel ? Colors.white : scheme.onSurface,
@@ -1078,7 +1184,7 @@ class _BookingScreenState extends State<BookingScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: sel ? scheme.primary : Theme.of(context).dividerColor,
+            color: sel ? RFormBrand.blue : Theme.of(context).dividerColor,
             width: sel ? 2 : 1,
           ),
         ),
@@ -1091,14 +1197,14 @@ class _BookingScreenState extends State<BookingScreen> {
                 height: 40,
                 decoration: BoxDecoration(
                   color: sel
-                      ? scheme.primary.withValues(alpha: 0.12)
+                      ? RFormBrand.blue.withValues(alpha: 0.12)
                       : scheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon,
                     size: 20,
                     color: sel
-                        ? scheme.primary
+                        ? RFormBrand.blue
                         : scheme.onSurfaceVariant),
               ),
               const SizedBox(width: 12),
@@ -1112,7 +1218,7 @@ class _BookingScreenState extends State<BookingScreen> {
                             style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: sel
-                                    ? scheme.primary
+                                    ? RFormBrand.blue
                                     : scheme.onSurface)),
                         if (badge != null) ...[
                           const SizedBox(width: 8),
@@ -1140,7 +1246,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
               ),
               if (sel)
-                Icon(Icons.check_circle, color: scheme.primary),
+                const Icon(Icons.check_circle, color: RFormBrand.blue),
             ],
           ),
         ),
@@ -1175,8 +1281,9 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _summaryCard() {
     final scheme = Theme.of(context).colorScheme;
-    final dateLabel =
-        '${_weekdays[_date.weekday - 1]}, ${_date.day} ${_months[_date.month - 1]}';
+    final dateLabel = _date == null
+        ? 'Not selected yet'
+        : '${_weekdays[_date!.weekday - 1]}, ${_date!.day} ${_months[_date!.month - 1]}';
     return RCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1187,7 +1294,7 @@ class _BookingScreenState extends State<BookingScreen> {
           const SizedBox(height: 8),
           _sumRow('Provider', widget.title),
           _sumRow('Date', dateLabel),
-          _sumRow('Time', _time),
+          _sumRow('Time', _time == null ? 'Not selected yet' : rTime12(_time!)),
           _sumRow('Payment', _payment),
           const Divider(height: 20),
           Row(

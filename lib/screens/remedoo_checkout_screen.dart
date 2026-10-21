@@ -13,6 +13,7 @@ import '../utils/coupons.dart';
 import '../utils/device_actions.dart';
 import '../widgets/coupon_field.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import 'payment_failure_screen.dart';
 import '../app_navigator.dart';
 
@@ -131,6 +132,15 @@ class _RemedooCheckoutScreenState
                         ],
                         const SizedBox(height: 12),
                         _paymentCard(),
+                        if (_payment == 'Pay Online') ...[
+                          const SizedBox(height: 12),
+                          RKitField(
+                            controller: _payerUpi,
+                            label: 'Your UPI ID (for refunds, optional)',
+                            icon: Icons.account_balance_wallet_outlined,
+                            hint: 'name@bank',
+                          ),
+                        ],
                         const SizedBox(height: 12),
                         CouponField(
                           subtotal: subtotal,
@@ -532,7 +542,7 @@ class _RemedooCheckoutScreenState
             ),
             const SizedBox(height: 10),
           ],
-          RTextField(
+          RKitField(
             label: 'Delivery Address',
             hint: 'Enter your full address',
             controller: _address,
@@ -693,13 +703,13 @@ class _RemedooCheckoutScreenState
                         decoration: BoxDecoration(
                           border: Border.all(
                             color: selected
-                                ? scheme.primary
+                                ? RFormBrand.blue
                                 : Theme.of(context)
                                     .dividerColor,
                             width: selected ? 2 : 1,
                           ),
                           color: selected
-                              ? scheme.primary
+                              ? RFormBrand.blue
                                   .withValues(alpha: 0.06)
                               : null,
                           borderRadius:
@@ -713,7 +723,7 @@ class _RemedooCheckoutScreenState
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: selected
-                                    ? scheme.primary
+                                    ? RFormBrand.blue
                                     : scheme.onSurfaceVariant)),
                       ),
                     ),
@@ -739,14 +749,6 @@ class _RemedooCheckoutScreenState
               ],
             ),
           ],
-          if (_payment == 'Pay Online') ...[
-            const SizedBox(height: 10),
-            RTextField(
-              controller: _payerUpi,
-              label: 'Your UPI ID (for refunds, optional)',
-              hint: 'yourname@okhdfcbank',
-            ),
-          ],
         ],
       ),
     );
@@ -761,7 +763,7 @@ class _RemedooCheckoutScreenState
               style: TextStyle(
                   fontWeight: FontWeight.w800, fontSize: 14)),
           const SizedBox(height: 10),
-          RTextField(
+          RKitField(
             label: 'Notes',
             hint: 'Any special instructions…',
             controller: _notes,

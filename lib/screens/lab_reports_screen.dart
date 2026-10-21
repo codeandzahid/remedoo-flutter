@@ -9,6 +9,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../utils/file_download.dart';
 import '../widgets/widgets.dart';
+import '../widgets/form_kit.dart';
 import 'lab_report_detail_screen.dart';
 import '../app_navigator.dart';
 
@@ -208,12 +209,12 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              RTextField(
+              RKitField(
                 controller: nameCtrl,
                 label: 'Report name',
               ),
               const SizedBox(height: 10),
-              RTextField(
+              RKitField(
                 controller: sourceCtrl,
                 label: 'Lab / doctor (optional)',
               ),
