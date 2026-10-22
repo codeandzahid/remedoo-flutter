@@ -15,6 +15,7 @@ import '../services/supabase_repository.dart';
 import '../services/payment_service.dart';
 import '../theme.dart';
 import '../utils/working_hours.dart';
+import '../utils/account_deletion.dart';
 import '../widgets/admin_style.dart';
 import '../widgets/existing_user_lookup.dart';
 
@@ -242,6 +243,20 @@ class AppState extends ChangeNotifier {
   /// Test-only: forces the signup-completion flag RootGate gates on.
   @visibleForTesting
   void debugSetProfileComplete(bool value) => _profileComplete = value;
+
+  /// When the signed-in account is scheduled for deletion
+  /// (profiles.deletion_requested_at, owner order 2026-10-22), this
+  /// holds the request moment; the data is erased 72 hours later.
+  /// RootGate shows the deletion page instead of any shell while this
+  /// is set. Resolved from the backend profile on sign-in / restore.
+  DateTime? _deletionRequestedAt;
+  DateTime? get deletionRequestedAt => _deletionRequestedAt;
+  bool get deletionPending => _deletionRequestedAt != null;
+
+  /// Test-only: forces the deletion-pending flag RootGate gates on.
+  @visibleForTesting
+  void debugSetDeletionRequestedAt(DateTime? value) =>
+      _deletionRequestedAt = value;
 
   /// Display name: Supabase user metadata -> email fallback -> mock name.
   String get userName {
@@ -696,6 +711,7 @@ class AppState extends ChangeNotifier {
     _guest = false;
     _mockLoggedIn = false;
     _profileComplete = true;
+    _deletionRequestedAt = null;
     _name = 'Patient';
     _email = '';
     _providerRole = null;
@@ -2812,6 +2828,17 @@ class AppState extends ChangeNotifier {
   /// RootGate routes every account type to its own shell — a
   /// doctor must never land in the patient app.
   Future<void> resolveBackendRole() async {
+    // Deletion gate first (owner order 2026-10-22): an account
+    // scheduled for deletion lands on the deletion page whatever its
+    // role, so RootGate needs the flag before it picks a shell.
+    try {
+      final profile = await _repo.fetchProfile();
+      _deletionRequestedAt =
+          parseDeletionRequest(profile?['deletion_requested_at']);
+    } catch (_) {
+      // Column absent until the migration lands: no gate.
+      _deletionRequestedAt = null;
+    }
     await checkAdminRole();
     if (_isAdmin) {
       switchRole('admin');
@@ -3725,11 +3752,29 @@ class AppState extends ChangeNotifier {
     await _repo.saveProfile({'avatar_url': url});
   }
 
-  /// Permanently deletes the account (backend function removes the
-  /// user's rows + the auth user), then signs out locally.
-  Future<bool> deleteMyAccount() async {
-    final ok = await _repo.deleteMyAccount();
-    if (ok) logout();
+  /// Schedules the account for deletion (owner order 2026-10-22):
+  /// the server stamps the request, the 72-hour window starts, and
+  /// the user is signed out. Returns the exact erase moment, or null
+  /// when scheduling failed (nothing was deleted in that case).
+  Future<DateTime?> requestAccountDeletion() async {
+    final eraseAt = await _repo.requestAccountDeletion();
+    if (eraseAt != null) logout();
+    return eraseAt;
+  }
+
+  /// Admin / support: cancels a scheduled deletion for [userId] and
+  /// refreshes the admin user list (the reactivated email is queued
+  /// by the server function).
+  Future<bool> reactivateUserAccount(String userId) async {
+    final ok = await _repo.reactivateAccount(userId);
+    if (ok) {
+      for (final p in _allProfiles) {
+        if ('${p['user_id']}' == userId) {
+          p['deletion_requested_at'] = null;
+        }
+      }
+      notifyListeners();
+    }
     return ok;
   }
 

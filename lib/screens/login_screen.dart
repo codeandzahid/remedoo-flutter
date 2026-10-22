@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../responsive/responsive.dart';
-import '../services/auth_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
@@ -66,17 +65,12 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = result.error);
       return;
     }
-    // Separate logins (owner's rule): this entrance is for patients
-    // only. An email registered as another account type is signed
-    // back out and told exactly what it is registered as.
-    final accountRole = await AuthService.instance.currentAccountRole();
-    if (!mounted) return;
-    if (accountRole != null && accountRole != 'user') {
-      await AuthService.instance.signOut();
-      if (!mounted) return;
-      setState(() => _error = wrongEntranceMessage(accountRole));
-      return;
-    }
+    // One login screen for everyone (owner order 2026-10-22): this
+    // screen signs in patients, panelists, admin and support alike.
+    // After login the app checks the account role and opens only
+    // that person's own panel — the data stays separate because the
+    // server gives every account only its own data. (The separate
+    // admin/partner app builds keep their own entrance screens.)
     if (Navigator.of(context).canPop()) {
       // Opened on top of the app (gated action): reveal the signed-in app.
       Navigator.of(context).popUntil((r) => r.isFirst);

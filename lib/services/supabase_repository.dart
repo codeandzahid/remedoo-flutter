@@ -1108,6 +1108,8 @@ class SupabaseRepository {
 
   /// Permanently deletes the signed-in user's account and their rows
   /// (SECURITY DEFINER function delete_my_account, 2026-10-19).
+  /// Kept for the server-side purge path; the app UI no longer calls
+  /// this directly (deletion is scheduled, see below).
   Future<bool> deleteMyAccount() async {
     if (!_ready || _uid == null) return false;
     try {
@@ -1115,6 +1117,38 @@ class SupabaseRepository {
       return true;
     } catch (e) {
       debugPrint('deleteMyAccount failed: $e');
+      return false;
+    }
+  }
+
+  /// Schedules the signed-in user's account for deletion
+  /// (owner order 2026-10-22): the server stamps
+  /// profiles.deletion_requested_at and returns the exact erase
+  /// moment (request + 72 hours), or null when the call failed —
+  /// including before the account_deletion_72h migration is applied,
+  /// in which case nothing is deleted and the UI says so.
+  Future<DateTime?> requestAccountDeletion() async {
+    if (!_ready || _uid == null) return null;
+    try {
+      final res = await _db.rpc('request_account_deletion');
+      return DateTime.tryParse('$res');
+    } catch (e) {
+      debugPrint('requestAccountDeletion failed: $e');
+      return null;
+    }
+  }
+
+  /// Admin / support: cancels a scheduled account deletion
+  /// (SECURITY DEFINER function reactivate_account, 2026-10-22; the
+  /// database checks the caller is admin or support staff).
+  Future<bool> reactivateAccount(String userId) async {
+    if (!_ready || _uid == null) return false;
+    try {
+      final res =
+          await _db.rpc('reactivate_account', params: {'p_user_id': userId});
+      return res == true;
+    } catch (e) {
+      debugPrint('reactivateAccount failed: $e');
       return false;
     }
   }
@@ -2363,12 +2397,26 @@ class SupabaseRepository {
   Future<List<Map<String, dynamic>>> fetchAllProfiles() async {
     if (!_ready) return const [];
     try {
-      final rows = await _db
-          .from('profiles')
-          .select(
-              'user_id, full_name, email, phone, created_at, status, gender, date_of_birth, address, language, upi_id, avatar_url')
-          .order('created_at', ascending: false)
-          .limit(500);
+      // deletion_requested_at arrives with the account_deletion_72h
+      // migration; before it is applied the column select fails, so
+      // fall back to the old column list (the Users page keeps working
+      // and simply shows no deletion state).
+      List<dynamic> rows;
+      try {
+        rows = await _db
+            .from('profiles')
+            .select(
+                'user_id, full_name, email, phone, created_at, status, gender, date_of_birth, address, language, upi_id, avatar_url, deletion_requested_at')
+            .order('created_at', ascending: false)
+            .limit(500);
+      } catch (_) {
+        rows = await _db
+            .from('profiles')
+            .select(
+                'user_id, full_name, email, phone, created_at, status, gender, date_of_birth, address, language, upi_id, avatar_url')
+            .order('created_at', ascending: false)
+            .limit(500);
+      }
       final profiles = rows.map((r) => Map<String, dynamic>.from(r)).toList();
       // Attach roles
       try {

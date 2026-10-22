@@ -10,6 +10,7 @@ import '../app_navigator.dart';
 import '../utils/device_actions.dart';
 import '../widgets/widgets.dart';
 import '../widgets/form_kit.dart';
+import '../widgets/provider_payments.dart';
 import 'login_screen.dart';
 
 /// My Profile: avatar, name/email, phone, gender, address, password section.
@@ -888,7 +889,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Deleting your account permanently removes your profile and personal data from Remedoo. This cannot be undone.',
+                            'Deleting closes your account at once. Everything is erased from the server after 72 hours. Within 72 hours, admin or support can reactivate your account.',
                             style: TextStyle(
                                 fontSize: 12.5,
                                 color: scheme.onSurfaceVariant),
@@ -932,31 +933,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Delete account flow (2026-10-19): two confirmations, then the
-  /// backend removes the user and the app returns to guest browsing.
+  /// Delete account flow (owner order 2026-10-22): a clear warning,
+  /// then an email OTP (only the account owner can do this), then a
+  /// final confirmation. The account closes at once and is scheduled
+  /// for deletion — everything is erased from the server after 72
+  /// hours. Inside those 72 hours admin or support can reactivate it.
   Future<void> _deleteAccount(AppState state) async {
     final first = await confirmDialog(
       context,
       title: 'Delete your account?',
       message:
-          'Your profile and personal data will be permanently removed. Past bookings and orders stay in the providers\' records without your name.',
+          'Warning: your account will close now and everything will be erased from the server within 72 hours — your profile, addresses, medical history and personal data. After 72 hours this cannot be undone. Past bookings and orders stay in the providers\' records without your name.\n\nChanged your mind within 72 hours? Log in again and ask support to reactivate your account.',
       confirmLabel: 'Continue',
     );
     if (first != true || !mounted) return;
+    final verified = await requireEmailOtp(
+      context,
+      title: 'Confirm it is you',
+      message:
+          'For your safety, enter the code to schedule your account for deletion.',
+    );
+    if (!verified || !mounted) return;
     final second = await confirmDialog(
       context,
       title: 'Are you fully sure?',
-      message: 'This is permanent and cannot be undone.',
+      message:
+          'Your account closes now. Everything is erased from the server after 72 hours.',
       confirmLabel: 'Delete my account',
     );
     if (second != true || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    final ok = await state.deleteMyAccount();
+    final eraseAt = await state.requestAccountDeletion();
     if (!mounted) return;
     messenger.showSnackBar(SnackBar(
-        content: Text(ok
-            ? 'Your account has been deleted.'
-            : 'Could not delete the account. Please try again or contact support.')));
+        content: Text(eraseAt != null
+            ? 'Your account is scheduled for deletion. Everything will be erased from the server by ${_fmtEraseTime(eraseAt)}. Log in within 72 hours if you want support to reactivate it.'
+            : 'Could not schedule the deletion. Please try again or contact support.')));
+  }
+
+  static String _fmtEraseTime(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final ampm = d.hour < 12 ? 'AM' : 'PM';
+    final mm = d.minute.toString().padLeft(2, '0');
+    return '${d.day} ${months[d.month - 1]} ${d.year}, $h:$mm $ampm';
   }
 
   /// Radio circle + small avatar + label, like the React gender picker.

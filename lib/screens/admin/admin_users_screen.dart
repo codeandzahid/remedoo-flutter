@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
+import '../../utils/account_deletion.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/form_kit.dart';
 
@@ -278,6 +279,46 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                         fontSize: 11,
                                         fontWeight: FontWeight.w800,
                                         color: Colors.red)),
+                              // 72-hour deletion window (2026-10-22):
+                              // show the state and let the admin
+                              // reactivate right from the list too
+                              // (support staff use Support > Account
+                              // Deletion; the server checks the role).
+                              if (parseDeletionRequest(
+                                      u['deletion_requested_at']) !=
+                                  null) ...[
+                                Text(
+                                  'DELETION PENDING — erases ${_fmtDate(parseDeletionRequest(u['deletion_requested_at'])!.toLocal().add(accountDeletionWindow).toIso8601String())}',
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.red),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: () async {
+                                      final done = await AppStateScope.of(
+                                              context)
+                                          .reactivateUserAccount(
+                                              '${u['user_id']}');
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(done
+                                              ? 'Account reactivated.'
+                                              : 'Reactivation failed.'),
+                                        ),
+                                      );
+                                      if (done) _load();
+                                    },
+                                    icon: const Icon(Icons.restore,
+                                        size: 15),
+                                    label: const Text('Reactivate'),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                           trailing: InkWell(

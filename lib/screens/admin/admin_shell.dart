@@ -13,6 +13,7 @@ import 'admin_orders_screen.dart';
 import 'admin_appointments_screen.dart';
 import 'admin_emergencies_screen.dart';
 import 'admin_support_tickets_screen.dart';
+import 'admin_account_deletion_screen.dart';
 import 'admin_reviews_screen.dart';
 import 'admin_broadcast_screen.dart';
 import 'admin_revenue_screen.dart';
@@ -72,7 +73,10 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const AdminEmergenciesScreen()),
       _NavItem('Orders & Care', 'Ambulance', Icons.emergency,
           (_) => const AdminAmbulanceScreen()),
-      _NavItem('Orders & Care', 'Support Tickets', Icons.support_agent,
+      // Support — its own section (owner order 2026-10-22): tickets,
+      // chat (inside tickets) and the account-deletion queue. Staff
+      // holding only 'support' land here and see nothing else.
+      _NavItem('Support', 'Support Tickets', Icons.support_agent,
           (_) => const AdminSupportTicketsScreen()),
       // Content — announcements appear in the app for users
       _NavItem('Content', 'Announcements', Icons.campaign,
@@ -133,6 +137,11 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const AdminTableScreen(table: 'platform_settings', title: 'Platform Settings', singular: 'Setting')),
       _NavItem('Content', 'Broadcasts', Icons.campaign_outlined,
           (_) => const BroadcastsScreen()),
+      // Support (appended last so existing nav indexes stay stable;
+      // perm key 'support' matches its _permKeys entry below):
+      // accounts inside the 72-hour deletion window + Reactivate.
+      _NavItem('Support', 'Account Deletion', Icons.schedule_outlined,
+          (_) => const AdminAccountDeletionScreen()),
     ];
 
 /// Permission key per nav item, aligned with [_items] by index.
@@ -148,7 +157,7 @@ const _permKeys = [
   'service_areas', 'featured', 'revenue', 'analytics', 'users',
   'remedoo_pay', 'team', 'export_data', 'panel_style',
   'coupons', 'faqs', 'legal_pages', 'slider_media', 'ads',
-  'platform_settings', 'broadcasts',
+  'platform_settings', 'broadcasts', 'support',
 ];
 
 /// Admin console shell: light sidebar nav (desktop) / drawer (phone, tablet),

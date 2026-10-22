@@ -11,6 +11,7 @@ import 'screens/maintenance_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/email_verified_screen.dart';
 import 'screens/signup_screen.dart';
+import 'screens/account_deletion_pending_screen.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/partner/doctor_dashboard.dart';
 import 'screens/partner/hospital_dashboard.dart';
@@ -133,6 +134,12 @@ class _RootGateState extends State<RootGate> {
     if (state.maintenanceMode) return const MaintenanceScreen();
     if (!_splashDone || !_authReady) return const SplashView();
     if (!state.seenOnboarding) return const OnboardingScreen();
+    // Deletion gate (owner order 2026-10-22): an account scheduled
+    // for deletion opens nothing of the app — only the deletion page
+    // with its erase time and the support reactivation request.
+    if (state.deletionPending) {
+      return const AccountDeletionPendingScreen();
+    }
     if (state.role == 'admin' || state.role == 'staff') {
       return const AdminShell();
     }

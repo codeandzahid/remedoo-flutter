@@ -25,7 +25,7 @@ const kStaffSectionOptions = <(String, String)>[
   ('refunds', 'Refunds'),
   ('emergencies', 'Emergencies'),
   ('ambulance', 'Ambulance'),
-  ('support', 'Support Tickets'),
+  ('support', 'Support (Tickets, Chat, Account Deletion)'),
   ('announcements', 'Announcements'),
   ('settings', 'App Settings'),
   ('branding', 'Branding'),
