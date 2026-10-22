@@ -3319,9 +3319,16 @@ class AppState extends ChangeNotifier {
       _adminProviderApplications;
 
   Future<void> loadAdminProviderApplications() async {
+    // Fetch BEFORE touching the list (live-test fix 2026-10-22:
+    // the clear()..addAll(await …) cascade let two overlapping
+    // loads append into the same list — the admin Users screen
+    // showed one user four times and the dashboard counted 90
+    // users instead of 72).
+    final rows = await _repo.fetchProviderApplications();
+    final seen = <String>{};
     _adminProviderApplications
       ..clear()
-      ..addAll(await _repo.fetchProviderApplications());
+      ..addAll(rows.where((r) => seen.add('${r['id']}')));
     notifyListeners();
   }
 
@@ -3463,9 +3470,11 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get announcements => _announcements;
 
   Future<void> loadAnnouncements() async {
+    final rows = await _repo.fetchAnnouncements();
+    final seen = <String>{};
     _announcements
       ..clear()
-      ..addAll(await _repo.fetchAnnouncements());
+      ..addAll(rows.where((r) => seen.add('${r['id']}')));
     notifyListeners();
   }
 
@@ -3509,9 +3518,11 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get allProfiles => _allProfiles;
 
   Future<void> loadAllProfiles() async {
+    final rows = await _repo.fetchAllProfiles();
+    final seen = <String>{};
     _allProfiles
       ..clear()
-      ..addAll(await _repo.fetchAllProfiles());
+      ..addAll(rows.where((r) => seen.add('${r['user_id']}')));
     notifyListeners();
   }
 
@@ -3522,9 +3533,11 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get adminOrders => _adminOrders;
 
   Future<void> loadAdminOrders() async {
+    final rows = await _repo.adminFetchOrders();
+    final seen = <String>{};
     _adminOrders
       ..clear()
-      ..addAll(await _repo.adminFetchOrders());
+      ..addAll(rows.where((r) => seen.add('${r['id']}')));
     notifyListeners();
   }
 
@@ -3696,9 +3709,11 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get emergencyRequests => _emergencyRequests;
 
   Future<void> loadEmergencyRequests() async {
+    final rows = await _repo.fetchEmergencyRequests();
+    final seen = <String>{};
     _emergencyRequests
       ..clear()
-      ..addAll(await _repo.fetchEmergencyRequests());
+      ..addAll(rows.where((r) => seen.add('${r['id']}')));
     notifyListeners();
   }
 
@@ -3719,9 +3734,11 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get ambulances => _ambulances;
 
   Future<void> loadAmbulances() async {
+    final rows = await _repo.fetchAmbulances();
+    final seen = <String>{};
     _ambulances
       ..clear()
-      ..addAll(await _repo.fetchAmbulances());
+      ..addAll(rows.where((r) => seen.add('${r['id']}')));
     notifyListeners();
   }
 
