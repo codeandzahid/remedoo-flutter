@@ -1,8 +1,13 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../utils/account_deletion.dart';
+import '../../utils/admin_user_edit.dart';
+import '../../widgets/provider_payments.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/form_kit.dart';
 
@@ -44,9 +49,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
 
-  /// Profile + status editor (audit Admin gap 6).
+  /// Profile + status editor (audit Admin gap 6; extended
+  /// 2026-10-22 on the owner's order: photo upload + ALL details,
+  /// including email and password — email/password changes ask the
+  /// admin for an email OTP first and run through the admin-staff
+  /// function, which re-checks the super-admin role on the server).
   Future<void> _editUser(Map<String, dynamic> u) async {
     final name = TextEditingController(text: '${u['full_name'] ?? ''}');
+    final email = TextEditingController(text: '${u['email'] ?? ''}');
+    final newPassword = TextEditingController();
     final phone = TextEditingController(text: '${u['phone'] ?? ''}');
     final address = TextEditingController(text: '${u['address'] ?? ''}');
     final language =
@@ -56,6 +67,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         text: '${u['date_of_birth'] ?? ''}'.split('T').first);
     var gender = '${u['gender'] ?? ''}';
     var status = '${u['status'] ?? 'active'}';
+    Uint8List? pickedPhoto;
+    String pickedPhotoName = '';
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -65,7 +78,68 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundImage: pickedPhoto != null
+                          ? MemoryImage(pickedPhoto!)
+                          : ('${u['avatar_url'] ?? ''}'.isNotEmpty
+                              ? NetworkImage('${u['avatar_url']}')
+                              : null) as ImageProvider?,
+                      child: pickedPhoto == null &&
+                              '${u['avatar_url'] ?? ''}'.isEmpty
+                          ? Text(
+                              ('${u['full_name'] ?? '?'}').isNotEmpty
+                                  ? '${u['full_name']}'[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 20),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    TextButton.icon(
+                      onPressed: () async {
+                        final files = await FilePicker.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+                        );
+                        if (files.isEmpty) return;
+                        try {
+                          final bytes = await files.single.readAsBytes();
+                          setD(() {
+                            pickedPhoto = bytes;
+                            pickedPhotoName = files.single.name;
+                          });
+                        } catch (_) {}
+                      },
+                      icon: const Icon(Icons.upload_outlined, size: 18),
+                      label: const Text('Upload photo'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 RKitField(controller: name, label: 'Full name'),
+                RKitField(
+                  controller: email,
+                  label: 'Email (login)',
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                RKitField(
+                  controller: newPassword,
+                  label: 'New password',
+                  hint: 'Leave blank to keep the current password',
+                  obscureText: true,
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'Changing the email or password asks for an OTP on your admin email first. Only the super admin can change them.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
                 RKitField(controller: phone, label: 'Phone'),
                 RKitField(controller: address, label: 'Address'),
                 RKitField(controller: language, label: 'Language code (en, hi, ur, ks)'),
@@ -123,9 +197,44 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         ),
       ),
     );
-    if (saved != true) return;
-    final ok = await SupabaseRepository.instance.adminUpdateProfile(
-      '${u['user_id']}',
+    if (saved != true || !mounted) return;
+
+    final problem = validateAdminUserEdit(
+        email: email.text, newPassword: newPassword.text);
+    if (problem != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(problem)),
+      );
+      return;
+    }
+
+    final userId = '${u['user_id']}';
+    final needsOtp = editNeedsOtp(
+      oldEmail: '${u['email'] ?? ''}',
+      newEmail: email.text,
+      newPassword: newPassword.text,
+    );
+    if (needsOtp) {
+      final verified = await requireEmailOtp(
+        context,
+        title: 'Verify it is you',
+        message:
+            'You are changing the login email or password of ${u['email'] ?? 'this account'}. Enter the code to continue.',
+      );
+      if (!verified || !mounted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Not saved — OTP not verified.')),
+          );
+        }
+        return;
+      }
+    }
+
+    final repo = SupabaseRepository.instance;
+    var ok = await repo.adminUpdateProfile(
+      userId,
       {
         'full_name': name.text.trim(),
         'phone': phone.text.trim(),
@@ -139,11 +248,33 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       },
     );
     if (!mounted) return;
+    String? authError;
+    if (pickedPhoto != null) {
+      final url =
+          await repo.adminSetUserAvatar(userId, pickedPhoto!, pickedPhotoName);
+      if (url == null) ok = false;
+      if (!mounted) return;
+    }
+    final emailChanged = email.text.trim().toLowerCase() !=
+        '${u['email'] ?? ''}'.trim().toLowerCase();
+    if (emailChanged) {
+      authError = await repo.adminUpdateUserEmail(userId, email.text.trim());
+      if (!mounted) return;
+    }
+    if (authError == null && newPassword.text.trim().isNotEmpty) {
+      authError =
+          await repo.adminSetUserPassword(userId, newPassword.text.trim());
+      if (!mounted) return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text(ok ? 'User updated.' : 'Update failed.')),
+          content: Text(authError != null
+              ? 'Details saved, but the login change failed: $authError'
+              : ok
+                  ? 'User updated.'
+                  : 'Update failed.')),
     );
-    if (ok) _load();
+    _load();
   }
 
   void _showRoleDialog(Map<String, dynamic> user) {

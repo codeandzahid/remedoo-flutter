@@ -8,7 +8,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 //
 // POST { action: 'create', name, email, password, sections: string[] }
 // POST { action: 'delete', user_id }
+// POST { action: 'update_email', user_id, email }   — any account
+// POST { action: 'set_password', user_id, password } — any account
 // Caller must hold the 'admin' role (checked from their JWT).
+// update_email / set_password (owner order 2026-10-22) power the
+// Admin > Users edit dialog: the app asks the admin for an email OTP
+// before calling these; the function re-checks the admin role here.
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -119,6 +124,43 @@ serve(async (req) => {
       try {
         await admin.from('profiles').delete().eq('user_id', uid);
       } catch (_) {}
+      return json({ ok: true });
+    }
+
+    if (action === 'update_email') {
+      const uid = String(body.user_id ?? '');
+      const email = String(body.email ?? '').trim().toLowerCase();
+      if (!uid) return json({ error: 'user_id is required.' }, 400);
+      if (!email || !email.includes('@')) {
+        return json({ error: 'A valid email is required.' }, 400);
+      }
+      const { error: upErr } = await admin.auth.admin.updateUserById(uid, {
+        email,
+        email_confirm: true,
+      });
+      if (upErr) return json({ error: upErr.message }, 400);
+      // Keep the profile row (what the app displays) in sync.
+      try {
+        await admin
+          .from('profiles')
+          .update({ email })
+          .eq('user_id', uid);
+      } catch (_) {}
+      return json({ ok: true });
+    }
+
+    if (action === 'set_password') {
+      const uid = String(body.user_id ?? '');
+      const password = String(body.password ?? '');
+      if (!uid) return json({ error: 'user_id is required.' }, 400);
+      if (password.length < 8) {
+        return json(
+          { error: 'Password must be at least 8 characters.' }, 400);
+      }
+      const { error: upErr } = await admin.auth.admin.updateUserById(uid, {
+        password,
+      });
+      if (upErr) return json({ error: upErr.message }, 400);
       return json({ ok: true });
     }
 

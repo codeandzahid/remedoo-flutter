@@ -1797,7 +1797,8 @@ class SupabaseRepository {
     }
   }
 
-  /// Call the admin-staff Edge Function (create/delete staff accounts).
+  /// Call the admin-staff Edge Function (create/delete staff accounts;
+  /// also update_email / set_password for any account, 2026-10-22).
   /// Returns null on success, or the error message.
   Future<String?> invokeAdminStaff(Map<String, dynamic> payload) async {
     if (!_ready) return 'Not ready.';
@@ -1816,6 +1817,57 @@ class SupabaseRepository {
       debugPrint('invokeAdminStaff failed: $e');
       return 'Request failed.';
     }
+  }
+
+  /// Admin: uploads a profile photo for ANOTHER user (Admin > Users
+  /// edit, owner order 2026-10-22). The avatars bucket only lets a
+  /// signed-in user write inside their own folder, so the file lands
+  /// in the admin's folder; the bucket is public, so the URL works
+  /// as the target user's avatar_url (saved on their profile row).
+  Future<String?> adminSetUserAvatar(
+      String userId, Uint8List bytes, String fileName) async {
+    final uid = _uid;
+    if (!_ready || uid == null) return null;
+    try {
+      final ext = fileName.split('.').last.toLowerCase();
+      final safeExt = ['jpg', 'jpeg', 'png', 'webp'].contains(ext) ? ext : 'jpg';
+      final path =
+          '$uid/for_${userId}_${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+      await _db.storage.from('avatars').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+                contentType: 'image/${safeExt == 'jpg' ? 'jpeg' : safeExt}',
+                upsert: true),
+          );
+      final url = _db.storage.from('avatars').getPublicUrl(path);
+      final saved = await adminUpdateProfile(userId, {'avatar_url': url});
+      return saved ? url : null;
+    } catch (e) {
+      debugPrint('adminSetUserAvatar failed: $e');
+      return null;
+    }
+  }
+
+  /// Admin: changes any account's login email via the admin-staff
+  /// function (super admin only there; the function also syncs
+  /// profiles.email). Returns null on success, or the error message.
+  Future<String?> adminUpdateUserEmail(String userId, String email) {
+    return invokeAdminStaff({
+      'action': 'update_email',
+      'user_id': userId,
+      'email': email,
+    });
+  }
+
+  /// Admin: sets any account's password via the admin-staff function
+  /// (super admin only there). Returns null on success, or the error.
+  Future<String?> adminSetUserPassword(String userId, String password) {
+    return invokeAdminStaff({
+      'action': 'set_password',
+      'user_id': userId,
+      'password': password,
+    });
   }
 
   /// Fetch an ENTIRE table in pages (Admin > Export Data). Runs under
