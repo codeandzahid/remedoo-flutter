@@ -10,23 +10,42 @@ import '../../widgets/form_kit.dart';
 /// 'team' is deliberately absent: only the super admin manages staff.
 const kStaffSectionOptions = <(String, String)>[
   ('dashboard', 'Dashboard'),
+  // Users
   ('doctors', 'Doctors'),
   ('hospitals', 'Hospitals'),
   ('labs', 'Labs'),
-  ('lab_tests', 'Lab Tests'),
   ('pharmacies', 'Pharmacies'),
+  ('users', 'Users'),
+  // Catalog
+  ('lab_tests', 'Lab Tests'),
   ('medicines', 'Medicines'),
   ('inventory', 'Inventory'),
+  ('coupons', 'Coupons'),
+  // Providers
   ('applications', 'Applications'),
   ('provider_payments', 'Payments (UPI)'),
   ('reviews', 'Reviews'),
+  // Orders & Care
   ('orders', 'Orders'),
   ('appointments', 'Appointments'),
   ('refunds', 'Refunds'),
   ('emergencies', 'Emergencies'),
   ('ambulance', 'Ambulance'),
+  // Support
   ('support', 'Support (Tickets, Chat, Account Deletion)'),
+  // Content
   ('announcements', 'Announcements'),
+  ('faqs', 'FAQs'),
+  ('legal_pages', 'Legal Pages'),
+  ('slider_media', 'Home Slider'),
+  ('ads', 'Ads'),
+  ('broadcasts', 'Broadcasts'),
+  // Insights
+  ('revenue', 'Revenue'),
+  ('analytics', 'Analytics'),
+  // Payments
+  ('remedoo_pay', 'Remedoo Pay'),
+  // Settings
   ('settings', 'App Settings'),
   ('branding', 'Branding'),
   ('commission', 'Commission'),
@@ -35,19 +54,9 @@ const kStaffSectionOptions = <(String, String)>[
   ('packages', 'Healthcare Packages'),
   ('service_areas', 'Service Areas'),
   ('featured', 'Featured'),
-  ('revenue', 'Revenue'),
-  ('analytics', 'Analytics'),
-  ('users', 'Users'),
-  ('remedoo_pay', 'Remedoo Pay'),
+  ('platform_settings', 'Platform Settings'),
   ('export_data', 'Export Data'),
   ('panel_style', 'Panel Style'),
-  ('coupons', 'Coupons'),
-  ('faqs', 'FAQs'),
-  ('legal_pages', 'Legal Pages'),
-  ('slider_media', 'Home Slider'),
-  ('ads', 'Ads'),
-  ('platform_settings', 'Platform Settings'),
-  ('broadcasts', 'Broadcasts'),
 ];
 
 String staffSectionLabel(String key) {

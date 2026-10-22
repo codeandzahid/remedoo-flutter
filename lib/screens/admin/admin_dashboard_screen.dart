@@ -138,29 +138,57 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           .toDouble());
     }
 
-    final stats = [
-      _stat(context, 'Total Users', '${state.allProfiles.length}',
-          Icons.people, _cBlue),
-      _stat(context, 'Doctors',
-          '${state.adminTable('doctors').length}', Icons.person_search,
-          _cGreen),
-      _stat(context, 'Appointments', '${appts.length}',
-          Icons.calendar_month, _cPink),
-      _stat(context, 'Revenue', inr(revenue), Icons.currency_rupee,
-          _cGreen),
-      _stat(context, 'Total Orders', '${state.adminOrders.length}',
-          Icons.shopping_bag, _cLav),
-      _stat(context, 'Pending Approvals', '$pendingApprovals',
-          Icons.approval, _cBlue),
-      _stat(
-          context,
-          'Pending Queries',
-          '$pendingQueries',
-          Icons.mark_chat_unread_outlined,
-          _cPink,
-          onTap: () => widget.onNavigate?.call(16)),
-      _stat(context, 'Active Emergencies', '$activeEmergencies',
-          Icons.sos, _cPink),
+    // Stat cards arranged section-wise (owner order 2026-10-22),
+    // in the same sections as the sidebar: Users, Orders & Care,
+    // Providers, Support, Insights.
+    final statGroups = <(String, List<Widget>)>[
+      (
+        'Users',
+        [
+          _stat(context, 'Total Users', '${state.allProfiles.length}',
+              Icons.people, _cBlue),
+          _stat(context, 'Doctors',
+              '${state.adminTable('doctors').length}',
+              Icons.person_search, _cGreen),
+        ]
+      ),
+      (
+        'Orders & Care',
+        [
+          _stat(context, 'Appointments', '${appts.length}',
+              Icons.calendar_month, _cPink),
+          _stat(context, 'Total Orders', '${state.adminOrders.length}',
+              Icons.shopping_bag, _cLav),
+          _stat(context, 'Active Emergencies', '$activeEmergencies',
+              Icons.sos, _cPink),
+        ]
+      ),
+      (
+        'Providers',
+        [
+          _stat(context, 'Pending Approvals', '$pendingApprovals',
+              Icons.approval, _cBlue),
+        ]
+      ),
+      (
+        'Support',
+        [
+          _stat(
+              context,
+              'Pending Queries',
+              '$pendingQueries',
+              Icons.mark_chat_unread_outlined,
+              _cPink,
+              onTap: () => widget.onNavigate?.call(18)),
+        ]
+      ),
+      (
+        'Insights',
+        [
+          _stat(context, 'Revenue', inr(revenue), Icons.currency_rupee,
+              _cGreen),
+        ]
+      ),
     ];
 
     // Recent activity from real orders + appointments.
@@ -445,21 +473,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         children: [
           _header(context, now),
           const SizedBox(height: 18),
-          ResponsiveGrid(
-            compactCols: 2,
-            mediumCols: 3,
-            expandedCols: 4,
-            wideCols: 4,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.3,
-            itemCount: stats.length,
-            itemBuilder: (_, i) =>
-                StaggerItem(index: i % 6, child: stats[i]),
-          ),
-          const SizedBox(height: 16),
+          // Section-wise stat groups (same sections as the sidebar),
+          // each with its heading and its own card grid.
+          for (final (title, cards) in statGroups) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                title.toUpperCase(),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                    color: Color(0xFF8A8F98)),
+              ),
+            ),
+            ResponsiveGrid(
+              compactCols: 2,
+              mediumCols: 3,
+              expandedCols: 4,
+              wideCols: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.3,
+              itemCount: cards.length,
+              itemBuilder: (_, i) =>
+                  StaggerItem(index: i % 6, child: cards[i]),
+            ),
+            const SizedBox(height: 16),
+          ],
           chartsRow,
           const SizedBox(height: 16),
           activityRow,
@@ -507,9 +550,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             onSelected: (i) => widget.onNavigate?.call(i),
             itemBuilder: (ctx) => const [
               PopupMenuItem(value: 1, child: Text('Add Doctor')),
-              PopupMenuItem(value: 6, child: Text('Add Medicine')),
+              PopupMenuItem(value: 7, child: Text('Add Medicine')),
               PopupMenuItem(
-                  value: 17, child: Text('Send Announcement')),
+                  value: 20, child: Text('Send Announcement')),
             ],
             child: Container(
               padding:

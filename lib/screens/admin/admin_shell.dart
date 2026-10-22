@@ -40,21 +40,28 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // Overview
       _NavItem('Overview', 'Dashboard', Icons.dashboard,
           (_) => AdminDashboardScreen(onNavigate: onNavigate)),
-      // Catalog — every listing users see, all backed by Supabase
-      _NavItem('Catalog', 'Doctors', Icons.person_search,
+      // Users — every people directory in one section (owner order
+      // 2026-10-22: arrange items section-wise, doctors/labs/etc.
+      // inside Users).
+      _NavItem('Users', 'Doctors', Icons.person_search,
           (_) => const AdminTableScreen(table: 'doctors', title: 'Doctors', singular: 'Doctor')),
-      _NavItem('Catalog', 'Hospitals', Icons.local_hospital,
+      _NavItem('Users', 'Hospitals', Icons.local_hospital,
           (_) => const AdminTableScreen(table: 'hospitals', title: 'Hospitals', singular: 'Hospital')),
-      _NavItem('Catalog', 'Labs', Icons.science,
+      _NavItem('Users', 'Labs', Icons.science,
           (_) => const AdminTableScreen(table: 'labs', title: 'Labs', singular: 'Lab')),
+      _NavItem('Users', 'Pharmacies', Icons.storefront,
+          (_) => const AdminTableScreen(table: 'pharmacies', title: 'Pharmacies', singular: 'Pharmacy')),
+      _NavItem('Users', 'Users', Icons.people,
+          (_) => const AdminUsersScreen()),
+      // Catalog — things, not people.
       _NavItem('Catalog', 'Lab Tests', Icons.biotech,
           (_) => const AdminTableScreen(table: 'lab_tests', title: 'Lab Tests', singular: 'Lab Test')),
-      _NavItem('Catalog', 'Pharmacies', Icons.storefront,
-          (_) => const AdminTableScreen(table: 'pharmacies', title: 'Pharmacies', singular: 'Pharmacy')),
       _NavItem('Catalog', 'Medicines', Icons.medication,
           (_) => const AdminTableScreen(table: 'medicines', title: 'Medicines', singular: 'Medicine')),
       _NavItem('Catalog', 'Inventory', Icons.inventory,
           (_) => const AdminInventoryScreen()),
+      _NavItem('Catalog', 'Coupons', Icons.local_offer,
+          (_) => const AdminTableScreen(table: 'coupons', title: 'Coupons', singular: 'Coupon')),
       // Providers
       _NavItem('Providers', 'Applications', Icons.approval,
           (_) => const AdminApprovalsScreen()),
@@ -78,9 +85,29 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // holding only 'support' land here and see nothing else.
       _NavItem('Support', 'Support Tickets', Icons.support_agent,
           (_) => const AdminSupportTicketsScreen()),
+      _NavItem('Support', 'Account Deletion', Icons.schedule_outlined,
+          (_) => const AdminAccountDeletionScreen()),
       // Content — announcements appear in the app for users
       _NavItem('Content', 'Announcements', Icons.campaign,
           (_) => const AdminBroadcastScreen()),
+      _NavItem('Content', 'FAQs', Icons.help_outline,
+          (_) => const AdminTableScreen(table: 'faqs', title: 'FAQs', singular: 'FAQ')),
+      _NavItem('Content', 'Legal Pages', Icons.gavel,
+          (_) => const AdminTableScreen(table: 'legal_pages', title: 'Legal Pages', singular: 'Legal Page')),
+      _NavItem('Content', 'Home Slider', Icons.view_carousel,
+          (_) => const AdminTableScreen(table: 'slider_media', title: 'Home Slider', singular: 'Slide')),
+      _NavItem('Content', 'Ads', Icons.ads_click,
+          (_) => const AdminTableScreen(table: 'ads', title: 'Ads', singular: 'Ad')),
+      _NavItem('Content', 'Broadcasts', Icons.campaign_outlined,
+          (_) => const BroadcastsScreen()),
+      // Insights
+      _NavItem('Insights', 'Revenue', Icons.trending_up,
+          (_) => const AdminRevenueScreen()),
+      _NavItem('Insights', 'Analytics', Icons.analytics,
+          (_) => const AdminAnalyticsScreen()),
+      // Payments — Remedoo Pay management
+      _NavItem('Payments', 'Remedoo Pay', Icons.qr_code_2,
+          (_) => const AdminRemedooPayScreen()),
       // Settings — all persisted to the app_config backend
       _NavItem('Settings', 'App Settings', Icons.settings,
           (_) => const AdminAppSettingsScreen()),
@@ -98,17 +125,8 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const ServiceAreasScreen()),
       _NavItem('Settings', 'Featured', Icons.star_border,
           (_) => const FeaturedScreen()),
-      // Insights
-      _NavItem('Insights', 'Revenue', Icons.trending_up,
-          (_) => const AdminRevenueScreen()),
-      _NavItem('Insights', 'Analytics', Icons.analytics,
-          (_) => const AdminAnalyticsScreen()),
-      _NavItem('Insights', 'Users', Icons.people,
-          (_) => const AdminUsersScreen()),
-      // Payments — Remedoo Pay management (own section, appended last
-      // so existing section indexes used by the dashboard stay stable)
-      _NavItem('Payments', 'Remedoo Pay', Icons.qr_code_2,
-          (_) => const AdminRemedooPayScreen()),
+      _NavItem('Settings', 'Platform Settings', Icons.tune,
+          (_) => const AdminTableScreen(table: 'platform_settings', title: 'Platform Settings', singular: 'Setting')),
       // Team — staff (employee admin) management, super admin only.
       _NavItem('Settings', 'Team', Icons.group,
           (_) => const AdminTeamScreen()),
@@ -119,45 +137,28 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // 2026-10-18: try every style one by one, live).
       _NavItem('Settings', 'Panel Style', Icons.style,
           (s) => AdminStyleScreen(state: s)),
-      // Audit-76 Batch 9 (Admin gap 1 / M15): tables that had no
-      // admin UI at all. Appended last (with matching _permKeys)
-      // so existing nav indexes stay stable. The section names
-      // join the existing Catalog / Content / Settings groups.
-      _NavItem('Catalog', 'Coupons', Icons.local_offer,
-          (_) => const AdminTableScreen(table: 'coupons', title: 'Coupons', singular: 'Coupon')),
-      _NavItem('Content', 'FAQs', Icons.help_outline,
-          (_) => const AdminTableScreen(table: 'faqs', title: 'FAQs', singular: 'FAQ')),
-      _NavItem('Content', 'Legal Pages', Icons.gavel,
-          (_) => const AdminTableScreen(table: 'legal_pages', title: 'Legal Pages', singular: 'Legal Page')),
-      _NavItem('Content', 'Home Slider', Icons.view_carousel,
-          (_) => const AdminTableScreen(table: 'slider_media', title: 'Home Slider', singular: 'Slide')),
-      _NavItem('Content', 'Ads', Icons.ads_click,
-          (_) => const AdminTableScreen(table: 'ads', title: 'Ads', singular: 'Ad')),
-      _NavItem('Settings', 'Platform Settings', Icons.tune,
-          (_) => const AdminTableScreen(table: 'platform_settings', title: 'Platform Settings', singular: 'Setting')),
-      _NavItem('Content', 'Broadcasts', Icons.campaign_outlined,
-          (_) => const BroadcastsScreen()),
-      // Support (appended last so existing nav indexes stay stable;
-      // perm key 'support' matches its _permKeys entry below):
-      // accounts inside the 72-hour deletion window + Reactivate.
-      _NavItem('Support', 'Account Deletion', Icons.schedule_outlined,
-          (_) => const AdminAccountDeletionScreen()),
     ];
 
 /// Permission key per nav item, aligned with [_items] by index.
 /// The super admin (role 'admin') sees everything. Staff accounts see
 /// only the items whose key the super admin ticked for them in
 /// Admin > Team ('team' itself is never visible to staff).
+/// Absolute indexes (used by the dashboard's quick links):
+/// 1 Doctors, 7 Medicines, 18 Support Tickets, 20 Announcements.
 const _permKeys = [
-  'dashboard', 'doctors', 'hospitals', 'labs', 'lab_tests', 'pharmacies',
-  'medicines', 'inventory', 'applications', 'provider_payments',
-  'reviews', 'orders', 'appointments', 'refunds', 'emergencies',
-  'ambulance', 'support', 'announcements', 'settings', 'branding',
-  'commission', 'subscriptions', 'corporate', 'packages',
-  'service_areas', 'featured', 'revenue', 'analytics', 'users',
-  'remedoo_pay', 'team', 'export_data', 'panel_style',
-  'coupons', 'faqs', 'legal_pages', 'slider_media', 'ads',
-  'platform_settings', 'broadcasts', 'support',
+  'dashboard',
+  'doctors', 'hospitals', 'labs', 'pharmacies', 'users',
+  'lab_tests', 'medicines', 'inventory', 'coupons',
+  'applications', 'provider_payments', 'reviews',
+  'orders', 'appointments', 'refunds', 'emergencies', 'ambulance',
+  'support', 'support',
+  'announcements', 'faqs', 'legal_pages', 'slider_media', 'ads',
+  'broadcasts',
+  'revenue', 'analytics',
+  'remedoo_pay',
+  'settings', 'branding', 'commission', 'subscriptions', 'corporate',
+  'packages', 'service_areas', 'featured', 'platform_settings',
+  'team', 'export_data', 'panel_style',
 ];
 
 /// Admin console shell: light sidebar nav (desktop) / drawer (phone, tablet),
