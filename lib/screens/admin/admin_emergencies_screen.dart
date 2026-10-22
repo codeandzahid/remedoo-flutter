@@ -58,6 +58,16 @@ class _AdminEmergenciesScreenState
     }
     final list = state.emergencyRequests.toList();
     if (list.isEmpty) {
+      if (state.listLoadFailed('emergency_requests')) {
+        return REmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: 'Could not load SOS alerts',
+          subtitle:
+              'The list failed to load — it is not necessarily empty.',
+          actionLabel: 'Retry',
+          onAction: _load,
+        );
+      }
       return const REmptyState(
         icon: Icons.sos,
         title: 'No SOS alerts',
@@ -154,22 +164,62 @@ class _AdminEmergenciesScreenState
               items: [
                 const DropdownMenuItem(
                     value: null, child: Text('Not assigned')),
+                // Full-check fix 2026-10-22: every vehicle was
+                // offered, including maintenance/closed ones.
+                // Only available (or in-use) vehicles can be
+                // picked; the currently assigned one always stays
+                // listed so the value renders.
                 for (final a in state.ambulances)
-                  DropdownMenuItem(
-                    value: '${a['id']}',
-                    child: Text(
-                        '${a['vehicle_number'] ?? 'Vehicle'} • ${a['status'] ?? ''}'),
-                  ),
+                  if (a['status'] == 'available' ||
+                      a['status'] == 'in_use' ||
+                      '${a['id']}' ==
+                          r['assigned_ambulance_id']?.toString())
+                    DropdownMenuItem(
+                      value: '${a['id']}',
+                      child: Text(
+                          '${a['vehicle_number'] ?? 'Vehicle'} • ${a['status'] ?? ''}'),
+                    ),
               ],
               onChanged: (v) async {
+                final previousAmbulance =
+                    r['assigned_ambulance_id']?.toString();
                 final fields = <String, dynamic>{
                   'assigned_ambulance_id': v,
-                  // Assigning a vehicle IS the dispatch step.
-                  if (v != null && status == 'pending')
+                  // Assigning a vehicle IS the dispatch step —
+                  // from pending OR acknowledged (full-check fix
+                  // 2026-10-22: acknowledged requests stayed
+                  // undispatched, invisible to the dashboard's
+                  // dispatched count).
+                  if (v != null &&
+                      (status == 'pending' || status == 'acknowledged'))
                     'status': 'dispatched',
+                  // Clearing the vehicle on a dispatched request
+                  // sends it back to the queue — a dispatched
+                  // request with no ambulance was an inconsistent
+                  // state presented as success.
+                  if (v == null && status == 'dispatched')
+                    'status': 'pending',
                 };
                 final ok = await state.updateEmergencyRequest(
                     '${r['id']}', fields);
+                if (ok) {
+                  // Keep the fleet board truthful: the vehicle is
+                  // in use by this patient now; a replaced/cleared
+                  // vehicle goes back to available.
+                  if (v != null) {
+                    await state.updateAmbulance(v, {
+                      'status': 'in_use',
+                      'assigned_patient_id': r['patient_id'],
+                    });
+                  }
+                  if (previousAmbulance != null &&
+                      previousAmbulance != v) {
+                    await state.updateAmbulance(previousAmbulance, {
+                      'status': 'available',
+                      'assigned_patient_id': null,
+                    });
+                  }
+                }
                 if (context.mounted && !ok) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(

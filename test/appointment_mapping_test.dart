@@ -107,9 +107,11 @@ void main() {
       expect(a.remoteStatus, 'cancelled');
     });
 
-    test('completed keeps its existing local equivalent, upcoming', () {
+    test('completed maps to completed so it lands in Past', () {
+      // Full-check fix 2026-10-22: completed used to collapse into
+      // 'upcoming', so finished visits never left the Upcoming list.
       final a = AppState.apptFromRowForTest(doctorRow(status: 'completed'));
-      expect(a.status, 'upcoming');
+      expect(a.status, 'completed');
       expect(a.remoteStatus, 'completed');
     });
 
@@ -123,7 +125,7 @@ void main() {
     test('localStatusFor maps the full stored vocabulary', () {
       expect(AppState.localStatusFor('pending'), 'pending');
       expect(AppState.localStatusFor('confirmed'), 'upcoming');
-      expect(AppState.localStatusFor('completed'), 'upcoming');
+      expect(AppState.localStatusFor('completed'), 'completed');
       expect(AppState.localStatusFor('cancelled'), 'cancelled');
     });
   });

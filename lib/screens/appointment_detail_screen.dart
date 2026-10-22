@@ -139,7 +139,12 @@ class AppointmentDetailScreen extends StatelessWidget {
                       variant: RButtonVariant.outline,
                       fullWidth: true,
                       onPressed: () => openDirections(context,
-                          name: a.place, address: a.place),
+                          name: a.place.isNotEmpty
+                              ? a.place
+                              : a.doctorName,
+                          address: a.place.isNotEmpty
+                              ? a.place
+                              : a.doctorName),
                     ),
                     if (a.status != 'cancelled') ...[
                       const SizedBox(height: 10),
@@ -183,7 +188,18 @@ class AppointmentDetailScreen extends StatelessWidget {
                               context,
                               appt: a);
                           if (ok && context.mounted) {
-                            state.cancelAppointment(a.id);
+                            final done =
+                                await state.cancelAppointment(a.id);
+                            if (!context.mounted) return;
+                            if (!done) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Could not cancel. Please try again.')),
+                              );
+                              return;
+                            }
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(

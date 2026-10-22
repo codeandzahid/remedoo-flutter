@@ -258,6 +258,16 @@ class AppState extends ChangeNotifier {
   void debugSetDeletionRequestedAt(DateTime? value) =>
       _deletionRequestedAt = value;
 
+  /// True when the signed-in account's profile is marked
+  /// 'suspended' in Admin > Users. RootGate shows the suspended
+  /// page instead of any shell (full-check fix 2026-10-22).
+  bool _accountSuspended = false;
+  bool get accountSuspended => _accountSuspended;
+
+  /// Test-only: forces the suspension flag RootGate gates on.
+  @visibleForTesting
+  void debugSetAccountSuspended(bool value) => _accountSuspended = value;
+
   /// Display name: Supabase user metadata -> email fallback -> mock name.
   String get userName {
     // Prefer the explicitly saved name (profile edits) over auth metadata.
@@ -315,6 +325,10 @@ class AppState extends ChangeNotifier {
       if (seen != null) {
         _seenOnboarding = seen;
       }
+      // Device copy of the dark-mode choice (guests have no profile
+      // to persist it on; the profile value wins when signed in).
+      final darkPref = prefs.getBool('remedoo_dark_mode_v1');
+      if (darkPref != null) _darkMode = darkPref;
       final themeId = prefs.getString(_kThemePackKey);
       if (themeId != null) {
         final pack = ThemePack.byId(themeId);
@@ -712,6 +726,7 @@ class AppState extends ChangeNotifier {
     _mockLoggedIn = false;
     _profileComplete = true;
     _deletionRequestedAt = null;
+    _accountSuspended = false;
     _name = 'Patient';
     _email = '';
     _providerRole = null;
@@ -846,6 +861,44 @@ class AppState extends ChangeNotifier {
         ..clear()
         ..addAll(ts);
       changed = true;
+      // Real per-lab numbers (full-check fix 2026-10-22: the repo
+      // derived testCount from the labs.services text array and
+      // hard-coded one turnaround for every lab). Count the lab's
+      // actual catalogue tests; turnaround = the most common
+      // turnaround among them.
+      for (var i = 0; i < labs.length; i++) {
+        final own = ts.where((t) => t.labId == labs[i].id).toList();
+        if (own.isEmpty) continue;
+        final tatCounts = <String, int>{};
+        for (final t in own) {
+          if (t.turnaround.isNotEmpty) {
+            tatCounts[t.turnaround] = (tatCounts[t.turnaround] ?? 0) + 1;
+          }
+        }
+        String? tat;
+        var bestN = -1;
+        tatCounts.forEach((k, v) {
+          if (v > bestN) {
+            bestN = v;
+            tat = k;
+          }
+        });
+        labs[i] = labs[i].copyWith(
+          testCount: own.length,
+          turnaround: tat ?? labs[i].turnaround,
+        );
+      }
+    }
+    if (ms.isNotEmpty) {
+      // Real per-pharmacy item count (the repo used the length of
+      // a legacy inventory JSON array).
+      for (var i = 0; i < pharmacies.length; i++) {
+        final n = ms.where((m) => m.pharmacyId == pharmacies[i].id).length;
+        if (pharmacies[i].itemCount != n) {
+          pharmacies[i] = pharmacies[i].copyWith(itemCount: n);
+          changed = true;
+        }
+      }
     }
     if (changed) notifyListeners();
   }
@@ -886,6 +939,7 @@ class AppState extends ChangeNotifier {
     // survive restarts and the tracker shows real records.
     unawaited(loadMyReviews());
     unawaited(loadMyRefunds());
+    unawaited(loadMyPrescriptions());
     // Own reminders from health_reminders (audit Patient 14).
     unawaited(loadRemindersFromBackend());
     unawaited(loadPatientLabSamples());
@@ -939,7 +993,17 @@ class AppState extends ChangeNotifier {
             title: '${r['title'] ?? ''}',
             message: '${r['message'] ?? ''}',
             time: DateTime.tryParse('${r['created_at']}') ?? DateTime.now(),
-            category: '${r['type'] ?? 'system'}',
+            // Server rows carry SINGULAR types ('appointment',
+            // 'order' — written by the DB triggers and the repo
+            // sender) while the notification tabs filter the plural
+            // categories local notifications use. Normalise here so
+            // server notifications land under their tabs instead of
+            // only ever appearing in All (full-check fix 2026-10-22).
+            category: switch ('${r['type'] ?? 'system'}') {
+              'appointment' => 'appointments',
+              'order' => 'orders',
+              final other => other,
+            },
             read: r['read'] == true,
           )));
     // Load support tickets so pending/open show correctly
@@ -972,6 +1036,7 @@ class AppState extends ChangeNotifier {
     _remoteAppointmentIds.clear();
     _remoteOrderIds.clear();
     _remoteFamilyIds.clear();
+    _myPrescriptions.clear();
   }
 
   static String _embeddedName(Map<String, dynamic> r, String key) {
@@ -1017,12 +1082,14 @@ class AppState extends ChangeNotifier {
   /// unapproved bookings carry "Upcoming" badges and CONFIRMED
   /// receipts (Live Test 2 follow-up, D5). 'confirmed' displays as
   /// 'upcoming' — the local word the dashboard Next Appointment
-  /// card, the receipt badge switch and the booking gate use — and
-  /// 'completed' keeps the local equivalent it has always had here,
-  /// 'upcoming'.
+  /// card, the receipt badge switch and the booking gate use.
+  /// 'completed' maps to 'completed' (full-check fix 2026-10-22:
+  /// it used to fall through to 'upcoming', so a finished visit
+  /// stayed in Upcoming forever and never reached the Past list).
   static String localStatusFor(String dbStatus) => switch (dbStatus) {
         'pending' => 'pending',
         'cancelled' => 'cancelled',
+        'completed' => 'completed',
         _ => 'upcoming',
       };
 
@@ -1086,11 +1153,33 @@ class AppState extends ChangeNotifier {
     // and the fee a hardcoded 0.
     final doc = kind == 'doctor' ? _embeddedMap(r, 'doctors') : null;
     final docSpecialty = '${doc?['specialization'] ?? ''}'.trim();
+    // Place for Directions / the details header (full-check fix
+    // 2026-10-22: backend rows always carried place '' so
+    // Directions searched for an empty string). Resolved from the
+    // embedded provider records: the provider's own location,
+    // falling back to its name.
+    final hosp = kind == 'hospital'
+        ? _embeddedMap(r, 'hospitals')
+        : (doc != null ? _embeddedMap(doc, 'hospitals') : null);
+    final lab = kind == 'lab' ? _embeddedMap(r, 'labs') : null;
+    var place = '';
+    for (final candidate in [
+      hosp?['location'],
+      lab?['location'],
+      hosp?['name'],
+      lab?['name'],
+    ]) {
+      final s = '${candidate ?? ''}'.trim();
+      if (s.isNotEmpty && s != 'null') {
+        place = s;
+        break;
+      }
+    }
     return Appointment(
       id: '${r['id']}',
       doctorName: title,
       specialty: docSpecialty.isNotEmpty ? docSpecialty : kind,
-      place: '',
+      place: place,
       date: date,
       timeLabel: timeLabel,
       fee: (doc?['consultation_fee'] as num?)?.toDouble() ?? 0,
@@ -1191,6 +1280,7 @@ class AppState extends ChangeNotifier {
       refundAt: _dateOrNull(r['refund_at']),
       refundUtr: _strOrNull(r['refund_utr']),
       refundRequestedAt: _dateOrNull(r['refund_requested_at']),
+      estimatedDelivery: _strOrNull(r['estimated_delivery']),
     );
   }
 
@@ -1230,10 +1320,30 @@ class AppState extends ChangeNotifier {
     return parts.isEmpty ? null : parts.join(' • ');
   }
 
-  void _syncBookAppointment(Appointment appt) {
-    if (_supaUser == null) return;
-    _repo
-        .bookAppointment(
+  /// Maps a booking's family-member id to the id the backend
+  /// knows: a same-session member carries a local 'F…' id whose
+  /// remote id lives in _remoteFamilyIds; a backend-loaded member
+  /// already carries its remote (UUID) id. Anything else maps to
+  /// null — sending a local id made the appointments insert fail
+  /// on the family_member_id foreign key (full-check fix
+  /// 2026-10-22).
+  String? _remoteFamilyIdFor(String? localId) {
+    if (localId == null || localId.isEmpty) return null;
+    final mapped = _remoteFamilyIds[localId];
+    if (mapped != null) return mapped;
+    final looksUuid = RegExp(
+            r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+        .hasMatch(localId);
+    return looksUuid ? localId : null;
+  }
+
+  /// Backend write for a booking. Returns the remote appointment id,
+  /// or null when the write failed (full-check fix 2026-10-22: this
+  /// used to be fire-and-forget, so the UI celebrated bookings the
+  /// server had rejected).
+  Future<String?> _syncBookAppointment(Appointment appt) {
+    if (_supaUser == null) return Future.value(null);
+    return _repo.bookAppointment(
       serviceType: appt.kind,
       doctorId: appt.kind == 'doctor' ? appt.refId : null,
       hospitalId: appt.kind == 'hospital' ? appt.refId : null,
@@ -1253,7 +1363,7 @@ class AppState extends ChangeNotifier {
           : null,
       paymentRef: appt.paymentRef,
       customerUpi: appt.customerUpi,
-      familyMemberId: appt.bookingForMemberId,
+      familyMemberId: _remoteFamilyIdFor(appt.bookingForMemberId),
       // Store the method the patient actually picked — without this
       // every row silently took the column default 'at_clinic'.
       paymentMethod: dbPaymentMethod(appt.payment),
@@ -1261,21 +1371,25 @@ class AppState extends ChangeNotifier {
       isVideoConsultation: appt.isVideoConsultation,
       collectionType: appt.collectionType,
       collectionAddress: appt.collectionAddress,
-    )
-        .then((remoteId) {
-      if (remoteId != null) _remoteAppointmentIds[appt.id] = remoteId;
-    });
+    );
   }
 
-  void _syncCancelAppointment(String localId) {
-    if (_supaUser == null) return;
-    _repo.cancelAppointment(_remoteAppointmentIds[localId] ?? localId);
+  Future<bool> _syncCancelAppointment(String localId) {
+    if (_supaUser == null) return Future.value(true);
+    return _repo
+        .cancelAppointment(_remoteAppointmentIds[localId] ?? localId);
   }
 
-  void _syncPlaceOrder(MedOrder order, String? pharmacyId) {
-    if (_supaUser == null || pharmacyId == null || pharmacyId.isEmpty) return;
-    _repo
-        .placeOrder(
+  /// Backend write for an order. Returns the remote order id, or
+  /// null when the write did not happen (guest, no pharmacy, or a
+  /// rejected insert — full-check fix 2026-10-22: this used to be
+  /// fire-and-forget, so checkouts celebrated orders the server
+  /// never received).
+  Future<String?> _syncPlaceOrder(MedOrder order, String? pharmacyId) {
+    if (_supaUser == null || pharmacyId == null || pharmacyId.isEmpty) {
+      return Future.value(null);
+    }
+    return _repo.placeOrder(
       pharmacyId: pharmacyId,
       lines: order.items,
       subtotal: order.subtotal,
@@ -1291,10 +1405,7 @@ class AppState extends ChangeNotifier {
       prescriptionUrl: order.prescriptionUrl,
       discountAmount: order.discountAmount,
       couponCode: order.couponCode,
-    )
-        .then((remoteId) {
-      if (remoteId != null) _remoteOrderIds[order.id] = remoteId;
-    });
+    );
   }
 
   void _syncToggleFavorite(String key, bool added) {
@@ -1350,6 +1461,7 @@ class AppState extends ChangeNotifier {
   /// M10: they used to be memory-only setters, so dark mode and the
   /// notification switches reset on every restart).
   void _syncPreferences() {
+    unawaited(_persistDarkModePref());
     if (_supaUser == null) return;
     _repo.saveProfile({
       'dark_mode': _darkMode,
@@ -1358,6 +1470,16 @@ class AppState extends ChangeNotifier {
         'push': _pushNotif,
       },
     });
+  }
+
+  Future<void> _persistDarkModePref() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('remedoo_dark_mode_v1', _darkMode);
+    } catch (_) {
+      // Best-effort device copy; the profile value is authoritative
+      // for signed-in users.
+    }
   }
 
   void toggleDarkMode() {
@@ -1435,7 +1557,13 @@ class AppState extends ChangeNotifier {
       .toList()
     ..sort((a, b) => b.date.compareTo(a.date));
 
-  Appointment bookAppointment({
+  /// Books an appointment. Awaited end-to-end (full-check fix
+  /// 2026-10-22): for a signed-in user the backend insert must
+  /// succeed before anything is celebrated — on failure nothing is
+  /// added locally and null is returned so the caller can show the
+  /// error. Guests (no backend user) keep the local-only behaviour;
+  /// the booking UI gates them to login before this is reachable.
+  Future<Appointment?> bookAppointment({
     required String kind,
     required String refId,
     required String title,
@@ -1457,7 +1585,7 @@ class AppState extends ChangeNotifier {
     bool isVideoConsultation = false,
     String? collectionType,
     String? collectionAddress,
-  }) {
+  }) async {
     final appt = Appointment(
       id: 'A${DateTime.now().millisecondsSinceEpoch}',
       doctorName: title,
@@ -1482,11 +1610,15 @@ class AppState extends ChangeNotifier {
       collectionType: collectionType,
       collectionAddress: collectionAddress,
     );
-    appointments.add(appt);
-    _takenSlots.add(_slotKey(title, date, timeLabel));
     // New bookings start as pending - require doctor/hospital approval
     appt.status = 'pending';
-    _syncBookAppointment(appt);
+    if (_supaUser != null) {
+      final remoteId = await _syncBookAppointment(appt);
+      if (remoteId == null) return null;
+      _remoteAppointmentIds[appt.id] = remoteId;
+    }
+    appointments.add(appt);
+    _takenSlots.add(_slotKey(title, date, timeLabel));
     addNotification(
       title: 'Appointment request sent',
       message: '$title on ${date.day}/${date.month} at $timeLabel is pending approval',
@@ -1526,11 +1658,20 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void cancelAppointment(String id) {
+  /// Cancels an appointment. Awaited (full-check fix 2026-10-22):
+  /// the local status flips back and false is returned when the
+  /// backend cancel fails, instead of an unconditional "cancelled".
+  Future<bool> cancelAppointment(String id) async {
     final appt = appointments.where((a) => a.id == id).firstOrNull;
-    if (appt == null) return;
+    if (appt == null) return false;
+    final previousStatus = appt.status;
     appt.status = 'cancelled';
-    _syncCancelAppointment(id);
+    final ok = await _syncCancelAppointment(id);
+    if (!ok) {
+      appt.status = previousStatus;
+      notifyListeners();
+      return false;
+    }
     // Paid online: cancelling raises a refund request the panelist
     // acts on (owner order 2026-10-19).
     if (appt.isPaidOnline) {
@@ -1563,11 +1704,13 @@ class AppState extends ChangeNotifier {
       category: 'appointments',
     );
     notifyListeners();
+    return true;
   }
 
-  void rescheduleAppointment(String id, DateTime date, String timeLabel) {
+  Future<bool> rescheduleAppointment(
+      String id, DateTime date, String timeLabel) async {
     final idx = appointments.indexWhere((a) => a.id == id);
-    if (idx < 0) return;
+    if (idx < 0) return false;
     final appt = appointments[idx];
     // Move the SAME appointment (form-pages audit M2): the old code
     // cancelled locally and fabricated a new local-only appointment
@@ -1601,11 +1744,26 @@ class AppState extends ChangeNotifier {
       refundAt: appt.refundAt,
       refundUtr: appt.refundUtr,
       refundRequestedAt: appt.refundRequestedAt,
+      // Preserved (full-check fix 2026-10-22: the moved copy used
+      // to drop these four, so a rescheduled booking lost its
+      // department / video / collection details locally).
+      department: appt.department,
+      isVideoConsultation: appt.isVideoConsultation,
+      collectionType: appt.collectionType,
+      collectionAddress: appt.collectionAddress,
     );
     appointments[idx] = moved;
     if (_supaUser != null) {
       final remoteId = _remoteAppointmentIds[id] ?? id;
-      unawaited(_repo.updateAppointmentSlot(remoteId, date, timeLabel));
+      final ok =
+          await _repo.updateAppointmentSlot(remoteId, date, timeLabel);
+      if (!ok) {
+        // Backend kept the old slot: restore the local row too and
+        // let the caller show the failure (was unawaited before).
+        appointments[idx] = appt;
+        notifyListeners();
+        return false;
+      }
     }
     addNotification(
       title: 'Appointment rescheduled',
@@ -1614,6 +1772,7 @@ class AppState extends ChangeNotifier {
       category: 'appointments',
     );
     notifyListeners();
+    return true;
   }
 
   static String _slotKey(String title, DateTime day, String label) =>
@@ -1826,7 +1985,18 @@ class AppState extends ChangeNotifier {
 
   /// Order Again (2026-10-19): refills the cart with a past order's
   /// items from the same pharmacy. Returns how many lines were added.
-  int reorder(MedOrder order) {    clearCart();
+  int reorder(MedOrder order) {
+    // Full-check fix 2026-10-22: the cart used to be cleared BEFORE
+    // the adds were attempted, so a reorder whose lines could not
+    // be added (different pharmacy already in the cart) wiped the
+    // existing cart and added nothing.
+    if (cart.isNotEmpty &&
+        order.items.isNotEmpty &&
+        cartPharmacyId != null &&
+        cartPharmacyId != order.items.first.medicine.pharmacyId) {
+      return 0;
+    }
+    clearCart();
     var added = 0;
     for (final line in order.items) {
       final ok = addToCart(
@@ -1854,7 +2024,12 @@ class AppState extends ChangeNotifier {
     if (!order.isCancellable) return;
     order.status = 'cancelled';
     notifyListeners();
-    unawaited(_repo.updateOrderStatus(order.id, 'cancelled'));
+    // Full-check fix 2026-10-22: the status sync used the LOCAL
+    // 'R…' id, which no backend row has — same-session cancels
+    // never reached the pharmacy. The refund calls below already
+    // used the remote-id mapping; the status update now does too.
+    final remoteOrderId = _remoteOrderIds[order.id] ?? order.id;
+    unawaited(_repo.updateOrderStatus(remoteOrderId, 'cancelled'));
     if (order.isPaidOnline) {
       order.refundStatus = 'requested';
       order.refundAmount = order.total;
@@ -1889,7 +2064,15 @@ class AppState extends ChangeNotifier {
           Uint8List? bytes, String? path, String fileName) =>
       _repo.uploadPrescriptionData(bytes, path, fileName);
 
-  MedOrder placeOrder({
+  /// Places the cart as an order. Awaited (full-check fix
+  /// 2026-10-22): for a signed-in user the backend insert must
+  /// succeed first — on failure the cart is left untouched, no
+  /// local order is added, and null is returned so the checkout
+  /// can show the error. The cart must belong to a real pharmacy:
+  /// the old 'remedoo' storefront marker is not a pharmacy id, so
+  /// those inserts failed on the orders.pharmacy_id foreign key
+  /// every single time.
+  Future<MedOrder?> placeOrder({
     required String address,
     required String payment,
     String? paymentRef,
@@ -1898,7 +2081,7 @@ class AppState extends ChangeNotifier {
     String? prescriptionUrl,
     String? couponCode,
     double couponDiscount = 0,
-  }) {
+  }) async {
     final subtotal = cartSubtotal;
     // One delivery rule for both checkouts (audit Patient 25):
     // the admin-configured fee + free-delivery threshold — the
@@ -1931,12 +2114,21 @@ class AppState extends ChangeNotifier {
       customerUpi: customerUpi,
       prescriptionUrl: prescriptionUrl,
     );
+    if (_supaUser != null) {
+      if (pharmacyId == null ||
+          pharmacyId.isEmpty ||
+          pharmacyId == 'remedoo') {
+        return null;
+      }
+      final remoteId = await _syncPlaceOrder(order, pharmacyId);
+      if (remoteId == null) return null;
+      _remoteOrderIds[order.id] = remoteId;
+    }
     orders.insert(0, order);
     cart.clear();
     cartPharmacyId = null;
     cartPharmacyName = null;
     _persistCart();
-    _syncPlaceOrder(order, pharmacyId);
     addNotification(
       title: 'Order placed',
       message: '${order.pharmacyName} • ${order.id} • ₹${order.total.toStringAsFixed(0)}',
@@ -1996,6 +2188,10 @@ class AppState extends ChangeNotifier {
     required String message,
     required String category,
   }) {
+    // The Settings notifications switch gates locally generated
+    // in-app notifications (full-check fix 2026-10-22: the switch
+    // persisted a preference nothing ever read).
+    if (!_pushNotif) return;
     notifications.insert(
       0,
       AppNotification(
@@ -2393,12 +2589,20 @@ class AppState extends ChangeNotifier {
 
   final List<SupportTicket> tickets = [];
 
-  void addTicket({
+  /// Creates a support ticket. Full-check fix 2026-10-22: this
+  /// used to insert locally and fire-and-forget the server write,
+  /// and the submit sheet showed "Query submitted!" even when the
+  /// server insert had failed — the ticket then vanished on the
+  /// next server reload. Now the server write is awaited: returns
+  /// true only when the ticket really exists (or the user is a
+  /// guest, where local-only is the design), false on failure and
+  /// nothing is added locally.
+  Future<bool> addTicket({
     required String subject,
     required String category,
     required String description,
     String priority = 'medium',
-  }) {
+  }) async {
     final ticket = SupportTicket(
       id: 'T${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
       subject: subject,
@@ -2406,33 +2610,26 @@ class AppState extends ChangeNotifier {
       description: description,
       date: DateTime.now(),
     );
+    if (_supaUser != null) {
+      final remoteId = await _repo.createSupportTicket(
+        subject: subject,
+        category: category,
+        description: description,
+        priority: priority,
+      );
+      if (remoteId == null) return false;
+      _remoteTicketIds[ticket.id] = remoteId;
+      // The query text becomes the first chat message, so the admin
+      // sees it inside the WhatsApp-style thread (and list previews).
+      await _repo.sendTicketMessage(
+        ticketId: remoteId,
+        message: description,
+        senderRole: 'user',
+      );
+    }
     tickets.insert(0, ticket);
-    // Sync to backend so it appears in admin panel
-    _syncTicket(ticket, priority: priority);
     notifyListeners();
-  }
-
-  void _syncTicket(SupportTicket ticket, {String priority = 'medium'}) {
-    if (_supaUser == null) return;
-    _repo
-        .createSupportTicket(
-      subject: ticket.subject,
-      category: ticket.category,
-      description: ticket.description,
-      priority: priority,
-    )
-        .then((remoteId) async {
-      if (remoteId != null) {
-        _remoteTicketIds[ticket.id] = remoteId;
-        // The query text becomes the first chat message, so the admin
-        // sees it inside the WhatsApp-style thread (and list previews).
-        await _repo.sendTicketMessage(
-          ticketId: remoteId,
-          message: ticket.description,
-          senderRole: 'user',
-        );
-      }
-    });
+    return true;
   }
 
   final Map<String, String> _remoteTicketIds = {};
@@ -2614,22 +2811,42 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setAdminReviewHidden(Review review, bool hidden) async {
+  /// Full-check fix 2026-10-22: these used to flip the local value
+  /// first and throw away the repository result — a failed write
+  /// looked exactly like success. Now the local change is rolled
+  /// back on failure and the caller gets the real outcome.
+  Future<bool> setAdminReviewHidden(Review review, bool hidden) async {
+    final previous = review.hidden;
     review.hidden = hidden;
     final local = reviews[review.appointmentId];
     if (local != null && local.id == review.id) local.hidden = hidden;
     notifyListeners();
     final id = review.id;
-    if (id != null) {
-      await _repo.setReviewStatus(id, hidden ? 'hidden' : 'approved');
+    if (id == null) return true; // local-only review, nothing to sync
+    final ok = await _repo.setReviewStatus(
+        id, hidden ? 'hidden' : 'approved');
+    if (!ok) {
+      review.hidden = previous;
+      if (local != null && local.id == review.id) {
+        local.hidden = previous;
+      }
+      notifyListeners();
     }
+    return ok;
   }
 
-  Future<void> setAdminReviewNotes(Review review, String notes) async {
+  Future<bool> setAdminReviewNotes(Review review, String notes) async {
+    final previous = review.adminNotes;
     review.adminNotes = notes;
     notifyListeners();
     final id = review.id;
-    if (id != null) await _repo.setReviewAdminNotes(id, notes);
+    if (id == null) return true;
+    final ok = await _repo.setReviewAdminNotes(id, notes);
+    if (!ok) {
+      review.adminNotes = previous;
+      notifyListeners();
+    }
+    return ok;
   }
 
   // ---------- Provider application ----------
@@ -2689,9 +2906,40 @@ class AppState extends ChangeNotifier {
   int medicineCountFor(String pharmacyId) =>
       medicines.where((m) => m.pharmacyId == pharmacyId && m.active).length;
 
-  final List<String> prescriptionsSeed = const [];
+  /// Prescription titles for the Medical History timeline.
+  /// Full-check fix 2026-10-22: this was a permanent `const []`
+  /// ("prescriptionsSeed") nothing ever populated — the timeline's
+  /// Prescriptions filter could only ever be empty. Now filled by
+  /// [loadMyPrescriptions] from the prescriptions table.
+  final List<String> _myPrescriptions = [];
 
-  List<String> get prescriptions => prescriptionsSeed;
+  List<String> get prescriptions => _myPrescriptions;
+
+  Future<void> loadMyPrescriptions() async {
+    if (_supaUser == null) return;
+    final rows = await _repo.fetchMyPrescriptions();
+    _myPrescriptions
+      ..clear()
+      ..addAll(rows.map((r) {
+        final doctor = r['doctors'];
+        final doctorName = doctor is Map
+            ? '${doctor['name'] ?? ''}'.trim()
+            : '';
+        final items = r['prescription_items'];
+        final meds = items is List
+            ? items
+                .map((i) =>
+                    i is Map ? '${i['medicine_name'] ?? ''}'.trim() : '')
+                .where((m) => m.isNotEmpty)
+                .toList()
+            : const <String>[];
+        final who = doctorName.isNotEmpty ? 'Dr. $doctorName' : 'Prescription';
+        if (meds.isEmpty) return who;
+        return '$who — ${meds.take(3).join(', ')}'
+            '${meds.length > 3 ? ' +${meds.length - 3} more' : ''}';
+      }));
+    notifyListeners();
+  }
 
   /// Force a rebuild (used after mutating a nested object directly).
   void refresh() => notifyListeners();
@@ -2705,12 +2953,18 @@ class AppState extends ChangeNotifier {
 
   void setDarkMode(bool v) {
     _darkMode = v;
+    // Full-check fix 2026-10-22: this UI-facing setter used to be
+    // memory-only, so the Settings switch reset on every reload.
+    // Persist like toggleDarkMode does (profile + device).
+    _syncPreferences();
+    unawaited(_persistDarkModePref());
     notifyListeners();
   }
 
   bool get notificationsEnabled => _pushNotif;
   void setNotificationsEnabled(bool v) {
     _pushNotif = v;
+    _syncPreferences();
     notifyListeners();
   }
 
@@ -2828,13 +3082,16 @@ class AppState extends ChangeNotifier {
   /// RootGate routes every account type to its own shell — a
   /// doctor must never land in the patient app.
   Future<void> resolveBackendRole() async {
-    // Deletion gate first (owner order 2026-10-22): an account
-    // scheduled for deletion lands on the deletion page whatever its
-    // role, so RootGate needs the flag before it picks a shell.
+    // Deletion + suspension gates first (owner order 2026-10-22;
+    // suspension fix from the full check the same day): RootGate
+    // needs both flags before it picks a shell. A suspended account
+    // (profiles.status, set from Admin > Users) used to sign in
+    // normally — nothing ever read the flag.
     try {
       final profile = await _repo.fetchProfile();
       _deletionRequestedAt =
           parseDeletionRequest(profile?['deletion_requested_at']);
+      _accountSuspended = profile?['status'] == 'suspended';
     } catch (_) {
       // Column absent until the migration lands: no gate.
       _deletionRequestedAt = null;
@@ -2891,6 +3148,7 @@ class AppState extends ChangeNotifier {
           enabled: gw['enabled'] == true,
           gateway: active,
           baseUrl: '${gw['base_url'] ?? ''}',
+          currency: '${appConfigValue('fees')['currency'] ?? 'INR'}',
         );
         configured = true;
       }
@@ -2903,6 +3161,7 @@ class AppState extends ChangeNotifier {
           keyId: '${rzp['key_id'] ?? ''}',
           enabled: rzp['enabled'] == true,
           gateway: 'razorpay',
+          currency: '${appConfigValue('fees')['currency'] ?? 'INR'}',
         );
       }
     }
@@ -2933,9 +3192,17 @@ class AppState extends ChangeNotifier {
           .where((e) => e.$2.isNotEmpty)
           .toList();
     }
+    // Full-check fix 2026-10-22: the no-config default used to be
+    // just Ambulance/Emergency, which shadowed the emergency
+    // screen's built-in 6-contact grid (Women Helpline, Police,
+    // Fire, Child Helpline, Disaster Mgmt never appeared).
     return const [
       ('Ambulance', '108'),
-      ('Emergency', '112'),
+      ('Women Helpline', '1091'),
+      ('Police', '100'),
+      ('Fire', '101'),
+      ('Child Helpline', '1098'),
+      ('Disaster Mgmt', '1078'),
     ];
   }
 
@@ -2948,6 +3215,32 @@ class AppState extends ChangeNotifier {
       '${appConfigValue('support')['phone'] ?? ''}';
   String get supportEmail =>
       '${appConfigValue('support')['email'] ?? 'support@remedoo.app'}';
+
+  /// Support hours from admin Settings (full-check fix
+  /// 2026-10-22: saved but displayed nowhere — the Help dialog
+  /// hardcoded "24x7").
+  String get supportHours =>
+      '${appConfigValue('support')['hours'] ?? ''}';
+
+  /// The admin's custom maintenance message (full-check fix
+  /// 2026-10-22: saved but never shown — the maintenance screen
+  /// hardcoded its text). Empty means "use the default text".
+  String get maintenanceMessage =>
+      '${appConfigValue('maintenance')['message'] ?? ''}';
+
+  /// Admin Branding values (full-check fix 2026-10-22: app name
+  /// and tagline were saved to app_config but read nowhere, so
+  /// the Branding screen's "applies everywhere" claim was not
+  /// true. The main shell header and login screen now show them.)
+  String get appName {
+    final v = '${appConfigValue('branding')['app_name'] ?? ''}'.trim();
+    return v.isEmpty ? 'Remedoo' : v;
+  }
+
+  String get appTagline {
+    final v = '${appConfigValue('branding')['tagline'] ?? ''}'.trim();
+    return v.isEmpty ? 'Healthcare, simplified' : v;
+  }
 
   // ---------- Announcements (admin broadcast -> in-app) ----------
 
@@ -2987,6 +3280,12 @@ class AppState extends ChangeNotifier {
   /// Raw rows of a catalog table as last loaded by [loadAdminTable].
   List<Map<String, dynamic>> adminTable(String t) =>
       _adminTables[t] ?? const [];
+
+  /// True when the latest load of [table] FAILED — its list is
+  /// empty because of an error, not because the table is empty
+  /// (full-check fix 2026-10-22).
+  bool listLoadFailed(String table) =>
+      _repo.failedListLoads.contains(table);
 
   Future<void> loadAdminTable(String t) async {
     _adminTables[t] = await _repo.adminFetchAll(t);
@@ -3033,6 +3332,10 @@ class AppState extends ChangeNotifier {
     final uid = _supaUser?.id;
     if (uid != null) row['user_id'] = uid;
     final id = await _repo.submitProviderApplication(row);
+    // Full-check fix 2026-10-22: keep the REAL application id — the
+    // pending screen showed "—" because only the old in-memory
+    // demo submit ever set this field.
+    if (id != null) providerApplicationId = id;
     return id != null;
   }
 
@@ -3048,8 +3351,11 @@ class AppState extends ChangeNotifier {
   /// applicant's user id. Returns true only if everything succeeded.
   Future<bool> decideProviderApplication(String id, String status,
       Map<String, dynamic> app) async {
-    final ok = await _repo.decideProviderApplication(id, status);
-    if (!ok) return false;
+    // Full-check fix 2026-10-22: the application used to be stamped
+    // FIRST, so a failed record creation stranded it as "approved"
+    // with no provider record and no role. Now the record and the
+    // role are created first (retry-safe: an existing record is
+    // reused) and the stamp lands last.
     if (status == 'approved') {
       final providerType = '${app['provider_type'] ?? ''}';
       final table = _appTypeToTable[providerType];
@@ -3098,6 +3404,14 @@ class AppState extends ChangeNotifier {
           if (services is List && services.isNotEmpty) {
             row['services'] = services;
           }
+        } else if (table == 'pharmacies') {
+          // Full-check fix 2026-10-22: there was no pharmacy
+          // branch — opening hours collected at registration
+          // were dropped and the record kept the schema default.
+          final hours = details['working_hours'];
+          if (hours is Map && hours.isNotEmpty) {
+            row['working_hours'] = hours;
+          }
         }
       }
       // Registration documents (audit M5): the license document
@@ -3125,11 +3439,19 @@ class AppState extends ChangeNotifier {
         if (licenseUrl != null) row['license_url'] = licenseUrl;
         if (extra.isNotEmpty) row['additional_docs_urls'] = extra;
       }
-      final newId = await _repo.adminUpsert(table, row);
-      if (newId == null) return false;
+      final existing = await _repo.findProviderRecordByUserId(
+          table, '${app['user_id']}');
+      if (existing == null) {
+        final newId = await _repo.adminUpsert(table, row);
+        if (newId == null) return false;
+      }
       // Grant the provider role so they can sign in to the Partner app.
-      await _repo.grantUserRole('${app['user_id']}', providerType);
+      final roleOk =
+          await _repo.grantUserRole('${app['user_id']}', providerType);
+      if (!roleOk) return false;
     }
+    final ok = await _repo.decideProviderApplication(id, status);
+    if (!ok) return false;
     await loadAdminProviderApplications();
     return true;
   }
@@ -3454,14 +3776,18 @@ class AppState extends ChangeNotifier {
   String? _providerUpiId;
   String? get providerUpiId => _providerUpiId;
 
-  /// Checks if the UPI setup popup should be shown:
-  /// user has an approved provider application but no UPI ID set.
+  /// Checks if the UPI setup popup should be shown: a signed-in
+  /// provider with no UPI ID set. Full-check fix 2026-10-22: this
+  /// used to scan the in-memory demo application list, which the
+  /// real registration flow never fills — so it could never be
+  /// true. The backend role is the real signal.
   bool get shouldShowUpiSetup {
     if (!isSignedIn) return false;
     if (_providerUpiId?.isNotEmpty ?? false) return false;
-    final email = this.email;
-    return providerApplications.any((a) =>
-        a.email == email && a.status == 'approved');
+    return role == 'doctor' ||
+        role == 'pharmacy' ||
+        role == 'lab' ||
+        role == 'hospital';
   }
 
   Future<bool> updateProfile(
@@ -3513,7 +3839,10 @@ class AppState extends ChangeNotifier {
   bool canReview(String appointmentId) {
     final a = appointments.where((e) => e.id == appointmentId);
     if (a.isEmpty) return false;
-    return a.first.status != 'upcoming' &&
+    // Only a COMPLETED visit can be reviewed (full-check fix
+    // 2026-10-22: the old "not upcoming" test also offered reviews
+    // for cancelled and still-pending appointments).
+    return a.first.status == 'completed' &&
         !reviews.containsKey(appointmentId);
   }
 
@@ -3568,6 +3897,7 @@ class AppState extends ChangeNotifier {
         ],
         fileUrl: url.isEmpty ? null : url,
         fileName: url.isEmpty ? null : 'Lab report',
+        fromLab: true,
       ));
       changed = true;
     }
@@ -3579,7 +3909,7 @@ class AppState extends ChangeNotifier {
   /// this local list; the stored file itself is left untouched in
   /// storage, this removes the patient's on-device entry.
   void removeUploadedReport(String id) {
-    reports.removeWhere((r) => r.id == id && r.isUploaded);
+    reports.removeWhere((r) => r.id == id && r.isOwnUpload);
     notifyListeners();
     unawaited(_persistMyReports());
   }
@@ -3588,7 +3918,7 @@ class AppState extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance()
           .timeout(const Duration(seconds: 3));
-      final uploaded = reports.where((r) => r.isUploaded).map((r) => {
+      final uploaded = reports.where((r) => r.isOwnUpload).map((r) => {
             'id': r.id,
             'patientName': r.patientName,
             'labName': r.labName,
@@ -3779,35 +4109,10 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------- Provider applications ----------
-
-  final List<ProviderApplication> providerApplications = [];
-
-  void submitProviderApplication({
-    required String name,
-    required String email,
-    required String phone,
-    required String role,
-    required String license,
-    String? upiId,
-  }) {
-    final app = ProviderApplication(
-      id: 'PA${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-      name: name,
-      email: email,
-      phone: phone,
-      role: role,
-      license: license,
-      date: DateTime.now(),
-    );
-    providerApplications.insert(0, app);
-    providerApplicationId = app.id;
-    notifyListeners();
-  }
-
-  void setApplicationStatus(String id, String status) {
-    providerApplications.where((a) => a.id == id).firstOrNull?.status = status;
-    notifyListeners();
-  }
+  // (The old in-memory demo list + submit were removed in the
+  // full-check fixes 2026-10-22: nothing ever called them — real
+  // applications go through submitProviderApplicationDb and the
+  // provider_applications table.)
 
   // ---------- SOS alerts ----------
 

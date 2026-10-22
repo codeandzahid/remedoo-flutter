@@ -40,16 +40,24 @@ class PaymentService {
   /// Configure from admin settings (call on app start and when
   /// settings change). [gateway] is the active gateway id. [baseUrl]
   /// is only used by self-hosted gateways (Remedoo Pay).
+  /// Currency from admin Settings (fees.currency), default INR —
+  /// the settings field was write-only before (full-check fix
+  /// 2026-10-22).
+  String _currency = 'INR';
+  String get currency => _currency;
+
   void configure({
     required String keyId,
     required bool enabled,
     String gateway = 'razorpay',
     String baseUrl = '',
+    String currency = 'INR',
   }) {
     _keyId = keyId;
     _enabled = enabled;
     _activeGateway = gateway;
     _baseUrl = baseUrl;
+    _currency = currency.trim().isEmpty ? 'INR' : currency.trim();
   }
 
   String get activeGateway => _activeGateway;
@@ -160,7 +168,7 @@ class PaymentService {
     final options = {
       'key': _keyId,
       'amount': (amount * 100).toInt(), // paise
-      'currency': 'INR',
+      'currency': _currency,
       'name': 'Remedoo',
       'description': description,
       'prefill': {

@@ -8,7 +8,9 @@ import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'doctor_detail_screen.dart';
 import 'hospital_detail_screen.dart';
+import 'lab_detail_screen.dart';
 import 'labs_screen.dart';
+import 'pharmacy_detail_screen.dart';
 import 'remedoo_pharmacy_screen.dart';
 
 /// Global search (2026-10-19): one box for doctors, medicines, lab
@@ -103,11 +105,16 @@ class _SearchScreenState extends State<SearchScreen> {
               child: q.isEmpty
                   ? _hint(context)
                   : nothing
-                      ? const REmptyState(
+                      ? REmptyState(
                           icon: Icons.search_off,
                           title: 'No results found',
                           subtitle:
                               'Try a doctor name, a medicine, or a test name.',
+                          actionLabel: 'Clear search',
+                          onAction: () {
+                            _ctrl.clear();
+                            setState(() => _q = '');
+                          },
                         )
                       : ListView(
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -135,8 +142,24 @@ class _SearchScreenState extends State<SearchScreen> {
                                   color: RemedooTheme.emergency,
                                   title: m.name,
                                   subtitle: '${m.pack} • ${inr(m.price)}',
-                                  onTap: () => pushPage(context,
-                                      const RemedooPharmacyScreen()),
+                                  // Full-check fix 2026-10-22:
+                                  // the tapped medicine used to be
+                                  // discarded for a generic
+                                  // storefront; open the pharmacy
+                                  // that actually sells it.
+                                  onTap: () {
+                                    final owners = state
+                                        .activePharmacies
+                                        .where((p) =>
+                                            p.id == m.pharmacyId)
+                                        .toList();
+                                    pushPage(
+                                        context,
+                                        owners.isNotEmpty
+                                            ? PharmacyDetailScreen(
+                                                pharmacy: owners.first)
+                                            : const RemedooPharmacyScreen());
+                                  },
                                 ),
                             ],
                             if (tests.isNotEmpty) ...[
@@ -149,8 +172,21 @@ class _SearchScreenState extends State<SearchScreen> {
                                   title: t.name,
                                   subtitle:
                                       '${t.category} • ${inr(t.price)}',
-                                  onTap: () => pushPage(
-                                      context, const LabsScreen()),
+                                  // Full-check fix 2026-10-22:
+                                  // open the lab that offers the
+                                  // tapped test, not the generic
+                                  // labs list.
+                                  onTap: () {
+                                    final owners = state.activeLabs
+                                        .where((l) => l.id == t.labId)
+                                        .toList();
+                                    pushPage(
+                                        context,
+                                        owners.isNotEmpty
+                                            ? LabDetailScreen(
+                                                lab: owners.first)
+                                            : const LabsScreen());
+                                  },
                                 ),
                             ],
                             if (hospitals.isNotEmpty) ...[

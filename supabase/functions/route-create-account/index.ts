@@ -114,6 +114,21 @@ serve(async (req) => {
     const fundAccount = await fundRes.json();
     if (!fundRes.ok) {
       console.error('Fund account creation failed:', fundAccount);
+      // Full-check fix 2026-10-22: this failure used to be only
+      // logged — the function went on to mark the provider
+      // 'created' and return success with no payout account
+      // attached. Report the failure honestly; the Razorpay
+      // account id is included so the account can be reconciled.
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            'Razorpay account was created but the bank account could not be added. Check the account number and IFSC, then try again.',
+          account_id: account.id,
+          details: fundAccount,
+        }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Step 3: Save to database
@@ -125,13 +140,27 @@ serve(async (req) => {
     };
     const table = tableMap[provider_type];
     if (table) {
-      await supabase
+      const { error: dbError } = await supabase
         .from(table)
         .update({
           razorpay_account_id: account.id,
           route_onboarding_status: 'created',
         })
         .eq('id', provider_id);
+      if (dbError) {
+        // Full-check fix 2026-10-22: a failed save was swallowed
+        // and success returned anyway.
+        console.error('Saving route account failed:', dbError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error:
+              'Razorpay account created but it could not be saved to the database. Give this account id to support.',
+            account_id: account.id,
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     return new Response(

@@ -133,11 +133,16 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     final state = AppStateScope.of(context);
     final repo = state.supabaseRepository;
     final uid = '${m['user_id']}';
+    // Full-check fix 2026-10-22: the section-clear result used to
+    // be discarded — the message claimed "access removed" even
+    // when clearing the sections had failed.
+    var sectionsOk = true;
     if (!active) {
-      await repo.updateStaffSections(uid, const []);
+      sectionsOk = await repo.updateStaffSections(uid, const []);
     }
-    final ok = await repo.adminUpdateProfile(
+    final profileOk = await repo.adminUpdateProfile(
         uid, {'status': active ? 'active' : 'suspended'});
+    final ok = sectionsOk && profileOk;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

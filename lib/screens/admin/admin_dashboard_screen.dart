@@ -62,8 +62,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       return const RLoading();
     }
 
-    final revenue = state.adminOrders.fold<double>(
-        0, (s, o) => s + ((o['total'] as num?)?.toDouble() ?? 0));
+    // Revenue counts real sales only — a cancelled order's total is
+    // not revenue (full-check fix 2026-10-22: the fold used to sum
+    // every order including cancelled ones).
+    final revenue = state.adminOrders
+        .where((o) => '${o['status']}' != 'cancelled')
+        .fold<double>(
+            0, (s, o) => s + ((o['total'] as num?)?.toDouble() ?? 0));
     final byStatus = <String, int>{};
     for (final o in state.adminOrders) {
       final st = '${o['status'] ?? 'placed'}';
@@ -146,28 +151,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         'Users',
         [
           _stat(context, 'Total Users', '${state.allProfiles.length}',
-              Icons.people, _cBlue),
+              Icons.people, _cBlue,
+              onTap: () => widget.onNavigate?.call(5)),
           _stat(context, 'Doctors',
               '${state.adminTable('doctors').length}',
-              Icons.person_search, _cGreen),
+              Icons.person_search, _cGreen,
+              onTap: () => widget.onNavigate?.call(1)),
         ]
       ),
       (
         'Orders & Care',
         [
           _stat(context, 'Appointments', '${appts.length}',
-              Icons.calendar_month, _cPink),
+              Icons.calendar_month, _cPink,
+              onTap: () => widget.onNavigate?.call(14)),
           _stat(context, 'Total Orders', '${state.adminOrders.length}',
-              Icons.shopping_bag, _cLav),
+              Icons.shopping_bag, _cLav,
+              onTap: () => widget.onNavigate?.call(13)),
           _stat(context, 'Active Emergencies', '$activeEmergencies',
-              Icons.sos, _cPink),
+              Icons.sos, _cPink,
+              onTap: () => widget.onNavigate?.call(16)),
         ]
       ),
       (
         'Providers',
         [
           _stat(context, 'Pending Approvals', '$pendingApprovals',
-              Icons.approval, _cBlue),
+              Icons.approval, _cBlue,
+              onTap: () => widget.onNavigate?.call(10)),
         ]
       ),
       (
@@ -186,7 +197,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         'Insights',
         [
           _stat(context, 'Revenue', inr(revenue), Icons.currency_rupee,
-              _cGreen),
+              _cGreen,
+              onTap: () => widget.onNavigate?.call(26)),
         ]
       ),
     ];

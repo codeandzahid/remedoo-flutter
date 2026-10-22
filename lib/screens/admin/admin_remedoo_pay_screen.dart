@@ -11,6 +11,7 @@ import '../../theme.dart';
 import '../../utils/refunds.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/form_kit.dart';
+import '../../widgets/provider_payments.dart';
 
 void _snack(BuildContext context, String msg) {
   ScaffoldMessenger.of(context)
@@ -125,6 +126,17 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
   }
 
   Future<void> _save({bool makeActive = false}) async {
+    // Money control (full-check fix 2026-10-22): saving the gateway
+    // config — above all Set as Active — changes where patient money
+    // goes platform-wide, so it takes the admin's email code first,
+    // like the other payment controls.
+    final verified = await requireEmailOtp(
+      context,
+      title: 'Confirm with email code',
+      message:
+          'Enter the 6-digit code sent to your email to save the Remedoo Pay settings.',
+    );
+    if (!verified || !mounted) return;
     // Same UPI format rule as the provider UPI dialog (audit
     // Admin gap 18: this editor used to accept any text, so a
     // malformed platform VPA reached live checkout).
@@ -140,10 +152,26 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
           'Enter the platform UPI ID before making Remedoo Pay active.');
       return;
     }
+    if (makeActive && _serverUrl.text.trim().isEmpty) {
+      // Full-check fix 2026-10-22: activation validated only the
+      // VPA — Remedoo Pay could become the live gateway with no
+      // server URL for checkout/observer calls to reach.
+      _snack(context,
+          'Enter the Remedoo Pay server URL before making it active.');
+      return;
+    }
     final state = AppStateScope.of(context);
     final repo = state.supabaseRepository;
     setState(() => _saving = true);
-    final config = Map<String, dynamic>.from(_fullConfig);
+    // Full-check fix 2026-10-22: the config was rebuilt from the
+    // snapshot taken when this screen loaded, so any change saved
+    // meanwhile from App Settings (including a different active
+    // gateway) was silently reverted. Re-read the stored config
+    // first and merge this screen's edits into the fresh value.
+    await state.loadAppConfig();
+    if (!mounted) return;
+    final config = Map<String, dynamic>.from(
+        state.appConfigValue('payment_gateways'));
     final gateways = config['gateways'] is Map
         ? Map<String, dynamic>.from(config['gateways'])
         : <String, dynamic>{};
@@ -920,17 +948,38 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
     }
     final state = AppStateScope.of(context);
     if (newStatus == 'ACTIVE') {
-      // No queue: only one open payment. Cancel any other open one,
-      // then re-open this one with a fresh 5-minute window.
+      // No queue: only one open payment. Cancel any other open
+      // one, then re-open this one with a fresh 5-minute window.
+      // Full-check fix 2026-10-22: only status ACTIVE was
+      // cancelled — QUEUED sessions are also open/payable (the
+      // Worker treats them so and this screen counts them as
+      // "Waiting now"), so a re-open could leave two open
+      // payments; and the cancel results were discarded, so a
+      // failed cancel still ended in a success report.
+      var cancelsOk = true;
       for (final other in _sessions) {
-        if (other['id'] != session['id'] && other['status'] == 'ACTIVE') {
-          await state.supabaseRepository.updateRemedooPaySession(
-              '${other['id']}', {'status': 'CANCELLED'});
+        if (other['id'] != session['id'] &&
+            (other['status'] == 'ACTIVE' ||
+                other['status'] == 'QUEUED')) {
+          final cancelled = await state.supabaseRepository
+              .updateRemedooPaySession(
+                  '${other['id']}', {'status': 'CANCELLED'});
+          if (!cancelled) cancelsOk = false;
         }
+      }
+      if (!cancelsOk) {
+        if (!mounted) return;
+        setState(() => _saving = false);
+        _snack(context,
+            'Could not cancel the other open payment — nothing was changed.');
+        return;
       }
       effectivePatch = {
         ...patch,
         'activated_at': DateTime.now().toUtc().toIso8601String(),
+        // The old session's UTR must not ride onto the re-opened
+        // payment (it was displayed as if it belonged to it).
+        'utr': null,
       };
     }
     final done = await state.supabaseRepository

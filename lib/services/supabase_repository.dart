@@ -189,7 +189,10 @@ class SupabaseRepository {
       location: '${r['location'] ?? ''}',
       rating: (r['rating'] as num?)?.toDouble() ?? 0,
       reviews: 0,
-      deliveryTime: '45 min',
+      // No delivery-time data exists for pharmacies — empty
+      // means 'not provided'; the UI hides it (full-check fix
+      // 2026-10-22: this was a hard-coded '45 min' for all).
+      deliveryTime: '',
       itemCount: inv is List ? inv.length : 0,
       offers: 0,
       verified: r['approval_status'] == _approved,
@@ -533,7 +536,7 @@ class SupabaseRepository {
           // appointments table has no fee column of its own, so the
           // receipt/details read them from the doctor's record.
           .select(
-              '*, doctors(name, specialization, consultation_fee), hospitals(name), labs(name)')
+              '*, doctors(name, specialization, consultation_fee, hospitals(name, location)), hospitals(name, location), labs(name, location)')
           .eq('patient_id', uid)
           .order('appointment_date', ascending: false)
           .order('appointment_time', ascending: false)
@@ -760,7 +763,10 @@ class SupabaseRepository {
   /// WhatsApp-style chat lists: last-message previews + unread counts.
   Future<List<Map<String, dynamic>>> fetchMessagesForTickets(
     List<String> ticketIds, {
-    int limit = 500,
+    // Full-check fix 2026-10-22: was 500 TOTAL across up to 200
+    // tickets — older conversations lost their preview and their
+    // unread user messages were silently uncounted.
+    int limit = 2000,
   }) async {
     if (!_ready || ticketIds.isEmpty) return const [];
     try {
@@ -999,6 +1005,51 @@ class SupabaseRepository {
     }
   }
 
+  /// Department names for one hospital (the public-read
+  /// departments table the hospital panel maintains) — the patient
+  /// hospital page used to show the same hard-coded list for every
+  /// hospital (full-check fix 2026-10-22).
+  Future<List<String>> fetchHospitalDepartments(String hospitalId) async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('departments')
+          .select('name')
+          .eq('hospital_id', hospitalId)
+          .eq('is_active', true)
+          .order('name')
+          .limit(50);
+      return rows
+          .map((r) => '${r['name'] ?? ''}'.trim())
+          .where((n) => n.isNotEmpty)
+          .toList();
+    } catch (e) {
+      debugPrint('fetchHospitalDepartments failed: $e');
+      return const [];
+    }
+  }
+
+  /// The signed-in patient's prescriptions, newest first, each
+  /// with the prescribing doctor's name and its medicine lines —
+  /// backs the Medical History timeline (full-check fix 2026-10-22:
+  /// that screen read a permanent empty constant, so the
+  /// Prescriptions filter could never show anything).
+  Future<List<Map<String, dynamic>>> fetchMyPrescriptions() async {
+    if (!_ready || _uid == null) return const [];
+    try {
+      final rows = await _db
+          .from('prescriptions')
+          .select('*, doctors(name), prescription_items(medicine_name)')
+          .eq('patient_id', _uid!)
+          .order('created_at', ascending: false)
+          .limit(50);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchMyPrescriptions failed: $e');
+      return const [];
+    }
+  }
+
   /// Creates a doctor's prescription for an appointment
   /// (prescriptions + prescription_items, schema_part_02) — the
   /// doctor panel had no creation form at all (audit M3). The
@@ -1016,10 +1067,10 @@ class SupabaseRepository {
       if (doctor == null) return null;
       final appt = await _db
           .from('appointments')
-          .select('user_id')
+          .select('patient_id')
           .eq('id', appointmentId)
           .single();
-      final patientId = '${appt['user_id'] ?? ''}';
+      final patientId = '${appt['patient_id'] ?? ''}';
       if (patientId.isEmpty) return null;
       final row = await _db.from('prescriptions').insert({
         'appointment_id': appointmentId,
@@ -1644,8 +1695,16 @@ class SupabaseRepository {
   Future<bool> setThemePackEnabled(String id, bool enabled) async {
     if (!_ready) return false;
     try {
-      await _db.from('theme_packs').update({'enabled': enabled}).eq('id', id);
-      return true;
+      // Full-check fix 2026-10-22: the update used to report
+      // success even when no row matched the id (e.g. toggling a
+      // pack the table does not have). Select the updated rows
+      // back and require at least one.
+      final rows = await _db
+          .from('theme_packs')
+          .update({'enabled': enabled})
+          .eq('id', id)
+          .select('id');
+      return rows.isNotEmpty;
     } catch (e) {
       debugPrint('setThemePackEnabled failed: $e');
       return false;
@@ -1942,6 +2001,21 @@ class SupabaseRepository {
     }
   }
 
+  /// Remove a sensitive setting from secure_settings (admin-only).
+  /// Full-check fix 2026-10-22: secrets could never be cleared —
+  /// the settings save skipped empty values, so an old secret
+  /// silently persisted and reappeared on reload.
+  Future<bool> deleteSecureSetting(String key) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('secure_settings').delete().eq('key', key);
+      return true;
+    } catch (e) {
+      debugPrint('deleteSecureSetting failed: $e');
+      return false;
+    }
+  }
+
   /// Read secure settings (admin only). Returns map of key->value.
   Future<Map<String, String>> fetchSecureSettings(List<String> keys) async {
     if (!_ready) return {};
@@ -1959,16 +2033,39 @@ class SupabaseRepository {
     }
   }
 
+  /// Tables whose latest admin list load FAILED (full-check fix
+  /// 2026-10-22). List fetches swallow errors into an empty list,
+  /// which made a failed load look exactly like an empty table;
+  /// screens check this set to offer a retry instead of showing
+  /// "nothing here".
+  final Set<String> failedListLoads = {};
+
   /// Admin read of any catalog table (all rows, incl. non-approved).
   Future<List<Map<String, dynamic>>> adminFetchAll(String table) async {
-    if (!_ready) return const [];
+    if (!_ready) {
+      failedListLoads.add(table);
+      return const [];
+    }
     try {
       final rows =
           await _db.from(table).select('*').order('name').limit(500);
+      failedListLoads.remove(table);
       return rows.map((r) => Map<String, dynamic>.from(r)).toList();
-    } catch (e) {
-      debugPrint('adminFetchAll($table) failed: $e');
-      return const [];
+    } catch (_) {
+      // Several tables have no `name` column (coupons, faqs,
+      // legal_pages, slider_media, ads, platform_settings,
+      // platform_commission_config, broadcast_notifications): the
+      // ordered query errors and the screen showed "Nothing here"
+      // forever. Retry unordered — the rows exist and must list.
+      try {
+        final rows = await _db.from(table).select('*').limit(500);
+        failedListLoads.remove(table);
+        return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      } catch (e) {
+        debugPrint('adminFetchAll($table) failed: $e');
+        failedListLoads.add(table);
+        return const [];
+      }
     }
   }
 
@@ -2068,7 +2165,10 @@ class SupabaseRepository {
           .from('provider_applications')
           .select('*')
           .order('created_at', ascending: false)
-          .limit(200);
+          // Full-check fix 2026-10-22: cap raised 200 → 1000
+          // (the PostgREST server cap) so admin lists and totals
+          // are not silently truncated.
+          .limit(1000);
       return rows.map((r) => Map<String, dynamic>.from(r)).toList();
     } catch (e) {
       debugPrint('fetchProviderApplications failed: $e');
@@ -2108,18 +2208,30 @@ class SupabaseRepository {
   }
 
   /// Grants a role to a user. Callers must be admin (enforced by RLS).
-  /// Roles are strictly separated: one user holds exactly one role, so
-  /// any existing role is replaced (matches the DB unique constraint on
-  /// user_roles.user_id).
-  Future<bool> grantUserRole(String userId, String role) async {
-    if (!_ready) return false;
+  /// Roles are strictly separated: one user holds exactly one role
+  /// (matches the DB unique constraint on user_roles.user_id).
+  /// Full-check fix 2026-10-22: same safe pattern as setUserRole —
+  /// update the existing row in place instead of delete-then-insert,
+  /// so a failed insert can never leave the account role-less.
+  Future<bool> grantUserRole(String userId, String role) async =>
+      setUserRole(userId, role);
+
+  /// The provider catalog row linked to [userId], if one exists
+  /// (approval retry guard, full-check fix 2026-10-22).
+  Future<Map<String, dynamic>?> findProviderRecordByUserId(
+      String table, String userId) async {
+    if (!_ready) return null;
     try {
-      await _db.from('user_roles').delete().eq('user_id', userId);
-      await _db.from('user_roles').insert({'user_id': userId, 'role': role});
-      return true;
+      final rows = await _db
+          .from(table)
+          .select()
+          .eq('user_id', userId)
+          .limit(1);
+      if (rows.isEmpty) return null;
+      return Map<String, dynamic>.from(rows.first);
     } catch (e) {
-      debugPrint('grantUserRole failed: $e');
-      return false;
+      debugPrint('findProviderRecordByUserId($table) failed: $e');
+      return null;
     }
   }
 
@@ -2181,6 +2293,34 @@ class SupabaseRepository {
   }
 
   /// Appointments for the signed-in doctor (via their doctors record).
+  /// Stamps each appointment row with 'patient_name' / 'patient_phone'
+  /// resolved through the provider_patient_contacts RPC (SECURITY
+  /// DEFINER: profiles RLS hides other patients from providers, so a
+  /// client-side join returns nothing). Fails soft — before the
+  /// migration is applied the cards simply keep the "Patient"
+  /// fallback label (full-check fix 2026-10-22).
+  Future<void> _stampPatientContacts(List<Map<String, dynamic>> rows) async {
+    if (rows.isEmpty) return;
+    try {
+      final contacts = await _db.rpc('provider_patient_contacts');
+      if (contacts is! List) return;
+      final byId = <String, Map<String, dynamic>>{
+        for (final c in contacts)
+          if (c is Map) '${c['patient_id']}': Map<String, dynamic>.from(c),
+      };
+      for (final r in rows) {
+        final c = byId['${r['patient_id']}'];
+        if (c == null) continue;
+        final name = '${c['full_name'] ?? ''}'.trim();
+        if (name.isNotEmpty) r['patient_name'] = name;
+        final phone = '${c['phone'] ?? ''}'.trim();
+        if (phone.isNotEmpty) r['patient_phone'] = phone;
+      }
+    } catch (_) {
+      // Display-only enrichment; never fail the list for it.
+    }
+  }
+
   Future<List<Map<String, dynamic>>> fetchDoctorAppointments() async {
     if (!_ready || _uid == null) return const [];
     try {
@@ -2194,7 +2334,9 @@ class SupabaseRepository {
           .order('appointment_date', ascending: true)
           .order('appointment_time', ascending: true)
           .limit(200);
-      return rows.cast<Map<String, dynamic>>();
+      final list = rows.cast<Map<String, dynamic>>();
+      await _stampPatientContacts(list);
+      return list;
     } catch (e) {
       debugPrint('fetchDoctorAppointments failed: $e');
       return const [];
@@ -2215,7 +2357,9 @@ class SupabaseRepository {
           .order('appointment_date', ascending: true)
           .order('appointment_time', ascending: true)
           .limit(200);
-      return rows.cast<Map<String, dynamic>>();
+      final list = rows.cast<Map<String, dynamic>>();
+      await _stampPatientContacts(list);
+      return list;
     } catch (e) {
       debugPrint('fetchHospitalAppointments failed: $e');
       return const [];
@@ -2236,7 +2380,9 @@ class SupabaseRepository {
           .order('appointment_date', ascending: true)
           .order('appointment_time', ascending: true)
           .limit(200);
-      return rows.cast<Map<String, dynamic>>();
+      final list = rows.cast<Map<String, dynamic>>();
+      await _stampPatientContacts(list);
+      return list;
     } catch (e) {
       debugPrint('fetchLabBookings failed: $e');
       return const [];
@@ -2433,12 +2579,31 @@ class SupabaseRepository {
   Future<List<Map<String, dynamic>>> fetchLatestAnnouncements() async {
     if (!_ready) return const [];
     try {
-      final rows = await _db
-          .from('announcements')
-          .select('title, message, created_at')
-          .order('created_at', ascending: false)
-          .limit(5);
-      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      // Audience targeting (full-check fix 2026-10-22): the admin
+      // Publish form stores 'all' | 'users' | 'providers'; this
+      // patient-side fetch must never surface provider-only posts.
+      try {
+        final rows = await _db
+            .from('announcements')
+            .select('title, message, created_at, audience')
+            .order('created_at', ascending: false)
+            .limit(10);
+        return rows
+            .map((r) => Map<String, dynamic>.from(r))
+            .where((r) =>
+                r['audience'] == null ||
+                r['audience'] == 'all' ||
+                r['audience'] == 'users')
+            .take(5)
+            .toList();
+      } catch (_) {
+        final rows = await _db
+            .from('announcements')
+            .select('title, message, created_at')
+            .order('created_at', ascending: false)
+            .limit(5);
+        return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      }
     } catch (e) {
       debugPrint('fetchLatestAnnouncements failed: $e');
       return const [];
@@ -2460,7 +2625,7 @@ class SupabaseRepository {
             .select(
                 'user_id, full_name, email, phone, created_at, status, gender, date_of_birth, address, language, upi_id, avatar_url, deletion_requested_at')
             .order('created_at', ascending: false)
-            .limit(500);
+            .limit(1000);
       } catch (_) {
         rows = await _db
             .from('profiles')
@@ -2508,9 +2673,26 @@ class SupabaseRepository {
   Future<bool> setUserRole(String userId, String role) async {
     if (!_ready) return false;
     try {
-      // Remove existing roles, then insert the new one (one role per user)
-      await _db.from('user_roles').delete().eq('user_id', userId);
-      await _db.from('user_roles').insert({'user_id': userId, 'role': role});
+      // Full-check fix 2026-10-22: this used to DELETE the role rows
+      // first and insert after — if the insert failed (e.g. picking
+      // 'driver' before its enum migration lands) the account was
+      // left with NO role at all. Update the existing row in place
+      // instead; insert only when the account has no role row yet.
+      // A failed write now leaves the old role untouched.
+      final existing = await _db
+          .from('user_roles')
+          .select('user_id')
+          .eq('user_id', userId)
+          .limit(1);
+      if (existing.isNotEmpty) {
+        await _db
+            .from('user_roles')
+            .update({'role': role}).eq('user_id', userId);
+      } else {
+        await _db
+            .from('user_roles')
+            .insert({'user_id': userId, 'role': role});
+      }
       return true;
     } catch (e) {
       debugPrint('setUserRole failed: $e');
@@ -2520,16 +2702,24 @@ class SupabaseRepository {
 
   /// Admin list of all orders with items, newest first.
   Future<List<Map<String, dynamic>>> adminFetchOrders() async {
-    if (!_ready) return const [];
+    if (!_ready) {
+      failedListLoads.add('orders');
+      return const [];
+    }
     try {
       final rows = await _db
           .from('orders')
           .select('*, order_items(*)')
           .order('created_at', ascending: false)
-          .limit(200);
+          // Full-check fix 2026-10-22: was 200 — Revenue and
+          // Analytics presented the newest-200 subset as platform
+          // totals. 1000 is the PostgREST server cap.
+          .limit(1000);
+      failedListLoads.remove('orders');
       return rows.map((r) => Map<String, dynamic>.from(r)).toList();
     } catch (e) {
       debugPrint('adminFetchOrders failed: $e');
+      failedListLoads.add('orders');
       return const [];
     }
   }
@@ -2567,7 +2757,10 @@ class SupabaseRepository {
   /// table and stamped onto each row as 'patient_name' (same
   /// client-join pattern as fetchAllProfiles attaching roles).
   Future<List<Map<String, dynamic>>> adminFetchAppointments() async {
-    if (!_ready) return const [];
+    if (!_ready) {
+      failedListLoads.add('appointments');
+      return const [];
+    }
     try {
       final rows = await _db
           .from('appointments')
@@ -2578,7 +2771,8 @@ class SupabaseRepository {
           .select(
               '*, doctors(name, specialization, consultation_fee), hospitals(name), labs(name), pharmacies(name)')
           .order('created_at', ascending: false)
-          .limit(200);
+          .limit(1000);
+      failedListLoads.remove('appointments');
       final list = rows.map((r) => Map<String, dynamic>.from(r)).toList();
       try {
         final profs = await _db
@@ -2606,6 +2800,7 @@ class SupabaseRepository {
       return list;
     } catch (e) {
       debugPrint('adminFetchAppointments failed: $e');
+      failedListLoads.add('appointments');
       return const [];
     }
   }
@@ -2836,16 +3031,21 @@ class SupabaseRepository {
 
   /// Admin list of emergency requests, newest first.
   Future<List<Map<String, dynamic>>> fetchEmergencyRequests() async {
-    if (!_ready) return const [];
+    if (!_ready) {
+      failedListLoads.add('emergency_requests');
+      return const [];
+    }
     try {
       final rows = await _db
           .from('emergency_requests')
           .select('*')
           .order('created_at', ascending: false)
           .limit(100);
+      failedListLoads.remove('emergency_requests');
       return rows.map((r) => Map<String, dynamic>.from(r)).toList();
     } catch (e) {
       debugPrint('fetchEmergencyRequests failed: $e');
+      failedListLoads.add('emergency_requests');
       return const [];
     }
   }
@@ -3407,7 +3607,11 @@ class SupabaseRepository {
   }
 
   /// Deliveries assigned to the signed-in driver, each joined
-  /// with its remedoo_orders row (items, total, payment method).
+  /// with its orders row (items, total, payment method). The join
+  /// used to read remedoo_orders — a table checkout never writes —
+  /// so the panel was empty forever (full-check fix 2026-10-22;
+  /// delivery_orders.order_id now references public.orders, see
+  /// delivery_orders_link_orders.sql).
   Future<List<Map<String, dynamic>>> fetchDriverDeliveries() async {
     if (!_ready || _uid == null) return const [];
     final driver = await fetchOwnDriverRecord();
@@ -3423,11 +3627,18 @@ class SupabaseRepository {
       for (final d in deliveries) {
         try {
           final order = await _db
-              .from('remedoo_orders')
-              .select()
+              .from('orders')
+              .select('*, order_items(*)')
               .eq('id', '${d['order_id']}')
               .maybeSingle();
-          if (order != null) d['order'] = order;
+          if (order != null) {
+            final o = Map<String, dynamic>.from(order);
+            // The driver card counts order['items']; orders keep
+            // their lines in order_items, so expose them under the
+            // same key.
+            o['items'] = o['order_items'] ?? const [];
+            d['order'] = o;
+          }
         } catch (_) {
           // Order details are best-effort; the delivery row alone
           // still renders.
@@ -3437,6 +3648,98 @@ class SupabaseRepository {
     } catch (e) {
       debugPrint('fetchDriverDeliveries failed: $e');
       return const [];
+    }
+  }
+
+  /// Active drivers a pharmacy can assign (full-check fix
+  /// 2026-10-22). Empty until delivery_orders_link_orders.sql gives
+  /// pharmacies read access to the driver list; fails soft.
+  Future<List<Map<String, dynamic>>> fetchAvailableDrivers() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('delivery_drivers')
+          .select('id, name, phone, vehicle_type, vehicle_number, status')
+          .eq('is_active', true)
+          .order('name')
+          .limit(100);
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchAvailableDrivers failed: $e');
+      return const [];
+    }
+  }
+
+  /// The delivery row for each of [orderIds] (order_id → row), for
+  /// the pharmacy panel's driver chips. Fails soft to an empty map.
+  Future<Map<String, Map<String, dynamic>>> fetchDeliveriesForOrders(
+      List<String> orderIds) async {
+    if (!_ready || orderIds.isEmpty) return const {};
+    try {
+      final rows = await _db
+          .from('delivery_orders')
+          .select()
+          .inFilter('order_id', orderIds)
+          .order('created_at', ascending: false);
+      final byOrder = <String, Map<String, dynamic>>{};
+      for (final r in rows) {
+        final row = Map<String, dynamic>.from(r);
+        byOrder.putIfAbsent('${row['order_id']}', () => row);
+      }
+      // Attach driver names for the chips.
+      if (byOrder.isNotEmpty) {
+        try {
+          final drivers = await fetchAvailableDrivers();
+          final names = {for (final d in drivers) '${d['id']}': d};
+          for (final row in byOrder.values) {
+            final d = names['${row['driver_id']}'];
+            if (d != null) row['driver_name'] = d['name'];
+          }
+        } catch (_) {}
+      }
+      return byOrder;
+    } catch (e) {
+      debugPrint('fetchDeliveriesForOrders failed: $e');
+      return const {};
+    }
+  }
+
+  /// Assigns (or re-assigns) a driver to a pharmacy order: creates
+  /// the delivery_orders row the driver panel reads, or updates the
+  /// driver on the existing row (full-check fix 2026-10-22 — this
+  /// insert path did not exist anywhere in the app).
+  Future<bool> assignOrderToDriver({
+    required String orderId,
+    required String driverId,
+    String? deliveryAddress,
+  }) async {
+    if (!_ready) return false;
+    try {
+      final existing = await _db
+          .from('delivery_orders')
+          .select('id')
+          .eq('order_id', orderId)
+          .limit(1);
+      if (existing.isNotEmpty) {
+        await _db.from('delivery_orders').update({
+          'driver_id': driverId,
+          'status': 'assigned',
+          if (deliveryAddress != null)
+            'delivery_address': deliveryAddress,
+        }).eq('order_id', orderId);
+      } else {
+        await _db.from('delivery_orders').insert({
+          'order_id': orderId,
+          'driver_id': driverId,
+          'status': 'assigned',
+          if (deliveryAddress != null)
+            'delivery_address': deliveryAddress,
+        });
+      }
+      return true;
+    } catch (e) {
+      debugPrint('assignOrderToDriver failed: $e');
+      return false;
     }
   }
 

@@ -23,24 +23,24 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('order prescription URL (M3a)', () {
-    test('placeOrder stores the uploaded prescription URL', () {
+    test('placeOrder stores the uploaded prescription URL', () async {
       final s = AppState();
       s.addToCart(_med('m1', 100),
           pharmacyId: 'ph1', pharmacyName: 'Pharmacy One');
-      final o = s.placeOrder(
+      final o = await s.placeOrder(
         address: '1 Main Street',
         payment: 'Cash on Delivery',
         prescriptionUrl: 'https://example.test/rx.pdf',
       );
-      expect(o.prescriptionUrl, 'https://example.test/rx.pdf');
+      expect(o?.prescriptionUrl, 'https://example.test/rx.pdf');
     });
 
-    test('placeOrder without a file leaves the URL null', () {
+    test('placeOrder without a file leaves the URL null', () async {
       final s = AppState();
       s.addToCart(_med('m1', 100),
           pharmacyId: 'ph1', pharmacyName: 'Pharmacy One');
-      final o = s.placeOrder(address: '1 Main Street', payment: 'COD');
-      expect(o.prescriptionUrl, isNull);
+      final o = await s.placeOrder(address: '1 Main Street', payment: 'COD');
+      expect(o?.prescriptionUrl, isNull);
     });
 
     test('repository writes orders.prescription_url', () {

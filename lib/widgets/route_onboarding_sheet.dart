@@ -12,12 +12,23 @@ class RouteOnboardingSheet extends StatefulWidget {
   final String providerType; // doctor, hospital, lab, pharmacy
   final String providerId;
   final String providerName;
+  // Explicit contact for ADMIN-initiated onboarding (full-check
+  // fix 2026-10-22: the sheet used to send the signed-in user's
+  // own email/phone — correct for a provider onboarding
+  // themselves, wrong when an admin onboards a provider: the
+  // Razorpay account was created with the ADMIN's contact).
+  // Pass '' to block the self fallback when the provider's
+  // contact is not on file.
+  final String? contactEmail;
+  final String? contactPhone;
 
   const RouteOnboardingSheet({
     super.key,
     required this.providerType,
     required this.providerId,
     required this.providerName,
+    this.contactEmail,
+    this.contactPhone,
   });
 
   @override
@@ -72,8 +83,19 @@ class _RouteOnboardingSheetState extends State<RouteOnboardingSheet> {
       _error = null;
     });
 
+    final state = AppStateScope.of(context);
+    final contactEmail = widget.contactEmail ?? state.email;
+    final contactPhone = widget.contactPhone ?? state.phone;
+    if (contactEmail.trim().isEmpty || contactPhone.trim().isEmpty) {
+      setState(() {
+        _busy = false;
+        _error =
+            'The provider\'s contact email and phone are not on file. Add them to the provider\'s profile first.';
+      });
+      return;
+    }
+
     try {
-      final state = AppStateScope.of(context);
       final res = await Supabase.instance.client.functions.invoke(
         'route-create-account',
         body: {
@@ -83,8 +105,8 @@ class _RouteOnboardingSheetState extends State<RouteOnboardingSheet> {
           'beneficiary_name': name,
           'account_number': acct,
           'ifsc': ifsc,
-          'email': state.email,
-          'phone': state.phone,
+          'email': contactEmail,
+          'phone': contactPhone,
         },
       );
 
@@ -268,6 +290,8 @@ Future<bool?> showRouteOnboarding(
   required String providerType,
   required String providerId,
   required String providerName,
+  String? contactEmail,
+  String? contactPhone,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -279,6 +303,8 @@ Future<bool?> showRouteOnboarding(
       providerType: providerType,
       providerId: providerId,
       providerName: providerName,
+      contactEmail: contactEmail,
+      contactPhone: contactPhone,
     ),
   );
 }

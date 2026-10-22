@@ -14,16 +14,11 @@ import '../app_navigator.dart';
 const _filters = [
   'Relevance',
   'Rating 4.0+',
-  'Delivery Time',
-  'Has Offers',
-  'Nearest First',
 ];
 
 const _sortOptions = [
   'Relevance',
   'Rating High→Low',
-  'Delivery Time',
-  'Distance Nearest',
 ];
 
 /// Promo banners tinted by the active theme.
@@ -83,37 +78,41 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
       final singleId = state.singleVendorPharmacyId;
       if (singleId != null) {
         list = list.where((p) => p.id == singleId).toList();
-      } else if (list.isNotEmpty) {
-        // Fallback to first pharmacy if none selected
-        list = [list.first];
       }
+      // Full-check fix 2026-10-22: single mode with NO configured
+      // pharmacy used to silently cut the list to whichever
+      // pharmacy happened to be first — an arbitrary shop shown
+      // as the only one. With nothing configured, show them all.
     }
     final q = _search.text.trim().toLowerCase();
     if (q.isNotEmpty) {
+      // The hint promises medicine search too (full-check fix
+      // 2026-10-22): a pharmacy matches when it stocks a medicine
+      // whose name/brand/category matches.
+      bool stocksMatch(String pharmacyId) => state.activeMedicines.any(
+          (m) =>
+              m.pharmacyId == pharmacyId &&
+              (m.name.toLowerCase().contains(q) ||
+                  m.brand.toLowerCase().contains(q) ||
+                  m.category.toLowerCase().contains(q)));
       list = list
           .where((p) =>
               p.name.toLowerCase().contains(q) ||
-              p.location.toLowerCase().contains(q))
+              p.location.toLowerCase().contains(q) ||
+              stocksMatch(p.id))
           .toList();
     }
     if (_filter == 'Rating 4.0+') {
       list = list.where((p) => p.rating >= 4.0).toList();
     }
-    if (_filter == 'Has Offers') {
-      list = list.where((p) => p.offers > 0).toList();
-    }
-    if (_filter == 'Delivery Time' || _sort == 'Delivery Time') {
-      list.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
-    }
-    if (_filter == 'Nearest First' || _sort == 'Distance Nearest') {
-      list.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
-    }
+    // Full-check fix 2026-10-22: the Delivery Time / Nearest /
+    // Has Offers options are gone — delivery time and distance
+    // have no real data source and offers are always 0, so every
+    // one of them was a no-op or an always-empty list.
     if (_sort == 'Rating High→Low') {
       list.sort((a, b) => b.rating.compareTo(a.rating));
     }
-    if (_sort == 'Relevance' &&
-        _filter != 'Nearest First' &&
-        _filter != 'Delivery Time') {
+    if (_sort == 'Relevance') {
       list.sort((a, b) => b.rating.compareTo(a.rating));
     }
     return list;
@@ -267,15 +266,24 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
       );
     }
     if (list.isEmpty) {
-      return const REmptyState(
+      return REmptyState(
         icon: Icons.medication_outlined,
         title: 'No pharmacies found',
         subtitle: 'Try a different search term',
+        // Full-check fix 2026-10-22: empty states offered no way
+        // out — add a working clear action.
+        actionLabel: 'Clear search & filters',
+        onAction: () => setState(() {
+          _search.clear();
+          _filter = _filters.first;
+          _sort = _sortOptions.first;
+        }),
       );
     }
     return RefreshIndicator(
       onRefresh: () async {
-        await Future.delayed(const Duration(milliseconds: 600));
+        // Real refresh (full-check fix 2026-10-22: fake delay before).
+        await AppStateScope.of(context).loadProductionCatalog();
         if (mounted) setState(() {});
       },
       child: denseList(
@@ -298,7 +306,7 @@ class _PharmaciesScreenState extends State<PharmaciesScreen> {
         rating: p.rating,
         parts: [
           '$itemCount items',
-          p.deliveryTime,
+          if (p.deliveryTime.isNotEmpty) p.deliveryTime,
           if (p.offers > 0) '${p.offers} offers',
         ],
       ),

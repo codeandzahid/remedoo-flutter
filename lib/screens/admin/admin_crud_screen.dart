@@ -526,6 +526,15 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                           if (f.defaultValue != null) {
                             values[f.key] = f.defaultValue;
                           }
+                        } else if (f.type == 'date' ||
+                            f.type == 'json' ||
+                            f.type == 'array') {
+                          // Full-check fix 2026-10-22: a blank
+                          // date/JSON/array field sent as '' makes
+                          // Postgres reject the whole insert (Add
+                          // Doctor broke on working_hours, Add
+                          // Medicine on a blank expiry). Skip the
+                          // key — the column default/null applies.
                         } else {
                           values[f.key] = '';
                         }
@@ -566,20 +575,41 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                         return;
                       }
                       values[f.key] = text;
+                    } else if (f.type == 'url') {
+                      // Full-check fix 2026-10-22: 'url' fields
+                      // fell through to plain text with no
+                      // validation, so any string landed in
+                      // photo/doc/media URL columns.
+                      if (!text.startsWith('http://') &&
+                          !text.startsWith('https://')) {
+                        fail('${f.label} must be a full URL '
+                            'starting with https://');
+                        return;
+                      }
+                      values[f.key] = text;
                     } else {
                       values[f.key] = text;
                     }
                   }
                   if (row != null) values['id'] = row['id'];
-                  Navigator.pop(context);
+                  // Full-check fix 2026-10-22: the dialog used to
+                  // pop BEFORE the save ran, so a failed save lost
+                  // everything the admin typed. Save first; only
+                  // close on success, and on failure keep the
+                  // dialog (and the entered values) for a retry.
                   final ok =
                       await state.adminSaveRow(widget.table, values);
                   if (!mounted) return;
+                  if (!ok) {
+                    fail('Save failed. Your entries are kept — '
+                        'please try again.');
+                    return;
+                  }
+                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                        content: Text(ok
-                            ? '${widget.singular} saved.'
-                            : 'Save failed. Please try again.')),
+                        content:
+                            Text('${widget.singular} saved.')),
                   );
                       },
                     ),
@@ -662,6 +692,10 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
   bool _initialBool(AdminField f, dynamic v) {
     if (v is bool) return v;
     if (f.defaultValue is bool) return f.defaultValue as bool;
+    // Full-check fix 2026-10-22: is_active/active columns default
+    // TRUE in the database, but a new FAQ/coupon/slider/ad was
+    // saved inactive because this fell through to false.
+    if (f.key == 'is_active' || f.key == 'active') return true;
     return false;
   }
 }

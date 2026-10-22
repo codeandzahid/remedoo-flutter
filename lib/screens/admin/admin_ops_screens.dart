@@ -97,6 +97,15 @@ class _AdminRefundsScreenState
     final id = '${r['id']}';
     final status = '${r['status'] ?? 'requested'}';
     final amount = (r['amount'] as num?)?.toDouble() ?? 0;
+    // Full-check fix 2026-10-22: the order id was cut with an
+    // unguarded substring(0, 8) — a shorter id (or a non-string
+    // value hit by the cast) crashed the whole refunds list.
+    final orderIdRaw = r['order_id'];
+    final orderShort = orderIdRaw == null
+        ? null
+        : ('$orderIdRaw'.length > 8
+            ? '$orderIdRaw'.substring(0, 8)
+            : '$orderIdRaw');
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: RCard(
@@ -117,7 +126,7 @@ class _AdminRefundsScreenState
             const SizedBox(height: 6),
             Text('${inr(amount)} • ${r['reason'] ?? '—'}'),
             Text(
-                '${r['order_id'] != null ? 'Order ${(r['order_id'] as String).substring(0, 8)} • ' : ''}${_fmtDate(r['created_at']?.toString())}',
+                '${orderShort != null ? 'Order $orderShort • ' : ''}${_fmtDate(r['created_at']?.toString())}',
                 style: TextStyle(
                     fontSize: 12,
                     color: scheme.onSurfaceVariant)),
@@ -270,6 +279,9 @@ class _AdminAmbulanceScreenState
         text: '${e['equipment_details'] ?? ''}');
     var type = '${e['vehicle_type'] ?? 'BLS'}';
     var status = '${e['status'] ?? 'available'}';
+    // Full-check fix 2026-10-22: these four controllers were
+    // never disposed (a leak on every open of this dialog).
+    try {
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -346,6 +358,12 @@ class _AdminAmbulanceScreenState
     _snack(context,
         ok ? 'Ambulance saved.' : 'Save failed. Try again.');
     if (ok) _load();
+    } finally {
+      vehicle.dispose();
+      driver.dispose();
+      phone.dispose();
+      equipment.dispose();
+    }
   }
 
   @override
@@ -462,6 +480,10 @@ class _AdminInventoryScreenState
     extends State<AdminInventoryScreen> {
   bool _loading = true;
   String _query = '';
+  // Freshest stock per medicine id while a stepper save is in
+  // flight (see _bumpStock).
+  final Map<String, int> _freshStock = {};
+  final Set<String> _stockSaving = {};
 
   @override
   void initState() {
@@ -529,8 +551,9 @@ class _AdminInventoryScreenState
   Widget _row(BuildContext context, AppState state,
       ColorScheme scheme, Map<String, dynamic> m) {
     final id = '${m['id']}';
-    final stock =
-        (m['stock_quantity'] as num?)?.toInt() ?? 0;
+    final stock = _freshStock[id] ??
+        (m['stock_quantity'] as num?)?.toInt() ??
+        0;
     final inStock = m['in_stock'] != false;
     final price = (m['price'] as num?)?.toDouble() ?? 0;
     return Padding(
@@ -567,10 +590,10 @@ class _AdminInventoryScreenState
               children: [
                 QtyStepper(
                   qty: stock,
-                  onMinus: () => _setStock(
-                      context, state, id, stock - 1),
-                  onPlus: () => _setStock(
-                      context, state, id, stock + 1),
+                  onMinus: () => _bumpStock(
+                      context, state, id, stock, -1),
+                  onPlus: () => _bumpStock(
+                      context, state, id, stock, 1),
                 ),
                 TextButton(
                   onPressed: () =>
@@ -615,14 +638,54 @@ class _AdminInventoryScreenState
     await _setStock(context, state, '${m['id']}', value);
   }
 
+  /// Stepper save. Full-check fix 2026-10-22: the stepper used
+  /// to compute the new quantity from the value captured when
+  /// the row was BUILT — two quick taps (or a tap while the
+  /// previous save was still refreshing the list) both started
+  /// from the same stale number, so one tap was silently lost.
+  /// The delta is now applied to the freshest known value, and
+  /// taps are ignored while a save for that medicine is running.
+  Future<void> _bumpStock(BuildContext context, AppState state,
+      String id, int displayedStock, int delta) async {
+    if (_stockSaving.contains(id)) return;
+    final next = (_freshStock[id] ?? displayedStock) + delta;
+    if (next < 0) return;
+    _stockSaving.add(id);
+    setState(() => _freshStock[id] = next);
+    final ok =
+        await state.supabaseRepository.updateMedicineStock(id, next);
+    _stockSaving.remove(id);
+    if (!mounted) return;
+    if (ok) {
+      await state.loadAdminTable('medicines');
+      if (mounted) setState(() => _freshStock.remove(id));
+    } else {
+      setState(() => _freshStock.remove(id));
+      if (context.mounted) {
+        _snack(context, 'Stock update failed. Try again.');
+      }
+    }
+  }
+
   Future<void> _setStock(BuildContext context, AppState state,
       String id, int qty) async {
     if (qty < 0) return;
-    final ok = await state.adminSaveRow('medicines', {
-      'id': id,
-      'stock_quantity': qty,
-      'in_stock': qty > 0,
-    });
+    // Full-check fix 2026-10-22: this used to go through the generic
+    // upsert (adminSaveRow) with a 3-column partial row — Postgres
+    // rejects it because medicines.pharmacy_id / name are NOT NULL,
+    // so the stepper could never save. updateMedicineStock does a
+    // proper UPDATE of just the stock columns.
+    _stockSaving.add(id);
+    final ok =
+        await state.supabaseRepository.updateMedicineStock(id, qty);
+    _stockSaving.remove(id);
+    if (ok) {
+      if (mounted) setState(() => _freshStock[id] = qty);
+      // Refresh the list the stepper reads from (the old path did
+      // this inside adminSaveRow).
+      await state.loadAdminTable('medicines');
+      if (mounted) setState(() => _freshStock.remove(id));
+    }
     if (context.mounted && !ok) {
       _snack(context, 'Stock update failed. Try again.');
     }

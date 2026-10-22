@@ -153,6 +153,12 @@ class FamilyScreen extends StatelessWidget {
                         _chip(context, 'Blood ${m.bloodGroup}'),
                       if ((m.allergies ?? '').isNotEmpty)
                         _chip(context, 'Allergy: ${m.allergies}'),
+                      // Full-check fix 2026-10-22: chronic
+                      // conditions were collected and saved but
+                      // never shown on the card.
+                      if ((m.chronicConditions ?? '').isNotEmpty)
+                        _chip(context,
+                            'Condition: ${m.chronicConditions}'),
                     ],
                   ),
                 ],

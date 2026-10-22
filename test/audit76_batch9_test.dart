@@ -99,9 +99,16 @@ void main() {
       expect(s.contains("'radius_km'"), isTrue);
     });
 
-    test('corporate + healthcare keep the app_config plan list', () {
-      expect(s.contains("configKey: 'corporate_plans'"), isTrue);
-      expect(s.contains("configKey: 'healthcare_packages'"), isTrue);
+    test('corporate + healthcare use their real tables '
+        '(full-check 2026-10-22: was a write-only app_config list)',
+        () {
+      expect(s.contains("loadAdminTable('corporate_plans')"), isTrue);
+      expect(s.contains("adminSaveRow('corporate_plans'"), isTrue);
+      expect(
+          s.contains("loadAdminTable('healthcare_packages')"), isTrue);
+      expect(s.contains("adminSaveRow('healthcare_packages'"), isTrue);
+      expect(s.contains("configKey: 'corporate_plans'"), isFalse);
+      expect(s.contains("configKey: 'healthcare_packages'"), isFalse);
     });
   });
 
@@ -197,7 +204,10 @@ void main() {
         'slider_media',
         'ads',
         'app_config',
-        'support_ticket_messages',
+        // Full-check fix 2026-10-22: the export pointed at the
+        // legacy table no code writes; support chat lives in
+        // support_messages now.
+        'support_messages',
       ]) {
         expect(s.contains(t), isTrue, reason: t);
       }

@@ -70,6 +70,11 @@ class _AdminAppSettingsScreenState
   late final TextEditingController _youpiPayeeName;
   String _youpiObserverToken = '';
 
+  /// Secret values as loaded, so Save can tell "field cleared on
+  /// purpose" (delete the stored secret) from "never had one"
+  /// (full-check fix 2026-10-22).
+  final Map<String, String> _initialSecrets = {};
+
   // Fees
   late final TextEditingController _deliveryFee;
   late final TextEditingController _freeThreshold;
@@ -77,6 +82,7 @@ class _AdminAppSettingsScreenState
 
   // Emergency
   List<Map<String, String>> _numbers = [];
+  int _emgSeq = 0;
   late final TextEditingController _sosMsg;
 
   // Support
@@ -210,15 +216,28 @@ class _AdminAppSettingsScreenState
         _youpiSecret.text = secrets['youpi_webhook_secret'] ?? '';
         _youpiObserverToken =
             secrets['remedoo_pay_observer_token'] ?? '';
+        _initialSecrets.addAll({
+          'razorpay_key_secret': _razorpayKeySecret.text,
+          'razorpay_webhook_secret': _razorpayWebhookSecret.text,
+          'cashfree_secret_key': _cashfreeSecret.text,
+          'instamojo_auth_token': _instamojoSecret.text,
+          'payu_salt': _payuSecret.text,
+          'youpi_webhook_secret': _youpiSecret.text,
+        });
         _deliveryFee.text = '${fees['delivery_fee'] ?? 30}';
         _freeThreshold.text =
             '${fees['free_delivery_threshold'] ?? 499}';
         // The seeded fees config carries a currency that no
         // field could edit (audit Admin gap 16).
         _feesCurrency.text = '${fees['currency'] ?? 'INR'}';
+        // Full-check fix 2026-10-22: rows get STABLE keys —
+        // they were keyed by list index while their controllers
+        // are created once in initState, so deleting a row made
+        // the next row display (and save) the deleted row's text.
         _numbers = [
           for (final n in (emg['numbers'] as List? ?? []))
             {
+              '_k': 'emg_${_emgSeq++}',
               'label': '${(n as Map)['label'] ?? ''}',
               'number': '${n['number'] ?? ''}',
             }
@@ -295,60 +314,89 @@ class _AdminAppSettingsScreenState
     final state = AppStateScope.of(context);
     final repo = state.supabaseRepository;
 
-    final config = {
+    // Full-check fix 2026-10-22: this save used to REPLACE the
+    // whole payment_gateways value with only the keys this screen
+    // knows, silently dropping anything stored by the other
+    // editor (Remedoo Pay screen) or a future field. Merge over
+    // the currently stored config instead.
+    final existingPg = state.appConfigValue('payment_gateways');
+    final existingGateways = existingPg['gateways'] is Map
+        ? Map<String, dynamic>.from(existingPg['gateways'] as Map)
+        : <String, dynamic>{};
+    Map<String, dynamic> mergedGw(
+            String id, Map<String, dynamic> fields) =>
+        <String, dynamic>{
+          if (existingGateways[id] is Map)
+            ...Map<String, dynamic>.from(existingGateways[id] as Map),
+          ...fields,
+        };
+    final config = <String, dynamic>{
+      ...existingPg,
       'active': _activeGateway,
       'gateways': {
-        'razorpay': {
+        ...existingGateways,
+        'razorpay': mergedGw('razorpay', {
           'enabled': _razorpayEnabled,
           'key_id': _razorpayKeyId.text.trim(),
           'test_mode': _razorpayTest,
-        },
-        'cashfree': {
+        }),
+        'cashfree': mergedGw('cashfree', {
           'enabled': _cashfreeEnabled,
           'key_id': _cashfreeKeyId.text.trim(),
           'test_mode': _cashfreeTest,
-        },
-        'instamojo': {
+        }),
+        'instamojo': mergedGw('instamojo', {
           'enabled': _instamojoEnabled,
           'key_id': _instamojoKeyId.text.trim(),
           'test_mode': _instamojoTest,
-        },
-        'payu': {
+        }),
+        'payu': mergedGw('payu', {
           'enabled': _payuEnabled,
           'key_id': _payuKeyId.text.trim(),
           'test_mode': _payuTest,
-        },
-        'youpi': {
+        }),
+        'youpi': mergedGw('youpi', {
           'enabled': _youpiEnabled,
           'key_id': _youpiKeyId.text.trim(),
           'base_url': _youpiBaseUrl.text.trim(),
           'vpa': _youpiVpa.text.trim(),
           'payee_name': _youpiPayeeName.text.trim(),
           'test_mode': _youpiTest,
-        },
+        }),
       },
     };
     bool ok = await state.saveAppConfigValue('payment_gateways', config);
-    // Keep legacy 'razorpay' config in sync (older builds read it)
-    await state.saveAppConfigValue('razorpay', {
-      'enabled': _razorpayEnabled,
-      'key_id': _razorpayKeyId.text.trim(),
-    });
+    // Keep legacy 'razorpay' config in sync (older builds read
+    // it) — its result counts now; it used to be discarded behind
+    // a success snackbar.
+    ok = await state.saveAppConfigValue('razorpay', {
+          'enabled': _razorpayEnabled,
+          'key_id': _razorpayKeyId.text.trim(),
+        }) &&
+        ok;
 
     Future<void> saveSecret(String key, String value) async {
       final v = value.trim();
       if (v.isNotEmpty) {
         ok = await repo.saveSecureSetting(key, v) && ok;
+      } else if ((_initialSecrets[key] ?? '').isNotEmpty) {
+        // The admin cleared a field that had a stored secret:
+        // delete it, don't silently keep the old one.
+        ok = await repo.deleteSecureSetting(key) && ok;
+        _initialSecrets[key] = '';
       }
     }
 
-    await saveSecret('razorpay_key_id', _razorpayKeyId.text);
-    await saveSecret('razorpay_key_secret', _razorpayKeySecret.text);
-    await saveSecret('razorpay_webhook_secret', _razorpayWebhookSecret.text);
-    await saveSecret('cashfree_secret_key', _cashfreeSecret.text);
-    await saveSecret('instamojo_auth_token', _instamojoSecret.text);
-    await saveSecret('payu_salt', _payuSecret.text);
-    await saveSecret('youpi_webhook_secret', _youpiSecret.text);
+    if (ok) {
+      await saveSecret('razorpay_key_id', _razorpayKeyId.text);
+      await saveSecret('razorpay_key_secret', _razorpayKeySecret.text);
+      await saveSecret(
+          'razorpay_webhook_secret', _razorpayWebhookSecret.text);
+      await saveSecret('cashfree_secret_key', _cashfreeSecret.text);
+      await saveSecret('instamojo_auth_token', _instamojoSecret.text);
+      await saveSecret('payu_salt', _payuSecret.text);
+      await saveSecret('youpi_webhook_secret', _youpiSecret.text);
+    }
     // Remedoo Pay observer token: create once, then keep. The SMS
     // forwarder app on the merchant phone sends it with every bank
     // credit SMS so the server can verify the sender.
@@ -518,6 +566,12 @@ class _AdminAppSettingsScreenState
     required ValueChanged<bool> onEnabled,
     required ValueChanged<bool> onTestMode,
     bool showWebhook = false,
+    // Full-check fix 2026-10-22: Remedoo Pay has no test mode —
+    // the worker never reads test_mode, so its switch changed
+    // nothing while claiming "no real money moves". Cards for
+    // gateways without a test mode hide the switch and the
+    // TEST/LIVE badge entirely.
+    bool hasTestMode = true,
     TextEditingController? urlController,
     String? urlLabel,
     String? urlHint,
@@ -598,23 +652,24 @@ class _AdminAppSettingsScreenState
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: testMode
-                          ? RemedooTheme.warning.withValues(alpha: 0.14)
-                          : RemedooTheme.success.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(10),
+                  if (hasTestMode)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: testMode
+                            ? RemedooTheme.warning.withValues(alpha: 0.14)
+                            : RemedooTheme.success.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(testMode ? 'TEST' : 'LIVE',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: testMode
+                                  ? RemedooTheme.warning
+                                  : RemedooTheme.success)),
                     ),
-                    child: Text(testMode ? 'TEST' : 'LIVE',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: testMode
-                                ? RemedooTheme.warning
-                                : RemedooTheme.success)),
-                  ),
                 ],
               ),
               SwitchListTile(
@@ -652,19 +707,20 @@ class _AdminAppSettingsScreenState
                     controller: _razorpayWebhookSecret,
                     obscureText: true),
               ],
-              SwitchListTile(
-                value: testMode,
-                onChanged: onTestMode,
-                title: const Text('Test mode',
-                    style: TextStyle(fontSize: 14)),
-                subtitle: Text(
-                    testMode
-                        ? 'Test keys — no real money moves'
-                        : 'LIVE mode — real money',
-                    style: TextStyle(
-                        fontSize: 12, color: scheme.onSurfaceVariant)),
-                contentPadding: EdgeInsets.zero,
-              ),
+              if (hasTestMode)
+                SwitchListTile(
+                  value: testMode,
+                  onChanged: onTestMode,
+                  title: const Text('Test mode',
+                      style: TextStyle(fontSize: 14)),
+                  subtitle: Text(
+                      testMode
+                          ? 'Test keys — no real money moves'
+                          : 'LIVE mode — real money',
+                      style: TextStyle(
+                          fontSize: 12, color: scheme.onSurfaceVariant)),
+                  contentPadding: EdgeInsets.zero,
+                ),
               if (extraChildren != null) ...extraChildren,
               if (!isActive)
                 Align(
@@ -833,7 +889,16 @@ class _AdminAppSettingsScreenState
                       final pharmacies = state.activePharmacies;
                       return RKitDropdown<String>(
                         label: 'Single vendor pharmacy',
-                        value: _singleVendorPharmacyId,
+                        // Full-check fix 2026-10-22: the stored id
+                        // can point at a pharmacy that is no
+                        // longer in the list — passing it as the
+                        // value breaks the dropdown. Fall back to
+                        // "no selection" instead.
+                        value: pharmacies
+                                .any((p) =>
+                                    p.id == _singleVendorPharmacyId)
+                            ? _singleVendorPharmacyId
+                            : null,
                         items: [
                           for (final p in pharmacies)
                             DropdownMenuItem(
@@ -855,15 +920,28 @@ class _AdminAppSettingsScreenState
                     small: true,
                     onPressed: _saving
                         ? null
-                        : () => _save('pharmacy_mode', {
+                        : () {
+                            // Full-check fix 2026-10-22: saving
+                            // "single" with nothing picked used to
+                            // keep the previously stored pharmacy
+                            // silently. Require the pick.
+                            if (!_pharmacyMultiVendor &&
+                                _singleVendorPharmacyId == null) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(const SnackBar(
+                                      content: Text(
+                                          'Pick the single pharmacy first.')));
+                              return;
+                            }
+                            _save('pharmacy_mode', {
                               'mode': _pharmacyMultiVendor
                                   ? 'multi'
                                   : 'single',
-                              if (!_pharmacyMultiVendor &&
-                                  _singleVendorPharmacyId != null)
+                              if (!_pharmacyMultiVendor)
                                 'pharmacy_id':
                                     _singleVendorPharmacyId,
-                            }),
+                            });
+                          },
                   ),
                 ),
               ],
@@ -880,11 +958,12 @@ class _AdminAppSettingsScreenState
               children: [
                 for (var i = 0; i < _numbers.length; i++)
                   _NumberRow(
-                    key: ValueKey('emg_$i'),
+                    key: ValueKey(_numbers[i]['_k'] ?? 'emg_$i'),
                     initialLabel: _numbers[i]['label'] ?? '',
                     initialNumber: _numbers[i]['number'] ?? '',
                     onChanged: (label, number) =>
                         _numbers[i] = {
+                      '_k': _numbers[i]['_k'] ?? 'emg_$i',
                       'label': label,
                       'number': number
                     },
@@ -895,7 +974,11 @@ class _AdminAppSettingsScreenState
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
                     onPressed: () => setState(() => _numbers.add(
-                        {'label': '', 'number': ''})),
+                        {
+                          '_k': 'emg_${_emgSeq++}',
+                          'label': '',
+                          'number': ''
+                        })),
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Add number'),
                   ),
@@ -1103,6 +1186,7 @@ class _AdminAppSettingsScreenState
             secretLabel: 'Webhook Secret (optional)',
             secretHint: 'From your Remedoo Pay server, stored securely',
             enabled: _youpiEnabled,
+            hasTestMode: false,
             testMode: _youpiTest,
             keyController: _youpiKeyId,
             secretController: _youpiSecret,

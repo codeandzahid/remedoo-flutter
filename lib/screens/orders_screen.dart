@@ -157,9 +157,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
     return RefreshIndicator(
       onRefresh: () async {
-        await Future<void>.delayed(
-            const Duration(milliseconds: 500));
-        if (mounted) AppStateScope.of(context).refresh();
+        // Real refresh (full-check fix 2026-10-22: fake delay before).
+        await AppStateScope.of(context).loadUserProductionData();
       },
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),

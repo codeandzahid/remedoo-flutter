@@ -256,13 +256,15 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
                         final ok = await confirmAppointmentCancel(context,
                             appt: a);
                         if (ok) {
-                          state.cancelAppointment(a.id);
+                          final done =
+                              await state.cancelAppointment(a.id);
                           if (mounted) {
                             ScaffoldMessenger.of(context)
                                 .showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      'Appointment cancelled')),
+                              SnackBar(
+                                  content: Text(done
+                                      ? 'Appointment cancelled'
+                                      : 'Could not cancel. Please try again.')),
                             );
                           }
                         }

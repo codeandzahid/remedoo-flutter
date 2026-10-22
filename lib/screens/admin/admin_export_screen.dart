@@ -41,7 +41,8 @@ const kExportDatasets = <(String, String, IconData)>[
   ('Home Slider', 'slider_media', Icons.view_carousel),
   ('Ads', 'ads', Icons.ads_click),
   ('App Config', 'app_config', Icons.tune),
-  ('Support Messages', 'support_ticket_messages', Icons.forum),
+  ('Support Messages', 'support_messages', Icons.forum),
+  ('Remedoo Orders', 'remedoo_orders', Icons.receipt_long),
 ];
 
 String _csvCell(dynamic v) {
@@ -112,6 +113,10 @@ class _AdminExportScreenState extends State<AdminExportScreen> {
     try {
       final tables = <String, dynamic>{};
       var total = 0;
+      // Full-check fix 2026-10-22: failed tables used to be written
+      // as [] and the message still claimed a complete backup. Track
+      // failures and say so, in the file and in the message.
+      final failed = <String>[];
       for (final d in kExportDatasets) {
         try {
           final rows = await state.supabaseRepository.exportTable(d.$2);
@@ -119,17 +124,21 @@ class _AdminExportScreenState extends State<AdminExportScreen> {
           total += rows.length;
         } catch (_) {
           tables[d.$2] = [];
+          failed.add(d.$2);
         }
       }
       final payload = {
         'exported_at': DateTime.now().toUtc().toIso8601String(),
         'tables': tables,
+        if (failed.isNotEmpty) 'failed_tables': failed,
       };
       downloadTextFile(
         'remedoo-backup.json',
         const JsonEncoder.withIndent('  ').convert(payload),
       );
-      _snack('Full backup downloaded — $total rows in all.');
+      _snack(failed.isEmpty
+          ? 'Full backup downloaded — $total rows in all.'
+          : 'Backup downloaded — $total rows. ${failed.length} table(s) could not be read: ${failed.join(', ')}');
     } finally {
       if (mounted) setState(() => _backupBusy = false);
     }

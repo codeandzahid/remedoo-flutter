@@ -52,7 +52,14 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
       ),
     );
     controller.dispose();
-    if (saved != null) await state.setAdminReviewNotes(review, saved);
+    if (saved != null) {
+      final ok = await state.setAdminReviewNotes(review, saved);
+      if (!ok && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('Could not save the note. Please try again.')));
+      }
+    }
   }
 
   @override
@@ -93,8 +100,16 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
                       Switch(
                         value: !r.hidden,
                         activeThumbColor: RemedooTheme.success,
-                        onChanged: (visible) =>
-                            state.setAdminReviewHidden(r, !visible),
+                        onChanged: (visible) async {
+                          final ok = await state.setAdminReviewHidden(
+                              r, !visible);
+                          if (!ok && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Could not update the review. Please try again.')));
+                          }
+                        },
                       ),
                     ],
                   ),

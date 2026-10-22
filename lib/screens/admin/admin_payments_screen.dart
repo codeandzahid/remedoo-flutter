@@ -5,6 +5,7 @@ import '../../theme.dart';
 import '../../widgets/route_onboarding_sheet.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/form_kit.dart';
+import '../../widgets/provider_payments.dart';
 
 void _snack(BuildContext context, String msg) {
   ScaffoldMessenger.of(context)
@@ -79,8 +80,11 @@ class _ProviderPaymentsTabState
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    await AppStateScope.of(context)
-        .loadAdminTable(widget.table);
+    final state = AppStateScope.of(context);
+    await state.loadAdminTable(widget.table);
+    if (state.allProfiles.isEmpty) {
+      await state.loadAllProfiles();
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -185,6 +189,15 @@ class _ProviderPaymentsTabState
               label: 'UPI payments',
               value: upiEnabled,
               onChanged: (v) async {
+                // Money control (full-check fix 2026-10-22):
+                // changing where patient money goes needs the
+                // admin's email code first, like every other
+                // payment change in the app.
+                final verified = await requireEmailOtp(context,
+                    title: 'Confirm with email code',
+                    message:
+                        'Enter the 6-digit code sent to your email to change this payment setting.');
+                if (!verified || !context.mounted) return;
                 final ok = await state.updateProviderPayment(
                     widget.table, id,
                     upiEnabled: v);
@@ -198,6 +211,11 @@ class _ProviderPaymentsTabState
               label: 'Pay in clinic',
               value: payInClinic,
               onChanged: (v) async {
+                final verified = await requireEmailOtp(context,
+                    title: 'Confirm with email code',
+                    message:
+                        'Enter the 6-digit code sent to your email to change this payment setting.');
+                if (!verified || !context.mounted) return;
                 final ok = await state.updateProviderPayment(
                     widget.table, id,
                     payInClinicEnabled: v);
@@ -245,8 +263,7 @@ class _ProviderPaymentsTabState
                 icon: Icons.account_balance,
                 small: true,
                 variant: RButtonVariant.outline,
-                onPressed: () => _onboardRoute(context, state, id,
-                    '${r['name'] ?? 'Provider'}'),
+                onPressed: () => _onboardRoute(context, state, r),
               ),
             ],
           ],
@@ -258,13 +275,39 @@ class _ProviderPaymentsTabState
   /// Admin triggers Route onboarding for a provider.
   /// Opens the bank details sheet pre-filled for this provider.
   Future<void> _onboardRoute(BuildContext context, AppState state,
-      String providerId, String providerName) async {
-    final providerType = widget.table.replaceAll('s', ''); // doctors->doctor
+      Map<String, dynamic> r) async {
+    // Full-check fix 2026-10-22: replaceAll('s', '') turned
+    // 'pharmacies' into 'pharmacie', which the Edge Function's
+    // table map does not know — the account was created at
+    // Razorpay but never written back to the provider's record.
+    const typeByTable = {
+      'doctors': 'doctor',
+      'hospitals': 'hospital',
+      'labs': 'lab',
+      'pharmacies': 'pharmacy',
+    };
+    final providerType = typeByTable[widget.table] ?? 'doctor';
+    final providerId = '${r['id']}';
+    final providerName = '${r['name'] ?? 'Provider'}';
+    // The provider's OWN contact (profile email via user_id,
+    // phone from the provider record) — never the admin's.
+    var contactEmail = '';
+    final userId = '${r['user_id'] ?? ''}';
+    if (userId.isNotEmpty) {
+      for (final p in state.allProfiles) {
+        if ('${p['user_id']}' == userId) {
+          contactEmail = '${p['email'] ?? ''}';
+          break;
+        }
+      }
+    }
     final done = await showRouteOnboarding(
       context,
       providerType: providerType,
       providerId: providerId,
       providerName: providerName,
+      contactEmail: contactEmail,
+      contactPhone: '${r['phone'] ?? ''}',
     );
     if (done == true && context.mounted) {
       _snack(context, 'Route onboarding started for $providerName');
@@ -324,6 +367,13 @@ class _ProviderPaymentsTabState
       ),
     );
     if (ok != true || !context.mounted) return;
+    // Money control (full-check fix 2026-10-22): the admin's email
+    // code is required before a provider's receiving UPI changes.
+    final verified = await requireEmailOtp(context,
+        title: 'Confirm with email code',
+        message:
+            'Enter the 6-digit code sent to your email to change this provider\'s UPI ID.');
+    if (!verified || !context.mounted) return;
     final saved = await state.updateProviderPayment(
         widget.table, id,
         upiId: ctrl.text.trim());

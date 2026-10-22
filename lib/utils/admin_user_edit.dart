@@ -19,6 +19,7 @@ bool editNeedsOtp({
 String? validateAdminUserEdit({
   required String email,
   required String newPassword,
+  String dateOfBirth = '',
 }) {
   final e = email.trim();
   if (e.isEmpty || !e.contains('@') || !e.contains('.')) {
@@ -27,6 +28,13 @@ String? validateAdminUserEdit({
   final p = newPassword.trim();
   if (p.isNotEmpty && p.length < 8) {
     return 'New password must be at least 8 characters.';
+  }
+  // Full-check fix 2026-10-22: the date of birth went to the DB
+  // unvalidated, so one typo failed the whole profile update with
+  // only a generic "Update failed."
+  final d = dateOfBirth.trim();
+  if (d.isNotEmpty && DateTime.tryParse(d) == null) {
+    return 'Date of birth must be a valid date (YYYY-MM-DD).';
   }
   return null;
 }

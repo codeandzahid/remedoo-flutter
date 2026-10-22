@@ -158,6 +158,28 @@ class Lab {
     this.phone = '',
     this.workingHours,
   });
+
+  Lab copyWith({int? testCount, String? turnaround}) {
+    return Lab(
+      id: id,
+      name: name,
+      location: location,
+      testCount: testCount ?? this.testCount,
+      offers: offers,
+      turnaround: turnaround ?? this.turnaround,
+      rating: rating,
+      reviews: reviews,
+      nabl: nabl,
+      verified: verified,
+      distanceKm: distanceKm,
+      active: active,
+      upiId: upiId,
+      payInClinicEnabled: payInClinicEnabled,
+      upiEnabled: upiEnabled,
+      phone: phone,
+      workingHours: workingHours,
+    );
+  }
 }
 
 class Pharmacy {
@@ -197,6 +219,26 @@ class Pharmacy {
     this.upiEnabled = false,
     this.phone = '',
   });
+
+  Pharmacy copyWith({int? itemCount}) {
+    return Pharmacy(
+      id: id,
+      name: name,
+      location: location,
+      rating: rating,
+      reviews: reviews,
+      deliveryTime: deliveryTime,
+      itemCount: itemCount ?? this.itemCount,
+      offers: offers,
+      verified: verified,
+      distanceKm: distanceKm,
+      active: active,
+      upiId: upiId,
+      payInClinicEnabled: payInClinicEnabled,
+      upiEnabled: upiEnabled,
+      phone: phone,
+    );
+  }
 }
 
 class Medicine {
@@ -314,7 +356,12 @@ class MedOrder {
     this.refundAt,
     this.refundUtr,
     this.refundRequestedAt,
+    this.estimatedDelivery,
   });
+
+  /// The pharmacy's own estimate text (orders.estimated_delivery)
+  /// when one was stored.
+  final String? estimatedDelivery;
 
   bool get isActive => status != 'delivered' && status != 'cancelled';
 
@@ -331,7 +378,21 @@ class MedOrder {
   }
 
   List<CartLine> get lines => items;
-  String get eta => '35-45 min';
+
+  /// Honest delivery estimate (full-check fix 2026-10-22: this was
+  /// a hard-coded '35-45 min' for every order at every status).
+  /// Uses the pharmacy's stored estimate when there is one, else a
+  /// plain status description — never an invented time.
+  String get eta {
+    final stored = (estimatedDelivery ?? '').trim();
+    if (stored.isNotEmpty) return stored;
+    return switch (status) {
+      'out_for_delivery' => 'On the way',
+      'delivered' => 'Delivered',
+      'cancelled' => 'Cancelled',
+      _ => 'To be confirmed by the pharmacy',
+    };
+  }
 }
 
 class Appointment {
@@ -584,10 +645,18 @@ class LabReport {
   final String status; // In Progress, Completed
   final List<Map<String, String>> tests;
 
-  /// Set when the patient uploaded this report file themselves
-  /// (owner feature 2026-10-19): a signed URL to the stored file.
+  /// Set when this report carries a stored file (owner feature
+  /// 2026-10-19): a signed URL to the stored file.
   final String? fileUrl;
   final String? fileName;
+
+  /// True when the LAB issued this report (merged from
+  /// lab_sample_collections). Full-check fix 2026-10-22: lab
+  /// reports were indistinguishable from the patient's own
+  /// uploads — they were labelled "Uploaded by you", offered a
+  /// Delete that could not stick (the server row re-added them),
+  /// and got persisted on-device as if they were own uploads.
+  final bool fromLab;
 
   const LabReport({
     required this.id,
@@ -598,9 +667,14 @@ class LabReport {
     required this.tests,
     this.fileUrl,
     this.fileName,
+    this.fromLab = false,
   });
 
   bool get isUploaded => fileUrl != null;
+
+  /// A file the patient uploaded themselves — the only kind the
+  /// patient can delete (device-local entry).
+  bool get isOwnUpload => fileUrl != null && !fromLab;
 }
 
 /// A health fact the patient adds to their Medical History

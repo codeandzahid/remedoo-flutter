@@ -6,6 +6,7 @@ import '../responsive/responsive.dart';
 import '../theme.dart';
 import '../state/app_state.dart';
 import '../utils/device_actions.dart';
+import '../utils/working_hours.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
 
@@ -160,8 +161,24 @@ class DoctorDetailScreen extends StatelessWidget {
                 ],
               ),
               TextButton.icon(
-                onPressed: () => openDirections(context,
-                    name: '${d.name}, ${d.hospital}', address: ''),
+                // Full-check fix 2026-10-22: the address was
+                // passed empty, so Maps searched by name only.
+                // Use the hospital's real location when the
+                // hospital is in the catalogue.
+                onPressed: () {
+                  final st = AppStateScope.of(context);
+                  var address = '';
+                  for (final h in st.activeHospitals) {
+                    if (h.name == d.hospital &&
+                        h.location.isNotEmpty) {
+                      address = h.location;
+                      break;
+                    }
+                  }
+                  openDirections(context,
+                      name: '${d.name}, ${d.hospital}',
+                      address: address);
+                },
                 icon: const Icon(Icons.directions, size: 18),
                 label: const Text('Directions'),
               ),
@@ -211,8 +228,10 @@ class DoctorDetailScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _hoursRow(context, 'Mon – Sat', '09:00 AM – 05:00 PM', false),
-          _hoursRow(context, 'Sunday', 'Closed', true),
+          // Real stored hours (full-check fix 2026-10-22: this
+          // card showed the same 9–5 for every doctor).
+          for (final row in workingHoursDisplayRows(doctor.workingHours))
+            _hoursRow(context, row.days, row.hours, row.closed),
         ],
       ),
     );
@@ -282,7 +301,7 @@ class DoctorDetailScreen extends StatelessWidget {
                   size: 16, color: scheme.onSurfaceVariant),
               const SizedBox(width: 6),
               Expanded(
-                  child: Text('Available Mon–Sat, 9 AM – 5 PM',
+                  child: Text(todayHoursLabel(d.workingHours),
                       style: TextStyle(
                           fontSize: 13,
                           color: scheme.onSurfaceVariant))),

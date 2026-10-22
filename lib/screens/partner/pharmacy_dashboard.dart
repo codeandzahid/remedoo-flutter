@@ -28,6 +28,7 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _orders = [];
   List<Map<String, dynamic>> _reviews = [];
+  Map<String, Map<String, dynamic>> _deliveries = {};
 
   SupabaseRepository get _repo =>
       AppStateScope.of(context).supabaseRepository;
@@ -46,12 +47,15 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
     try {
       final profile = await _repo.fetchOwnProviderRecord('pharmacies');
       final orders = await _repo.fetchPharmacyOrders();
+      final deliveries = await _repo.fetchDeliveriesForOrders(
+          [for (final o in orders) '${o['id']}']);
       final reviews =
           await _repo.fetchProviderReviews('pharmacy', 'pharmacies');
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _orders = orders;
+        _deliveries = deliveries;
         _reviews = reviews;
         _loading = false;
       });
@@ -137,6 +141,68 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not verify. Try again.')),
+      );
+    }
+  }
+
+  /// Assign-driver sheet (full-check fix 2026-10-22): lists the
+  /// active drivers and creates/updates the delivery row the driver
+  /// panel reads. Before this, nothing in the app could create a
+  /// delivery at all.
+  Future<void> _assignDriver(Map<String, dynamic> o) async {
+    final drivers = await _repo.fetchAvailableDrivers();
+    if (!mounted) return;
+    if (drivers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'No drivers are available right now. Please try again later.')),
+      );
+      return;
+    }
+    final picked = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Choose a driver',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w800)),
+            ),
+            for (final d in drivers)
+              ListTile(
+                leading: const Icon(Icons.delivery_dining),
+                title: Text('${d['name'] ?? 'Driver'}'),
+                subtitle: Text(
+                    '${d['vehicle_type'] ?? 'bike'}${d['vehicle_number'] != null ? ' • ${d['vehicle_number']}' : ''} • ${d['status'] ?? ''}'),
+                onTap: () => Navigator.pop(ctx, d),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final ok = await _repo.assignOrderToDriver(
+      orderId: '${o['id']}',
+      driverId: '${picked['id']}',
+      deliveryAddress: '${o['delivery_address'] ?? ''}',
+    );
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                'Driver ${picked['name'] ?? ''} assigned to this order.')),
+      );
+      _load();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Could not assign the driver. Try again.')),
       );
     }
   }
@@ -635,6 +701,44 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
                     _setStatus(o, 'delivered'),
               ),
             ],
+            // Driver assignment (full-check fix 2026-10-22: the
+            // driver panel could never receive a delivery because
+            // nothing created delivery rows — this is that missing
+            // action). Available once the order is confirmed;
+            // re-assignment stays possible until delivered.
+            if (status == 'confirmed' ||
+                status == 'preparing' ||
+                status == 'out_for_delivery') ...[
+              const SizedBox(height: 10),
+              if (_deliveries['${o['id']}'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.delivery_dining,
+                          size: 16, color: RemedooTheme.primary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Driver: ${_deliveries['${o['id']}']!['driver_name'] ?? 'Assigned'} • ${_deliveryStatusLabel('${_deliveries['${o['id']}']!['status'] ?? ''}')}',
+                          style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              RButton(
+                label: _deliveries['${o['id']}'] == null
+                    ? 'Assign driver'
+                    : 'Change driver',
+                icon: Icons.delivery_dining,
+                small: true,
+                variant: RButtonVariant.outline,
+                onPressed: () => _assignDriver(o),
+              ),
+            ],
             // Cancelled paid-online order with a refund owed: the
             // customer cancelled, the pharmacy refunds from here.
             if (status == 'cancelled' &&
@@ -674,5 +778,23 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
         ),
       ),
     );
+  }
+}
+
+/// Human label for a delivery_orders status (pharmacy chip).
+String _deliveryStatusLabel(String status) {
+  switch (status) {
+    case 'assigned':
+      return 'Assigned';
+    case 'picked_up':
+      return 'Picked up';
+    case 'in_transit':
+      return 'On the way';
+    case 'delivered':
+      return 'Delivered';
+    case 'cancelled':
+      return 'Cancelled';
+    default:
+      return 'Pending';
   }
 }

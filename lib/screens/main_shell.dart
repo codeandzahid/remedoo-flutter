@@ -44,9 +44,9 @@ class _MainShellState extends State<MainShell> {
     FavoritesScreen(),
   ];
 
-  /// The phone bottom bar now has 6 tabs: Home, Doctors, Hospitals, Labs,
-  /// Pharmacy, Orders — matching the page order directly.
-  static const _navToPage = [0, 1, 2, 3, 4, 5];
+  /// The phone bottom bar has 7 tabs: Home, Doctors, Hospitals, Labs,
+  /// Pharmacy, Orders, Favorites — matching the page order directly.
+  static const _navToPage = [0, 1, 2, 3, 4, 5, 6];
 
   static int _navIndexFor(int page) {
     final i = _navToPage.indexOf(page);
@@ -313,18 +313,21 @@ class _MainShellState extends State<MainShell> {
                   color: scheme.primary,
                   borderRadius: BorderRadius.circular(13),
                 ),
-                child: const Center(
-                  child: Text('R',
-                      style: TextStyle(
+                child: Center(
+                  child: Text(state.appName[0].toUpperCase(),
+                      style: const TextStyle(
                           color: Colors.white,
                           fontSize: 19,
                           fontWeight: FontWeight.w800)),
                 ),
               ),
               const SizedBox(width: 9),
-              const Text('Remedoo',
-                  style:
-                      TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              // Admin Branding name (app_config 'branding') —
+              // full-check fix 2026-10-22; was a hard-coded
+              // 'Remedoo' that ignored the Branding screen.
+              Text(state.appName,
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w800)),
               const SizedBox(width: 16),
               Expanded(
                 child: SingleChildScrollView(

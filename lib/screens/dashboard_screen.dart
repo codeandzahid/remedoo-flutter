@@ -92,8 +92,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _refresh() async {
+    // Real refresh (full-check fix 2026-10-22: this used to wait
+    // 700 ms and redraw the same data).
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 700));
+    final state = AppStateScope.of(context);
+    await state.loadProductionCatalog();
+    if (state.isSignedIn) await state.loadUserProductionData();
     if (mounted) setState(() => _loading = false);
   }
 
@@ -536,26 +540,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final pd = RemedooTheme.primaryDark;
     return [
       (
-        title: 'Flat 30% OFF',
-        subtitle: 'on first doctor consultation',
+        // Full-check fix 2026-10-22: the banner claimed "Flat
+        // 30% OFF" with no such offer behind it — promo copy now
+        // states only what the app actually does.
+        title: 'Trusted Doctors',
+        subtitle: 'book a consultation in a few taps',
         gradient: g([p, pd], Alignment.centerLeft, Alignment.centerRight),
         icon: Icons.medical_services,
       ),
       (
         title: 'Free Delivery',
-        subtitle: 'on medicine orders above ₹199',
+        // Full-check fix 2026-10-22: this claimed ₹199 while the
+        // configured threshold (admin Settings, default ₹499) is
+        // what checkout actually applies.
+        subtitle:
+            'on medicine orders above ₹${AppStateScope.of(context).freeDeliveryThreshold.toStringAsFixed(0)}',
         gradient: g([pd, p], Alignment.topLeft, Alignment.bottomRight),
         icon: Icons.medication,
       ),
       (
         title: 'Health Packages',
-        subtitle: 'starting at ₹299 only',
+        subtitle: 'lab tests and full-body checkups',
         gradient: g([p, pd], Alignment.topCenter, Alignment.bottomCenter),
         icon: Icons.science,
       ),
       (
         title: 'Emergency SOS',
-        subtitle: 'ambulance in under 10 mins',
+        subtitle: 'one tap to call for help',
         gradient: g([pd, p], Alignment.centerRight, Alignment.centerLeft),
         icon: Icons.sos,
       ),

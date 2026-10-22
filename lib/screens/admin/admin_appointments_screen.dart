@@ -151,13 +151,22 @@ class _AdminAppointmentsScreenState
               : RefreshIndicator(
                   onRefresh: _load,
                   child: list.isEmpty
-                      ? const REmptyState(
-                          icon:
-                              Icons.calendar_month_outlined,
-                          title: 'No appointments',
-                          subtitle:
-                              'Bookings will appear here.',
-                        )
+                      ? (state.listLoadFailed('appointments')
+                          ? REmptyState(
+                              icon: Icons.cloud_off_outlined,
+                              title: 'Could not load appointments',
+                              subtitle:
+                                  'The list failed to load — it is not necessarily empty.',
+                              actionLabel: 'Retry',
+                              onAction: _load,
+                            )
+                          : const REmptyState(
+                              icon:
+                                  Icons.calendar_month_outlined,
+                              title: 'No appointments',
+                              subtitle:
+                                  'Bookings will appear here.',
+                            ))
                       : ListView.builder(
                           padding:
                               const EdgeInsets.fromLTRB(
@@ -294,19 +303,20 @@ class _AdminAppointmentsScreenState
                 RKitField(controller: meetingLink, label: 'Video meeting link'),
                 RKitDropdown<String>(
                   label: 'Payment status',
-                  value: const ['pending', 'paid', 'refunded',
-                          'failed']
-                      .contains(payStatus)
+                  // Full-check fix 2026-10-22: 'refunded' is
+                  // refund vocabulary (appointments.refund_status,
+                  // written by the refund flow) and 'failed' has
+                  // no consumer — every payment writer uses only
+                  // pending/paid for payment_status. A legacy row
+                  // carrying 'refunded' here displays as pending
+                  // and is repaired on save.
+                  value: const ['pending', 'paid'].contains(payStatus)
                       ? payStatus
                       : 'pending',
                   items: const [
                     DropdownMenuItem(
                         value: 'pending', child: Text('pending')),
                     DropdownMenuItem(value: 'paid', child: Text('paid')),
-                    DropdownMenuItem(
-                        value: 'refunded', child: Text('refunded')),
-                    DropdownMenuItem(
-                        value: 'failed', child: Text('failed')),
                   ],
                   onChanged: (v) =>
                       setD(() => payStatus = v ?? 'pending'),
@@ -333,11 +343,35 @@ class _AdminAppointmentsScreenState
           content: Text('Date must be YYYY-MM-DD.')));
       return;
     }
+    // Full-check fix 2026-10-22: cleared date/time were sent as
+    // '' to DATE/TIME columns (DB rejects the whole update), the
+    // time was never validated, and an empty/garbage token
+    // silently wrote NULL over an existing token_number while
+    // reporting success. Blank now means "leave unchanged", and
+    // garbage is a validation error.
+    final timeText = time.text.trim();
+    if (timeText.isNotEmpty &&
+        !RegExp(r'^\d{1,2}:\d{2}(:\d{2})?$').hasMatch(timeText)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Time must be HH:MM.')));
+      return;
+    }
+    final tokenText = token.text.trim();
+    int? tokenValue;
+    if (tokenText.isNotEmpty) {
+      tokenValue = int.tryParse(tokenText);
+      if (tokenValue == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Token number must be a number.')));
+        return;
+      }
+    }
     final done = await AppStateScope.of(context)
         .updateAdminAppointment('${a['id']}', {
-      'appointment_date': date.text.trim(),
-      'appointment_time': time.text.trim(),
-      'token_number': int.tryParse(token.text.trim()),
+      if (date.text.trim().isNotEmpty)
+        'appointment_date': date.text.trim(),
+      if (timeText.isNotEmpty) 'appointment_time': timeText,
+      if (tokenValue != null) 'token_number': tokenValue,
       'department': department.text.trim().isEmpty
           ? null
           : department.text.trim(),

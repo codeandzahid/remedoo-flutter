@@ -175,6 +175,22 @@ class _AdminShellState extends State<AdminShell> {
   List<_NavItem> _allItems = const [];
   List<_NavItem> _visibleItems = const [];
 
+  @override
+  void initState() {
+    super.initState();
+    // Full-check fix 2026-10-22: the bell badge read
+    // state.supportTickets, which only the Dashboard populated —
+    // the badge was 0/stale until Dashboard had been built. Load
+    // the tickets when the shell starts if nobody has yet.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = AppStateScope.of(context);
+      if (state.supportTickets.isEmpty) {
+        state.loadSupportTickets();
+      }
+    });
+  }
+
   void _go(int i) {
     setState(() => _index = i);
   }
@@ -471,15 +487,25 @@ class _AdminShellState extends State<AdminShell> {
 
   void _jumpTo(List<_NavItem> items, String label) {
     final i = items.indexWhere((it) => it.label == label);
-    if (i >= 0) setState(() => _index = i);
+    if (i >= 0) {
+      setState(() => _index = i);
+    } else if (mounted) {
+      // Full-check fix 2026-10-22: for staff without the section
+      // permission the item is filtered out and this tap used to
+      // silently do nothing.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('You do not have access to $label.')));
+    }
   }
 
   /// Cognify's bell: opens Support Tickets, with a pink count
   /// badge while queries are waiting.
   Widget _bellButton(AppState state, List<_NavItem> items) {
+    // 'opened' was a legacy status fetchSupportTickets normalises
+    // away (full-check fix 2026-10-22).
     final pending = state.supportTickets.where((t) {
       final s = '${t['status'] ?? 'open'}';
-      return s == 'open' || s == 'opened';
+      return s == 'open';
     }).length;
     return Stack(
       clipBehavior: Clip.none,

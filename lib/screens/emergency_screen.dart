@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -280,9 +282,8 @@ class EmergencyScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                      '${h.location} \u2022 ${h.distanceKm.toStringAsFixed(1)} km \u2022 '
-                      '\u2605 ${h.rating.toStringAsFixed(1)} \u2022 ${h.beds} beds \u2022 '
-                      '${h.waitMin} min wait',
+                      '${h.location} \u2022 '
+                      '\u2605 ${h.rating.toStringAsFixed(1)} \u2022 ${h.beds} beds',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -379,15 +380,20 @@ class EmergencyScreen extends StatelessWidget {
             small: true,
             onPressed: () async {
               Navigator.pop(context);
-              // Create the emergency_requests record (with the
-              // device's location when it can be fetched quickly)
-              // so the admin board sees this SOS — the call itself
-              // is never blocked on it (audit Patient 17).
-              final coords = await fetchCurrentCoordinates();
-              state.reportSos(
-                latitude: coords?.$1,
-                longitude: coords?.$2,
-              );
+              // Full-check fix 2026-10-22: the dial used to WAIT
+              // for the GPS fetch (up to ~10 s, plus a possible
+              // permission prompt) before calling — an emergency
+              // call must never wait on a location fix. The call
+              // goes out immediately; the SOS record is reported
+              // with the location as soon as it arrives (or without
+              // it), in the background.
+              unawaited(() async {
+                final coords = await fetchCurrentCoordinates();
+                state.reportSos(
+                  latitude: coords?.$1,
+                  longitude: coords?.$2,
+                );
+              }());
               if (!context.mounted) return;
               dialNumber(context, primary);
               ScaffoldMessenger.of(context).showSnackBar(

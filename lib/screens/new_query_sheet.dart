@@ -80,15 +80,25 @@ class _NewQuerySheetState extends State<NewQuerySheet> {
     if (_subjectError != null || _messageError != null) return;
 
     setState(() => _submitting = true);
-    AppStateScope.of(context).addTicket(
+    // Full-check fix 2026-10-22: success is shown only when the
+    // ticket really reached the server (it used to show after a
+    // fixed 450 ms pause regardless of the outcome).
+    final ok = await AppStateScope.of(context).addTicket(
       subject: subject,
       category: _category,
       description: message,
       priority: _priority,
     );
-    // Brief pause so the button state reads as "sending".
-    await Future<void>.delayed(const Duration(milliseconds: 450));
     if (!mounted) return;
+    if (!ok) {
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Could not send your query. Please check your connection and try again.')),
+      );
+      return;
+    }
     setState(() {
       _submitting = false;
       _done = true;

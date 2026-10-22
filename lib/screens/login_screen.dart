@@ -147,7 +147,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Sign in to manage your health',
+                      // Admin Branding tagline (app_config
+                      // 'branding') — full-check fix 2026-10-22;
+                      // was a hard-coded line that ignored the
+                      // Branding screen.
+                      AppStateScope.of(context).appTagline,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,

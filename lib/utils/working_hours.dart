@@ -155,3 +155,67 @@ bool slotBlocked(String label, Map<String, dynamic> block) {
   final t = _minutes(label);
   return t >= _minutes(s.substring(0, 5)) && t < _minutes(e.substring(0, 5));
 }
+
+/// Display rows for a "Working Hours" card, built from the
+/// provider's real stored hours (full-check fix 2026-10-22: the
+/// doctor and hospital pages showed the same hard-coded hours for
+/// everyone). Consecutive days with identical hours collapse
+/// into one row ("Mon – Fri"). A null/unset value yields the
+/// standard default schedule — the same one booking slots use.
+List<({String days, String hours, bool closed})> workingHoursDisplayRows(
+    dynamic raw) {
+  final parsed = parseWorkingHours(raw);
+  const names = {
+    'mon': 'Monday',
+    'tue': 'Tuesday',
+    'wed': 'Wednesday',
+    'thu': 'Thursday',
+    'fri': 'Friday',
+    'sat': 'Saturday',
+    'sun': 'Sunday',
+  };
+  String fmt(String hhmm) {
+    final p = hhmm.split(':');
+    var h = int.parse(p[0]);
+    final suffix = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 == 0 ? 12 : h % 12;
+    return '$h:${p[1]} $suffix';
+  }
+
+  final rows = <({String days, String hours, bool closed})>[];
+  var i = 0;
+  while (i < dayKeys.length) {
+    final day = parsed[dayKeys[i]]!;
+    var j = i;
+    while (j + 1 < dayKeys.length && parsed[dayKeys[j + 1]] == day) {
+      j++;
+    }
+    final label = i == j
+        ? names[dayKeys[i]]!
+        : '${names[dayKeys[i]]} – ${names[dayKeys[j]]}';
+    rows.add((
+      days: label,
+      hours: day.isOpen ? '${fmt(day.start!)} – ${fmt(day.end!)}' : 'Closed',
+      closed: !day.isOpen,
+    ));
+    i = j + 1;
+  }
+  return rows;
+}
+
+/// One-line summary of today's hours, e.g. "Today: 9:00 AM –
+/// 5:00 PM" or "Closed today" — for compact panels.
+String todayHoursLabel(dynamic raw) {
+  final parsed = parseWorkingHours(raw);
+  final today = parsed[dayKeyForWeekday(DateTime.now().weekday)]!;
+  if (!today.isOpen) return 'Closed today';
+  String fmt(String hhmm) {
+    final p = hhmm.split(':');
+    var h = int.parse(p[0]);
+    final suffix = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 == 0 ? 12 : h % 12;
+    return '$h:${p[1]} $suffix';
+  }
+
+  return 'Today: ${fmt(today.start!)} – ${fmt(today.end!)}';
+}

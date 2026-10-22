@@ -30,7 +30,6 @@ const _specialties = [
 const _sortOptions = [
   'Relevance',
   'Rating High→Low',
-  'Distance Nearest',
   'Fee Low→High',
   'Fee High→Low',
   'Experience',
@@ -73,7 +72,6 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   String _sort = _sortOptions.first;
   bool _rating4 = false;
   bool _lowFee = false;
-  bool _nearest = false;
   bool _loading = true;
   int _bannerIdx = 0;
   Timer? _bannerTimer;
@@ -91,8 +89,9 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   }
 
   Future<void> _refresh() async {
+    // Real refresh (full-check fix 2026-10-22: fake delay before).
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
+    await AppStateScope.of(context).loadProductionCatalog();
     if (mounted) setState(() => _loading = false);
   }
 
@@ -136,9 +135,6 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
       case 'Rating High→Low':
         list.sort((a, b) => b.rating.compareTo(a.rating));
         break;
-      case 'Distance Nearest':
-        list.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
-        break;
       case 'Fee Low→High':
         list.sort((a, b) => a.fee.compareTo(b.fee));
         break;
@@ -150,7 +146,6 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
         break;
     }
     if (_lowFee) list.sort((a, b) => a.fee.compareTo(b.fee));
-    if (_nearest) list.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
     return list;
   }
 
@@ -178,13 +173,22 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                             ? ListView(
                                 physics:
                                     const AlwaysScrollableScrollPhysics(),
-                                children: const [
-                                  SizedBox(height: 60),
+                                children: [
+                                  const SizedBox(height: 60),
                                   EmptyState(
                                     icon: Icons.person_search,
                                     title: 'No doctors found',
                                     subtitle:
                                         'Try a different search or filter.',
+                                    actionLabel:
+                                        'Clear search & filters',
+                                    onAction: () => setState(() {
+                                      _search.clear();
+                                      _specialty = 'All';
+                                      _rating4 = false;
+                                      _lowFee = false;
+                                      _sort = _sortOptions.first;
+                                    }),
                                   ),
                                 ],
                               )
@@ -358,14 +362,6 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                     label: 'Fee: Low-High',
                     selected: _lowFee,
                     onTap: () => setState(() => _lowFee = !_lowFee),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Center(
-                  child: RFilterChip(
-                    label: 'Nearest First',
-                    selected: _nearest,
-                    onTap: () => setState(() => _nearest = !_nearest),
                   ),
                 ),
               ],

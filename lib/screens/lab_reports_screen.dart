@@ -165,6 +165,7 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
                         // waited 500ms and repainted the same list
                         // (audit fix 2026-10-19).
                         await state.loadPersistedState();
+                        await state.loadPatientLabSamples();
                         if (mounted) setState(() {});
                       },
                       child: ListView.builder(
@@ -445,7 +446,7 @@ class _LabReportsScreenState extends State<LabReportsScreen> {
                         // Uploaded reports can be removed from
                         // the device list (audit fix 2026-10-19 —
                         // there was no delete at all before).
-                        if (r.isUploaded)
+                        if (r.isOwnUpload)
                           TextButton.icon(
                             onPressed: () async {
                               final st = AppStateScope.of(context);

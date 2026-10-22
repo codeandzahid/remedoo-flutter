@@ -248,7 +248,7 @@ class _CartScreenState extends State<CartScreen> {
       }
     }
     final discount = _couponDiscount(state.cartTotal);
-    state.placeOrder(
+    final placed = await state.placeOrder(
       address: _address.text.trim(),
       payment: _payment,
       paymentRef: paymentRef,
@@ -262,6 +262,19 @@ class _CartScreenState extends State<CartScreen> {
       couponCode: discount > 0 ? '${_coupon?['code'] ?? ''}' : null,
       couponDiscount: discount,
     );
+    if (!mounted) return;
+    if (placed == null) {
+      // Backend rejected the order (or the cart has no real
+      // pharmacy) — the cart is untouched; say so (full-check fix
+      // 2026-10-22: success used to show unconditionally and the
+      // coupon was recorded for an order that never existed).
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Could not place the order. Please try again.')),
+      );
+      return;
+    }
     if (discount > 0 && _coupon != null) {
       unawaited(state.supabaseRepository.recordCouponUsage(
         couponId: '${_coupon!['id']}',
@@ -464,7 +477,13 @@ class _CartScreenState extends State<CartScreen> {
       children: [
         _stepBtn(
           l.qty == 1 ? Icons.delete_outline : Icons.remove,
-          () => state.removeCartLine(l),
+          // Full-check fix 2026-10-22: minus used to delete the
+          // whole line at ANY quantity; it now steps down by one
+          // (changeQty existed but was never called). Trash at
+          // qty 1 still removes the line.
+          l.qty == 1
+              ? () => state.removeCartLine(l)
+              : () => state.changeQty(l.medicine.id, -1),
           scheme,
           destructive: l.qty == 1,
         ),

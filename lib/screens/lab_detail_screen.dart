@@ -556,18 +556,28 @@ class _LabDetailScreenState extends State<LabDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 10),
+                  // Full-check fix 2026-10-22: "About" was a
+                  // generic template for every test; the real
+                  // lab_tests.description is shown when present.
                   _detailBlock(
                       context,
                       Icons.info_outline,
                       'About This Test',
-                      'The ${t.name} is a ${t.category.toLowerCase()} test. '
-                      'Reports are typically available within ${t.turnaround}.'),
+                      t.description.isNotEmpty
+                          ? t.description
+                          : 'The ${t.name} is a ${t.category.toLowerCase()} test. '
+                              'Reports are typically available within ${t.turnaround}.'),
                   _detailBlock(
                       context,
                       Icons.warning_amber_outlined,
                       'Before the Test',
-                      'Carry a valid ID and your prescription (if any). '
-                      'Inform the lab about any medications you are taking.'),
+                      [
+                        'Sample type: ${t.sampleType}.',
+                        if (t.requiresFasting)
+                          'Fasting is required for this test.',
+                        'Carry a valid ID and your prescription (if any). '
+                            'Inform the lab about any medications you are taking.',
+                      ].join(' ')),
                   _detailBlock(
                       context,
                       Icons.check_circle_outline,

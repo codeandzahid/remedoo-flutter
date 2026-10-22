@@ -2,36 +2,28 @@ import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
 import '../models.dart';
+import '../services/supabase_repository.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../theme.dart';
 import '../state/app_state.dart';
 import '../utils/device_actions.dart';
+import '../utils/working_hours.dart';
 import '../widgets/widgets.dart';
 import 'booking_screen.dart';
 import 'doctor_detail_screen.dart';
 import '../app_navigator.dart';
 
-const _departments = [
-  'Emergency',
-  'Cardiology',
-  'Orthopedics',
-  'Pediatrics',
-  'Gynecology',
-  'Neurology',
-  'Radiology',
-];
-
-const _facilities = [
-  '24x7 Emergency',
-  'ICU & Ventilators',
-  'Pharmacy',
-  'Pathology Lab',
-  'Ambulance',
-  'Cafeteria',
-  'Parking',
-  'Blood Bank',
-];
+/// Facilities shown on the hospital page, derived ONLY from the
+/// hospital's real record (full-check fix 2026-10-22: this used to
+/// be the same invented list — Pharmacy, Blood Bank, Cafeteria —
+/// for every hospital).
+List<String> _facilitiesFor(Hospital h) => [
+      if (h.emergencyContact.isNotEmpty) '24x7 Emergency',
+      if (h.hasIcu) 'ICU & Ventilators',
+      if (h.beds > 0) 'Inpatient Care',
+      if (h.government) 'Government Hospital',
+    ];
 
 /// Hospital detail: hero card, stats, departments, doctors, hours —
 /// reskinned to match HospitalDetail.tsx.
@@ -61,7 +53,10 @@ class HospitalDetailScreen extends StatelessWidget {
       return const GuestGate(message: 'Please login to view details');
     }
     final h = hospital;
-    final docs = doctors.where((d) => d.hospital == h.name).take(6).toList();
+    // Full-check fix 2026-10-22: this was capped at 6 while the
+    // stat and section header presented the capped number as the
+    // hospital's doctor total.
+    final docs = doctors.where((d) => d.hospital == h.name).toList();
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: SafeArea(
@@ -231,8 +226,11 @@ class HospitalDetailScreen extends StatelessWidget {
                   children: [
                     _stat(context, Icons.bed_outlined, '${h.beds}',
                         'Beds Available'),
+                    // Full-check fix 2026-10-22: the ICU figure
+                    // used to be beds ~/ 10 — an invented number.
+                    // The record only says whether ICU exists.
                     _stat(context, Icons.shield_outlined,
-                        h.hasIcu ? '${h.beds ~/ 10}' : '0', 'ICU Beds'),
+                        h.hasIcu ? 'Yes' : 'No', 'ICU'),
                     _stat(context, Icons.people_outline,
                         '${docs.length}', 'Doctors'),
                   ],
@@ -331,43 +329,7 @@ class HospitalDetailScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        RCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.business_outlined,
-                      size: 16, color: scheme.primary),
-                  const SizedBox(width: 8),
-                  Text('Departments (${_departments.length})',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 15)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _departments
-                    .map((d) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: RemedooTheme.accent
-                                .withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(d,
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500)),
-                        ))
-                    .toList(),
-              ),
-            ],
-          ),
-        ),
+        _HospitalDepartmentsCard(hospitalId: h.id),
         const SizedBox(height: 12),
         RCard(
           child: Column(
@@ -486,11 +448,12 @@ class HospitalDetailScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              ...[
-                ('Monday – Friday', '9:00 AM – 8:00 PM'),
-                ('Saturday', '9:00 AM – 2:00 PM'),
-                ('Sunday', 'Emergency only'),
-              ].map((e) => Padding(
+              // Real stored hours (full-check fix 2026-10-22:
+              // this card showed the same hours for every
+              // hospital).
+              ...workingHoursDisplayRows(h.workingHours)
+                  .map((r) => (r.days, r.hours))
+                  .map((e) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 5),
                     child: Row(
                       children: [
@@ -530,7 +493,7 @@ class HospitalDetailScreen extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _facilities
+                children: _facilitiesFor(h)
                     .map((f) => Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 7),
@@ -650,6 +613,85 @@ class _FavCircle extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: Center(child: FavoriteButton(favKey: favKey)),
+    );
+  }
+}
+
+/// Departments card backed by the real departments table
+/// (full-check fix 2026-10-22). Renders nothing while loading or
+/// when the hospital has no departments recorded — the page used
+/// to show the same seven invented departments for every hospital.
+class _HospitalDepartmentsCard extends StatefulWidget {
+  final String hospitalId;
+  const _HospitalDepartmentsCard({required this.hospitalId});
+
+  @override
+  State<_HospitalDepartmentsCard> createState() =>
+      _HospitalDepartmentsCardState();
+}
+
+class _HospitalDepartmentsCardState
+    extends State<_HospitalDepartmentsCard> {
+  List<String> _departments = const [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SupabaseRepository.instance
+        .fetchHospitalDepartments(widget.hospitalId)
+        .then((d) {
+      if (mounted) {
+        setState(() {
+          _departments = d;
+          _loaded = true;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded || _departments.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final scheme = Theme.of(context).colorScheme;
+    return RCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.business_outlined,
+                  size: 16, color: scheme.primary),
+              const SizedBox(width: 8),
+              Text('Departments (${_departments.length})',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _departments
+                .map((d) => Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color:
+                            RemedooTheme.accent.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(d,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500)),
+                    ))
+                .toList(),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -19,59 +19,59 @@ void main() {
 
   group('placeOrder (patient-panel audit batch 1)', () {
     test('checkout notes are stored on the order (were silently dropped)',
-        () {
+        () async {
       final s = AppState();
       s.addToCart(_med('m1', 100),
           pharmacyId: 'p1', pharmacyName: 'Pharmacy One');
-      final o = s.placeOrder(
+      final o = (await s.placeOrder(
         address: '1 Main Street',
         payment: 'Cash on Delivery',
         notes: 'Leave at the door',
-      );
+      ))!;
       expect(o.notes, 'Leave at the door');
       expect(o.pharmacyId, 'p1');
     });
 
-    test('no notes -> empty string', () {
+    test('no notes -> empty string', () async {
       final s = AppState();
       s.addToCart(_med('m1', 100),
           pharmacyId: 'p1', pharmacyName: 'Pharmacy One');
-      final o = s.placeOrder(
+      final o = (await s.placeOrder(
         address: '1 Main Street',
         payment: 'Cash on Delivery',
-      );
+      ))!;
       expect(o.notes, '');
     });
 
-    test('free delivery at/above the 499 threshold', () {
+    test('free delivery at/above the 499 threshold', () async {
       final s = AppState();
       s.addToCart(_med('m1', 500),
           pharmacyId: 'p1', pharmacyName: 'Pharmacy One');
-      final o = s.placeOrder(
+      final o = (await s.placeOrder(
         address: '1 Main Street',
         payment: 'Cash on Delivery',
-      );
+      ))!;
       expect(o.deliveryFee, 0);
       expect(o.total, 500);
     });
 
-    test('delivery fee charged below the threshold', () {
+    test('delivery fee charged below the threshold', () async {
       final s = AppState();
       s.addToCart(_med('m1', 100),
           pharmacyId: 'p1', pharmacyName: 'Pharmacy One');
-      final o = s.placeOrder(
+      final o = (await s.placeOrder(
         address: '1 Main Street',
         payment: 'Cash on Delivery',
-      );
+      ))!;
       expect(o.deliveryFee, 30);
       expect(o.total, 130);
     });
 
-    test('cart is cleared and the order is recorded', () {
+    test('cart is cleared and the order is recorded', () async {
       final s = AppState();
       s.addToCart(_med('m1', 100),
           pharmacyId: 'p1', pharmacyName: 'Pharmacy One');
-      s.placeOrder(address: '1 Main Street', payment: 'Cash on Delivery');
+      await s.placeOrder(address: '1 Main Street', payment: 'Cash on Delivery');
       expect(s.cart, isEmpty);
       expect(s.orders.length, 1);
     });

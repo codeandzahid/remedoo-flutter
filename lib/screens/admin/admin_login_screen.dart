@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/auth_service.dart';
-import '../../services/supabase_config.dart';
+
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/admin_style.dart';
@@ -33,32 +33,32 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   String? _diag;
 
   /// Tests basic connectivity to the Supabase backend and reports details.
+  /// Full-check fix 2026-10-22: the internet leg used dart:io
+  /// HttpClient, which does not exist on the web platform this app
+  /// runs on - it always reported "Internet: FAILED". The probe
+  /// now goes through the Supabase client itself (a real PostgREST
+  /// request, works on web and mobile alike).
   Future<void> _testConnection() async {
     setState(() {
-      _diag = 'Testing…';
+      _diag = 'Testing\u2026';
       _error = null;
     });
     final sb = StringBuffer();
-    try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 10);
-      final req = await client.headUrl(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/'));
-      req.headers.set('apikey', 'test');
-      final resp =
-          await req.close().timeout(const Duration(seconds: 10));
-      sb.writeln('Internet: OK (server replied ${resp.statusCode})');
-      client.close();
-    } catch (e) {
-      sb.writeln('Internet: FAILED');
-      sb.writeln('$e'.split('\n').first);
-    }
-    try {
-      final inited = AuthService.instance.isInitialized;
-      sb.writeln(
-          'App backend: ${inited ? 'ready' : 'NOT ready — restart app'}');
-    } catch (e) {
-      sb.writeln('App backend: error');
+    final inited = AuthService.instance.isInitialized;
+    sb.writeln(
+        'App backend: ${inited ? 'ready' : 'NOT ready - restart app'}');
+    if (inited) {
+      try {
+        await Supabase.instance.client
+            .from('app_config')
+            .select('key')
+            .limit(1)
+            .timeout(const Duration(seconds: 10));
+        sb.writeln('Internet: OK (database replied)');
+      } catch (e) {
+        sb.writeln('Internet: FAILED');
+        sb.writeln('$e'.split('\n').first);
+      }
     }
     if (mounted) setState(() => _diag = sb.toString().trim());
   }

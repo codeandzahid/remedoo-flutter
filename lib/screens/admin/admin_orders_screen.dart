@@ -33,7 +33,11 @@ class _AdminOrdersScreenState
   static const _statuses = [
     'placed',
     'confirmed',
-    'packed',
+    // 'preparing' is the pharmacy flow's real status — it was
+    // missing here (orders in it rendered a blank dropdown), and
+    // 'packed' was offered instead, which is not in the order
+    // vocabulary at all (full-check fix 2026-10-22).
+    'preparing',
     'out_for_delivery',
     'delivered',
     'cancelled',
@@ -93,13 +97,22 @@ class _AdminOrdersScreenState
               : RefreshIndicator(
                   onRefresh: _load,
                   child: list.isEmpty
-                      ? const REmptyState(
-                          icon:
-                              Icons.shopping_bag_outlined,
-                          title: 'No orders',
-                          subtitle:
-                              'Orders will appear here.',
-                        )
+                      ? (state.listLoadFailed('orders')
+                          ? REmptyState(
+                              icon: Icons.cloud_off_outlined,
+                              title: 'Could not load orders',
+                              subtitle:
+                                  'The list failed to load — it is not necessarily empty.',
+                              actionLabel: 'Retry',
+                              onAction: _load,
+                            )
+                          : const REmptyState(
+                              icon:
+                                  Icons.shopping_bag_outlined,
+                              title: 'No orders',
+                              subtitle:
+                                  'Orders will appear here.',
+                            ))
                       : ListView.builder(
                           padding:
                               const EdgeInsets.fromLTRB(

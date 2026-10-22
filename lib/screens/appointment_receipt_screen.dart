@@ -23,6 +23,10 @@ class AppointmentReceiptScreen extends StatelessWidget {
         return 'PENDING APPROVAL';
       case 'cancelled':
         return 'CANCELLED';
+      case 'completed':
+        // Full-check fix 2026-10-22: completed fell into the
+        // CONFIRMED default, indistinguishable from a live booking.
+        return 'COMPLETED';
       default:
         return 'CONFIRMED';
     }

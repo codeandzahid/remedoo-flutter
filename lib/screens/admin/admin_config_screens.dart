@@ -116,12 +116,21 @@ class _CommissionScreenState extends State<CommissionScreen> {
       ),
     );
     if (saved != true || !mounted) return;
+    // Validate like the row editor does — garbage used to save
+    // silently as 0.
+    final percentValue = num.tryParse(percent.text.trim());
+    final flatValue = num.tryParse(flat.text.trim());
+    if (percentValue == null || flatValue == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Enter valid numbers for % and flat fee.')));
+      return;
+    }
     final ok = await AppStateScope.of(context).adminSaveRow(
         'platform_commission_config', {
       'provider_type': provider,
       'service_type': service,
-      'commission_percent': num.tryParse(percent.text) ?? 0,
-      'flat_fee': num.tryParse(flat.text) ?? 0,
+      'commission_percent': percentValue,
+      'flat_fee': flatValue,
       'is_active': true,
     });
     if (!mounted) return;
@@ -149,7 +158,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
                 child: RSectionHeader(
                     title: 'Commission',
                     subtitle:
-                        'Platform cut per provider + service (real table)'),
+                        'Percent plus flat fee per provider + service, taken when an earning is created'),
               ),
               RButton(
                   label: 'Add rule',
@@ -289,172 +298,6 @@ class _CommissionRowState extends State<_CommissionRow> {
   }
 }
 
-/// Generic name+price plan list editor backed by app_config.
-/// Kept for Corporate Plans and Healthcare Packages — those two
-/// have no dedicated table, so app_config is their only store
-/// (audit Admin gap 5 note).
-class _PlanListScreen extends StatefulWidget {
-  final String configKey;
-  final String title;
-  final String subtitle;
-  final String itemLabel;
-
-  const _PlanListScreen({
-    required this.configKey,
-    required this.title,
-    required this.subtitle,
-    required this.itemLabel,
-  });
-
-  @override
-  State<_PlanListScreen> createState() => _PlanListScreenState();
-}
-
-class _PlanListScreenState extends State<_PlanListScreen> {
-  bool _loading = true;
-  bool _saving = false;
-  List<Map<String, dynamic>> _plans = [];
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
-  }
-
-  Future<void> _load() async {
-    final state = AppStateScope.of(context);
-    await state.loadAppConfig();
-    if (!mounted) return;
-    final saved = state.appConfigValue(widget.configKey);
-    setState(() {
-      _plans = [
-        for (final p in (saved['plans'] as List? ?? []))
-          Map<String, dynamic>.from(p as Map)
-      ];
-      _loading = false;
-    });
-  }
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    final ok = await AppStateScope.of(context)
-        .saveAppConfigValue(widget.configKey, {'plans': _plans});
-    if (!mounted) return;
-    setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content:
-              Text(ok ? 'Saved' : 'Could not save (admin only)')),
-    );
-  }
-
-  void _addDialog() {
-    final name = TextEditingController();
-    final price = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Add ${widget.itemLabel}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RKitField(label: 'Name', controller: name),
-            const SizedBox(height: 10),
-            RKitField(
-                label: 'Price (₹)',
-                controller: price,
-                keyboardType: TextInputType.number),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          RButton(
-            label: 'Add',
-            small: true,
-            onPressed: () {
-              if (name.text.trim().isEmpty) return;
-              setState(() => _plans.add({
-                    'name': name.text.trim(),
-                    'price': num.tryParse(price.text) ?? 0,
-                  }));
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const RLoading();
-    }
-    return _Scaffold(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: RSectionHeader(
-                    title: widget.title, subtitle: widget.subtitle),
-              ),
-              RButton(
-                  label: 'Add',
-                  icon: Icons.add,
-                  small: true,
-                  onPressed: _addDialog),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (_plans.isEmpty)
-            const REmptyState(
-                icon: Icons.card_membership,
-                title: 'No plans yet',
-                subtitle: 'Add your first plan above.',
-                compact: true)
-          else
-            RCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  for (var i = 0; i < _plans.length; i++)
-                    ListTile(
-                      title: Text('${_plans[i]['name']}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(inr((_plans[i]['price'] as num?) ?? 0),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700)),
-                          IconButton(
-                            icon: Icon(Icons.delete_outline,
-                                color: RemedooTheme.emergency),
-                            onPressed: () =>
-                                setState(() => _plans.removeAt(i)),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 16),
-          RButton(
-              label: 'Save changes',
-              fullWidth: true,
-              onPressed: _saving ? null : _save),
-        ],
-      ),
-    );
-  }
-}
-
 /// Subscription plans — the REAL `subscription_plans` table
 /// (audit Admin gaps 5 + 23 / M16: this editor used to store
 /// only {name, price} in app_config, and the table's
@@ -551,6 +394,16 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           const SnackBar(content: Text('A plan needs a name.')));
       return;
     }
+    // No silent ₹0 (gap 23, full-check 2026-10-22): a blank or
+    // unparseable price used to save as 0 without a word. Zero
+    // is allowed only when the admin actually types 0.
+    final priceValue = num.tryParse(price.text.trim());
+    if (priceValue == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('Enter a price (type 0 for a free plan).')));
+      return;
+    }
     final ok = await AppStateScope.of(context)
         .adminSaveRow('subscription_plans', {
       if (row != null) 'id': row['id'],
@@ -559,9 +412,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           ? null
           : description.text.trim(),
       'provider_type': provider,
-      // No silent ₹0 (gap 23): an empty/invalid price is kept a
-      // deliberate 0 only when the admin typed 0.
-      'price': num.tryParse(price.text.trim()) ?? 0,
+      'price': priceValue,
       'duration_days': int.tryParse(days.text.trim()) ?? 30,
       'features': features.text
           .split(',')
@@ -667,30 +518,619 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   }
 }
 
-/// Corporate plans.
-class CorporatePlansScreen extends StatelessWidget {
+/// Corporate plans — the REAL `corporate_plans` table
+/// (full-check fix 2026-10-22: this screen used to save a
+/// name+price list into app_config key 'corporate_plans', which
+/// nothing in the app reads, behind a "Saved" message. The real
+/// table is a company subscription record: company, contact,
+/// plan type, employee cap, monthly price, services, dates.)
+class CorporatePlansScreen extends StatefulWidget {
   const CorporatePlansScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const _PlanListScreen(
-        configKey: 'corporate_plans',
-        title: 'Corporate Plans',
-        subtitle: 'Plans for companies',
-        itemLabel: 'Plan',
-      );
+  State<CorporatePlansScreen> createState() =>
+      _CorporatePlansScreenState();
 }
 
-/// Healthcare packages.
-class HealthcarePackagesScreen extends StatelessWidget {
+class _CorporatePlansScreenState extends State<CorporatePlansScreen> {
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    await AppStateScope.of(context).loadAdminTable('corporate_plans');
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _edit([Map<String, dynamic>? row]) async {
+    final company =
+        TextEditingController(text: '${row?['company_name'] ?? ''}');
+    final email =
+        TextEditingController(text: '${row?['contact_email'] ?? ''}');
+    final phone =
+        TextEditingController(text: '${row?['contact_phone'] ?? ''}');
+    final employees = TextEditingController(
+        text: '${row?['max_employees'] ?? 50}');
+    final price = TextEditingController(
+        text: row == null ? '' : '${row['monthly_price'] ?? ''}');
+    final servicesRaw = row?['services_included'];
+    final services = TextEditingController(
+        text: servicesRaw is List ? servicesRaw.join(', ') : '');
+    final startDate = TextEditingController(
+        text: '${row?['start_date'] ?? ''}'.split('T').first);
+    final endDate = TextEditingController(
+        text: '${row?['end_date'] ?? ''}'.split('T').first);
+    var planType = '${row?['plan_type'] ?? 'basic'}';
+    if (!const ['basic', 'premium', 'enterprise'].contains(planType)) {
+      planType = 'basic';
+    }
+    var active = row?['is_active'] != false;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text(row == null
+              ? 'Add corporate plan'
+              : 'Edit corporate plan'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RKitField(controller: company, label: 'Company name'),
+                RKitField(controller: email, label: 'Contact email'),
+                RKitField(controller: phone, label: 'Contact phone'),
+                RKitDropdown<String>(
+                  label: 'Plan type',
+                  value: planType,
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'basic', child: Text('Basic')),
+                    DropdownMenuItem(
+                        value: 'premium', child: Text('Premium')),
+                    DropdownMenuItem(
+                        value: 'enterprise',
+                        child: Text('Enterprise')),
+                  ],
+                  onChanged: (v) => setD(() => planType = v ?? 'basic'),
+                ),
+                RKitField(
+                    controller: employees,
+                    label: 'Max employees',
+                    keyboardType: TextInputType.number),
+                RKitField(
+                    controller: price,
+                    label: 'Monthly price (₹)',
+                    keyboardType: TextInputType.number),
+                RKitField(
+                    controller: services,
+                    label:
+                        'Services included (comma separated)'),
+                RKitField(
+                    controller: startDate,
+                    label: 'Start date (YYYY-MM-DD, optional)'),
+                RKitField(
+                    controller: endDate,
+                    label: 'End date (YYYY-MM-DD, optional)'),
+                RFormSwitchTile(
+                  title: 'Active',
+                  value: active,
+                  onChanged: (v) => setD(() => active = v),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    void fail(String msg) => ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+    if (company.text.trim().isEmpty) {
+      fail('A corporate plan needs a company name.');
+      return;
+    }
+    final priceValue = num.tryParse(price.text.trim());
+    if (priceValue == null) {
+      fail('Enter the monthly price (type 0 for a free plan).');
+      return;
+    }
+    final startText = startDate.text.trim();
+    final endText = endDate.text.trim();
+    DateTime? startParsed;
+    DateTime? endParsed;
+    if (startText.isNotEmpty) {
+      startParsed = DateTime.tryParse(startText);
+      if (startParsed == null) {
+        fail('Start date must be YYYY-MM-DD.');
+        return;
+      }
+    }
+    if (endText.isNotEmpty) {
+      endParsed = DateTime.tryParse(endText);
+      if (endParsed == null) {
+        fail('End date must be YYYY-MM-DD.');
+        return;
+      }
+    }
+    if (startParsed != null &&
+        endParsed != null &&
+        endParsed.isBefore(startParsed)) {
+      fail('End date is before the start date.');
+      return;
+    }
+    final ok = await AppStateScope.of(context)
+        .adminSaveRow('corporate_plans', {
+      if (row != null) 'id': row['id'],
+      'company_name': company.text.trim(),
+      'contact_email':
+          email.text.trim().isEmpty ? null : email.text.trim(),
+      'contact_phone':
+          phone.text.trim().isEmpty ? null : phone.text.trim(),
+      'plan_type': planType,
+      'max_employees': int.tryParse(employees.text.trim()) ?? 50,
+      'monthly_price': priceValue,
+      'services_included': services.text
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList(),
+      'is_active': active,
+      'start_date': startText.isEmpty ? null : startText,
+      'end_date': endText.isEmpty ? null : endText,
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(ok
+              ? 'Corporate plan saved.'
+              : 'Could not save (admin only)')),
+    );
+    if (ok) _load();
+  }
+
+  Future<void> _delete(Map<String, dynamic> row) async {
+    final sure = await confirmDialog(
+      context,
+      title: 'Delete corporate plan?',
+      message:
+          'Remove the plan for ${row['company_name'] ?? 'this company'}? This cannot be undone.',
+    );
+    if (!sure || !mounted) return;
+    final ok = await AppStateScope.of(context)
+        .adminDeleteRow('corporate_plans', '${row['id']}');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(
+              ok ? 'Plan deleted.' : 'Could not delete.')),
+    );
+    if (ok) _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const RLoading();
+    final state = AppStateScope.of(context);
+    final rows = state.adminTable('corporate_plans');
+    return _Scaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: RSectionHeader(
+                    title: 'Corporate Plans',
+                    subtitle:
+                        'Company subscriptions from the corporate_plans table'),
+              ),
+              RButton(
+                  label: 'Add plan',
+                  small: true,
+                  icon: Icons.add,
+                  onPressed: () => _edit()),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (rows.isEmpty)
+            const REmptyState(
+              icon: Icons.business,
+              title: 'No corporate plans yet',
+              subtitle: 'Add the first company subscription.',
+              compact: true,
+            )
+          else
+            ...rows.map((r) {
+              final services = r['services_included'];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: RCard(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${r['company_name'] ?? ''}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700)),
+                    subtitle: Text(
+                      '${r['plan_type'] ?? 'basic'} · '
+                      '₹${r['monthly_price'] ?? 0}/month · '
+                      'up to ${r['max_employees'] ?? 50} employees'
+                      '${r['is_active'] == true ? '' : ' · inactive'}'
+                      '${services is List && services.isNotEmpty ? '\n${services.join(', ')}' : ''}',
+                    ),
+                    isThreeLine:
+                        services is List && services.isNotEmpty,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: 'Edit',
+                          onPressed: () => _edit(r),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.red),
+                          tooltip: 'Delete',
+                          onPressed: () => _delete(r),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+}
+
+/// Healthcare packages — the REAL `healthcare_packages` table
+/// (full-check fix 2026-10-22: same write-only app_config problem
+/// as Corporate Plans. Every package belongs to a hospital or a
+/// lab — provider_id is NOT NULL in the table — so the editor
+/// picks the provider from the live catalogue.)
+class HealthcarePackagesScreen extends StatefulWidget {
   const HealthcarePackagesScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const _PlanListScreen(
-        configKey: 'healthcare_packages',
-        title: 'Healthcare Packages',
-        subtitle: 'Bundled checkup packages',
-        itemLabel: 'Package',
-      );
+  State<HealthcarePackagesScreen> createState() =>
+      _HealthcarePackagesScreenState();
+}
+
+class _HealthcarePackagesScreenState
+    extends State<HealthcarePackagesScreen> {
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    final state = AppStateScope.of(context);
+    await state.loadAdminTable('healthcare_packages');
+    if (state.activeHospitals.isEmpty && state.activeLabs.isEmpty) {
+      await state.loadProductionCatalog();
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  String _providerName(AppState state, Map<String, dynamic> row) {
+    final id = '${row['provider_id'] ?? ''}';
+    if (row['provider_type'] == 'lab') {
+      for (final l in state.activeLabs) {
+        if (l.id == id) return l.name;
+      }
+      return 'Lab';
+    }
+    for (final h in state.activeHospitals) {
+      if (h.id == id) return h.name;
+    }
+    return 'Hospital';
+  }
+
+  Future<void> _edit([Map<String, dynamic>? row]) async {
+    final state = AppStateScope.of(context);
+    final name =
+        TextEditingController(text: '${row?['name'] ?? ''}');
+    final description =
+        TextEditingController(text: '${row?['description'] ?? ''}');
+    final testsRaw = row?['tests_included'];
+    final tests = TextEditingController(
+        text: testsRaw is List ? testsRaw.join(', ') : '');
+    final price = TextEditingController(
+        text: row == null ? '' : '${row['original_price'] ?? ''}');
+    final discounted = TextEditingController(
+        text: row?['discounted_price'] == null
+            ? ''
+            : '${row?['discounted_price']}');
+    final days = TextEditingController(
+        text: '${row?['duration_days'] ?? 1}');
+    final sortOrder =
+        TextEditingController(text: '${row?['sort_order'] ?? 0}');
+    var providerType = '${row?['provider_type'] ?? 'hospital'}';
+    if (!const ['hospital', 'lab'].contains(providerType)) {
+      providerType = 'hospital';
+    }
+    String? providerId = row?['provider_id']?.toString();
+    var active = row?['is_active'] != false;
+
+    List<(String, String)> providerOptions() {
+      if (providerType == 'lab') {
+        return [for (final l in state.activeLabs) (l.id, l.name)];
+      }
+      return [for (final h in state.activeHospitals) (h.id, h.name)];
+    }
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          final options = providerOptions();
+          if (providerId != null &&
+              !options.any((o) => o.$1 == providerId)) {
+            providerId = null;
+          }
+          return AlertDialog(
+            title: Text(row == null
+                ? 'Add healthcare package'
+                : 'Edit healthcare package'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RKitField(controller: name, label: 'Package name'),
+                  RKitField(
+                      controller: description,
+                      label: 'Description',
+                      maxLines: 2),
+                  RKitDropdown<String>(
+                    label: 'Provider type',
+                    value: providerType,
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'hospital', child: Text('Hospital')),
+                      DropdownMenuItem(
+                          value: 'lab', child: Text('Lab')),
+                    ],
+                    onChanged: (v) => setD(() {
+                      providerType = v ?? 'hospital';
+                      providerId = null;
+                    }),
+                  ),
+                  if (options.isEmpty)
+                    Padding(
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        providerType == 'lab'
+                            ? 'No labs in the catalogue yet — add a lab first.'
+                            : 'No hospitals in the catalogue yet — add a hospital first.',
+                        style: const TextStyle(
+                            color: Colors.red, fontSize: 13),
+                      ),
+                    )
+                  else
+                    RKitDropdown<String>(
+                      label: 'Provider',
+                      value: providerId,
+                      items: [
+                        for (final o in options)
+                          DropdownMenuItem(
+                              value: o.$1, child: Text(o.$2)),
+                      ],
+                      onChanged: (v) =>
+                          setD(() => providerId = v),
+                    ),
+                  RKitField(
+                      controller: tests,
+                      label: 'Tests included (comma separated)'),
+                  RKitField(
+                      controller: price,
+                      label: 'Price (₹)',
+                      keyboardType: TextInputType.number),
+                  RKitField(
+                      controller: discounted,
+                      label: 'Discounted price (₹, optional)',
+                      keyboardType: TextInputType.number),
+                  RKitField(
+                      controller: days,
+                      label: 'Duration (days)',
+                      keyboardType: TextInputType.number),
+                  RKitField(
+                      controller: sortOrder,
+                      label: 'Sort order',
+                      keyboardType: TextInputType.number),
+                  RFormSwitchTile(
+                    title: 'Active',
+                    value: active,
+                    onChanged: (v) => setD(() => active = v),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Save')),
+            ],
+          );
+        },
+      ),
+    );
+    if (saved != true || !mounted) return;
+    void fail(String msg) => ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+    if (name.text.trim().isEmpty) {
+      fail('A package needs a name.');
+      return;
+    }
+    if (providerId == null) {
+      fail('Pick the hospital or lab this package belongs to.');
+      return;
+    }
+    final priceValue = num.tryParse(price.text.trim());
+    if (priceValue == null) {
+      fail('Enter the price (type 0 for a free package).');
+      return;
+    }
+    num? discountedValue;
+    if (discounted.text.trim().isNotEmpty) {
+      discountedValue = num.tryParse(discounted.text.trim());
+      if (discountedValue == null) {
+        fail('Discounted price must be a number.');
+        return;
+      }
+      if (discountedValue > priceValue) {
+        fail('Discounted price cannot be higher than the price.');
+        return;
+      }
+    }
+    final ok = await AppStateScope.of(context)
+        .adminSaveRow('healthcare_packages', {
+      if (row != null) 'id': row['id'],
+      'provider_type': providerType,
+      'provider_id': providerId,
+      'name': name.text.trim(),
+      'description': description.text.trim().isEmpty
+          ? null
+          : description.text.trim(),
+      'tests_included': tests.text
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList(),
+      'original_price': priceValue,
+      'discounted_price': discountedValue,
+      'duration_days': int.tryParse(days.text.trim()) ?? 1,
+      'sort_order': int.tryParse(sortOrder.text.trim()) ?? 0,
+      'is_active': active,
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(ok
+              ? 'Package saved.'
+              : 'Could not save (admin only)')),
+    );
+    if (ok) _load();
+  }
+
+  Future<void> _delete(Map<String, dynamic> row) async {
+    final sure = await confirmDialog(
+      context,
+      title: 'Delete healthcare package?',
+      message:
+          'Remove "${row['name'] ?? 'this package'}"? This cannot be undone.',
+    );
+    if (!sure || !mounted) return;
+    final ok = await AppStateScope.of(context)
+        .adminDeleteRow('healthcare_packages', '${row['id']}');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(
+              ok ? 'Package deleted.' : 'Could not delete.')),
+    );
+    if (ok) _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const RLoading();
+    final state = AppStateScope.of(context);
+    final rows = [...state.adminTable('healthcare_packages')]
+      ..sort((a, b) => ((a['sort_order'] as num?) ?? 0)
+          .compareTo((b['sort_order'] as num?) ?? 0));
+    return _Scaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: RSectionHeader(
+                    title: 'Healthcare Packages',
+                    subtitle:
+                        'Bundled checkup packages from the healthcare_packages table'),
+              ),
+              RButton(
+                  label: 'Add package',
+                  small: true,
+                  icon: Icons.add,
+                  onPressed: () => _edit()),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (rows.isEmpty)
+            const REmptyState(
+              icon: Icons.medical_services_outlined,
+              title: 'No packages yet',
+              subtitle: 'Add the first healthcare package.',
+              compact: true,
+            )
+          else
+            ...rows.map((r) {
+              final tests = r['tests_included'];
+              final discounted = r['discounted_price'];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: RCard(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${r['name'] ?? ''}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700)),
+                    subtitle: Text(
+                      '${_providerName(state, r)} · '
+                      '${discounted != null ? '₹$discounted (was ₹${r['original_price'] ?? 0})' : '₹${r['original_price'] ?? 0}'} · '
+                      '${r['duration_days'] ?? 1} days · '
+                      '${r['bookings_count'] ?? 0} bookings'
+                      '${r['is_active'] == true ? '' : ' · inactive'}'
+                      '${tests is List && tests.isNotEmpty ? '\n${tests.join(', ')}' : ''}',
+                    ),
+                    isThreeLine: tests is List && tests.isNotEmpty,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: 'Edit',
+                          onPressed: () => _edit(r),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.red),
+                          tooltip: 'Delete',
+                          onPressed: () => _delete(r),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
 }
 
 /// Branding: app name + tagline in app_config, plus the real theme controls.
@@ -745,8 +1185,13 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
   Future<void> _save() async {
     setState(() => _saving = true);
-    final ok = await AppStateScope.of(context).saveAppConfigValue(
-        'branding', {
+    final state = AppStateScope.of(context);
+    // Merge over the stored value (full-check fix 2026-10-22):
+    // saveAppConfigValue replaces the whole 'branding' value, so
+    // saving only name+tagline used to wipe any other branding
+    // keys stored under it.
+    final ok = await state.saveAppConfigValue('branding', {
+      ...state.appConfigValue('branding'),
       'app_name': _name.text.trim(),
       'tagline': _tagline.text.trim(),
     });
@@ -755,7 +1200,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content: Text(ok
-              ? 'Branding saved — live across website and app'
+              ? 'Branding saved — shown in the header and on the login page'
               : 'Could not save (admin only)')),
     );
   }
@@ -768,7 +1213,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
         children: [
           const RSectionHeader(
               title: 'Branding',
-              subtitle: 'Saved to the database, applies everywhere'),
+              subtitle:
+                  'App name shows in the website header; tagline on the login page'),
           const SizedBox(height: 12),
           RCard(
             padding: const EdgeInsets.all(20),
@@ -799,8 +1245,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
   }
 }
 
-/// Admin control for theme pack availability. Sky Pulse is the primary
-/// theme and cannot be turned off.
+/// Admin control for theme pack availability. The primary
+/// theme (Remidy) cannot be turned off.
 class _ThemePackAdminCard extends StatefulWidget {
   @override
   State<_ThemePackAdminCard> createState() => _ThemePackAdminCardState();
@@ -820,18 +1266,13 @@ class _ThemePackAdminCardState extends State<_ThemePackAdminCard> {
     final rows = await SupabaseRepository.instance.fetchThemePacks();
     if (!mounted) return;
     setState(() {
-      // Fall back to built-in packs when the table isn't reachable.
-      _packs = rows.isEmpty
-          ? [
-              for (final p in ThemePack.all)
-                {
-                  'id': p.id,
-                  'name': p.name,
-                  'enabled': true,
-                  'is_primary': p.id == 'remidy',
-                }
-            ]
-          : rows;
+      // Full-check fix 2026-10-22: an empty result used to be
+      // replaced with invented built-in packs, all shown enabled —
+      // but fetchThemePacks returns [] both when the table cannot
+      // be read AND when it has no rows, and toggling an invented
+      // pack updated zero database rows. Show the honest empty
+      // state with a retry instead.
+      _packs = rows;
       _loading = false;
     });
     // Keep AppState's availability map in sync.
@@ -870,6 +1311,30 @@ class _ThemePackAdminCardState extends State<_ThemePackAdminCard> {
       return const RCard(
         padding: EdgeInsets.all(20),
         child: const RLoading(),
+      );
+    }
+    if (_packs.isEmpty) {
+      return RCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Text(
+              'The theme list could not be loaded from the database. '
+              'No themes can be changed until it loads.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            RButton(
+              label: 'Retry',
+              small: true,
+              icon: Icons.refresh,
+              onPressed: () {
+                setState(() => _loading = true);
+                _load();
+              },
+            ),
+          ],
+        ),
       );
     }
     return RCard(
@@ -1069,10 +1534,46 @@ class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
       ),
     );
     if (saved != true || !mounted) return;
+    void failArea(String msg) => ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
     if (name.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('An area needs a name.')));
+      failArea('An area needs a name.');
       return;
+    }
+    // Full-check fix 2026-10-22: blank-or-garbage latitude,
+    // longitude and radius were silently written as NULL (a typo
+    // quietly erased the area's coordinates). Blank is allowed
+    // only as a deliberate pair; anything typed must be a valid
+    // in-range number.
+    final latText = lat.text.trim();
+    final lngText = lng.text.trim();
+    double? latValue;
+    double? lngValue;
+    if (latText.isEmpty != lngText.isEmpty) {
+      failArea('Latitude and longitude must be entered together, '
+          'or both left blank.');
+      return;
+    }
+    if (latText.isNotEmpty) {
+      latValue = double.tryParse(latText);
+      if (latValue == null || latValue < -90 || latValue > 90) {
+        failArea('Latitude must be a number between -90 and 90.');
+        return;
+      }
+      lngValue = double.tryParse(lngText);
+      if (lngValue == null || lngValue < -180 || lngValue > 180) {
+        failArea('Longitude must be a number between -180 and 180.');
+        return;
+      }
+    }
+    final radiusText = radius.text.trim();
+    double? radiusValue;
+    if (radiusText.isNotEmpty) {
+      radiusValue = double.tryParse(radiusText);
+      if (radiusValue == null || radiusValue <= 0) {
+        failArea('Radius must be a positive number of km, or blank.');
+        return;
+      }
     }
     final ok = await AppStateScope.of(context)
         .adminSaveRow('service_areas', {
@@ -1080,9 +1581,9 @@ class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
       'name': name.text.trim(),
       'type': type,
       'parent_id': parentId,
-      'latitude': num.tryParse(lat.text.trim()),
-      'longitude': num.tryParse(lng.text.trim()),
-      'radius_km': num.tryParse(radius.text.trim()),
+      'latitude': latValue,
+      'longitude': lngValue,
+      'radius_km': radiusValue,
       'is_active': active,
     });
     if (!mounted) return;
@@ -1154,11 +1655,23 @@ class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
                           Switch(
                             value: r['is_active'] == true,
                             onChanged: (v) async {
-                              await AppStateScope.of(context)
+                              // Full-check fix 2026-10-22: the
+                              // save result was ignored — a failed
+                              // toggle looked exactly like a
+                              // successful one until the reload.
+                              final ok = await AppStateScope.of(
+                                      context)
                                   .adminSaveRow('service_areas', {
                                 'id': r['id'],
                                 'is_active': v,
                               });
+                              if (!context.mounted) return;
+                              if (!ok) {
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Could not update the area. Try again.')));
+                              }
                               _load();
                             },
                           ),
@@ -1172,10 +1685,29 @@ class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
                                 color: Colors.red),
                             tooltip: 'Delete',
                             onPressed: () async {
-                              await AppStateScope.of(context)
+                              // Full-check fix 2026-10-22:
+                              // delete had no confirmation and
+                              // ignored the result — a failed
+                              // delete was indistinguishable from
+                              // a successful one.
+                              final sure = await confirmDialog(
+                                context,
+                                title: 'Delete service area?',
+                                message:
+                                    'Remove "${r['name'] ?? 'this area'}"? This cannot be undone.',
+                              );
+                              if (!sure || !context.mounted) return;
+                              final ok = await AppStateScope.of(
+                                      context)
                                   .adminDeleteRow(
                                       'service_areas', '${r['id']}');
-                              _load();
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                      content: Text(ok
+                                          ? 'Area deleted.'
+                                          : 'Could not delete.')));
+                              if (ok) _load();
                             },
                           ),
                         ],
@@ -1366,8 +1898,14 @@ class _BroadcastsScreenState extends State<BroadcastsScreen> {
     final state = AppStateScope.of(context);
     final delivered =
         await state.createAnnouncement(title, message, _audience);
-    final logged = await state.supabaseRepository.sendBroadcast(
-        title: title, message: message, audience: _audience);
+    // Full-check fix 2026-10-22: the history log row was written
+    // even when the announcement itself failed to save, so the
+    // "Sent broadcasts" list gained phantom rows for messages
+    // nobody ever received. Log only what was actually sent.
+    final logged = delivered
+        ? await state.supabaseRepository.sendBroadcast(
+            title: title, message: message, audience: _audience)
+        : false;
     if (!mounted) return;
     setState(() => _sending = false);
     ScaffoldMessenger.of(context).showSnackBar(

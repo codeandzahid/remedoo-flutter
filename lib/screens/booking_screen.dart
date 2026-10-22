@@ -91,8 +91,15 @@ class _BookingScreenState extends State<BookingScreen> {
     final now = DateTime.now();
     _days = List.generate(7, (i) => now.add(Duration(days: i)));
     if (widget.prefill != null) {
-      _date = DateTime(now.year, now.month, now.day);
+      // Reschedule starts from the appointment's OWN date
+      // (full-check fix 2026-10-22: it used to prefill today, so
+      // the form opened on the wrong day).
+      _date = DateTime(widget.prefill!.date.year,
+          widget.prefill!.date.month, widget.prefill!.date.day);
       _time = widget.prefill!.timeLabel;
+      if (_date!.isAfter(_days.last)) {
+        _days = List.generate(7, (i) => _date!.add(Duration(days: i)));
+      }
     }
     _payment = widget.prefill?.payment ?? 'Pay Online';
     if (widget.prefill != null) _notes.text = widget.prefill!.notes;
@@ -441,10 +448,10 @@ class _BookingScreenState extends State<BookingScreen> {
     final state = AppStateScope.of(context);
 
     // Pay at clinic: show warning with double confirmation
-    if (!isReschedule &&
-        (_payment == 'At Clinic' ||
-            _payment == 'Pay at Hospital' ||
-            _payment == 'Pay at Lab')) {
+    // (full-check fix 2026-10-22: the 'Pay at Hospital' / 'Pay at
+    // Lab' branches here were dead — the payment card only ever
+    // sets 'Pay Online' or 'At Clinic').
+    if (!isReschedule && _payment == 'At Clinic') {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -497,11 +504,20 @@ class _BookingScreenState extends State<BookingScreen> {
     }
 
     if (isReschedule) {
-      state.rescheduleAppointment(
+      final moved = await state.rescheduleAppointment(
         widget.prefill!.id,
         _date!,
         _time!,
       );
+      if (!mounted) return;
+      if (!moved) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Could not reschedule. The old time is kept — please try again.')),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Appointment rescheduled!')),
       );
@@ -542,9 +558,23 @@ class _BookingScreenState extends State<BookingScreen> {
           _prescriptionPath,
           _prescriptionName!,
         );
+        if (prescriptionUrl == null) {
+          // Full-check fix 2026-10-22: a failed upload used to
+          // fall back silently to the local device path, which
+          // the server write drops — the provider never saw the
+          // prescription while the patient believed it was sent.
+          // Stop and say so; the patient can retry.
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Prescription upload failed. Please check your connection and try again — the booking was not placed.')),
+          );
+          return;
+        }
       }
 
-      final appt = state.bookAppointment(
+      final appt = await state.bookAppointment(
         kind: widget.kind,
         refId: widget.refId,
         title: widget.title,
@@ -563,7 +593,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 .where((m) => m.id == _bookingForMemberId)
                 .firstOrNull
                 ?.name,
-        prescriptionPath: prescriptionUrl ?? _prescriptionPath,
+        prescriptionPath: prescriptionUrl,
         prescriptionName: _prescriptionName,
         paymentRef: paymentRef,
         customerUpi: _payerUpi.text.trim().isEmpty
@@ -577,6 +607,18 @@ class _BookingScreenState extends State<BookingScreen> {
             ? _collectionAddress.text.trim()
             : null,
       );
+      if (!mounted) return;
+      if (appt == null) {
+        // The backend rejected the booking — nothing was booked,
+        // so say so instead of celebrating (full-check fix
+        // 2026-10-22).
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Booking failed — please check your connection and try again.')),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Appointment booked successfully!')),
       );

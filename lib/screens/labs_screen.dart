@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../data/mock_data.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
@@ -15,14 +16,11 @@ const _filters = [
   'Relevance',
   'Rating 4.0+',
   'Most Tests',
-  'Has Offers',
-  'Nearest First',
 ];
 
 const _sortOptions = [
   'Relevance',
   'Rating High→Low',
-  'Distance Nearest',
   'Most Tests',
 ];
 
@@ -84,27 +82,28 @@ class _LabsScreenState extends State<LabsScreen> {
       list = list
           .where((l) =>
               l.name.toLowerCase().contains(q) ||
-              l.location.toLowerCase().contains(q))
+              l.location.toLowerCase().contains(q) ||
+              // The hint says "labs or tests" (full-check fix
+              // 2026-10-22): a lab matches when one of its real
+              // catalogue tests matches by name or category.
+              labTests.any((t) =>
+                  t.labId == l.id &&
+                  (t.name.toLowerCase().contains(q) ||
+                      t.category.toLowerCase().contains(q))))
           .toList();
     }
     if (_filter == 'Rating 4.0+') {
       list = list.where((l) => l.rating >= 4.0).toList();
     }
-    if (_filter == 'Has Offers') {
-      list = list.where((l) => l.offers > 0).toList();
-    }
     if (_filter == 'Most Tests' || _sort == 'Most Tests') {
       list.sort((a, b) => b.testCount.compareTo(a.testCount));
-    }
-    if (_filter == 'Nearest First' || _sort == 'Distance Nearest') {
-      list.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
     }
     switch (_sort) {
       case 'Rating High→Low':
         list.sort((a, b) => b.rating.compareTo(a.rating));
         break;
       case 'Relevance':
-        if (_filter != 'Nearest First' && _filter != 'Most Tests') {
+        if (_filter != 'Most Tests') {
           list.sort((a, b) => b.rating.compareTo(a.rating));
         }
         break;
@@ -260,15 +259,24 @@ class _LabsScreenState extends State<LabsScreen> {
       );
     }
     if (list.isEmpty) {
-      return const REmptyState(
+      return REmptyState(
         icon: Icons.science_outlined,
         title: 'No labs found',
         subtitle: 'Try a different search term',
+        // Full-check fix 2026-10-22: empty states offered no way
+        // out — add a working clear action.
+        actionLabel: 'Clear search & filters',
+        onAction: () => setState(() {
+          _search.clear();
+          _filter = _filters.first;
+          _sort = _sortOptions.first;
+        }),
       );
     }
     return RefreshIndicator(
       onRefresh: () async {
-        await Future.delayed(const Duration(milliseconds: 600));
+        // Real refresh (full-check fix 2026-10-22: fake delay before).
+        await AppStateScope.of(context).loadProductionCatalog();
         if (mounted) setState(() {});
       },
       child: denseList(

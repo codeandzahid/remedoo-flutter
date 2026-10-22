@@ -12,6 +12,8 @@ import 'screens/reset_password_screen.dart';
 import 'screens/email_verified_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/account_deletion_pending_screen.dart';
+import 'screens/account_suspended_screen.dart';
+import 'screens/driver_dashboard_screen.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/partner/doctor_dashboard.dart';
 import 'screens/partner/hospital_dashboard.dart';
@@ -134,6 +136,12 @@ class _RootGateState extends State<RootGate> {
     if (state.maintenanceMode) return const MaintenanceScreen();
     if (!_splashDone || !_authReady) return const SplashView();
     if (!state.seenOnboarding) return const OnboardingScreen();
+    // Suspension gate (full-check fix 2026-10-22): a suspended
+    // account reaches no shell at all — the status flag used to be
+    // written by Admin > Users but never read anywhere.
+    if (state.accountSuspended) {
+      return const AccountSuspendedScreen();
+    }
     // Deletion gate (owner order 2026-10-22): an account scheduled
     // for deletion opens nothing of the app — only the deletion page
     // with its erase time and the support reactivation request.
@@ -154,6 +162,12 @@ class _RootGateState extends State<RootGate> {
         return const LabDashboard();
       case 'hospital':
         return const HospitalDashboard();
+      // Driver routing (full-check fix 2026-10-22): the website's
+      // RootGate had no driver case, so a driver signing in on the
+      // website fell through to the patient app. The partner app
+      // build routed it already.
+      case 'driver':
+        return const DriverDashboardScreen();
     }
     // Signup-completion gate: a signed-in patient account that never
     // finished Step 2 (no name on the profile — e.g. it confirmed via

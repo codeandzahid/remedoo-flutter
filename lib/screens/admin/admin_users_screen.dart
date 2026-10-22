@@ -113,7 +113,17 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                             pickedPhoto = bytes;
                             pickedPhotoName = files.single.name;
                           });
-                        } catch (_) {}
+                        } catch (_) {
+                          // Full-check fix 2026-10-22: a failed
+                          // read was swallowed and Save still
+                          // reported success with no photo picked.
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Could not read that photo. Please pick another image.')),
+                          );
+                        }
                       },
                       icon: const Icon(Icons.upload_outlined, size: 18),
                       label: const Text('Upload photo'),
@@ -200,7 +210,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     if (saved != true || !mounted) return;
 
     final problem = validateAdminUserEdit(
-        email: email.text, newPassword: newPassword.text);
+        email: email.text,
+        newPassword: newPassword.text,
+        dateOfBirth: dob.text);
     if (problem != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(problem)),
@@ -233,7 +245,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     }
 
     final repo = SupabaseRepository.instance;
-    var ok = await repo.adminUpdateProfile(
+    var profileOk = await repo.adminUpdateProfile(
       userId,
       {
         'full_name': name.text.trim(),
@@ -248,31 +260,48 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       },
     );
     if (!mounted) return;
-    String? authError;
     if (pickedPhoto != null) {
       final url =
           await repo.adminSetUserAvatar(userId, pickedPhoto!, pickedPhotoName);
-      if (url == null) ok = false;
+      if (url == null) profileOk = false;
       if (!mounted) return;
     }
     final emailChanged = email.text.trim().toLowerCase() !=
         '${u['email'] ?? ''}'.trim().toLowerCase();
+    String? emailError;
     if (emailChanged) {
-      authError = await repo.adminUpdateUserEmail(userId, email.text.trim());
+      emailError = await repo.adminUpdateUserEmail(userId, email.text.trim());
       if (!mounted) return;
     }
-    if (authError == null && newPassword.text.trim().isNotEmpty) {
-      authError =
-          await repo.adminSetUserPassword(userId, newPassword.text.trim());
-      if (!mounted) return;
+    // Full-check fix 2026-10-22: the password step used to be
+    // silently skipped when the email step failed, and a failed
+    // profile update was masked by the auth message. Every step
+    // now reports its own outcome.
+    String? passwordError;
+    var passwordSkipped = false;
+    if (newPassword.text.trim().isNotEmpty) {
+      if (emailError != null) {
+        passwordSkipped = true;
+      } else {
+        passwordError =
+            await repo.adminSetUserPassword(userId, newPassword.text.trim());
+        if (!mounted) return;
+      }
     }
+    final problems = <String>[
+      if (!profileOk) 'Profile details failed to save.',
+      if (emailError != null)
+        'Login email change failed: $emailError',
+      if (passwordSkipped)
+        'Password was NOT changed (the email step failed first).',
+      if (passwordError != null)
+        'Password change failed: $passwordError',
+    ];
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text(authError != null
-              ? 'Details saved, but the login change failed: $authError'
-              : ok
-                  ? 'User updated.'
-                  : 'Update failed.')),
+          content: Text(problems.isEmpty
+              ? 'User updated.'
+              : problems.join(' '))),
     );
     _load();
   }

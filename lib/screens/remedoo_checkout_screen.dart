@@ -200,6 +200,22 @@ class _RemedooCheckoutScreenState
       );
       return;
     }
+    // COD must actually be offered by the cart pharmacy
+    // (full-check fix 2026-10-22: _payment defaulted to COD, so a
+    // COD order was placed even when this pharmacy does not offer
+    // COD and the method was never shown as selected).
+    final pharm = state.activePharmacies
+        .where((p) => p.id == state.cartPharmacyId);
+    final codOn =
+        pharm.isEmpty ? true : (pharm.first.payInClinicEnabled ?? true);
+    if (_payment == 'Cash on Delivery' && !codOn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Cash on Delivery is not available for this pharmacy. Please pay online.')),
+      );
+      return;
+    }
     // "Pay Online" runs the gateway checkout first — the order is
     // only placed after the payment succeeds (same rail as the cart
     // screen). The amount charged is exactly the summary total: the
@@ -242,7 +258,7 @@ class _RemedooCheckoutScreenState
       }
     }
     final discount = _couponDiscount(state.cartTotal);
-    state.placeOrder(
+    final placed = await state.placeOrder(
       address: _address.text.trim(),
       payment: _payment,
       paymentRef: paymentRef,
@@ -254,6 +270,15 @@ class _RemedooCheckoutScreenState
       couponCode: discount > 0 ? '${_coupon?['code'] ?? ''}' : null,
       couponDiscount: discount,
     );
+    if (!mounted) return;
+    if (placed == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Could not place the order. Please try again.')),
+      );
+      return;
+    }
     if (discount > 0 && _coupon != null) {
       unawaited(state.supabaseRepository.recordCouponUsage(
         couponId: '${_coupon!['id']}',
@@ -669,6 +694,11 @@ class _RemedooCheckoutScreenState
     if (!onlineAvailable && _payment == 'Pay Online') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _payment = 'Cash on Delivery');
+      });
+    }
+    if (!codOn && _payment == 'Cash on Delivery' && onlineAvailable) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _payment = 'Pay Online');
       });
     }
     final methods = [

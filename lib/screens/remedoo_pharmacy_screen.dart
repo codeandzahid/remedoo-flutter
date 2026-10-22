@@ -48,8 +48,18 @@ class _RemedooPharmacyScreenState extends State<RemedooPharmacyScreen> {
   }
 
   void _add(AppState state, Medicine m) {
+    // Full-check fix 2026-10-22: the storefront used to add every
+    // medicine under the fake pharmacy id 'remedoo', which made the
+    // checkout insert fail on the orders.pharmacy_id foreign key —
+    // no storefront order ever reached a pharmacy. Each medicine
+    // belongs to its real pharmacy; the one-pharmacy cart rule
+    // below then works exactly like the pharmacy pages.
+    final pharmacy = state.activePharmacies
+        .where((p) => p.id == m.pharmacyId)
+        .firstOrNull;
+    final pharmacyName = pharmacy?.name ?? 'Pharmacy';
     if (state.addToCart(
-        m, pharmacyId: 'remedoo', pharmacyName: 'Remedoo Pharmacy')) {
+        m, pharmacyId: m.pharmacyId, pharmacyName: pharmacyName)) {
       return;
     }
     showResponsiveDialog(
@@ -67,8 +77,8 @@ class _RemedooPharmacyScreenState extends State<RemedooPharmacyScreen> {
             onPressed: () {
               state.clearCart();
               state.addToCart(m,
-                  pharmacyId: 'remedoo',
-                  pharmacyName: 'Remedoo Pharmacy');
+                  pharmacyId: m.pharmacyId,
+                  pharmacyName: pharmacyName);
               Navigator.pop(c);
             },
             child: const Text('Clear & add'),
@@ -129,8 +139,8 @@ class _RemedooPharmacyScreenState extends State<RemedooPharmacyScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                await Future.delayed(
-                    const Duration(milliseconds: 600));
+                // Real refresh (full-check fix 2026-10-22: fake delay before).
+                await AppStateScope.of(context).loadProductionCatalog();
                 if (mounted) setState(() {});
               },
               child: _loading
@@ -465,7 +475,7 @@ class _RemedooPharmacyScreenState extends State<RemedooPharmacyScreen> {
           else
             QtyStepper(
               qty: qty,
-              onMinus: () => state.removeFromCart(m.id),
+              onMinus: () => state.changeQty(m.id, -1),
               onPlus: () => _add(state, m),
             ),
         ],
@@ -477,7 +487,11 @@ class _RemedooPharmacyScreenState extends State<RemedooPharmacyScreen> {
     final hasRx =
         state.cartLines.any((l) => l.medicine.rxRequired);
     final subtotal = state.cartTotal;
-    final delivery = subtotal >= 499 ? 0.0 : 30.0;
+    // Configured delivery rule (full-check fix 2026-10-22: the
+    // footer hard-coded ₹30 / free above ₹499 and ignored the
+    // admin-configured fee and threshold).
+    final delivery =
+        subtotal >= state.freeDeliveryThreshold ? 0.0 : state.deliveryFee;
     return Container(
       color: Colors.transparent,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),

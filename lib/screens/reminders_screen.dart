@@ -208,6 +208,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         bg: scheme.surfaceContainerHighest,
                         fg: scheme.onSurfaceVariant,
                       ),
+                      // Full-check fix 2026-10-22: the saved
+                      // date was never shown on the card.
+                      _pill(
+                        icon: Icons.calendar_today_outlined,
+                        label:
+                            '${r.date.day}/${r.date.month}/${r.date.year}',
+                        bg: scheme.surfaceContainerHighest,
+                        fg: scheme.onSurfaceVariant,
+                      ),
                       _pill(
                         label: r.repeat,
                         bg: scheme.primary
@@ -217,6 +226,16 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       ),
                     ],
                   ),
+                  // The saved notes were never shown either.
+                  if (r.notes.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(r.notes,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant)),
+                  ],
                 ],
               ),
             ),

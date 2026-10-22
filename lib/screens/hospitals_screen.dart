@@ -17,13 +17,11 @@ const _filters = [
   'Rating 4.0+',
   'Has ICU',
   'Government',
-  'Nearest First',
 ];
 
 const _sortOptions = [
   'Relevance',
   'Rating High→Low',
-  'Distance Nearest',
   'Beds Most',
   'Name A→Z',
 ];
@@ -104,9 +102,6 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
     if (_filter == 'Government') {
       list = list.where((h) => h.government).toList();
     }
-    if (_filter == 'Nearest First' || _sort == 'Distance Nearest') {
-      list.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
-    }
     switch (_sort) {
       case 'Rating High→Low':
         list.sort((a, b) => b.rating.compareTo(a.rating));
@@ -118,9 +113,7 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
         list.sort((a, b) => a.name.compareTo(b.name));
         break;
       case 'Relevance':
-        if (_filter != 'Nearest First') {
-          list.sort((a, b) => b.rating.compareTo(a.rating));
-        }
+        list.sort((a, b) => b.rating.compareTo(a.rating));
         break;
     }
     return list;
@@ -279,15 +272,24 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
       );
     }
     if (list.isEmpty) {
-      return const REmptyState(
+      return REmptyState(
         icon: Icons.local_hospital_outlined,
         title: 'No hospitals found',
         subtitle: 'Try a different search term',
+        // Full-check fix 2026-10-22: empty states offered no way
+        // out — add a working clear action.
+        actionLabel: 'Clear search & filters',
+        onAction: () => setState(() {
+          _search.clear();
+          _filter = 'Relevance';
+          _sort = _sortOptions.first;
+        }),
       );
     }
     return RefreshIndicator(
       onRefresh: () async {
-        await Future.delayed(const Duration(milliseconds: 600));
+        // Real refresh (full-check fix 2026-10-22: fake delay before).
+        await AppStateScope.of(context).loadProductionCatalog();
         if (mounted) setState(() {});
       },
       child: denseList(

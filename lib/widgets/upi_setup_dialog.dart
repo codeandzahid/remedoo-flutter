@@ -5,6 +5,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'form_kit.dart';
+import 'provider_payments.dart';
 
 /// UPI setup popup shown after a provider's account is verified.
 /// Guides them to add their UPI ID so patients can pay them directly.
@@ -42,6 +43,11 @@ class _UpiSetupDialogState
           'Enter a valid UPI ID (e.g. yourname@okhdfcbank).');
       return;
     }
+    // Full-check fix 2026-10-22: this first-run popup switched UPI
+    // payments ON with no OTP, while the settings card demands the
+    // email code for the same activation (owner's rule). Same gate.
+    final verified = await requirePaymentOtp(context);
+    if (!verified || !mounted) return;
     setState(() {
       _busy = true;
       _error = null;

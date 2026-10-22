@@ -283,7 +283,8 @@ class LabReportDetailScreen extends StatelessWidget {
                     style: const TextStyle(
                         fontWeight: FontWeight.w700, fontSize: 14)),
                 const SizedBox(height: 2),
-                Text('Uploaded by you',
+                Text(
+                    r.fromLab ? 'Uploaded by the lab' : 'Uploaded by you',
                     style: TextStyle(
                         fontSize: 12, color: scheme.onSurfaceVariant)),
               ],
@@ -298,6 +299,11 @@ class LabReportDetailScreen extends StatelessWidget {
                     mode: LaunchMode.externalApplication),
                 child: const Text('Open'),
               ),
+              // Only the patient's own uploads can be deleted —
+              // a lab-issued report is the lab's record and would
+              // simply come back from the server (full-check fix
+              // 2026-10-22).
+              if (r.isOwnUpload)
               TextButton.icon(
                 onPressed: () async {
                   final st = AppStateScope.of(context);
@@ -347,7 +353,7 @@ class LabReportDetailScreen extends StatelessWidget {
               Icon(Icons.location_on_outlined,
                   size: 13, color: scheme.onSurfaceVariant),
               const SizedBox(width: 4),
-              Text('Lab location on file',
+              Text(_labLocation(context, r),
                   style: TextStyle(
                       fontSize: 12, color: scheme.onSurfaceVariant)),
             ],
@@ -355,6 +361,19 @@ class LabReportDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// The lab's real location from the catalogue, matched by the
+  /// name on the report (full-check fix 2026-10-22: the card
+  /// always showed the placeholder "Lab location on file").
+  String _labLocation(BuildContext context, LabReport r) {
+    final state = AppStateScope.of(context);
+    for (final l in state.activeLabs) {
+      if (l.name == r.labName && l.location.isNotEmpty) {
+        return l.location;
+      }
+    }
+    return 'Location not provided';
   }
 
   Widget _scheduleCard(BuildContext context, LabReport r) {

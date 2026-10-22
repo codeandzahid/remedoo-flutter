@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../data/mock_data.dart';
 import '../models.dart';
 import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
@@ -30,8 +29,13 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
   String _sort = 'Popular';
 
   List<Medicine> _list(AppState state) {
-    var list = medicinesForPharmacy(widget.pharmacy.id)
-        .where((m) => m.active)
+    // Full-check fix 2026-10-22: this list came from
+    // medicinesForPharmacy() in mock_data — a hash trick that
+    // assigned pseudo-random medicines to any pharmacy and ignored
+    // the server catalogue entirely. The real list is the
+    // catalogue rows owned by this pharmacy.
+    var list = state.activeMedicines
+        .where((m) => m.pharmacyId == widget.pharmacy.id)
         .toList();
     if (_category != 'All') {
       list = list.where((m) => m.category == _category).toList();
@@ -42,6 +46,16 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
         break;
       case 'Price High→Low':
         list.sort((a, b) => b.price.compareTo(a.price));
+        break;
+      case 'Popular':
+        // Was a no-op (list order unchanged). Popular = biggest
+        // saving first, then name.
+        list.sort((a, b) {
+          final da = a.mrp - a.price;
+          final db = b.mrp - b.price;
+          final bySaving = db.compareTo(da);
+          return bySaving != 0 ? bySaving : a.name.compareTo(b.name);
+        });
         break;
     }
     return list;
@@ -103,7 +117,10 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
     final list = _list(state);
     final categories = [
       'All',
-      ...{for (final m in medicinesForPharmacy(p.id)) m.category}
+      ...{
+        for (final m in state.activeMedicines)
+          if (m.pharmacyId == p.id) m.category
+      }
     ];
     return Scaffold(
       body: SafeArea(
@@ -241,7 +258,12 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                        '${p.deliveryTime} • ${p.itemCount} items • ${p.location}',
+                        [
+                          if (p.deliveryTime.isNotEmpty)
+                            p.deliveryTime,
+                          '${p.itemCount} items',
+                          p.location,
+                        ].join(' • '),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -366,7 +388,8 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
               style:
                   TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
           const SizedBox(height: 12),
-          _orderRow('Delivery', p.deliveryTime),
+          if (p.deliveryTime.isNotEmpty)
+            _orderRow('Delivery time', p.deliveryTime),
           _orderRow('Items in cart', '${state.cartCount}'),
           Divider(height: 20, color: Theme.of(context).dividerColor),
           Row(
@@ -603,7 +626,7 @@ class _PharmacyDetailScreenState extends State<PharmacyDetailScreen> {
             else
               QtyStepper(
                 qty: qty,
-                onMinus: () => state.removeFromCart(m.id),
+                onMinus: () => state.changeQty(m.id, -1),
                 onPlus: () => _add(state, m),
               ),
           ],

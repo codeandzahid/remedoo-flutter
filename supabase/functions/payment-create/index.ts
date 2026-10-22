@@ -244,6 +244,17 @@ async function youpiCreate(supabase: any, gw: any, p: any) {
       throw e;
     }
   }
+  // Central payments (the Remedoo storefront): use the platform
+  // UPI ID + payee name the admin set in App Settings / the
+  // Remedoo Pay screen (gateways.youpi.vpa / payee_name).
+  // Full-check fix 2026-10-22: those fields were saved but never
+  // sent anywhere, so the name/VPA the admin typed had no effect.
+  if (!provider.vpa && gw.vpa) {
+    provider = {
+      vpa: String(gw.vpa).trim(),
+      payeeName: String(gw.payee_name || 'Remedoo').trim(),
+    };
+  }
   const res = await fetch(`${base}/api/v1/payments`, {
     method: 'POST',
     headers,

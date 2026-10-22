@@ -7,7 +7,9 @@ import '../data/mock_data.dart' show specialties;
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/working_hours.dart';
 import '../widgets/email_otp_field.dart';
+import '../widgets/working_hours_editor.dart';
 import '../widgets/widgets.dart';
 import '../widgets/form_kit.dart';
 import 'pending_approval_screen.dart';
@@ -91,6 +93,11 @@ class _ProviderRegisterScreenState
   final _services = TextEditingController();
   String _specialization = specialties.first;
   bool _icu = false;
+  // Pharmacy opening hours (full-check fix 2026-10-22: pharmacy
+  // applications collected no practice details at all, and the
+  // approval mapping had no pharmacy branch — the created
+  // pharmacy record always got the schema-default hours).
+  Map<String, DayHours> _pharmacyHours = parseWorkingHours(null);
   bool _busy = false;
   String? _error;
   bool _emailVerified = false;
@@ -289,6 +296,8 @@ class _ProviderRegisterScreenState
             .map((s) => s.trim())
             .where((s) => s.isNotEmpty)
             .toList(),
+      if (role == 'pharmacy')
+        'working_hours': workingHoursToJson(_pharmacyHours),
     };
     // Submit to the real backend so the admin panel can review it.
     final ok = await state.submitProviderApplicationDb({
@@ -473,7 +482,9 @@ class _ProviderRegisterScreenState
                         widget.providerType.toLowerCase() ==
                             'hospital' ||
                         widget.providerType.toLowerCase() ==
-                            'lab')
+                            'lab' ||
+                        widget.providerType.toLowerCase() ==
+                            'pharmacy')
                       _SectionCard(
                         title: 'Practice Details',
                         icon: Icons.work_outline,
@@ -534,6 +545,18 @@ class _ProviderRegisterScreenState
                               controller: _services,
                               icon: Icons.science_outlined,
                             ),
+                          if (widget.providerType.toLowerCase() ==
+                              'pharmacy') ...[
+                            const Text('Opening hours',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            WorkingHoursEditor(
+                              initial: _pharmacyHours,
+                              onChanged: (v) => _pharmacyHours = v,
+                            ),
+                          ],
                         ],
                       ),
                     if (widget.providerType.toLowerCase() ==
@@ -541,7 +564,9 @@ class _ProviderRegisterScreenState
                         widget.providerType.toLowerCase() ==
                             'hospital' ||
                         widget.providerType.toLowerCase() ==
-                            'lab')
+                            'lab' ||
+                        widget.providerType.toLowerCase() ==
+                            'pharmacy')
                       const SizedBox(height: 14),
                     // Documents
                     _SectionCard(

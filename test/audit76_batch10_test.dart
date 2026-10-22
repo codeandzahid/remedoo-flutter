@@ -94,10 +94,13 @@ void main() {
     test('Remedoo Pay editors both preserve the merged config '
         '(Admin gap 18)', () {
       final pay = _src('lib/screens/admin/admin_remedoo_pay_screen.dart');
-      // Starts from the full loaded config and only overwrites
-      // the fields it owns, so key_id / test_mode survive.
-      expect(pay.contains('Map<String, dynamic>.from(_fullConfig)'),
+      // Full-check 2026-10-22: _save no longer merges over the
+      // load-time _fullConfig snapshot (it silently reverted App
+      // Settings changes made in between); it re-reads the fresh
+      // config and merges over that instead.
+      expect(pay.contains("state.appConfigValue('payment_gateways')"),
           isTrue);
+      expect(pay.contains('await state.loadAppConfig()'), isTrue);
       final settings =
           _src('lib/screens/admin/admin_app_settings_screen.dart');
       expect(settings.contains('..addAll(patch)'), isTrue);

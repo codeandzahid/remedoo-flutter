@@ -130,10 +130,19 @@ class CareMatchPreferences {
   final bool nearest;
   final bool bestRated;
 
+  /// Asks the data cannot always honour — parsed so the result
+  /// note can say plainly whether they were applied (full-check
+  /// fix 2026-10-22: the form's own examples, "prefer a female
+  /// doctor" and "home sample collection", were never read).
+  final bool femaleDoctor;
+  final bool homeCollection;
+
   const CareMatchPreferences({
     this.cheapest = false,
     this.nearest = false,
     this.bestRated = false,
+    this.femaleDoctor = false,
+    this.homeCollection = false,
   });
 
   bool get anySort => cheapest || nearest || bestRated;
@@ -158,6 +167,11 @@ CareMatchPreferences careMatchPreferences(String notes) {
     bestRated: t.contains('best rated') ||
         t.contains('top rated') ||
         t.contains('highest rating'),
+    femaleDoctor: t.contains('female') || t.contains('lady doctor'),
+    homeCollection: t.contains('home collection') ||
+        t.contains('home sample') ||
+        t.contains('collect at home') ||
+        t.contains('home visit'),
   );
 }
 
@@ -174,7 +188,6 @@ class CareMatchScreen extends StatefulWidget {
 class _CareMatchScreenState extends State<CareMatchScreen> {
   late final TextEditingController _symptom;
   late final TextEditingController _budget;
-  late final TextEditingController _distance;
   final _notes = TextEditingController();
   String _careType = 'Anything suitable';
   String _urgency = 'Routine';
@@ -182,22 +195,18 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
 
   double get _budgetValue =>
       double.tryParse(_budget.text) ?? 1000;
-  double get _distanceValue =>
-      double.tryParse(_distance.text) ?? 10;
 
   @override
   void initState() {
     super.initState();
     _symptom = TextEditingController(text: widget.initialSymptom);
     _budget = TextEditingController(text: '1000');
-    _distance = TextEditingController(text: '10');
   }
 
   @override
   void dispose() {
     _symptom.dispose();
     _budget.dispose();
-    _distance.dispose();
     _notes.dispose();
     super.dispose();
   }
@@ -309,7 +318,7 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                             children: _quickSymptoms
                                 .map((s) => RFilterChip(
                                       label: s,
-                                      selected: false,
+                                      selected: _symptom.text == s,
                                       onTap: () => setState(
                                           () =>
                                               _symptom.text = s),
@@ -353,28 +362,17 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                                 .toList(),
                           ),
                           const SizedBox(height: 18),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: RKitField(
-                                  label: 'Budget (₹)',
-                                  hint: 'e.g. 500',
-                                  controller: _budget,
-                                  keyboardType:
-                                      TextInputType.number,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: RKitField(
-                                  label: 'Max distance (km)',
-                                  hint: 'e.g. 10',
-                                  controller: _distance,
-                                  keyboardType:
-                                      TextInputType.number,
-                                ),
-                              ),
-                            ],
+                          // Full-check fix 2026-10-22: the Max
+                          // distance field is gone — providers
+                          // carry no real distance data, so the
+                          // filter passed everything and meant
+                          // nothing.
+                          RKitField(
+                            label: 'Budget (₹)',
+                            hint: 'e.g. 500',
+                            controller: _budget,
+                            keyboardType:
+                                TextInputType.number,
                           ),
                           const SizedBox(height: 14),
                           RKitField(
@@ -419,7 +417,7 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
                             padding:
                                 EdgeInsets.symmetric(vertical: 20),
                             child: Text(
-                              'No matches found for your criteria. Try increasing your budget or distance.',
+                              'No matches found for your criteria. Try increasing your budget.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                   fontSize: 14,
@@ -476,7 +474,6 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
     final out = <Widget>[];
     final urgent = _urgency == 'Urgent';
     final budget = _budgetValue;
-    final distance = _distanceValue;
     final symptomText = _symptom.text.trim();
     // The "Anything else?" text is read now (audit Patient 16):
     // it joins the symptom text for specialty relevance and its
@@ -492,26 +489,29 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
         StaggerItem(index: out.length % 6, child: card);
     if (_careType == 'Anything suitable' || _careType == 'Doctor') {
       final docs = state.activeDoctors
-          .where((d) =>
-              d.fee <= budget && d.distanceKm <= distance)
+          .where((d) => d.fee <= budget)
           .toList()
         ..sort((a, b) {
-          // Symptom-relevant specialties first, then the ranking
-          // the patient asked for in "Anything else?" (default:
-          // rating, then distance). No invented percentages.
+          // Symptom-relevant specialties first, then urgency
+          // (soonest typical wait first when the need is not
+          // routine — full-check fix 2026-10-22: urgency used to
+          // change nothing for doctors), then the ranking the
+          // patient asked for in "Anything else?" (default:
+          // rating). No invented percentages, no fake distances.
           final ra = doctorRelevant(a) ? 0 : 1;
           final rb = doctorRelevant(b) ? 0 : 1;
           if (ra != rb) return ra.compareTo(rb);
+          if (_urgency != 'Routine') {
+            final byWait = a.waitMin.compareTo(b.waitMin);
+            if (byWait != 0) return byWait;
+          }
           if (prefs.cheapest) {
             final byFee = a.fee.compareTo(b.fee);
             if (byFee != 0) return byFee;
-          } else if (prefs.nearest) {
-            final byDist = a.distanceKm.compareTo(b.distanceKm);
-            if (byDist != 0) return byDist;
           }
           final byRating = b.rating.compareTo(a.rating);
           if (byRating != 0) return byRating;
-          return a.distanceKm.compareTo(b.distanceKm);
+          return a.fee.compareTo(b.fee);
         });
       for (final d in docs.take(3)) {
         final relevant = doctorRelevant(d);
@@ -519,13 +519,12 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
           kind: 'Doctor',
           icon: Icons.medical_services,
           name: d.name,
-          sub:
-              '${d.specialty} • ${inr(d.fee)} • ${d.distanceKm.toStringAsFixed(1)} km',
+          sub: '${d.specialty} • ${inr(d.fee)}',
           rating: d.rating,
           tag: relevant ? 'Matches your symptoms' : null,
           reason: relevant
-              ? '${d.specialty} specialist — relevant to the symptoms you described, and within your budget and distance.'
-              : 'Highly rated ${d.specialty} within your budget and distance.',
+              ? '${d.specialty} specialist — relevant to the symptoms you described, and within your budget.'
+              : 'Highly rated ${d.specialty} within your budget.',
           onTap: () {
             if (!checkLogin(context, 'Please login to view details')) return;
             Navigator.push(
@@ -538,8 +537,11 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
       }
     }
     if (_careType == 'Anything suitable' || _careType == 'Hospital') {
+      // Budget applies to hospitals too (full-check fix
+      // 2026-10-22: it used to filter doctors only). A hospital
+      // with no consultation fee on record (0) is not excluded.
       final hs = state.activeHospitals
-          .where((h) => h.distanceKm <= distance)
+          .where((h) => h.fee == 0 || h.fee <= budget)
           .toList()
         ..sort((a, b) {
           if (urgent) {
@@ -547,26 +549,25 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
             final ib = b.hasIcu ? 0 : 1;
             if (ia != ib) return ia.compareTo(ib);
           }
-          if (prefs.nearest) {
-            final byDist = a.distanceKm.compareTo(b.distanceKm);
-            if (byDist != 0) return byDist;
+          if (prefs.cheapest) {
+            final byFee = a.fee.compareTo(b.fee);
+            if (byFee != 0) return byFee;
           }
           final byRating = b.rating.compareTo(a.rating);
           if (byRating != 0) return byRating;
-          return a.distanceKm.compareTo(b.distanceKm);
+          return a.name.compareTo(b.name);
         });
       for (final h in hs.take(2)) {
         out.add(staggered(_matchCard(
           kind: 'Hospital',
           icon: Icons.local_hospital_outlined,
           name: h.name,
-          sub:
-              '${h.location} • ${h.distanceKm.toStringAsFixed(1)} km',
+          sub: h.location,
           rating: h.rating,
           tag: h.hasIcu ? 'ICU available' : null,
           reason: urgent && h.hasIcu
-              ? 'Has ICU facilities and is within your distance — a safer pick for urgent care.'
-              : 'Well-rated hospital within your distance.',
+              ? 'Has ICU facilities — a safer pick for urgent care.'
+              : 'Well-rated hospital within your budget.',
           onTap: () {
             if (!checkLogin(context, 'Please login to view details')) return;
             Navigator.push(
@@ -587,16 +588,56 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
           .split(RegExp(r'[^a-z]+'))
           .where((w) => w.length > 3)
           .toSet();
+      // Real catalogue tests (full-check fix 2026-10-22: this
+      // read the mock labTests list). Budget for a lab = it offers
+      // at least one test within budget; a lab whose tests are not
+      // loaded is not excluded on a guess.
       final relatedTests = catalog.labTests.where((t) {
         final hay = '${t.name} ${t.category}'.toLowerCase();
         return words.any((w) => hay.contains(w));
       }).toList();
+      double cheapestFor(String labId) {
+        var best = double.infinity;
+        for (final t in catalog.labTests) {
+          if (t.labId == labId && t.price < best) best = t.price;
+        }
+        return best;
+      }
+
+      bool offersHome(String labId) => catalog.labTests
+          .any((t) => t.labId == labId && t.homeCollection);
+      int turnaroundHours(Lab l) {
+        final m = RegExp(r'(\d+)').firstMatch(l.turnaround);
+        if (m != null) return int.parse(m.group(1)!);
+        return l.turnaround.toLowerCase().contains('same') ? 12 : 48;
+      }
+
       final ls = state.activeLabs
-          .where((l) => l.distanceKm <= distance)
+          .where((l) {
+            final tests =
+                catalog.labTests.where((t) => t.labId == l.id).toList();
+            return tests.isEmpty ||
+                tests.any((t) => t.price <= budget);
+          })
           .toList()
-        ..sort((a, b) => prefs.nearest
-            ? a.distanceKm.compareTo(b.distanceKm)
-            : b.rating.compareTo(a.rating));
+        ..sort((a, b) {
+          if (prefs.homeCollection) {
+            final ha = offersHome(a.id) ? 0 : 1;
+            final hb = offersHome(b.id) ? 0 : 1;
+            if (ha != hb) return ha.compareTo(hb);
+          }
+          if (urgent) {
+            final byTat =
+                turnaroundHours(a).compareTo(turnaroundHours(b));
+            if (byTat != 0) return byTat;
+          }
+          if (prefs.cheapest) {
+            final byPrice =
+                cheapestFor(a.id).compareTo(cheapestFor(b.id));
+            if (byPrice != 0) return byPrice;
+          }
+          return b.rating.compareTo(a.rating);
+        });
       for (final l in ls.take(2)) {
         out.add(staggered(_matchCard(
           kind: 'Lab',
@@ -605,12 +646,14 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
           sub:
               '${l.testCount} tests • Report in ${l.turnaround}',
           rating: l.rating,
-          tag: relatedTests.isNotEmpty
-              ? 'Symptom-related tests'
-              : null,
+          tag: prefs.homeCollection && offersHome(l.id)
+              ? 'Home collection'
+              : relatedTests.isNotEmpty
+                  ? 'Symptom-related tests'
+                  : null,
           reason: relatedTests.isNotEmpty
               ? 'Offers tests related to your symptoms, e.g. ${relatedTests.first.name}.'
-              : 'Highly rated lab within your distance.',
+              : 'Highly rated lab with tests within your budget.',
           onTap: () {
             if (!checkLogin(context, 'Please login to view details')) return;
             Navigator.push(
@@ -623,14 +666,34 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
       }
     }
     if (notesText.isNotEmpty && out.isNotEmpty) {
+      // Say plainly what the note did and did not change
+      // (full-check fix 2026-10-22). "Nearest" cannot be honoured
+      // — providers carry no real distance data — and doctor
+      // gender is not in the data at all; both are named here
+      // instead of being silently dropped.
+      final effects = <String>[];
+      if (prefs.cheapest || prefs.bestRated) {
+        effects.add('sorted by ${prefs.sortLabel}');
+      }
+      if (prefs.nearest) {
+        effects.add(
+            'you asked for nearest first, but distances are not available yet, so ranking used rating and fee');
+      }
+      if (prefs.femaleDoctor) {
+        effects.add(
+            'doctor gender is not in our data yet, so that preference could not be applied');
+      }
+      if (prefs.homeCollection) {
+        effects.add('labs offering home collection were preferred');
+      }
+      if (effects.isEmpty) effects.add('used for specialty matching');
       out.insert(
         0,
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: RCard(
             child: Text(
-              'Your note: "$notesText"'
-              '${prefs.anySort ? ' — sorted by ${prefs.sortLabel}.' : ' — used for specialty matching.'}',
+              'Your note: "$notesText" — ${effects.join('; ')}.',
               style: TextStyle(
                   fontSize: 12.5,
                   color:
@@ -640,16 +703,8 @@ class _CareMatchScreenState extends State<CareMatchScreen> {
         ),
       );
     }
-    if (out.isEmpty) {
-      out.add(RCard(
-        child: Text(
-            'No matches for these filters — try widening your budget or distance.',
-            style: TextStyle(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurfaceVariant)),
-      ));
-    }
+    // No self-appended empty card (full-check fix 2026-10-22):
+    // the results Builder owns the empty state.
     return out;
   }
 

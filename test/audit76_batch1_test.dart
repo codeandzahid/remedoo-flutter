@@ -18,22 +18,24 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('form-pages audit batch 1 — orders (M1)', () {
-    test('Pay Online order carries canonical online/paid fields', () {
+    test('Pay Online order carries canonical online/paid fields',
+        () async {
       final s = AppState();
       s.addToCart(_med('m1', 100),
           pharmacyId: 'p1', pharmacyName: 'Pharmacy One');
-      final o = s.placeOrder(address: '1 Main Street', payment: 'Pay Online');
+      final o = (await s.placeOrder(
+          address: '1 Main Street', payment: 'Pay Online'))!;
       expect(o.paymentMethod, 'online');
       expect(o.paymentStatus, 'paid');
       expect(o.isPaidOnline, isTrue);
     });
 
-    test('COD order stays cod/pending', () {
+    test('COD order stays cod/pending', () async {
       final s = AppState();
       s.addToCart(_med('m1', 100),
           pharmacyId: 'p1', pharmacyName: 'Pharmacy One');
-      final o = s.placeOrder(
-          address: '1 Main Street', payment: 'Cash on Delivery');
+      final o = (await s.placeOrder(
+          address: '1 Main Street', payment: 'Cash on Delivery'))!;
       expect(o.paymentMethod, 'cod');
       expect(o.paymentStatus, 'pending');
       expect(o.isPaidOnline, isFalse);
@@ -41,9 +43,10 @@ void main() {
   });
 
   group('form-pages audit batch 1 — reschedule (M2)', () {
-    test('moves the same appointment, preserving id and all fields', () {
+    test('moves the same appointment, preserving id and all fields',
+        () async {
       final s = AppState();
-      final appt = s.bookAppointment(
+      final appt = (await s.bookAppointment(
         kind: 'doctor',
         refId: 'd1',
         title: 'Dr. One',
@@ -58,10 +61,10 @@ void main() {
         bookingForName: 'Mother',
         paymentRef: 'APT123',
         customerUpi: 'patient@upi',
-      );
+      ))!;
       final countBefore = s.appointments.length;
       final newDate = DateTime(2026, 11, 3);
-      s.rescheduleAppointment(appt.id, newDate, '10:30');
+      await s.rescheduleAppointment(appt.id, newDate, '10:30');
 
       expect(s.appointments.length, countBefore);
       final moved = s.appointments.singleWhere((a) => a.id == appt.id);
@@ -76,9 +79,11 @@ void main() {
       expect(moved.fee, 500);
     });
 
-    test('unknown id is a no-op', () {
+    test('unknown id is a no-op', () async {
       final s = AppState();
-      s.rescheduleAppointment('nope', DateTime(2026, 11, 3), '10:30');
+      final ok =
+          await s.rescheduleAppointment('nope', DateTime(2026, 11, 3), '10:30');
+      expect(ok, isFalse);
       expect(s.appointments, isEmpty);
     });
   });

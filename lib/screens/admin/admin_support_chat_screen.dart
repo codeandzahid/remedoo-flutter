@@ -204,10 +204,15 @@ class _AdminSupportChatScreenState
         ));
       }
       // First admin reply moves the ticket to in_progress.
+      // Full-check fix 2026-10-22: the local status was flipped
+      // even when the server update failed (the status-chip path
+      // in the list already checked the result; this one didn't).
       if (_status == 'open' || _status == 'opened') {
-        await AppStateScope.of(context)
+        final statusOk = await AppStateScope.of(context)
             .updateSupportTicket(_ticketId, {'status': 'in_progress'});
-        widget.ticket['status'] = 'in_progress';
+        if (statusOk) {
+          widget.ticket['status'] = 'in_progress';
+        }
       }
       _loadMessages();
     } else {
@@ -355,9 +360,23 @@ class _AdminSupportChatScreenState
                     selected: _status == s,
                     onSelected: (_) async {
                       Navigator.pop(ctx);
-                      await AppStateScope.of(context)
+                      // Full-check fix 2026-10-22: the result used
+                      // to be discarded — the chip flipped and the
+                      // user was notified "resolved/closed" even
+                      // when the server update had failed.
+                      final ok = await AppStateScope.of(context)
                           .updateSupportTicket(
                               _ticketId, {'status': s});
+                      if (!ok) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Status update failed. Please try again.')),
+                          );
+                        }
+                        return;
+                      }
                       if (s == 'resolved' && _userId.isNotEmpty) {
                         unawaited(SupabaseRepository.instance
                             .sendNotificationToUser(

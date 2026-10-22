@@ -499,7 +499,17 @@ class FavoriteButton extends StatelessWidget {
         fav ? Icons.favorite : Icons.favorite_border,
         color: fav ? RemedooTheme.emergency : null,
       ),
-      onPressed: () => state.toggleFavorite(favKey),
+      // Full-check fix 2026-10-22: a guest's heart used to toggle
+      // an in-memory set that was never saved or synced — the
+      // favorite silently vanished. Guests are asked to log in,
+      // like every other save action.
+      onPressed: () {
+        if (!state.isSignedIn) {
+          checkLogin(context, 'Please login to save favorites');
+          return;
+        }
+        state.toggleFavorite(favKey);
+      },
     );
   }
 }
@@ -887,8 +897,6 @@ class LabCompareSheet extends StatelessWidget {
           _row(context, 'NABL', a.nabl ? 'Yes' : 'No',
               b.nabl ? 'Yes' : 'No',
               highlightA: a.nabl && !b.nabl, highlightB: b.nabl && !a.nabl),
-          _row(context, 'Distance', '${a.distanceKm.toStringAsFixed(1)} km',
-              '${b.distanceKm.toStringAsFixed(1)} km'),
         ],
       ),
     );
@@ -904,7 +912,12 @@ void showHelpDialog(BuildContext context) {
   final state = AppStateScope.of(context);
   final phone = state.supportPhone.trim();
   final email = state.supportEmail.trim();
-  final buffer = StringBuffer('Our support team is available 24x7.');
+  // Admin-configured support hours when set (full-check fix
+  // 2026-10-22: the field was saved but shown nowhere).
+  final hours = state.supportHours.trim();
+  final buffer = StringBuffer(hours.isNotEmpty
+      ? 'Our support team is available $hours.'
+      : 'Our support team is available 24x7.');
   if (phone.isNotEmpty || email.isNotEmpty) {
     buffer.write('\n');
     if (phone.isNotEmpty) buffer.write('\n• Call us: $phone');
@@ -2263,6 +2276,9 @@ class RBottomNav extends StatelessWidget {
     ('Labs', Icons.science_outlined, Icons.science),
     ('Pharmacy', Icons.storefront_outlined, Icons.storefront),
     ('Orders', Icons.shopping_cart_outlined, Icons.shopping_cart),
+    // Full-check fix 2026-10-22: Favorites had no phone bottom-nav
+    // entry at all, and its page highlighted Home instead.
+    ('Favorites', Icons.favorite_outline, Icons.favorite),
   ];
 
   @override

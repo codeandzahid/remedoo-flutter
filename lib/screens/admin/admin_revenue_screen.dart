@@ -33,10 +33,17 @@ class _AdminRevenueScreenState extends State<AdminRevenueScreen> {
     if (_loading) {
       return const RLoading();
     }
+    // Revenue counts real sales only — cancelled orders are
+    // excluded from the total and the average (full-check fix
+    // 2026-10-22: both used to include them). The transaction list
+    // below still shows every order, cancelled included.
     final orders = state.adminOrders;
-    final total = orders.fold<double>(
+    final sold = orders
+        .where((o) => '${o['status']}' != 'cancelled')
+        .toList();
+    final total = sold.fold<double>(
         0, (s, o) => s + ((o['total'] as num?)?.toDouble() ?? 0));
-    final avg = orders.isEmpty ? 0.0 : total / orders.length;
+    final avg = sold.isEmpty ? 0.0 : total / sold.length;
 
     // Orders grouped by status for the pipeline summary.
     final byStatus = <String, int>{};

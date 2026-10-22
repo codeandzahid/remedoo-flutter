@@ -103,6 +103,7 @@ class FavoritesScreen extends StatelessWidget {
     String sub = kind;
     double? rating;
     VoidCallback? onTap;
+    var orphan = false;
     try {
       switch (kind) {
         case 'doctor':
@@ -135,7 +136,13 @@ class FavoritesScreen extends StatelessWidget {
               context, PharmacyDetailScreen(pharmacy: p));
       }
     } catch (_) {
-      return const SizedBox.shrink();
+      // Full-check fix 2026-10-22: an unresolvable favorite used
+      // to vanish silently while the header count still included
+      // it. Show a removable placeholder tile instead, so the
+      // count and the list agree and the user can clear it.
+      orphan = true;
+      title = 'No longer available';
+      sub = 'This saved item is not in the catalogue anymore.';
     }
     final scheme = Theme.of(context).colorScheme;
     final Color tileBg;
