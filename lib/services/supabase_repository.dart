@@ -2516,15 +2516,37 @@ class SupabaseRepository {
   Future<Map<String, dynamic>> fetchCouponByCode(String code) async {
     if (!_ready) return {'ok': false, 'message': 'Offline.'};
     try {
-      final rows = await _db
-          .from('coupons')
-          .select()
-          .eq('code', code.trim().toUpperCase())
-          .limit(1);
+      final wanted = code.trim();
+      if (wanted.isEmpty) {
+        return {'ok': false, 'message': 'Coupon not found.'};
+      }
+      // Case handling must match end to end (bug fix 2026-10-23,
+      // "Coupon not found" for codes the admin had just created):
+      // the admin CRUD stores the code exactly as typed (e.g.
+      // "Save10"), but this lookup used to search for the
+      // UPPER-CASE form only via eq(), and Postgres text equality
+      // is case-sensitive — so any code not typed in ALL CAPS
+      // returned zero rows. ilike() matches any stored casing;
+      // \, % and _ in the typed code are escaped so they stay
+      // literal characters, not pattern wildcards. If several
+      // rows differ only by case, the exact-case row wins.
+      final pattern = wanted
+          .replaceAll(r'\', r'\\')
+          .replaceAll('%', r'\%')
+          .replaceAll('_', r'\_');
+      final rows =
+          await _db.from('coupons').select().ilike('code', pattern);
       if (rows.isEmpty) {
         return {'ok': false, 'message': 'Coupon not found.'};
       }
-      return {'ok': true, 'coupon': Map<String, dynamic>.from(rows.first)};
+      Map<String, dynamic>? exact;
+      for (final r in rows) {
+        if ('${r['code'] ?? ''}' == wanted) {
+          exact = Map<String, dynamic>.from(r);
+          break;
+        }
+      }
+      return {'ok': true, 'coupon': exact ?? Map<String, dynamic>.from(rows.first)};
     } catch (e) {
       debugPrint('fetchCouponByCode failed: $e');
       return {'ok': false, 'message': 'Could not check the coupon.'};
