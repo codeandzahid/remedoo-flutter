@@ -6,6 +6,7 @@ import '../responsive/animations.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/nav_memory.dart';
 import '../widgets/widgets.dart';
 import 'dashboard_screen.dart';
 import 'doctors_screen.dart';
@@ -57,6 +58,29 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _index = widget.initialIndex;
+    // Refresh restore (owner report 2026-10-23): a page refresh
+    // restarts the app and used to throw the user back to the
+    // dashboard. When no explicit start tab was requested, return
+    // to the tab they were last on. Gated tabs (Orders/Favorites)
+    // are only restored for a signed-in user.
+    if (widget.initialIndex == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final saved = await NavMemory.read(NavMemory.mainTab);
+        if (!mounted || saved == null) return;
+        if (saved < 0 || saved >= _pages.length || saved == _index) return;
+        if ((saved == 5 || saved == 6) &&
+            !AppStateScope.of(context).isSignedIn) {
+          return;
+        }
+        setState(() => _index = saved);
+      });
+    }
+  }
+
+  /// Switches tab and remembers the place for refresh restore.
+  void _go(int pageIndex) {
+    setState(() => _index = pageIndex);
+    NavMemory.save(NavMemory.mainTab, pageIndex);
   }
 
   DateTime? _lastBackPress;
@@ -75,7 +99,7 @@ class _MainShellState extends State<MainShell> {
     }
     // Not on the home tab: back goes to the dashboard, not out of the app.
     if (_index != 0) {
-      setState(() => _index = 0);
+      _go(0);
       return;
     }
     final now = DateTime.now();
@@ -113,7 +137,7 @@ class _MainShellState extends State<MainShell> {
     if (pageIndex == 5 || pageIndex == 6) {
       if (!checkLogin(context)) return;
     }
-    setState(() => _index = pageIndex);
+    _go(pageIndex);
   }
 
   /// Drawer navigation with the reference-style guest gate: toast + redirect

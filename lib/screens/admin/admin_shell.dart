@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../utils/nav_memory.dart';
 import '../../widgets/admin_style.dart';
 import '../../widgets/widgets.dart';
 import 'admin_style_screen.dart';
@@ -182,17 +183,26 @@ class _AdminShellState extends State<AdminShell> {
     // state.supportTickets, which only the Dashboard populated —
     // the badge was 0/stale until Dashboard had been built. Load
     // the tickets when the shell starts if nobody has yet.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final state = AppStateScope.of(context);
       if (state.supportTickets.isEmpty) {
         state.loadSupportTickets();
+      }
+      // Refresh restore (owner report 2026-10-23): return to the
+      // section the admin was on before the page refreshed,
+      // instead of always landing on the Dashboard.
+      final saved = await NavMemory.read(NavMemory.adminTab);
+      if (!mounted || saved == null) return;
+      if (saved > 0 && saved < _visibleItems.length && saved != _index) {
+        setState(() => _index = saved);
       }
     });
   }
 
   void _go(int i) {
     setState(() => _index = i);
+    NavMemory.save(NavMemory.adminTab, i);
   }
 
   /// Dashboard cards navigate by ABSOLUTE item index; translate to the
@@ -200,7 +210,7 @@ class _AdminShellState extends State<AdminShell> {
   void _goAbs(int abs) {
     if (abs < 0 || abs >= _allItems.length) return;
     final vi = _visibleItems.indexOf(_allItems[abs]);
-    if (vi >= 0) setState(() => _index = vi);
+    if (vi >= 0) _go(vi);
   }
 
   Future<void> _logout(AppState state) async {
@@ -488,7 +498,7 @@ class _AdminShellState extends State<AdminShell> {
   void _jumpTo(List<_NavItem> items, String label) {
     final i = items.indexWhere((it) => it.label == label);
     if (i >= 0) {
-      setState(() => _index = i);
+      _go(i);
     } else if (mounted) {
       // Full-check fix 2026-10-22: for staff without the section
       // permission the item is filtered out and this tap used to
@@ -638,7 +648,7 @@ class _AdminShellState extends State<AdminShell> {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(999),
                       onTap: () {
-                        setState(() => _index = items.indexOf(it));
+                        _go(items.indexOf(it));
                         Navigator.of(context).pop();
                       },
                       child: Container(
@@ -720,7 +730,7 @@ class _AdminShellState extends State<AdminShell> {
         borderRadius: BorderRadius.circular(999),
         onTap: () {
           final idx = items.indexWhere((it) => it.section == section);
-          if (idx >= 0) setState(() => _index = idx);
+          if (idx >= 0) _go(idx);
         },
         child: Container(
           padding:
@@ -762,8 +772,7 @@ class _AdminShellState extends State<AdminShell> {
                 padding: const EdgeInsets.only(right: 6),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(999),
-                  onTap: () =>
-                      setState(() => _index = items.indexOf(it)),
+                  onTap: () => _go(items.indexOf(it)),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 13, vertical: 8),

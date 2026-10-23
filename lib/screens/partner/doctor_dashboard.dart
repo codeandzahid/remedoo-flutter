@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../utils/nav_memory.dart';
 import '../../utils/working_hours.dart';
 import '../../widgets/prescription_form.dart';
 import '../../widgets/provider_payments.dart';
@@ -39,6 +40,15 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    // Refresh restore (owner order 2026-10-23): reopen on the
+    // tab the doctor was last on (Visits/Profile/Payments/Reviews).
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final saved = await NavMemory.read(NavMemory.doctorTab);
+      if (!mounted || saved == null) return;
+      if (saved > 0 && saved < 4 && saved != _tab) {
+        setState(() => _tab = saved);
+      }
+    });
   }
 
   Future<void> _load() async {
@@ -200,7 +210,10 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                 ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _tab,
-        onTap: (i) => setState(() => _tab = i),
+        onTap: (i) {
+          setState(() => _tab = i);
+          NavMemory.save(NavMemory.doctorTab, i);
+        },
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(

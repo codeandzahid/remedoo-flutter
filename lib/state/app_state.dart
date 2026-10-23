@@ -16,6 +16,7 @@ import '../services/payment_service.dart';
 import '../theme.dart';
 import '../utils/working_hours.dart';
 import '../utils/account_deletion.dart';
+import '../utils/nav_memory.dart';
 import '../widgets/admin_style.dart';
 import '../widgets/existing_user_lookup.dart';
 
@@ -777,6 +778,9 @@ class AppState extends ChangeNotifier {
     unawaited(AuthService.instance.signOut());
     _supaUser = null;
     _clearAuthLocal();
+    // Forget the remembered tab/section (NavMemory) so the next
+    // account starts on its dashboard, not the last one's place.
+    unawaited(NavMemory.clearAll());
     // Pop any pushed pages: after logout the RootGate shows the dashboard
     // in guest-browsing state, and inner screens must not linger on top
     // with the gates down.

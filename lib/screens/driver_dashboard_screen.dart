@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../responsive/responsive.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/nav_memory.dart';
 import '../widgets/widgets.dart';
 
 /// Driver Dashboard — wired to the real backend (form-pages
@@ -34,6 +35,18 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
+    // Refresh restore (owner order 2026-10-23): remember the
+    // driver tab and reopen on it after a page refresh.
+    _tabs.addListener(() {
+      if (!_tabs.indexIsChanging) {
+        NavMemory.save(NavMemory.driverTab, _tabs.index);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final saved = await NavMemory.read(NavMemory.driverTab);
+      if (!mounted || saved == null) return;
+      if (saved > 0 && saved < _tabs.length) _tabs.index = saved;
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
