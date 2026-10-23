@@ -45,27 +45,27 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // 2026-10-22: arrange items section-wise, doctors/labs/etc.
       // inside Users).
       _NavItem('Users', 'Doctors', Icons.person_search,
-          (_) => const AdminTableScreen(table: 'doctors', title: 'Doctors', singular: 'Doctor')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('doctors'), table: 'doctors', title: 'Doctors', singular: 'Doctor')),
       _NavItem('Users', 'Hospitals', Icons.local_hospital,
-          (_) => const AdminTableScreen(table: 'hospitals', title: 'Hospitals', singular: 'Hospital')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('hospitals'), table: 'hospitals', title: 'Hospitals', singular: 'Hospital')),
       _NavItem('Users', 'Labs', Icons.science,
-          (_) => const AdminTableScreen(table: 'labs', title: 'Labs', singular: 'Lab')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('labs'), table: 'labs', title: 'Labs', singular: 'Lab')),
       _NavItem('Users', 'Pharmacies', Icons.storefront,
-          (_) => const AdminTableScreen(table: 'pharmacies', title: 'Pharmacies', singular: 'Pharmacy')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('pharmacies'), table: 'pharmacies', title: 'Pharmacies', singular: 'Pharmacy')),
       _NavItem('Users', 'Users', Icons.people,
-          (_) => const AdminUsersScreen()),
+          (s) => AdminUsersScreen(readOnly: !s.staffCanWrite('users'))),
       // Catalog — things and sellable plans, not people. Corporate
       // Plans, Healthcare Packages and Subscriptions moved here
       // from Settings (sidebar rearrange, owner order 2026-10-23):
       // they are offerings, not app settings.
       _NavItem('Catalog', 'Lab Tests', Icons.biotech,
-          (_) => const AdminTableScreen(table: 'lab_tests', title: 'Lab Tests', singular: 'Lab Test')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('lab_tests'), table: 'lab_tests', title: 'Lab Tests', singular: 'Lab Test')),
       _NavItem('Catalog', 'Medicines', Icons.medication,
-          (_) => const AdminTableScreen(table: 'medicines', title: 'Medicines', singular: 'Medicine')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('medicines'), table: 'medicines', title: 'Medicines', singular: 'Medicine')),
       _NavItem('Catalog', 'Inventory', Icons.inventory,
           (_) => const AdminInventoryScreen()),
       _NavItem('Catalog', 'Coupons', Icons.local_offer,
-          (_) => const AdminTableScreen(table: 'coupons', title: 'Coupons', singular: 'Coupon')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('coupons'), table: 'coupons', title: 'Coupons', singular: 'Coupon')),
       _NavItem('Catalog', 'Corporate Plans', Icons.business,
           (_) => const CorporatePlansScreen()),
       _NavItem('Catalog', 'Healthcare Packages', Icons.health_and_safety,
@@ -82,7 +82,7 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       _NavItem('Providers', 'Reviews', Icons.star,
           (_) => const AdminReviewsScreen()),
       _NavItem('Providers', 'Drivers', Icons.delivery_dining,
-          (_) => const AdminTableScreen(table: 'delivery_drivers', title: 'Drivers', singular: 'Driver')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('drivers'), table: 'delivery_drivers', title: 'Drivers', singular: 'Driver')),
       // Payments — all money in one section (rearrange
       // 2026-10-23): Remedoo Pay plus the per-provider UPI
       // payments screen, which used to sit under Providers.
@@ -113,7 +113,7 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // details — without leaving the Support section. Same
       // screen as Users > Users, with the Add user button on.
       _NavItem('Support', 'Users', Icons.people_outline,
-          (_) => const AdminUsersScreen(allowAddUser: true)),
+          (s) => AdminUsersScreen(allowAddUser: true, readOnly: !s.staffCanWrite('support'))),
       // Content — Announcements and Broadcasts side by side
       // (rearrange 2026-10-23: they were separated by four items
       // and easy to confuse).
@@ -122,13 +122,13 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       _NavItem('Content', 'Broadcasts', Icons.campaign_outlined,
           (_) => const BroadcastsScreen()),
       _NavItem('Content', 'FAQs', Icons.help_outline,
-          (_) => const AdminTableScreen(table: 'faqs', title: 'FAQs', singular: 'FAQ')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('faqs'), table: 'faqs', title: 'FAQs', singular: 'FAQ')),
       _NavItem('Content', 'Legal Pages', Icons.gavel,
-          (_) => const AdminTableScreen(table: 'legal_pages', title: 'Legal Pages', singular: 'Legal Page')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('legal_pages'), table: 'legal_pages', title: 'Legal Pages', singular: 'Legal Page')),
       _NavItem('Content', 'Home Slider', Icons.view_carousel,
-          (_) => const AdminTableScreen(table: 'slider_media', title: 'Home Slider', singular: 'Slide')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('slider_media'), table: 'slider_media', title: 'Home Slider', singular: 'Slide')),
       _NavItem('Content', 'Ads', Icons.ads_click,
-          (_) => const AdminTableScreen(table: 'ads', title: 'Ads', singular: 'Ad')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('ads'), table: 'ads', title: 'Ads', singular: 'Ad')),
       // Insights — Export Data moved here from Settings
       // (rearrange 2026-10-23): it is reports and downloads.
       _NavItem('Insights', 'Revenue', Icons.trending_up,
@@ -145,7 +145,7 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       _NavItem('Settings', 'Commission', Icons.percent,
           (_) => const CommissionScreen()),
       _NavItem('Settings', 'Platform Settings', Icons.tune,
-          (_) => const AdminTableScreen(table: 'platform_settings', title: 'Platform Settings', singular: 'Setting')),
+          (s) => AdminTableScreen(readOnly: !s.staffCanWrite('platform_settings'), table: 'platform_settings', title: 'Platform Settings', singular: 'Setting')),
       // Panel Style — switch the admin UI style (owner order
       // 2026-10-18: try every style one by one, live).
       _NavItem('Settings', 'Panel Style', Icons.style,
@@ -285,10 +285,46 @@ class _AdminShellState extends State<AdminShell> {
     }
     final safeIndex = _index.clamp(0, items.length - 1);
     final current = items[safeIndex];
-    final page = IndexedStack(
+    Widget page = IndexedStack(
       index: safeIndex,
       children: [for (final it in items) it.builder(state)],
     );
+    // View-only banner (staff access levels, owner order
+    // 2026-10-23): when this option is view-only for the signed-in
+    // staff member, say so plainly above the page. Change actions
+    // inside list screens are hidden; the rest is covered by the
+    // same rule once the enforcement migration is applied.
+    final currentKey = _permKeys[all.indexOf(current)];
+    if (!state.isAdmin && state.staffViewOnly.contains(currentKey)) {
+      page = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            color: const Color(0xFFFFF4E0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: const Row(
+              children: [
+                Icon(Icons.visibility_outlined,
+                    size: 16, color: Color(0xFF8D6E00)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'View only — you can see this option, but changes '
+                    'are off for your account.',
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF8D6E00)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(child: page),
+        ],
+      );
+    }
     final style = state.adminStyle;
     final floating = style.floating;
 

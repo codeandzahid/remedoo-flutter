@@ -19,7 +19,7 @@ After that one sign-in, everything here is done in one go.
 - Status: still 300 seconds as of 2026-10-21 05:30 EDT — do not report
   this as done until a dashboard save is seen.
 
-## Step 2 — Run these 14 SQL files, in this order
+## Step 2 — Run these 16 SQL files, in this order
 
 Dashboard → SQL Editor → paste the whole file → Run. One file at a time,
 in this order. All files are in `supabase/migration/` in this repo.
@@ -66,6 +66,14 @@ in this order. All files are in `supabase/migration/` in this repo.
     applying the flat fee from each commission rule (percent +
     flat fee, capped at the amount). Until this runs, only the
     percent part is taken.
+15. `coupons_guest_read.sql` — guests can read active coupons, so
+    a coupon code works at guest checkout instead of answering
+    "Coupon not found".
+16. `staff_view_only_enforcement.sql` — database-side write
+    block for view-only staff options (Team access levels,
+    2026-10-23). Until this runs, view-only is enforced by the
+    app (change buttons hidden); afterwards the database refuses
+    the writes too.
 
 Until these run, the app still works — each new feature just stays
 off or falls back (that is how the all-76 form fixes were built).

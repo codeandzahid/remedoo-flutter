@@ -72,8 +72,11 @@ serve(async (req) => {
       const name = String(body.name ?? '').trim();
       const email = String(body.email ?? '').trim().toLowerCase();
       const password = String(body.password ?? '');
+      // Access levels (2026-10-23) can double the entry count —
+      // a view-only option stores its key plus a 'view:' marker —
+      // so the cap sits well above 41 options x 2.
       const sections = Array.isArray(body.sections)
-        ? body.sections.map((s: any) => String(s)).slice(0, 40)
+        ? body.sections.map((s: any) => String(s)).slice(0, 120)
         : [];
       if (!name || !email || !email.includes('@')) {
         return json({ error: 'Name and a valid email are required.' }, 400);

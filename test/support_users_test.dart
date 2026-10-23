@@ -13,13 +13,14 @@ void main() {
   test('support section has a Users item with add-user enabled', () {
     final s = read('lib/screens/admin/admin_shell.dart');
     expect(s.contains("_NavItem('Support', 'Users'"), isTrue);
-    expect(s.contains('AdminUsersScreen(allowAddUser: true)'), isTrue);
+    expect(s.contains('AdminUsersScreen(allowAddUser: true,'), isTrue);
   });
 
   test('admin users screen gates the Add user button on the flag', () {
     final s = read('lib/screens/admin/admin_users_screen.dart');
     expect(s.contains('final bool allowAddUser;'), isTrue);
-    expect(s.contains('if (widget.allowAddUser)'), isTrue);
+    expect(s.contains('if (widget.allowAddUser && !widget.readOnly)'),
+        isTrue);
     expect(s.contains("'action': 'create_user'"), isTrue);
   });
 

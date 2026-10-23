@@ -5,6 +5,7 @@ import '../../theme.dart';
 import '../../widgets/existing_user_lookup.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/form_kit.dart';
+import '../../utils/staff_access.dart';
 
 /// Assignable admin sections for staff accounts (key -> label).
 /// 'team' is deliberately absent: only the super admin manages staff.
@@ -67,6 +68,72 @@ String staffSectionLabel(String key) {
   }
   return key;
 }
+
+/// The same options grouped by sidebar section, for the detailed
+/// access picker (owner order 2026-10-23: choose per option, not
+/// just per section). Dashboard stands alone at the top.
+const kStaffSectionGroups = <(String, List<(String, String)>)>[
+  ('Overview', [('dashboard', 'Dashboard')]),
+  ('Users', [
+    ('doctors', 'Doctors'),
+    ('hospitals', 'Hospitals'),
+    ('labs', 'Labs'),
+    ('pharmacies', 'Pharmacies'),
+    ('users', 'Users'),
+  ]),
+  ('Catalog', [
+    ('lab_tests', 'Lab Tests'),
+    ('medicines', 'Medicines'),
+    ('inventory', 'Inventory'),
+    ('coupons', 'Coupons'),
+    ('corporate', 'Corporate Plans'),
+    ('packages', 'Healthcare Packages'),
+    ('subscriptions', 'Subscriptions'),
+  ]),
+  ('Providers', [
+    ('applications', 'Applications'),
+    ('reviews', 'Reviews'),
+    ('drivers', 'Drivers'),
+  ]),
+  ('Payments', [
+    ('remedoo_pay', 'Remedoo Pay'),
+    ('provider_payments', 'Payments (UPI)'),
+  ]),
+  ('Orders & Care', [
+    ('orders', 'Orders'),
+    ('appointments', 'Appointments'),
+    ('refunds', 'Refunds'),
+    ('emergencies', 'Emergencies'),
+    ('ambulance', 'Ambulance'),
+  ]),
+  ('Support', [
+    ('support', 'Support (Tickets, Chat, Account Deletion, Users)'),
+  ]),
+  ('Content', [
+    ('announcements', 'Announcements'),
+    ('broadcasts', 'Broadcasts'),
+    ('faqs', 'FAQs'),
+    ('legal_pages', 'Legal Pages'),
+    ('slider_media', 'Home Slider'),
+    ('ads', 'Ads'),
+  ]),
+  ('Insights', [
+    ('revenue', 'Revenue'),
+    ('analytics', 'Analytics'),
+    ('export_data', 'Export Data'),
+  ]),
+  ('Settings', [
+    ('settings', 'App Settings'),
+    ('branding', 'Branding'),
+    ('commission', 'Commission'),
+    ('platform_settings', 'Platform Settings'),
+    ('panel_style', 'Panel Style'),
+  ]),
+  ('Management', [
+    ('service_areas', 'Service Areas'),
+    ('featured', 'Featured'),
+  ]),
+];
 
 /// Admin > Team: the super admin creates staff (employee admin)
 /// accounts and ticks exactly which admin sections each may use.
@@ -340,9 +407,12 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          for (final k in sections)
+                          for (final e
+                              in staffLevelsDecode(sections).entries)
                             Chip(
-                              label: Text(staffSectionLabel(k)),
+                              label: Text(e.value == 'view'
+                                  ? '${staffSectionLabel(e.key)} (view)'
+                                  : staffSectionLabel(e.key)),
                               labelStyle: const TextStyle(fontSize: 11),
                               visualDensity: VisualDensity.compact,
                             ),
@@ -358,6 +428,12 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
   }
 }
 
+/// Detailed access picker (owner order 2026-10-23): instead of a
+/// plain tick per section, every OPTION gets a level — No access,
+/// View only, or Full access — grouped by sidebar section, with
+/// per-group quick-set buttons. Speaks the encoded sections list
+/// (see utils/staff_access.dart) through [initial]/[onChanged] so
+/// the create dialog and the edit-access dialog share it.
 class _SectionPicker extends StatefulWidget {
   final Set<String> initial;
   final ValueChanged<Set<String>> onChanged;
@@ -369,53 +445,145 @@ class _SectionPicker extends StatefulWidget {
 }
 
 class _SectionPickerState extends State<_SectionPicker> {
-  late final Set<String> _picked = {...widget.initial};
+  late final Map<String, String> _levels =
+      staffLevelsDecode(widget.initial.toList());
 
-  void _emit() => widget.onChanged({..._picked});
+  void _emit() =>
+      widget.onChanged(staffSectionsEncode(_levels).toSet());
+
+  void _set(String key, String? level) {
+    setState(() {
+      if (level == null) {
+        _levels.remove(key);
+      } else {
+        _levels[key] = level;
+      }
+    });
+    _emit();
+  }
+
+  void _setGroup(List<(String, String)> options, String? level) {
+    setState(() {
+      for (final o in options) {
+        if (level == null) {
+          _levels.remove(o.$1);
+        } else {
+          _levels[o.$1] = level;
+        }
+      }
+    });
+    _emit();
+  }
+
+  Widget _levelButton(String key, String label, String? level) {
+    final active = _levels[key] == level;
+    return InkWell(
+      onTap: () => _set(key, level),
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: active ? RemedooTheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active
+                ? RemedooTheme.primary
+                : const Color(0xFFD5D8DE),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: active ? Colors.white : const Color(0xFF6B7280),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Text(
+          'View = can open and see it, but cannot change anything. '
+          'Full = can add, edit and delete.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+        ),
         Row(
           children: [
             TextButton(
               onPressed: () {
                 setState(() {
-                  _picked
-                      .addAll(kStaffSectionOptions.map((o) => o.$1));
+                  for (final o in kStaffSectionOptions) {
+                    _levels[o.$1] = 'full';
+                  }
                 });
                 _emit();
               },
-              child: const Text('Select all'),
+              child: const Text('All full access'),
             ),
             TextButton(
               onPressed: () {
-                setState(_picked.clear);
+                setState(_levels.clear);
                 _emit();
               },
-              child: const Text('Clear'),
+              child: const Text('Clear all'),
             ),
           ],
         ),
-        for (final o in kStaffSectionOptions)
-          CheckboxListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: Text(o.$2, style: const TextStyle(fontSize: 13.5)),
-            value: _picked.contains(o.$1),
-            onChanged: (v) {
-              setState(() {
-                if (v == true) {
-                  _picked.add(o.$1);
-                } else {
-                  _picked.remove(o.$1);
-                }
-              });
-              _emit();
-            },
+        for (final g in kStaffSectionGroups) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  g.$1,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111318)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => _setGroup(g.$2, 'full'),
+                child: const Text('All full',
+                    style: TextStyle(fontSize: 11.5)),
+              ),
+              TextButton(
+                onPressed: () => _setGroup(g.$2, 'view'),
+                child: const Text('All view',
+                    style: TextStyle(fontSize: 11.5)),
+              ),
+              TextButton(
+                onPressed: () => _setGroup(g.$2, null),
+                child: const Text('None',
+                    style: TextStyle(fontSize: 11.5)),
+              ),
+            ],
           ),
+          const Divider(height: 1),
+          for (final o in g.$2)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(o.$2,
+                        style: const TextStyle(fontSize: 13.5)),
+                  ),
+                  _levelButton(o.$1, 'None', null),
+                  const SizedBox(width: 5),
+                  _levelButton(o.$1, 'View', 'view'),
+                  const SizedBox(width: 5),
+                  _levelButton(o.$1, 'Full', 'full'),
+                ],
+              ),
+            ),
+        ],
       ],
     );
   }
@@ -571,7 +739,7 @@ class _CreateStaffDialogState extends State<CreateStaffDialog> {
                         ),
                       ] else ...[
                         const Text(
-                          'Which sections can this person open?',
+                          'What can this person open, and what can they change?',
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w700,

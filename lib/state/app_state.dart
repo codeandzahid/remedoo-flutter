@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models.dart';
+import '../utils/staff_access.dart';
 import '../data/mock_data.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_repository.dart';
@@ -734,6 +735,7 @@ class AppState extends ChangeNotifier {
     _isAdmin = false;
     _isStaff = false;
     _staffSections = const [];
+    _staffViewOnly = const {};
     _role = 'patient';
     appointments.clear();
     orders.clear();
@@ -3055,18 +3057,34 @@ class AppState extends ChangeNotifier {
 
   bool _isStaff = false;
   List<String> _staffSections = const [];
+  Set<String> _staffViewOnly = const {};
 
   /// Staff (employee admin) account: sees only the admin sections the
   /// super admin assigned in Admin > Team. Enforced by RLS as well.
+  /// Each option has a level (owner order 2026-10-23): view only or
+  /// full access — see utils/staff_access.dart for the encoding.
   bool get isStaff => _isStaff;
   List<String> get staffSections => _staffSections;
+
+  /// Options this staff member may look at but not change.
+  Set<String> get staffViewOnly => _staffViewOnly;
+
   bool staffCan(String section) =>
       _isAdmin || _staffSections.contains(section);
+
+  /// True when the user may CHANGE things in [section]: the super
+  /// admin always can; staff only with full (not view-only) access.
+  bool staffCanWrite(String section) =>
+      _isAdmin ||
+      (_staffSections.contains(section) &&
+          !_staffViewOnly.contains(section));
 
   Future<void> checkStaffRole() async {
     final res = await _repo.fetchOwnStaffAccess();
     _isStaff = res != null;
-    _staffSections = res ?? const [];
+    final raw = res ?? const <String>[];
+    _staffSections = staffAccessibleKeys(raw).toList();
+    _staffViewOnly = staffViewOnlyKeys(raw);
     notifyListeners();
   }
 

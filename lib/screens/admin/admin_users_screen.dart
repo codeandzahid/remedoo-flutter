@@ -22,7 +22,15 @@ class AdminUsersScreen extends StatefulWidget {
   /// runs through the admin-staff function's create_user action.
   final bool allowAddUser;
 
-  const AdminUsersScreen({super.key, this.allowAddUser = false});
+  /// View-only mode (staff access levels): the list stays, the
+  /// Add user button hides and rows no longer open the editor.
+  final bool readOnly;
+
+  const AdminUsersScreen({
+    super.key,
+    this.allowAddUser = false,
+    this.readOnly = false,
+  });
 
   @override
   State<AdminUsersScreen> createState() => _AdminUsersScreenState();
@@ -435,7 +443,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       color: scheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600)),
               const Spacer(),
-              if (widget.allowAddUser)
+              if (widget.allowAddUser && !widget.readOnly)
                 RButton(
                   label: 'Add user',
                   icon: Icons.person_add_outlined,
@@ -466,7 +474,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 6),
                         child: ListTile(
-                          onTap: () => _editUser(u),
+                          onTap: widget.readOnly ? null : () => _editUser(u),
                           leading: CircleAvatar(
                             backgroundColor: scheme.primary
                                 .withValues(alpha: 0.12),

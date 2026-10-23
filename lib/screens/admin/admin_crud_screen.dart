@@ -60,12 +60,17 @@ class AdminTableScreen extends StatefulWidget {
   final String singular;
   final List<AdminField>? fields;
 
+  /// View-only mode (staff access levels, owner order 2026-10-23):
+  /// the list and search stay, every add/edit/delete action hides.
+  final bool readOnly;
+
   const AdminTableScreen({
     super.key,
     required this.table,
     required this.title,
     required this.singular,
     this.fields,
+    this.readOnly = false,
   });
 
   @override
@@ -138,12 +143,13 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                RButton(
-                  label: 'Add ${widget.singular}',
-                  icon: Icons.add,
-                  small: true,
-                  onPressed: () => _editDialog(null),
-                ),
+                if (!widget.readOnly)
+                  RButton(
+                    label: 'Add ${widget.singular}',
+                    icon: Icons.add,
+                    small: true,
+                    onPressed: () => _editDialog(null),
+                  ),
               ],
             ),
           ),
@@ -169,8 +175,10 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                             title: 'Nothing here',
                             subtitle:
                                 'Add the first ${widget.singular.toLowerCase()}.',
-                            actionLabel: 'Add ${widget.singular}',
-                            onAction: () => _editDialog(null),
+                            actionLabel:
+                                widget.readOnly ? null : 'Add ${widget.singular}',
+                            onAction:
+                                widget.readOnly ? null : () => _editDialog(null),
                           )
                         : context.isDesktop
                             ? _dataTable(rows)
@@ -228,25 +236,27 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                           ),
                         ),
                       ),
-                    DataCell(Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.edit_outlined,
-                              size: 20,
-                              color: scheme.onSurfaceVariant),
-                          tooltip: 'Edit',
-                          onPressed: () => _editDialog(r),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline,
-                              size: 20,
-                              color: RemedooTheme.emergency),
-                          tooltip: 'Delete',
-                          onPressed: () => _confirmDelete(r),
-                        ),
-                      ],
-                    )),
+                    DataCell(widget.readOnly
+                        ? const SizedBox.shrink()
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.edit_outlined,
+                                    size: 20,
+                                    color: scheme.onSurfaceVariant),
+                                tooltip: 'Edit',
+                                onPressed: () => _editDialog(r),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline,
+                                    size: 20,
+                                    color: RemedooTheme.emergency),
+                                tooltip: 'Delete',
+                                onPressed: () => _confirmDelete(r),
+                              ),
+                            ],
+                          )),
                   ]),
               ],
             ),
@@ -287,22 +297,24 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                   style: TextStyle(
                       fontSize: 12,
                       color: scheme.onSurfaceVariant)),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: Icon(Icons.edit_outlined,
-                    size: 20, color: scheme.onSurfaceVariant),
-                tooltip: 'Edit',
-                onPressed: () => _editDialog(r),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    size: 20, color: RemedooTheme.emergency),
-                tooltip: 'Delete',
-                onPressed: () => _confirmDelete(r),
-              ),
-            ],
+          trailing: widget.readOnly
+              ? null
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.edit_outlined,
+                          size: 20, color: scheme.onSurfaceVariant),
+                      tooltip: 'Edit',
+                      onPressed: () => _editDialog(r),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline,
+                          size: 20, color: RemedooTheme.emergency),
+                      tooltip: 'Delete',
+                      onPressed: () => _confirmDelete(r),
+                    ),
+                  ],
           ),
         ),
       ),
