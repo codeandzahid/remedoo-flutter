@@ -11,7 +11,10 @@ import '../../widgets/provider_payments.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/form_kit.dart';
 
-/// Real user list from Supabase profiles with role management.
+/// Real user list from Supabase profiles. Roles are shown as a
+/// plain label only — role CHANGE was removed on the owner's
+/// order (2026-10-23); a role is set when an account is created
+/// or when a provider application is approved.
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
 
@@ -33,21 +36,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     await AppStateScope.of(context).loadAllProfiles();
     if (mounted) setState(() => _loading = false);
   }
-
-  Future<void> _changeRole(Map<String, dynamic> user, String newRole) async {
-    final ok = await SupabaseRepository.instance
-        .setUserRole('${user['user_id']}', newRole);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(ok
-            ? 'Role updated to $newRole for ${user['email']}'
-            : 'Failed to update role'),
-      ),
-    );
-    if (ok) _load();
-  }
-
 
   /// Profile + status editor (audit Admin gap 6; extended
   /// 2026-10-22 on the owner's order: photo upload + ALL details,
@@ -306,41 +294,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     _load();
   }
 
-  void _showRoleDialog(Map<String, dynamic> user) {
-    const roles = ['user', 'doctor', 'pharmacy', 'lab', 'hospital', 'driver', 'admin'];
-    final current = '${user['role'] ?? 'user'}';
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Role for ${user['email'] ?? 'user'}'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView(
-            shrinkWrap: true,
-            children: roles
-                .map((r) => ListTile(
-                      title: Text(r[0].toUpperCase() + r.substring(1)),
-                      trailing: current == r
-                          ? const Icon(Icons.check, color: Colors.green)
-                          : null,
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        if (current != r) _changeRole(user, r);
-                      },
-                    ))
-                .toList(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _fmtDate(String? iso) {
     if (iso == null || iso.isEmpty) return '';
     final d = DateTime.tryParse(iso);
@@ -481,43 +434,22 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                               ],
                             ],
                           ),
-                          trailing: InkWell(
-                            onTap: () {
-                              // Roles belong to the super admin only;
-                              // staff (even with Users access) can't
-                              // change them — the database blocks it too.
-                              if (state.isStaff) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'Only the super admin can change roles.')),
-                                );
-                                return;
-                              }
-                              _showRoleDialog(u);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: scheme.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${u['role'] ?? 'user'}',
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: scheme.primary),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Icon(Icons.edit,
-                                      size: 14, color: scheme.primary),
-                                ],
-                              ),
+                          // Role is a plain label now — role
+                          // change was removed on the owner's
+                          // order (2026-10-23). No tap, no pencil.
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${u['role'] ?? 'user'}',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: scheme.primary),
                             ),
                           ),
                         ),
