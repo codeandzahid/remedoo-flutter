@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
+import '../../utils/nav_memory.dart';
 import '../../theme.dart';
 import '../../widgets/provider_payments.dart';
 import '../../widgets/provider_profile_form.dart';
@@ -22,6 +23,7 @@ class LabDashboard extends StatefulWidget {
 }
 
 class _LabDashboardState extends State<LabDashboard> {
+  int _tab = 0;
   bool _loading = true;
   bool _upiPromptShown = false;
   String? _error;
@@ -36,6 +38,17 @@ class _LabDashboardState extends State<LabDashboard> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    // Refresh restore + tabs (owner order 2026-10-23): this panel
+    // now uses the same tab layout as the doctor panel — work
+    // first, then profile, payments, reviews — instead of one
+    // long scroll with the profile form on top.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final saved = await NavMemory.read(NavMemory.labTab);
+      if (!mounted || saved == null) return;
+      if (saved > 0 && saved < 5 && saved != _tab) {
+        setState(() => _tab = saved);
+      }
+    });
   }
 
   Future<void> _load() async {
@@ -131,25 +144,65 @@ class _LabDashboardState extends State<LabDashboard> {
       ),
       body: _loading
           ? const RLoading()
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: _error != null
-                  ? ListView(
-                      padding: const EdgeInsets.all(24),
-                      children: [
-                        REmptyState(
-                          icon: Icons.cloud_off,
-                          title: 'Something went wrong',
-                          subtitle: _error!,
-                        ),
-                      ],
-                    )
-                  : _buildBody(context),
-            ),
+          : _error != null
+              ? RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    padding: const EdgeInsets.all(24),
+                    children: [
+                      REmptyState(
+                        icon: Icons.cloud_off,
+                        title: 'Something went wrong',
+                        subtitle: _error!,
+                      ),
+                    ],
+                  ),
+                )
+              : IndexedStack(
+                  index: _tab,
+                  children: [
+                    _workTab(context),
+                    _testsTab(context),
+                    _profileTab(context),
+                    _paymentsTab(context),
+                    _reviewsTab(context),
+                  ],
+                ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _tab,
+        onTap: (i) {
+          setState(() => _tab = i);
+          NavMemory.save(NavMemory.labTab, i);
+        },
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.science),
+            label: 'Bookings',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.biotech),
+            label: 'My Tests',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.payments),
+            label: 'Payments',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.star),
+            label: 'Reviews',
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildBody(BuildContext context) {
+  // Bookings tab: welcome, stats, today and upcoming.
+  Widget _workTab(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final today = DateTime.now();
     final todayStr =
@@ -163,7 +216,9 @@ class _LabDashboardState extends State<LabDashboard> {
     final pendingCount =
         _bookings.where((b) => '${b['status']}' == 'pending').length;
 
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
       padding: const EdgeInsets.all(16),
       children: [
         RCard(
@@ -202,38 +257,6 @@ class _LabDashboardState extends State<LabDashboard> {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-        ProviderProfileForm(
-          table: 'labs',
-          profile: _profile,
-          repo: _repo,
-          onSaved: _load,
-        ),
-        const SizedBox(height: 16),
-        ProviderUpiSettingsCard(
-          table: 'labs',
-          profile: _profile,
-          repo: _repo,
-          onSaved: _load,
-        ),
-        const SizedBox(height: 16),
-        ProviderOnlinePayments(repo: _repo),
-        const SizedBox(height: 16),
-        RouteOnboardingTile(
-          providerType: 'lab',
-          providerId: '${_profile?['id'] ?? ''}',
-          providerName: '${_profile?['name'] ?? ''}',
-        ),
-        const SizedBox(height: 16),
-        LabCatalogueManager(repo: _repo),
-        const SizedBox(height: 16),
-        LabSamplesManager(repo: _repo, bookings: _bookings),
-        const SizedBox(height: 16),
-        ProviderWalletCard(
-          repo: _repo,
-          providerType: 'lab',
-          providerId: '${_profile?['id'] ?? ''}',
         ),
         const SizedBox(height: 16),
         Row(
@@ -305,9 +328,86 @@ class _LabDashboardState extends State<LabDashboard> {
         else
           ...upcoming.take(20).map((b) => _bookingCard(context, b)),
         const SizedBox(height: 24),
-        ProviderReviewsList(reviews: _reviews),
-        const SizedBox(height: 16),
       ],
+    ),
+    );
+  }
+
+  // My Tests tab: the lab test catalogue.
+  Widget _testsTab(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+        LabCatalogueManager(repo: _repo),
+        const SizedBox(height: 16),
+        LabSamplesManager(repo: _repo, bookings: _bookings),
+        ],
+      ),
+    );
+  }
+
+  // Profile tab: the provider profile form and setup.
+  Widget _profileTab(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+        ProviderProfileForm(
+          table: 'labs',
+          profile: _profile,
+          repo: _repo,
+          onSaved: _load,
+        ),
+        const SizedBox(height: 16),
+        RouteOnboardingTile(
+          providerType: 'lab',
+          providerId: '${_profile?['id'] ?? ''}',
+          providerName: '${_profile?['name'] ?? ''}',
+        ),
+        ],
+      ),
+    );
+  }
+
+  // Payments tab: UPI settings, online payments and wallet.
+  Widget _paymentsTab(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+        ProviderUpiSettingsCard(
+          table: 'labs',
+          profile: _profile,
+          repo: _repo,
+          onSaved: _load,
+        ),
+        const SizedBox(height: 16),
+        ProviderOnlinePayments(repo: _repo),
+        const SizedBox(height: 16),
+        ProviderWalletCard(
+          repo: _repo,
+          providerType: 'lab',
+          providerId: '${_profile?['id'] ?? ''}',
+        ),
+        ],
+      ),
+    );
+  }
+
+  // Reviews tab: what patients said.
+  Widget _reviewsTab(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+        ProviderReviewsList(reviews: _reviews),
+        ],
+      ),
     );
   }
 

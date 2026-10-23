@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
+import '../../utils/nav_memory.dart';
 import '../../theme.dart';
 import '../../widgets/provider_payments.dart';
 import '../../widgets/provider_profile_form.dart';
@@ -22,6 +23,7 @@ class PharmacyDashboard extends StatefulWidget {
 }
 
 class _PharmacyDashboardState extends State<PharmacyDashboard> {
+  int _tab = 0;
   bool _loading = true;
   bool _upiPromptShown = false;
   String? _error;
@@ -37,6 +39,17 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    // Refresh restore + tabs (owner order 2026-10-23): this panel
+    // now uses the same tab layout as the doctor panel — work
+    // first, then profile, payments, reviews — instead of one
+    // long scroll with the profile form on top.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final saved = await NavMemory.read(NavMemory.pharmacyTab);
+      if (!mounted || saved == null) return;
+      if (saved > 0 && saved < 5 && saved != _tab) {
+        setState(() => _tab = saved);
+      }
+    });
   }
 
   Future<void> _load() async {
@@ -305,25 +318,65 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
       ),
       body: _loading
           ? const RLoading()
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: _error != null
-                  ? ListView(
-                      padding: const EdgeInsets.all(24),
-                      children: [
-                        REmptyState(
-                          icon: Icons.cloud_off,
-                          title: 'Something went wrong',
-                          subtitle: _error!,
-                        ),
-                      ],
-                    )
-                  : _buildBody(context),
-            ),
+          : _error != null
+              ? RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    padding: const EdgeInsets.all(24),
+                    children: [
+                      REmptyState(
+                        icon: Icons.cloud_off,
+                        title: 'Something went wrong',
+                        subtitle: _error!,
+                      ),
+                    ],
+                  ),
+                )
+              : IndexedStack(
+                  index: _tab,
+                  children: [
+                    _workTab(context),
+                    _medicinesTab(context),
+                    _profileTab(context),
+                    _paymentsTab(context),
+                    _reviewsTab(context),
+                  ],
+                ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _tab,
+        onTap: (i) {
+          setState(() => _tab = i);
+          NavMemory.save(NavMemory.pharmacyTab, i);
+        },
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_bag),
+            label: 'Orders',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.medication),
+            label: 'Medicines',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.payments),
+            label: 'Payments',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.star),
+            label: 'Reviews',
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildBody(BuildContext context) {
+  // Orders tab: welcome, stats, orders to fulfill and history.
+  Widget _workTab(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final active = _orders
         .where((o) =>
@@ -338,7 +391,9 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
     final newCount =
         _orders.where((o) => '${o['status']}' == 'placed').length;
 
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
       padding: const EdgeInsets.all(16),
       children: [
         RCard(
@@ -376,36 +431,6 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-        ProviderProfileForm(
-          table: 'pharmacies',
-          profile: _profile,
-          repo: _repo,
-          onSaved: _load,
-        ),
-        const SizedBox(height: 16),
-        ProviderUpiSettingsCard(
-          table: 'pharmacies',
-          profile: _profile,
-          repo: _repo,
-          onSaved: _load,
-        ),
-        const SizedBox(height: 16),
-        ProviderOnlinePayments(repo: _repo),
-        const SizedBox(height: 16),
-        RouteOnboardingTile(
-          providerType: 'pharmacy',
-          providerId: '${_profile?['id'] ?? ''}',
-          providerName: '${_profile?['name'] ?? ''}',
-        ),
-        const SizedBox(height: 16),
-        PharmacyMedicinesManager(repo: _repo),
-        const SizedBox(height: 16),
-        ProviderWalletCard(
-          repo: _repo,
-          providerType: 'pharmacy',
-          providerId: '${_profile?['id'] ?? ''}',
         ),
         const SizedBox(height: 16),
         Row(
@@ -470,9 +495,84 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
           ...done.take(10).map((o) => _orderCard(context, o)),
         ],
         const SizedBox(height: 24),
-        ProviderReviewsList(reviews: _reviews),
-        const SizedBox(height: 16),
       ],
+    ),
+    );
+  }
+
+  // Medicines tab: stock and catalogue.
+  Widget _medicinesTab(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+        PharmacyMedicinesManager(repo: _repo),
+        ],
+      ),
+    );
+  }
+
+  // Profile tab: the provider profile form and setup.
+  Widget _profileTab(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+        ProviderProfileForm(
+          table: 'pharmacies',
+          profile: _profile,
+          repo: _repo,
+          onSaved: _load,
+        ),
+        const SizedBox(height: 16),
+        RouteOnboardingTile(
+          providerType: 'pharmacy',
+          providerId: '${_profile?['id'] ?? ''}',
+          providerName: '${_profile?['name'] ?? ''}',
+        ),
+        ],
+      ),
+    );
+  }
+
+  // Payments tab: UPI settings, online payments and wallet.
+  Widget _paymentsTab(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+        ProviderUpiSettingsCard(
+          table: 'pharmacies',
+          profile: _profile,
+          repo: _repo,
+          onSaved: _load,
+        ),
+        const SizedBox(height: 16),
+        ProviderOnlinePayments(repo: _repo),
+        const SizedBox(height: 16),
+        ProviderWalletCard(
+          repo: _repo,
+          providerType: 'pharmacy',
+          providerId: '${_profile?['id'] ?? ''}',
+        ),
+        ],
+      ),
+    );
+  }
+
+  // Reviews tab: what patients said.
+  Widget _reviewsTab(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+        ProviderReviewsList(reviews: _reviews),
+        ],
+      ),
     );
   }
 

@@ -34,7 +34,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     // Refresh restore (owner order 2026-10-23): remember the
     // driver tab and reopen on it after a page refresh.
     _tabs.addListener(() {
@@ -167,6 +167,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
             Tab(text: 'Deliveries'),
             Tab(text: 'Earnings'),
             Tab(text: 'History'),
+            Tab(text: 'Profile'),
           ],
         ),
       ),
@@ -244,12 +245,75 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
                             _deliveryList(active, actionable: true),
                             _earningsTab(doneToday, codToday, done),
                             _deliveryList(done, actionable: false),
+                            _profileTab(),
                           ],
                         ),
                       ),
                     ],
                   ),
                 ),
+    );
+  }
+
+  /// Profile tab (panels check, owner order 2026-10-23): every
+  /// other panel has a Profile tab; the driver panel showed the
+  /// details only inside the online banner. Read-only here — the
+  /// admin manages driver profiles in Admin > Providers > Drivers.
+  Widget _profileTab() {
+    final d = _driver ?? const <String, dynamic>{};
+    String v(String k) => '${d[k] ?? ''}'.trim().isEmpty ? '—' : '${d[k]}';
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        RCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Driver profile',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
+              _profileRow('Name', v('name')),
+              _profileRow('Phone', v('phone')),
+              _profileRow('Vehicle type', v('vehicle_type')),
+              _profileRow('Vehicle number', v('vehicle_number')),
+              _profileRow('Status', v('status')),
+              _profileRow(
+                  'Active', d['is_active'] == false ? 'No' : 'Yes'),
+              const SizedBox(height: 8),
+              const Text(
+                'To change any of these details, ask the Remedoo admin '
+                '— driver profiles are managed from the admin panel.',
+                style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _profileRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B7280))),
+          ),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
     );
   }
 

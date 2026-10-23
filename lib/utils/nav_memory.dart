@@ -13,9 +13,20 @@ abstract final class NavMemory {
   static const mainTab = 'nav_main_tab';
   static const adminTab = 'nav_admin_tab_v3';
   static const doctorTab = 'nav_doctor_tab';
+  static const hospitalTab = 'nav_hospital_tab';
+  static const labTab = 'nav_lab_tab';
+  static const pharmacyTab = 'nav_pharmacy_tab';
   static const driverTab = 'nav_driver_tab';
 
-  static const allKeys = [mainTab, adminTab, doctorTab, driverTab];
+  static const allKeys = [
+    mainTab,
+    adminTab,
+    doctorTab,
+    hospitalTab,
+    labTab,
+    pharmacyTab,
+    driverTab,
+  ];
 
   static Future<int?> read(String key) async {
     try {

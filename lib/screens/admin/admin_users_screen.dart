@@ -173,6 +173,18 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // User ID (panels check 2026-10-23): shown so the
+                // admin can copy it where an ID is needed — e.g.
+                // linking a driver profile in Providers > Drivers.
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: SelectableText(
+                    'User ID: ${u['user_id'] ?? ''}',
+                    style: const TextStyle(
+                        fontSize: 11.5, color: Color(0xFF6B7280)),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     CircleAvatar(
