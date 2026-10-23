@@ -54,7 +54,10 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const AdminTableScreen(table: 'pharmacies', title: 'Pharmacies', singular: 'Pharmacy')),
       _NavItem('Users', 'Users', Icons.people,
           (_) => const AdminUsersScreen()),
-      // Catalog — things, not people.
+      // Catalog — things and sellable plans, not people. Corporate
+      // Plans, Healthcare Packages and Subscriptions moved here
+      // from Settings (sidebar rearrange, owner order 2026-10-23):
+      // they are offerings, not app settings.
       _NavItem('Catalog', 'Lab Tests', Icons.biotech,
           (_) => const AdminTableScreen(table: 'lab_tests', title: 'Lab Tests', singular: 'Lab Test')),
       _NavItem('Catalog', 'Medicines', Icons.medication,
@@ -63,13 +66,30 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const AdminInventoryScreen()),
       _NavItem('Catalog', 'Coupons', Icons.local_offer,
           (_) => const AdminTableScreen(table: 'coupons', title: 'Coupons', singular: 'Coupon')),
-      // Providers
+      _NavItem('Catalog', 'Corporate Plans', Icons.business,
+          (_) => const CorporatePlansScreen()),
+      _NavItem('Catalog', 'Healthcare Packages', Icons.health_and_safety,
+          (_) => const HealthcarePackagesScreen()),
+      _NavItem('Catalog', 'Subscriptions', Icons.card_membership,
+          (_) => const SubscriptionsScreen()),
+      // Providers — applications and reviews; Drivers added
+      // 2026-10-23 (owner: 'add more if anything missing') — the
+      // delivery_drivers table had no admin screen at all, so a
+      // driver profile (needed before a driver can receive
+      // deliveries) could never be created or checked here.
       _NavItem('Providers', 'Applications', Icons.approval,
           (_) => const AdminApprovalsScreen()),
-      _NavItem('Providers', 'Payments (UPI)', Icons.qr_code,
-          (_) => const AdminProviderPaymentsScreen()),
       _NavItem('Providers', 'Reviews', Icons.star,
           (_) => const AdminReviewsScreen()),
+      _NavItem('Providers', 'Drivers', Icons.delivery_dining,
+          (_) => const AdminTableScreen(table: 'delivery_drivers', title: 'Drivers', singular: 'Driver')),
+      // Payments — all money in one section (rearrange
+      // 2026-10-23): Remedoo Pay plus the per-provider UPI
+      // payments screen, which used to sit under Providers.
+      _NavItem('Payments', 'Remedoo Pay', Icons.qr_code_2,
+          (_) => const AdminRemedooPayScreen()),
+      _NavItem('Payments', 'Payments (UPI)', Icons.qr_code,
+          (_) => const AdminProviderPaymentsScreen()),
       // Orders & Care
       _NavItem('Orders & Care', 'Orders', Icons.shopping_bag,
           (_) => const AdminOrdersScreen()),
@@ -88,9 +108,13 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const AdminSupportTicketsScreen()),
       _NavItem('Support', 'Account Deletion', Icons.schedule_outlined,
           (_) => const AdminAccountDeletionScreen()),
-      // Content — announcements appear in the app for users
+      // Content — Announcements and Broadcasts side by side
+      // (rearrange 2026-10-23: they were separated by four items
+      // and easy to confuse).
       _NavItem('Content', 'Announcements', Icons.campaign,
           (_) => const AdminBroadcastScreen()),
+      _NavItem('Content', 'Broadcasts', Icons.campaign_outlined,
+          (_) => const BroadcastsScreen()),
       _NavItem('Content', 'FAQs', Icons.help_outline,
           (_) => const AdminTableScreen(table: 'faqs', title: 'FAQs', singular: 'FAQ')),
       _NavItem('Content', 'Legal Pages', Icons.gavel,
@@ -99,29 +123,21 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const AdminTableScreen(table: 'slider_media', title: 'Home Slider', singular: 'Slide')),
       _NavItem('Content', 'Ads', Icons.ads_click,
           (_) => const AdminTableScreen(table: 'ads', title: 'Ads', singular: 'Ad')),
-      _NavItem('Content', 'Broadcasts', Icons.campaign_outlined,
-          (_) => const BroadcastsScreen()),
-      // Insights
+      // Insights — Export Data moved here from Settings
+      // (rearrange 2026-10-23): it is reports and downloads.
       _NavItem('Insights', 'Revenue', Icons.trending_up,
           (_) => const AdminRevenueScreen()),
       _NavItem('Insights', 'Analytics', Icons.analytics,
           (_) => const AdminAnalyticsScreen()),
-      // Payments — Remedoo Pay management
-      _NavItem('Payments', 'Remedoo Pay', Icons.qr_code_2,
-          (_) => const AdminRemedooPayScreen()),
-      // Settings — all persisted to the app_config backend
+      _NavItem('Insights', 'Export Data', Icons.download,
+          (_) => const AdminExportScreen()),
+      // Settings — app configuration only.
       _NavItem('Settings', 'App Settings', Icons.settings,
           (_) => const AdminAppSettingsScreen()),
       _NavItem('Settings', 'Branding', Icons.palette,
           (_) => const BrandingScreen()),
       _NavItem('Settings', 'Commission', Icons.percent,
           (_) => const CommissionScreen()),
-      _NavItem('Settings', 'Subscriptions', Icons.card_membership,
-          (_) => const SubscriptionsScreen()),
-      _NavItem('Settings', 'Corporate Plans', Icons.business,
-          (_) => const CorporatePlansScreen()),
-      _NavItem('Settings', 'Healthcare Packages', Icons.health_and_safety,
-          (_) => const HealthcarePackagesScreen()),
       _NavItem('Settings', 'Service Areas', Icons.map,
           (_) => const ServiceAreasScreen()),
       _NavItem('Settings', 'Featured', Icons.star_border,
@@ -131,9 +147,6 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // Team — staff (employee admin) management, super admin only.
       _NavItem('Settings', 'Team', Icons.group,
           (_) => const AdminTeamScreen()),
-      // Export Data — download project data (CSV / full backup JSON).
-      _NavItem('Settings', 'Export Data', Icons.download,
-          (_) => const AdminExportScreen()),
       // Panel Style — switch the admin UI style (owner order
       // 2026-10-18: try every style one by one, live).
       _NavItem('Settings', 'Panel Style', Icons.style,
@@ -145,21 +158,22 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
 /// only the items whose key the super admin ticked for them in
 /// Admin > Team ('team' itself is never visible to staff).
 /// Absolute indexes (used by the dashboard's quick links):
-/// 1 Doctors, 7 Medicines, 18 Support Tickets, 20 Announcements.
+/// 1 Doctors, 7 Medicines, 25 Announcements.
 const _permKeys = [
   'dashboard',
   'doctors', 'hospitals', 'labs', 'pharmacies', 'users',
   'lab_tests', 'medicines', 'inventory', 'coupons',
-  'applications', 'provider_payments', 'reviews',
+  'corporate', 'packages', 'subscriptions',
+  'applications', 'reviews', 'drivers',
+  'remedoo_pay', 'provider_payments',
   'orders', 'appointments', 'refunds', 'emergencies', 'ambulance',
   'support', 'support',
-  'announcements', 'faqs', 'legal_pages', 'slider_media', 'ads',
-  'broadcasts',
-  'revenue', 'analytics',
-  'remedoo_pay',
-  'settings', 'branding', 'commission', 'subscriptions', 'corporate',
-  'packages', 'service_areas', 'featured', 'platform_settings',
-  'team', 'export_data', 'panel_style',
+  'announcements', 'broadcasts', 'faqs', 'legal_pages', 'slider_media',
+  'ads',
+  'revenue', 'analytics', 'export_data',
+  'settings', 'branding', 'commission', 'service_areas', 'featured',
+  'platform_settings',
+  'team', 'panel_style',
 ];
 
 /// Admin console shell: light sidebar nav (desktop) / drawer (phone, tablet),

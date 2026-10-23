@@ -21,10 +21,16 @@ const kStaffSectionOptions = <(String, String)>[
   ('medicines', 'Medicines'),
   ('inventory', 'Inventory'),
   ('coupons', 'Coupons'),
+  ('corporate', 'Corporate Plans'),
+  ('packages', 'Healthcare Packages'),
+  ('subscriptions', 'Subscriptions'),
   // Providers
   ('applications', 'Applications'),
-  ('provider_payments', 'Payments (UPI)'),
   ('reviews', 'Reviews'),
+  ('drivers', 'Drivers'),
+  // Payments
+  ('remedoo_pay', 'Remedoo Pay'),
+  ('provider_payments', 'Payments (UPI)'),
   // Orders & Care
   ('orders', 'Orders'),
   ('appointments', 'Appointments'),
@@ -35,27 +41,22 @@ const kStaffSectionOptions = <(String, String)>[
   ('support', 'Support (Tickets, Chat, Account Deletion)'),
   // Content
   ('announcements', 'Announcements'),
+  ('broadcasts', 'Broadcasts'),
   ('faqs', 'FAQs'),
   ('legal_pages', 'Legal Pages'),
   ('slider_media', 'Home Slider'),
   ('ads', 'Ads'),
-  ('broadcasts', 'Broadcasts'),
   // Insights
   ('revenue', 'Revenue'),
   ('analytics', 'Analytics'),
-  // Payments
-  ('remedoo_pay', 'Remedoo Pay'),
+  ('export_data', 'Export Data'),
   // Settings
   ('settings', 'App Settings'),
   ('branding', 'Branding'),
   ('commission', 'Commission'),
-  ('subscriptions', 'Subscriptions'),
-  ('corporate', 'Corporate Plans'),
-  ('packages', 'Healthcare Packages'),
   ('service_areas', 'Service Areas'),
   ('featured', 'Featured'),
   ('platform_settings', 'Platform Settings'),
-  ('export_data', 'Export Data'),
   ('panel_style', 'Panel Style'),
 ];
 

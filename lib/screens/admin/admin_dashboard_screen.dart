@@ -144,8 +144,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
 
     // Stat cards arranged section-wise (owner order 2026-10-22),
-    // in the same sections as the sidebar: Users, Orders & Care,
-    // Providers, Support, Insights.
+    // in the same sections as the sidebar: Users, Providers,
+    // Orders & Care, Support, Insights (sidebar order re-confirmed
+    // in the 2026-10-23 rearrangement; absolute nav indexes below
+    // follow admin_shell.dart's _items order).
     final statGroups = <(String, List<Widget>)>[
       (
         'Users',
@@ -160,25 +162,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ]
       ),
       (
-        'Orders & Care',
-        [
-          _stat(context, 'Appointments', '${appts.length}',
-              Icons.calendar_month, _cPink,
-              onTap: () => widget.onNavigate?.call(14)),
-          _stat(context, 'Total Orders', '${state.adminOrders.length}',
-              Icons.shopping_bag, _cLav,
-              onTap: () => widget.onNavigate?.call(13)),
-          _stat(context, 'Active Emergencies', '$activeEmergencies',
-              Icons.sos, _cPink,
-              onTap: () => widget.onNavigate?.call(16)),
-        ]
-      ),
-      (
         'Providers',
         [
           _stat(context, 'Pending Approvals', '$pendingApprovals',
               Icons.approval, _cBlue,
-              onTap: () => widget.onNavigate?.call(10)),
+              onTap: () => widget.onNavigate?.call(13)),
+        ]
+      ),
+      (
+        'Orders & Care',
+        [
+          _stat(context, 'Appointments', '${appts.length}',
+              Icons.calendar_month, _cPink,
+              onTap: () => widget.onNavigate?.call(19)),
+          _stat(context, 'Total Orders', '${state.adminOrders.length}',
+              Icons.shopping_bag, _cLav,
+              onTap: () => widget.onNavigate?.call(18)),
+          _stat(context, 'Active Emergencies', '$activeEmergencies',
+              Icons.sos, _cPink,
+              onTap: () => widget.onNavigate?.call(21)),
         ]
       ),
       (
@@ -190,7 +192,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               '$pendingQueries',
               Icons.mark_chat_unread_outlined,
               _cPink,
-              onTap: () => widget.onNavigate?.call(18)),
+              onTap: () => widget.onNavigate?.call(23)),
         ]
       ),
       (
@@ -198,7 +200,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         [
           _stat(context, 'Revenue', inr(revenue), Icons.currency_rupee,
               _cGreen,
-              onTap: () => widget.onNavigate?.call(26)),
+              onTap: () => widget.onNavigate?.call(31)),
         ]
       ),
     ];
@@ -564,7 +566,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               PopupMenuItem(value: 1, child: Text('Add Doctor')),
               PopupMenuItem(value: 7, child: Text('Add Medicine')),
               PopupMenuItem(
-                  value: 20, child: Text('Send Announcement')),
+                  value: 25, child: Text('Send Announcement')),
             ],
             child: Container(
               padding:

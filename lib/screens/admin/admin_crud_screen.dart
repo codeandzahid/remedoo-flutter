@@ -1131,6 +1131,30 @@ List<AdminField> adminTableFields(String table) {
         AdminField(key: 'valid_until', label: 'Valid Until', type: 'date'),
         AdminField(key: 'is_active', label: 'Active', type: 'bool'),
       ];
+    case 'delivery_drivers':
+      // Sidebar rearrange 2026-10-23: the Drivers item is new —
+      // delivery_drivers had no admin screen, so a driver profile
+      // (required before a driver can receive deliveries) could
+      // never be created or fixed from the panel.
+      return const [
+        AdminField(key: 'name', label: 'Name', required: true),
+        AdminField(key: 'phone', label: 'Phone'),
+        AdminField(
+            key: 'vehicle_type',
+            label: 'Vehicle Type',
+            type: 'dropdown',
+            options: ['bike', 'scooter', 'car', 'van', 'bicycle'],
+            defaultValue: 'bike'),
+        AdminField(key: 'vehicle_number', label: 'Vehicle Number'),
+        AdminField(
+            key: 'status',
+            label: 'Status',
+            type: 'dropdown',
+            options: ['available', 'offline'],
+            defaultValue: 'available'),
+        AdminField(key: 'user_id', label: 'Linked User ID'),
+        AdminField(key: 'is_active', label: 'Active', type: 'bool'),
+      ];
     case 'faqs':
       return const [
         AdminField(
@@ -1227,6 +1251,11 @@ String adminTableSubtitle(String table, Map<String, dynamic> r) {
           .trim();
     case 'coupons':
       return '${r['discount_type'] ?? 'percentage'} ${r['discount_value'] ?? 0}'
+          '${r['is_active'] == true ? '' : ' · inactive'}';
+    case 'delivery_drivers':
+      return '${r['vehicle_type'] ?? 'bike'}'
+          '${r['vehicle_number'] != null ? ' · ${r['vehicle_number']}' : ''}'
+          ' · ${r['status'] ?? ''}'
           '${r['is_active'] == true ? '' : ' · inactive'}';
     case 'faqs':
       return '${r['category'] ?? 'general'}'
