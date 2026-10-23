@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../utils/device_actions.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/form_kit.dart';
 
@@ -1471,6 +1472,10 @@ class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
     var type = '${row?['type'] ?? 'city'}';
     String? parentId = row?['parent_id']?.toString();
     var active = row?['is_active'] != false;
+    // Busy state for the "Use GPS" fill button (owner order
+    // 2026-10-23: coordinates come from the device GPS, not
+    // typed values).
+    var gpsBusy = false;
     final candidates = rows
         .where((r) => row == null || '${r['id']}' != '${row['id']}')
         .toList();
@@ -1513,6 +1518,49 @@ class _ServiceAreasScreenState extends State<ServiceAreasScreen> {
                 ),
                 RKitField(controller: lat, label: 'Latitude', keyboardType: TextInputType.number),
                 RKitField(controller: lng, label: 'Longitude', keyboardType: TextInputType.number),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: gpsBusy
+                        ? null
+                        : () async {
+                            final messenger =
+                                ScaffoldMessenger.of(ctx);
+                            setD(() => gpsBusy = true);
+                            final coords =
+                                await fetchCurrentCoordinates();
+                            if (!mounted) return;
+                            setD(() => gpsBusy = false);
+                            if (coords != null) {
+                              lat.text =
+                                  coords.$1.toStringAsFixed(6);
+                              lng.text =
+                                  coords.$2.toStringAsFixed(6);
+                              // Rebuild so the filled values are
+                              // what the admin sees before saving.
+                              setD(() {});
+                              messenger.showSnackBar(const SnackBar(
+                                  content:
+                                      Text('Location set from GPS')));
+                            } else {
+                              messenger.showSnackBar(const SnackBar(
+                                  content: Text(
+                                      'Could not get GPS location. '
+                                      'Check location permission.')));
+                            }
+                          },
+                    icon: gpsBusy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2),
+                          )
+                        : const Icon(Icons.my_location, size: 18),
+                    label: const Text(
+                        'Use GPS (fill Latitude & Longitude)'),
+                  ),
+                ),
                 RKitField(controller: radius, label: 'Radius (km)', keyboardType: TextInputType.number),
                 RFormSwitchTile(
                   title: 'Active',

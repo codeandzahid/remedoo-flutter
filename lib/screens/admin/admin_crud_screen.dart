@@ -6,6 +6,7 @@ import '../../data/mock_data.dart' show specialties;
 import '../../responsive/responsive.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../utils/device_actions.dart';
 import '../../widgets/existing_user_lookup.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/form_kit.dart';
@@ -348,6 +349,11 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
       for (final f in fields.where((f) => f.type == 'dropdown'))
         f.key: _initialDrop(f, row?[f.key]),
     };
+    // Busy state for the "Use GPS" fill button (owner order
+    // 2026-10-23: forms take latitude/longitude from the device
+    // GPS instead of typed values). Lives with the controllers so
+    // the StatefulBuilder below can rebuild around it.
+    var gpsBusy = false;
     await showResponsiveDialog(
       context,
       (_) => StatefulBuilder(
@@ -448,6 +454,64 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
             );
           }
 
+          // The form's widgets, with the GPS fill button placed
+          // directly under the longitude field whenever this form
+          // carries BOTH coordinate fields (provider tables).
+          final hasLatLng = ctrls.containsKey('latitude') &&
+              ctrls.containsKey('longitude');
+          final formChildren = <Widget>[];
+          for (final f in fields) {
+            formChildren.add(fieldWidget(f));
+            if (hasLatLng && f.key == 'longitude') {
+              formChildren.add(Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: gpsBusy
+                        ? null
+                        : () async {
+                            setD(() => gpsBusy = true);
+                            final coords =
+                                await fetchCurrentCoordinates();
+                            if (!mounted) return;
+                            setD(() => gpsBusy = false);
+                            if (coords != null) {
+                              ctrls['latitude']!.text =
+                                  coords.$1.toStringAsFixed(6);
+                              ctrls['longitude']!.text =
+                                  coords.$2.toStringAsFixed(6);
+                              // Rebuild so the filled values are
+                              // what the admin sees before saving.
+                              setD(() {});
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(const SnackBar(
+                                      content:
+                                          Text('Location set from GPS')));
+                            } else {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(const SnackBar(
+                                      content: Text(
+                                          'Could not get GPS location. '
+                                          'Check location permission.')));
+                            }
+                          },
+                    icon: gpsBusy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2),
+                          )
+                        : const Icon(Icons.my_location, size: 18),
+                    label: const Text(
+                        'Use GPS (fill Latitude & Longitude)'),
+                  ),
+                ),
+              ));
+            }
+          }
+
           final dialog = Dialog(
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20)),
@@ -468,7 +532,7 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                           const EdgeInsets.fromLTRB(20, 18, 20, 4),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        children: fields.map(fieldWidget).toList(),
+                        children: formChildren,
                       ),
                     ),
                   ),
@@ -590,6 +654,21 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                     } else {
                       values[f.key] = text;
                     }
+                  }
+                  if (widget.table == 'coupons' &&
+                      values['code'] is String) {
+                    // Store coupon codes in the canonical
+                    // upper-case form that is shared with
+                    // customers (bug fix 2026-10-23: a code saved
+                    // in mixed case, e.g. "Save10", was reported
+                    // "Coupon not found" at patient checkout,
+                    // which queried a different casing than the
+                    // one stored). Checkout lookup is also
+                    // case-insensitive now, so existing mixed-case
+                    // rows keep working; this just keeps new and
+                    // edited rows canonical.
+                    values['code'] =
+                        (values['code'] as String).toUpperCase();
                   }
                   if (row != null) values['id'] = row['id'];
                   // Full-check fix 2026-10-22: the dialog used to
@@ -721,6 +800,10 @@ List<AdminField> adminTableFields(String table) {
             type: 'fk',
             fkTable: 'hospitals'),
         const AdminField(
+            key: 'latitude', label: 'Latitude', type: 'double'),
+        const AdminField(
+            key: 'longitude', label: 'Longitude', type: 'double'),
+        const AdminField(
             key: 'consultation_fee', label: 'Fee (₹)', type: 'double'),
         const AdminField(
             key: 'rating',
@@ -839,6 +922,8 @@ List<AdminField> adminTableFields(String table) {
       return const [
         AdminField(key: 'name', label: 'Name', required: true),
         AdminField(key: 'location', label: 'Location'),
+        AdminField(key: 'latitude', label: 'Latitude', type: 'double'),
+        AdminField(key: 'longitude', label: 'Longitude', type: 'double'),
         AdminField(key: 'phone', label: 'Phone'),
         AdminField(
             key: 'services',
@@ -931,6 +1016,8 @@ List<AdminField> adminTableFields(String table) {
       return const [
         AdminField(key: 'name', label: 'Name', required: true),
         AdminField(key: 'location', label: 'Location'),
+        AdminField(key: 'latitude', label: 'Latitude', type: 'double'),
+        AdminField(key: 'longitude', label: 'Longitude', type: 'double'),
         AdminField(key: 'phone', label: 'Phone'),
         AdminField(key: 'rating', label: 'Rating', type: 'double', min: 0, max: 5),
         AdminField(key: 'image_url', label: 'Photo URL', type: 'url'),
