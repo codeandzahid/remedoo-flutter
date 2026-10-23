@@ -144,19 +144,22 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const BrandingScreen()),
       _NavItem('Settings', 'Commission', Icons.percent,
           (_) => const CommissionScreen()),
-      _NavItem('Settings', 'Service Areas', Icons.map,
-          (_) => const ServiceAreasScreen()),
-      _NavItem('Settings', 'Featured', Icons.star_border,
-          (_) => const FeaturedScreen()),
       _NavItem('Settings', 'Platform Settings', Icons.tune,
           (_) => const AdminTableScreen(table: 'platform_settings', title: 'Platform Settings', singular: 'Setting')),
-      // Team — staff (employee admin) management, super admin only.
-      _NavItem('Settings', 'Team', Icons.group,
-          (_) => const AdminTeamScreen()),
       // Panel Style — switch the admin UI style (owner order
       // 2026-10-18: try every style one by one, live).
       _NavItem('Settings', 'Panel Style', Icons.style,
           (s) => AdminStyleScreen(state: s)),
+      // Management — the Settings section split in two (owner
+      // order 2026-10-23: too many options in Settings). Day-to-day
+      // running of the platform: coverage areas, homepage picks
+      // and the staff team. Team is super admin only.
+      _NavItem('Management', 'Service Areas', Icons.map,
+          (_) => const ServiceAreasScreen()),
+      _NavItem('Management', 'Featured', Icons.star_border,
+          (_) => const FeaturedScreen()),
+      _NavItem('Management', 'Team', Icons.group,
+          (_) => const AdminTeamScreen()),
     ];
 
 /// Permission key per nav item, aligned with [_items] by index.
@@ -177,9 +180,9 @@ const _permKeys = [
   'announcements', 'broadcasts', 'faqs', 'legal_pages', 'slider_media',
   'ads',
   'revenue', 'analytics', 'export_data',
-  'settings', 'branding', 'commission', 'service_areas', 'featured',
-  'platform_settings',
-  'team', 'panel_style',
+  'settings', 'branding', 'commission', 'platform_settings',
+  'panel_style',
+  'service_areas', 'featured', 'team',
 ];
 
 /// Admin console shell: light sidebar nav (desktop) / drawer (phone, tablet),

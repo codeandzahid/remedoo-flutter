@@ -5,7 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// Sidebar rearrangement (owner order 2026-10-23): plans moved
 /// from Settings to Catalog, Payments (UPI) joined Remedoo Pay
 /// under Payments, Export Data moved to Insights, Announcements
-/// and Broadcasts sit together, and a Drivers item was added
+/// and Broadcasts sit together, a Drivers item was added, and
+/// Settings was later split into Settings + Management
 /// (delivery_drivers had no admin screen). The permission keys,
 /// the Team section catalog and the dashboard's absolute links
 /// must all follow the same order.
@@ -40,8 +41,11 @@ void main() {
     expect(keys[27], 'broadcasts');
     expect(keys[32], 'revenue');
     expect(keys[34], 'export_data');
-    expect(keys[41], 'team');
-    expect(keys[42], 'panel_style');
+    expect(keys[38], 'platform_settings');
+    expect(keys[39], 'panel_style');
+    expect(keys[40], 'service_areas');
+    expect(keys[41], 'featured');
+    expect(keys[42], 'team');
   });
 
   test('drivers item exists in sidebar, team catalog and CRUD', () {

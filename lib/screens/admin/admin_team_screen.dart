@@ -54,10 +54,11 @@ const kStaffSectionOptions = <(String, String)>[
   ('settings', 'App Settings'),
   ('branding', 'Branding'),
   ('commission', 'Commission'),
-  ('service_areas', 'Service Areas'),
-  ('featured', 'Featured'),
   ('platform_settings', 'Platform Settings'),
   ('panel_style', 'Panel Style'),
+  // Management ('team' itself is never assignable to staff)
+  ('service_areas', 'Service Areas'),
+  ('featured', 'Featured'),
 ];
 
 String staffSectionLabel(String key) {
