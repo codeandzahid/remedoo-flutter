@@ -13,7 +13,7 @@ void main() {
   test('NavMemory helper stores per-surface tab keys', () {
     final s = read('lib/utils/nav_memory.dart');
     expect(s.contains("static const mainTab = 'nav_main_tab'"), isTrue);
-    expect(s.contains("static const adminTab = 'nav_admin_tab_v2'"), isTrue);
+    expect(s.contains("static const adminTab = 'nav_admin_tab_v3'"), isTrue);
     expect(s.contains("static const doctorTab = 'nav_doctor_tab'"), isTrue);
     expect(s.contains("static const driverTab = 'nav_driver_tab'"), isTrue);
     expect(s.contains('clearAll'), isTrue);

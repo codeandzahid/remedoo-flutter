@@ -38,7 +38,7 @@ const kStaffSectionOptions = <(String, String)>[
   ('emergencies', 'Emergencies'),
   ('ambulance', 'Ambulance'),
   // Support
-  ('support', 'Support (Tickets, Chat, Account Deletion)'),
+  ('support', 'Support (Tickets, Chat, Account Deletion, Users)'),
   // Content
   ('announcements', 'Announcements'),
   ('broadcasts', 'Broadcasts'),

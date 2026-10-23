@@ -4,14 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// surface, so a page refresh (or an app relaunch) returns them
 /// to the same screen instead of throwing them back to the
 /// dashboard (owner report 2026-10-23). The admin key carries a
-/// v2 suffix: the sidebar was rearranged the same day, and the old
+/// versioned suffix: the sidebar order changed on 2026-10-23, and the old
 /// saved index would have landed on a different section.
 ///
 /// Keys are cleared on logout (AppState.logout) so the next
 /// account never inherits the previous one's place.
 abstract final class NavMemory {
   static const mainTab = 'nav_main_tab';
-  static const adminTab = 'nav_admin_tab_v2';
+  static const adminTab = 'nav_admin_tab_v3';
   static const doctorTab = 'nav_doctor_tab';
   static const driverTab = 'nav_driver_tab';
 

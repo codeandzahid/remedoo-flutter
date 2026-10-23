@@ -83,9 +83,12 @@ Dashboard → Edge Functions → deploy from the repo copies in
 2. `admin-staff` — REDEPLOY the extended version. The new
    `update_email` / `set_password` actions power the admin Users
    full edit (change any account's login email or password, after
-   the admin's own email OTP). Until this redeploy, photo and all
+   the admin's own email OTP). The `create_user` action (added
+   2026-10-23) powers Support → Users → Add user (creates a plain
+   'user' account). Until this redeploy, photo and all
    other detail edits save normally, but email/password saves
-   return the function's "Unknown action" error.
+   return the function's "Unknown action" error, and Add user in
+   Support shows the same error and creates nothing.
 
 ## Step 2c — Quick checks for the new items
 

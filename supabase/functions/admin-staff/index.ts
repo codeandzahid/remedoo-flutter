@@ -7,6 +7,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // via RLS, the app only shows those sections.
 //
 // POST { action: 'create', name, email, password, sections: string[] }
+// POST { action: 'create_user', name, email, password, phone? }
+//   — a plain patient/user account (role 'user', no staff sections);
+//   powers Support > Users > Add user (owner order 2026-10-23).
 // POST { action: 'delete', user_id }
 // POST { action: 'update_email', user_id, email }   — any account
 // POST { action: 'set_password', user_id, password } — any account
@@ -102,6 +105,43 @@ serve(async (req) => {
         await admin
           .from('profiles')
           .update({ full_name: name })
+          .eq('user_id', uid);
+      } catch (_) {
+        // best effort — the account works without it
+      }
+      return json({ ok: true, user_id: uid });
+    }
+
+    if (action === 'create_user') {
+      const name = String(body.name ?? '').trim();
+      const email = String(body.email ?? '').trim().toLowerCase();
+      const password = String(body.password ?? '');
+      const phone = String(body.phone ?? '').trim();
+      if (!name || !email || !email.includes('@')) {
+        return json({ error: 'Name and a valid email are required.' }, 400);
+      }
+      if (password.length < 8) {
+        return json(
+          { error: 'Password must be at least 8 characters.' }, 400);
+      }
+      const { data: created, error: createErr } =
+        await admin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { name },
+        });
+      if (createErr || !created?.user) {
+        return json(
+          { error: createErr?.message || 'Could not create the account.' },
+          400);
+      }
+      const uid = created.user.id;
+      await admin.from('user_roles').insert({ user_id: uid, role: 'user' });
+      try {
+        await admin
+          .from('profiles')
+          .update({ full_name: name, ...(phone ? { phone } : {}) })
           .eq('user_id', uid);
       } catch (_) {
         // best effort — the account works without it

@@ -200,7 +200,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         [
           _stat(context, 'Revenue', inr(revenue), Icons.currency_rupee,
               _cGreen,
-              onTap: () => widget.onNavigate?.call(31)),
+              onTap: () => widget.onNavigate?.call(32)),
         ]
       ),
     ];
@@ -566,7 +566,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               PopupMenuItem(value: 1, child: Text('Add Doctor')),
               PopupMenuItem(value: 7, child: Text('Add Medicine')),
               PopupMenuItem(
-                  value: 25, child: Text('Send Announcement')),
+                  value: 26, child: Text('Send Announcement')),
             ],
             child: Container(
               padding:

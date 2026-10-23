@@ -16,7 +16,13 @@ import '../../widgets/form_kit.dart';
 /// order (2026-10-23); a role is set when an account is created
 /// or when a provider application is approved.
 class AdminUsersScreen extends StatefulWidget {
-  const AdminUsersScreen({super.key});
+  /// When true, an "Add user" button shows at the top — used by
+  /// the Support section's Users item (owner order 2026-10-23:
+  /// support can add users and manage them). Account creation
+  /// runs through the admin-staff function's create_user action.
+  final bool allowAddUser;
+
+  const AdminUsersScreen({super.key, this.allowAddUser = false});
 
   @override
   State<AdminUsersScreen> createState() => _AdminUsersScreenState();
@@ -35,6 +41,99 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Future<void> _load() async {
     await AppStateScope.of(context).loadAllProfiles();
     if (mounted) setState(() => _loading = false);
+  }
+
+  /// Add user (owner order 2026-10-23, Support > Users): creates
+  /// a plain user account (role 'user') through the admin-staff
+  /// function. Until the extended function is deployed (dashboard
+  /// sitting), the server answers with an error and nothing is
+  /// created — the message is shown as-is.
+  Future<void> _addUser() async {
+    final name = TextEditingController();
+    final email = TextEditingController();
+    final phone = TextEditingController();
+    final password = TextEditingController();
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const RFormHeaderBand(
+                title: 'Add user',
+                icon: Icons.person_add_outlined,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    RKitField(
+                        controller: name,
+                        label: 'Full name',
+                        icon: Icons.person_outline),
+                    const SizedBox(height: 14),
+                    RKitField(
+                        controller: email,
+                        label: 'Email (login)',
+                        icon: Icons.mail_outline),
+                    const SizedBox(height: 14),
+                    RKitField(
+                        controller: phone,
+                        label: 'Phone (optional)',
+                        icon: Icons.phone_outlined),
+                    const SizedBox(height: 14),
+                    RKitField(
+                      controller: password,
+                      label: 'Password (min 8 characters)',
+                      icon: Icons.lock_outline,
+                      obscureText: true,
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: RFormActions(
+                  onCancel: () => Navigator.of(ctx).pop(false),
+                  primaryLabel: 'Create account',
+                  onPrimary: () => Navigator.of(ctx).pop(true),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (go != true || !mounted) return;
+    final n = name.text.trim();
+    final e = email.text.trim();
+    if (n.isEmpty || !e.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Enter a name and a valid email.')));
+      return;
+    }
+    if (password.text.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Password must be at least 8 characters.')));
+      return;
+    }
+    final err = await SupabaseRepository.instance.invokeAdminStaff({
+      'action': 'create_user',
+      'name': n,
+      'email': e,
+      'phone': phone.text.trim(),
+      'password': password.text,
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err ?? 'User created.')));
+    if (err == null) _load();
   }
 
   /// Profile + status editor (audit Admin gap 6; extended
@@ -335,6 +434,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       fontSize: 12,
                       color: scheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600)),
+              const Spacer(),
+              if (widget.allowAddUser)
+                RButton(
+                  label: 'Add user',
+                  icon: Icons.person_add_outlined,
+                  small: true,
+                  onPressed: _addUser,
+                ),
             ],
           ),
         ),

@@ -108,6 +108,12 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
           (_) => const AdminSupportTicketsScreen()),
       _NavItem('Support', 'Account Deletion', Icons.schedule_outlined,
           (_) => const AdminAccountDeletionScreen()),
+      // Support > Users (owner order 2026-10-23): support can add
+      // users and manage them — active/inactive and change
+      // details — without leaving the Support section. Same
+      // screen as Users > Users, with the Add user button on.
+      _NavItem('Support', 'Users', Icons.people_outline,
+          (_) => const AdminUsersScreen(allowAddUser: true)),
       // Content — Announcements and Broadcasts side by side
       // (rearrange 2026-10-23: they were separated by four items
       // and easy to confuse).
@@ -158,7 +164,7 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
 /// only the items whose key the super admin ticked for them in
 /// Admin > Team ('team' itself is never visible to staff).
 /// Absolute indexes (used by the dashboard's quick links):
-/// 1 Doctors, 7 Medicines, 25 Announcements.
+/// 1 Doctors, 7 Medicines, 26 Announcements.
 const _permKeys = [
   'dashboard',
   'doctors', 'hospitals', 'labs', 'pharmacies', 'users',
@@ -167,7 +173,7 @@ const _permKeys = [
   'applications', 'reviews', 'drivers',
   'remedoo_pay', 'provider_payments',
   'orders', 'appointments', 'refunds', 'emergencies', 'ambulance',
-  'support', 'support',
+  'support', 'support', 'support',
   'announcements', 'broadcasts', 'faqs', 'legal_pages', 'slider_media',
   'ads',
   'revenue', 'analytics', 'export_data',

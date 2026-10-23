@@ -24,7 +24,7 @@ void main() {
 
   test('perm keys match the new sidebar order and count', () {
     final keys = permKeys(read('lib/screens/admin/admin_shell.dart'));
-    expect(keys.length, 42);
+    expect(keys.length, 43);
     expect(keys[0], 'dashboard');
     expect(keys[10], 'corporate');
     expect(keys[11], 'packages');
@@ -34,12 +34,14 @@ void main() {
     expect(keys[16], 'remedoo_pay');
     expect(keys[17], 'provider_payments');
     expect(keys[23], 'support');
-    expect(keys[25], 'announcements');
-    expect(keys[26], 'broadcasts');
-    expect(keys[31], 'revenue');
-    expect(keys[33], 'export_data');
-    expect(keys[40], 'team');
-    expect(keys[41], 'panel_style');
+    // Support > Users (2026-10-23) also rides the 'support' key.
+    expect(keys[25], 'support');
+    expect(keys[26], 'announcements');
+    expect(keys[27], 'broadcasts');
+    expect(keys[32], 'revenue');
+    expect(keys[34], 'export_data');
+    expect(keys[41], 'team');
+    expect(keys[42], 'panel_style');
   });
 
   test('drivers item exists in sidebar, team catalog and CRUD', () {
@@ -59,8 +61,8 @@ void main() {
     expect(s.contains('onNavigate?.call(18))'), isTrue); // Orders
     expect(s.contains('onNavigate?.call(21))'), isTrue); // Emergencies
     expect(s.contains('onNavigate?.call(23))'), isTrue); // Support
-    expect(s.contains('onNavigate?.call(31))'), isTrue); // Revenue
-    expect(s.contains("value: 25, child: Text('Send Announcement')"),
+    expect(s.contains('onNavigate?.call(32))'), isTrue); // Revenue
+    expect(s.contains("value: 26, child: Text('Send Announcement')"),
         isTrue);
   });
 
