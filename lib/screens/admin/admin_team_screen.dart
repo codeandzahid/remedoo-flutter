@@ -106,7 +106,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     final state = AppStateScope.of(context);
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => const _CreateStaffDialog(),
+      builder: (_) => const CreateStaffDialog(),
     );
     if (result == null) return;
     final err = await state.supabaseRepository.invokeAdminStaff({
@@ -469,18 +469,38 @@ class _AccessDialogState extends State<_AccessDialog> {
   }
 }
 
-class _CreateStaffDialog extends StatefulWidget {
-  const _CreateStaffDialog();
+/// Create-staff dialog (Team screen). Also reused by the Support
+/// section's "Add support user" (owner order 2026-10-23) with the
+/// Support section preset and locked.
+class CreateStaffDialog extends StatefulWidget {
+  final String title;
+  final Set<String> presetSections;
+  final bool lockSections;
+  final String? lockedNote;
+
+  const CreateStaffDialog({
+    super.key,
+    this.title = 'Add staff account',
+    this.presetSections = const {},
+    this.lockSections = false,
+    this.lockedNote,
+  });
 
   @override
-  State<_CreateStaffDialog> createState() => _CreateStaffDialogState();
+  State<CreateStaffDialog> createState() => _CreateStaffDialogState();
 }
 
-class _CreateStaffDialogState extends State<_CreateStaffDialog> {
+class _CreateStaffDialogState extends State<CreateStaffDialog> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
   Set<String> _picked = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _picked = {...widget.presetSections};
+  }
 
   @override
   void dispose() {
@@ -511,8 +531,8 @@ class _CreateStaffDialogState extends State<_CreateStaffDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const RFormHeaderBand(
-                title: 'Add staff account',
+              RFormHeaderBand(
+                title: widget.title,
                 icon: Icons.person_add_outlined,
               ),
               Flexible(
@@ -538,17 +558,28 @@ class _CreateStaffDialogState extends State<_CreateStaffDialog> {
                         obscureText: true,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Which sections can this person open?',
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
+                      if (widget.lockSections) ...[
+                        Text(
+                          widget.lockedNote ??
+                              'This person will get the sections above only.',
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      _SectionPicker(
-                        initial: const {},
-                        onChanged: (s) => _picked = s,
-                      ),
+                      ] else ...[
+                        const Text(
+                          'Which sections can this person open?',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        _SectionPicker(
+                          initial: widget.presetSections,
+                          onChanged: (s) => _picked = s,
+                        ),
+                      ],
                     ],
                   ),
                 ),

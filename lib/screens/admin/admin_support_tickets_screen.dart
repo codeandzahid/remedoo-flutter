@@ -5,6 +5,7 @@ import '../../state/app_state.dart';
 import '../../widgets/support_chat_widgets.dart';
 import '../../widgets/widgets.dart';
 import 'admin_support_chat_screen.dart';
+import 'admin_team_screen.dart';
 
 /// Admin support — WhatsApp-style chat list.
 /// Every user query is a conversation: sender name + avatar, last
@@ -32,6 +33,38 @@ class _AdminSupportTicketsScreenState
 
   /// ticket_id -> unread user messages count.
   final Map<String, int> _unread = {};
+
+  /// Add support user (owner order 2026-10-23): creates a staff
+  /// account that can open ONLY the Support section — the same
+  /// server path as Team > Add staff, with the section locked to
+  /// 'support'. The admin-staff function itself refuses anyone
+  /// who is not the super admin, and the button is only shown to
+  /// the super admin.
+  Future<void> _addSupportUser() async {
+    final state = AppStateScope.of(context);
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => const CreateStaffDialog(
+        title: 'Add support user',
+        presetSections: {'support'},
+        lockSections: true,
+        lockedNote:
+            'This person will get the Support section only — tickets, chats and account deletion.',
+      ),
+    );
+    if (result == null || !mounted) return;
+    final err = await state.supabaseRepository.invokeAdminStaff({
+      'action': 'create',
+      'name': result['name'],
+      'email': result['email'],
+      'password': result['password'],
+      'sections': result['sections'],
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(err ??
+            'Support user created. They can log in now and will see only the Support section.')));
+  }
 
   @override
   void initState() {
@@ -154,6 +187,15 @@ class _AdminSupportTicketsScreenState
                 tooltip: 'Refresh',
                 onPressed: _load,
               ),
+              if (state.isAdmin) ...[
+                const SizedBox(width: 4),
+                RButton(
+                  label: 'Add support user',
+                  icon: Icons.person_add_outlined,
+                  small: true,
+                  onPressed: _addSupportUser,
+                ),
+              ],
             ],
           ),
         ),
