@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../utils/nav_memory.dart';
+import '../../utils/provider_team.dart';
 import '../../theme.dart';
 import '../../widgets/provider_payments.dart';
+import '../../widgets/provider_team_screen.dart';
 import '../../widgets/provider_profile_form.dart';
 import '../../widgets/lab_catalogue_manager.dart';
 import '../../widgets/lab_samples_manager.dart';
@@ -30,6 +32,11 @@ class _LabDashboardState extends State<LabDashboard> {
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _bookings = [];
   List<Map<String, dynamic>> _reviews = [];
+  // Provider team (2026-10-24): owner sees all tabs + Team;
+  // members see only their allowed tabs.
+  bool _isOwner = true;
+  Map<String, String> _teamAccess = fullTeamAccess('lab');
+  String? _teamProviderId;
 
   SupabaseRepository get _repo =>
       AppStateScope.of(context).supabaseRepository;
@@ -45,7 +52,7 @@ class _LabDashboardState extends State<LabDashboard> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final saved = await NavMemory.read(NavMemory.labTab);
       if (!mounted || saved == null) return;
-      if (saved > 0 && saved < 5 && saved != _tab) {
+      if (saved > 0 && saved < 6 && saved != _tab) {
         setState(() => _tab = saved);
       }
     });
@@ -60,11 +67,15 @@ class _LabDashboardState extends State<LabDashboard> {
       final profile = await _repo.fetchOwnProviderRecord('labs');
       final bookings = await _repo.fetchLabBookings();
       final reviews = await _repo.fetchProviderReviews('lab', 'labs');
+      final teamCtx = await _repo.fetchOwnTeamContext('labs');
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _bookings = bookings;
         _reviews = reviews;
+        _isOwner = teamCtx.isOwner;
+        _teamAccess = teamCtx.access;
+        _teamProviderId = teamCtx.providerId;
         _loading = false;
       });
     } catch (e) {
@@ -131,6 +142,58 @@ class _LabDashboardState extends State<LabDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // Team tabs (2026-10-24): members see only allowed tabs,
+    // owners also get the Team tab.
+    final tabState = partnerTabs(
+      entries: [
+        (
+          'bookings',
+          _workTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.science),
+            label: 'Bookings',
+          ),
+        ),
+        (
+          'my_tests',
+          _testsTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.biotech),
+            label: 'My Tests',
+          ),
+        ),
+        (
+          'profile',
+          _profileTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ),
+        (
+          'payments',
+          _paymentsTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.payments),
+            label: 'Payments',
+          ),
+        ),
+        (
+          'reviews',
+          _reviewsTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.star),
+            label: 'Reviews',
+          ),
+        ),
+      ],
+      isOwner: _isOwner,
+      access: _teamAccess,
+      currentIndex: _tab,
+      providerType: 'lab',
+      providerId: _teamProviderId,
+      repo: _repo,
+    );
     return Scaffold(
       appBar: AppBar(
         title: const Text('Lab Dashboard'),
@@ -158,45 +221,27 @@ class _LabDashboardState extends State<LabDashboard> {
                     ],
                   ),
                 )
-              : IndexedStack(
-                  index: _tab,
+              : Column(
                   children: [
-                    _workTab(context),
-                    _testsTab(context),
-                    _profileTab(context),
-                    _paymentsTab(context),
-                    _reviewsTab(context),
+                    if (tabState.viewOnly) viewOnlyBanner(),
+                    Expanded(
+                      child: IndexedStack(
+                        index: tabState.index,
+                        children: [
+                          for (final t in tabState.tabs) t.$2,
+                        ],
+                      ),
+                    ),
                   ],
                 ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tab,
+        currentIndex: tabState.index,
         onTap: (i) {
           setState(() => _tab = i);
           NavMemory.save(NavMemory.labTab, i);
         },
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.science),
-            label: 'Bookings',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.biotech),
-            label: 'My Tests',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.payments),
-            label: 'Payments',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.star),
-            label: 'Reviews',
-          ),
-        ],
+        items: [for (final t in tabState.tabs) t.$3],
       ),
     );
   }

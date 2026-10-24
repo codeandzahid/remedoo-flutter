@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../utils/nav_memory.dart';
+import '../../utils/provider_team.dart';
 import '../../theme.dart';
 import '../../widgets/provider_payments.dart';
+import '../../widgets/provider_team_screen.dart';
 import '../../widgets/provider_profile_form.dart';
 import '../../widgets/hospital_units_manager.dart';
 import '../../widgets/provider_wallet_card.dart';
@@ -29,6 +31,11 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _appointments = [];
   List<Map<String, dynamic>> _reviews = [];
+  // Provider team (2026-10-24): owner sees all tabs + Team;
+  // members see only their allowed tabs.
+  bool _isOwner = true;
+  Map<String, String> _teamAccess = fullTeamAccess('hospital');
+  String? _teamProviderId;
 
   SupabaseRepository get _repo =>
       AppStateScope.of(context).supabaseRepository;
@@ -44,7 +51,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final saved = await NavMemory.read(NavMemory.hospitalTab);
       if (!mounted || saved == null) return;
-      if (saved > 0 && saved < 4 && saved != _tab) {
+      if (saved > 0 && saved < 5 && saved != _tab) {
         setState(() => _tab = saved);
       }
     });
@@ -60,11 +67,15 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
       final appointments = await _repo.fetchHospitalAppointments();
       final reviews =
           await _repo.fetchProviderReviews('hospital', 'hospitals');
+      final teamCtx = await _repo.fetchOwnTeamContext('hospitals');
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _appointments = appointments;
         _reviews = reviews;
+        _isOwner = teamCtx.isOwner;
+        _teamAccess = teamCtx.access;
+        _teamProviderId = teamCtx.providerId;
         _loading = false;
       });
     } catch (e) {
@@ -140,6 +151,50 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // Team tabs (2026-10-24): members see only allowed tabs,
+    // owners also get the Team tab.
+    final tabState = partnerTabs(
+      entries: [
+        (
+          'appointments',
+          _workTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month),
+            label: 'Appointments',
+          ),
+        ),
+        (
+          'profile',
+          _profileTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ),
+        (
+          'payments',
+          _paymentsTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.payments),
+            label: 'Payments',
+          ),
+        ),
+        (
+          'reviews',
+          _reviewsTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.star),
+            label: 'Reviews',
+          ),
+        ),
+      ],
+      isOwner: _isOwner,
+      access: _teamAccess,
+      currentIndex: _tab,
+      providerType: 'hospital',
+      providerId: _teamProviderId,
+      repo: _repo,
+    );
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hospital Dashboard'),
@@ -167,40 +222,27 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                     ],
                   ),
                 )
-              : IndexedStack(
-                  index: _tab,
+              : Column(
                   children: [
-                    _workTab(context),
-                    _profileTab(context),
-                    _paymentsTab(context),
-                    _reviewsTab(context),
+                    if (tabState.viewOnly) viewOnlyBanner(),
+                    Expanded(
+                      child: IndexedStack(
+                        index: tabState.index,
+                        children: [
+                          for (final t in tabState.tabs) t.$2,
+                        ],
+                      ),
+                    ),
                   ],
                 ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tab,
+        currentIndex: tabState.index,
         onTap: (i) {
           setState(() => _tab = i);
           NavMemory.save(NavMemory.hospitalTab, i);
         },
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_month),
-            label: 'Appointments',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.payments),
-            label: 'Payments',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.star),
-            label: 'Reviews',
-          ),
-        ],
+        items: [for (final t in tabState.tabs) t.$3],
       ),
     );
   }

@@ -4,8 +4,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../utils/nav_memory.dart';
+import '../../utils/provider_team.dart';
 import '../../theme.dart';
 import '../../widgets/provider_payments.dart';
+import '../../widgets/provider_team_screen.dart';
 import '../../widgets/provider_profile_form.dart';
 import '../../widgets/pharmacy_medicines_manager.dart';
 import '../../widgets/provider_wallet_card.dart';
@@ -31,6 +33,11 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
   List<Map<String, dynamic>> _orders = [];
   List<Map<String, dynamic>> _reviews = [];
   Map<String, Map<String, dynamic>> _deliveries = {};
+  // Provider team (2026-10-24): owner sees all tabs + Team;
+  // members see only their allowed tabs.
+  bool _isOwner = true;
+  Map<String, String> _teamAccess = fullTeamAccess('pharmacy');
+  String? _teamProviderId;
 
   SupabaseRepository get _repo =>
       AppStateScope.of(context).supabaseRepository;
@@ -46,7 +53,7 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final saved = await NavMemory.read(NavMemory.pharmacyTab);
       if (!mounted || saved == null) return;
-      if (saved > 0 && saved < 5 && saved != _tab) {
+      if (saved > 0 && saved < 6 && saved != _tab) {
         setState(() => _tab = saved);
       }
     });
@@ -64,12 +71,16 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
           [for (final o in orders) '${o['id']}']);
       final reviews =
           await _repo.fetchProviderReviews('pharmacy', 'pharmacies');
+      final teamCtx = await _repo.fetchOwnTeamContext('pharmacies');
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _orders = orders;
         _deliveries = deliveries;
         _reviews = reviews;
+        _isOwner = teamCtx.isOwner;
+        _teamAccess = teamCtx.access;
+        _teamProviderId = teamCtx.providerId;
         _loading = false;
       });
     } catch (e) {
@@ -305,6 +316,58 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // Team tabs (2026-10-24): members see only allowed tabs,
+    // owners also get the Team tab.
+    final tabState = partnerTabs(
+      entries: [
+        (
+          'orders',
+          _workTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_bag),
+            label: 'Orders',
+          ),
+        ),
+        (
+          'medicines',
+          _medicinesTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.medication),
+            label: 'Medicines',
+          ),
+        ),
+        (
+          'profile',
+          _profileTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ),
+        (
+          'payments',
+          _paymentsTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.payments),
+            label: 'Payments',
+          ),
+        ),
+        (
+          'reviews',
+          _reviewsTab(context),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.star),
+            label: 'Reviews',
+          ),
+        ),
+      ],
+      isOwner: _isOwner,
+      access: _teamAccess,
+      currentIndex: _tab,
+      providerType: 'pharmacy',
+      providerId: _teamProviderId,
+      repo: _repo,
+    );
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pharmacy Dashboard'),
@@ -332,45 +395,27 @@ class _PharmacyDashboardState extends State<PharmacyDashboard> {
                     ],
                   ),
                 )
-              : IndexedStack(
-                  index: _tab,
+              : Column(
                   children: [
-                    _workTab(context),
-                    _medicinesTab(context),
-                    _profileTab(context),
-                    _paymentsTab(context),
-                    _reviewsTab(context),
+                    if (tabState.viewOnly) viewOnlyBanner(),
+                    Expanded(
+                      child: IndexedStack(
+                        index: tabState.index,
+                        children: [
+                          for (final t in tabState.tabs) t.$2,
+                        ],
+                      ),
+                    ),
                   ],
                 ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tab,
+        currentIndex: tabState.index,
         onTap: (i) {
           setState(() => _tab = i);
           NavMemory.save(NavMemory.pharmacyTab, i);
         },
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_bag),
-            label: 'Orders',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.medication),
-            label: 'Medicines',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.payments),
-            label: 'Payments',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.star),
-            label: 'Reviews',
-          ),
-        ],
+        items: [for (final t in tabState.tabs) t.$3],
       ),
     );
   }

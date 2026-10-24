@@ -19,7 +19,7 @@ After that one sign-in, everything here is done in one go.
 - Status: still 300 seconds as of 2026-10-21 05:30 EDT — do not report
   this as done until a dashboard save is seen.
 
-## Step 2 — Run these 16 SQL files, in this order
+## Step 2 — Run these 17 SQL files, in this order
 
 Dashboard → SQL Editor → paste the whole file → Run. One file at a time,
 in this order. All files are in `supabase/migration/` in this repo.
@@ -74,6 +74,16 @@ in this order. All files are in `supabase/migration/` in this repo.
     2026-10-23). Until this runs, view-only is enforced by the
     app (change buttons hidden); afterwards the database refuses
     the writes too.
+17. `provider_teams.sql` — provider teams (2026-10-24): the
+    `provider_team_members` table (with API grants for the Oct 30
+    rule), two helper functions, team read/write rules for
+    appointments, orders, profiles, medicines, lab tests, samples,
+    hospital units and deliveries, and the
+    `added_by_provider_type/id` columns on `delivery_drivers`.
+    Until this runs, the Team tab in the four partner panels
+    opens but adding a member or driver fails honestly, and a
+    team member who signs in sees the owner's panel with no
+    shared data (their membership row cannot exist yet).
 
 Until these run, the app still works — each new feature just stays
 off or falls back (that is how the all-76 form fixes were built).
@@ -115,6 +125,17 @@ Dashboard → Edge Functions → deploy from the repo copies in
    or a failed database save now returns an honest failure
    instead of "success" (Razorpay itself is parked by the owner's
    order — this only matters when Route is used again).
+
+## Step 2e — One more NEW function (same sitting, provider teams)
+
+5. `provider-team` — NEW. Powers the Team tab in the four partner
+   panels (2026-10-24): `create_team_member` / `remove_team_member`
+   (a login account with the provider's role, linked to the
+   provider, with per-tab access) and `create_driver` /
+   `remove_driver` (hospital / lab / pharmacy only; the driver
+   joins the pool the provider assigns from). Until this deploy,
+   the Team tab opens but every add shows "Team setup is not
+   live yet" and creates nothing.
 
 ## Step 3 — Quick checks after the sitting
 

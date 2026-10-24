@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models.dart';
+import '../utils/provider_team.dart';
 import 'auth_service.dart';
 
 /// Production data layer: reads/writes the live Supabase tables that back
@@ -2248,25 +2249,153 @@ class SupabaseRepository {
           .select()
           .eq('user_id', uid)
           .limit(1);
-      if (rows.isEmpty) return null;
-      return (rows.first as Map).cast<String, dynamic>();
+      if (rows.isNotEmpty) {
+        return (rows.first as Map).cast<String, dynamic>();
+      }
+      // Team member (2026-10-24): no own record — resolve through
+      // the membership row to the shared provider record.
+      final type = providerTypeForTable(table);
+      final links = await _db
+          .from('provider_team_members')
+          .select('provider_id')
+          .eq('provider_type', type)
+          .eq('user_id', uid)
+          .eq('is_active', true)
+          .limit(1);
+      if (links.isEmpty) return null;
+      final shared = await _db
+          .from(table)
+          .select()
+          .eq('id', '${links.first['provider_id']}')
+          .limit(1);
+      if (shared.isEmpty) return null;
+      return (shared.first as Map).cast<String, dynamic>();
     } catch (e) {
       debugPrint('fetchOwnProviderRecord($table) failed: $e');
       return null;
     }
   }
 
-  /// Updates the provider's own catalog record.
+  /// Updates the provider's own catalog record. Resolves by provider
+  /// id (not user_id) so team members with full profile access can
+  /// save too — the database still enforces their access level.
   Future<bool> updateOwnProviderRecord(
       String table, Map<String, dynamic> values) async {
-    final uid = _uid;
-    if (!_ready || uid == null) return false;
+    if (!_ready || _uid == null) return false;
     try {
-      await _db.from(table).update(values).eq('user_id', uid);
+      final providerId = await _ownProviderId(table);
+      if (providerId == null) return false;
+      await _db.from(table).update(values).eq('id', providerId);
       return true;
     } catch (e) {
       debugPrint('updateOwnProviderRecord($table) failed: $e');
       return false;
+    }
+  }
+
+  /// Provider-team context for the signed-in user on one panel:
+  /// whether they own the provider record, their per-tab access
+  /// map, and the shared provider id. Owners get full access.
+  Future<({bool isOwner, Map<String, String> access, String? providerId})>
+      fetchOwnTeamContext(String table) async {
+    final uid = _uid;
+    final type = providerTypeForTable(table);
+    if (!_ready || uid == null) {
+      return (isOwner: true, access: fullTeamAccess(type), providerId: null);
+    }
+    try {
+      final own = await _db
+          .from(table)
+          .select('id')
+          .eq('user_id', uid)
+          .limit(1);
+      if (own.isNotEmpty) {
+        return (
+          isOwner: true,
+          access: fullTeamAccess(type),
+          providerId: '${own.first['id']}',
+        );
+      }
+      final links = await _db
+          .from('provider_team_members')
+          .select('provider_id, access')
+          .eq('provider_type', type)
+          .eq('user_id', uid)
+          .eq('is_active', true)
+          .limit(1);
+      if (links.isEmpty) {
+        return (isOwner: true, access: fullTeamAccess(type), providerId: null);
+      }
+      final raw = links.first['access'];
+      return (
+        isOwner: false,
+        access: decodeTeamAccess(
+            type, raw is Map ? raw.cast<String, dynamic>() : null),
+        providerId: '${links.first['provider_id']}',
+      );
+    } catch (e) {
+      debugPrint('fetchOwnTeamContext($table) failed: $e');
+      return (isOwner: true, access: fullTeamAccess(type), providerId: null);
+    }
+  }
+
+  /// Team members of one provider (owner-only read: the owner
+  /// policy on provider_team_members permits it).
+  Future<List<Map<String, dynamic>>> fetchTeamMembers(
+      String providerType, String providerId) async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('provider_team_members')
+          .select('user_id, name, email, access, created_at')
+          .eq('provider_type', providerType)
+          .eq('provider_id', providerId)
+          .eq('is_active', true)
+          .order('created_at');
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchTeamMembers failed: $e');
+      return const [];
+    }
+  }
+
+  /// Drivers this provider added (hospital / lab / pharmacy).
+  Future<List<Map<String, dynamic>>> fetchOwnAddedDrivers(
+      String providerType, String providerId) async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('delivery_drivers')
+          .select(
+              'user_id, name, phone, vehicle_type, vehicle_number, status, is_active')
+          .eq('added_by_provider_type', providerType)
+          .eq('added_by_provider_id', providerId)
+          .order('name');
+      return rows.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchOwnAddedDrivers failed: $e');
+      return const [];
+    }
+  }
+
+  /// Call the provider-team Edge Function (team + driver accounts).
+  /// Returns null on success, or the error message.
+  Future<String?> invokeProviderTeam(Map<String, dynamic> payload) async {
+    if (!_ready) return 'Not ready.';
+    try {
+      final res = await _db.functions.invoke('provider-team', body: payload);
+      final data = res.data;
+      if (data is Map && data['error'] != null) return '${data['error']}';
+      return null;
+    } on FunctionException catch (e) {
+      final details = e.details;
+      if (details is Map && details['error'] != null) {
+        return '${details['error']}';
+      }
+      return 'Request failed (${e.status}).';
+    } catch (e) {
+      debugPrint('invokeProviderTeam failed: $e');
+      return 'Request failed.';
     }
   }
 

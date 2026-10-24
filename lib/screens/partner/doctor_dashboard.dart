@@ -5,8 +5,10 @@ import '../../services/supabase_repository.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../utils/nav_memory.dart';
+import '../../utils/provider_team.dart';
 import '../../utils/working_hours.dart';
 import '../../widgets/prescription_form.dart';
+import '../../widgets/provider_team_screen.dart';
 import '../../widgets/provider_payments.dart';
 import '../../widgets/provider_wallet_card.dart';
 import '../../widgets/upi_setup_dialog.dart';
@@ -32,6 +34,11 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _appointments = [];
   List<Map<String, dynamic>> _reviews = [];
+  // Provider team (2026-10-24): owner sees all tabs + Team;
+  // members see only their allowed tabs.
+  bool _isOwner = true;
+  Map<String, String> _teamAccess = fullTeamAccess('doctor');
+  String? _teamProviderId;
 
   SupabaseRepository get _repo =>
       AppStateScope.of(context).supabaseRepository;
@@ -45,7 +52,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final saved = await NavMemory.read(NavMemory.doctorTab);
       if (!mounted || saved == null) return;
-      if (saved > 0 && saved < 4 && saved != _tab) {
+      if (saved > 0 && saved < 5 && saved != _tab) {
         setState(() => _tab = saved);
       }
     });
@@ -60,11 +67,15 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
       final profile = await _repo.fetchOwnProviderRecord('doctors');
       final appointments = await _repo.fetchDoctorAppointments();
       final reviews = await _repo.fetchProviderReviews('doctor', 'doctors');
+      final teamCtx = await _repo.fetchOwnTeamContext('doctors');
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _appointments = appointments;
         _reviews = reviews;
+        _isOwner = teamCtx.isOwner;
+        _teamAccess = teamCtx.access;
+        _teamProviderId = teamCtx.providerId;
         _loading = false;
       });
     } catch (e) {
@@ -162,6 +173,63 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // Team tabs (2026-10-24): members see only allowed tabs,
+    // owners also get the Team tab.
+    final tabState = partnerTabs(
+      entries: [
+        (
+          'visits',
+          _AppointmentsTab(
+            appointments: _appointments,
+            profile: _profile,
+            onRefresh: _load,
+            onSetStatus: _setStatus,
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month),
+            label: 'Visits',
+          ),
+        ),
+        (
+          'profile',
+          _ProfileTab(
+            profile: _profile,
+            repo: _repo,
+            onSaved: _load,
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ),
+        (
+          'payments',
+          _PaymentsTab(
+            profile: _profile,
+            repo: _repo,
+            onSaved: _load,
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.payments),
+            label: 'Payments',
+          ),
+        ),
+        (
+          'reviews',
+          _ReviewsTab(reviews: _reviews),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.star),
+            label: 'Reviews',
+          ),
+        ),
+      ],
+      isOwner: _isOwner,
+      access: _teamAccess,
+      currentIndex: _tab,
+      providerType: 'doctor',
+      providerId: _teamProviderId,
+      repo: _repo,
+    );
     return Scaffold(
       appBar: AppBar(
         title: const Text('Doctor Dashboard'),
@@ -186,53 +254,27 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                     ),
                   ],
                 )
-              : IndexedStack(
-                  index: _tab,
+              : Column(
                   children: [
-                    _AppointmentsTab(
-                      appointments: _appointments,
-                      profile: _profile,
-                      onRefresh: _load,
-                      onSetStatus: _setStatus,
+                    if (tabState.viewOnly) viewOnlyBanner(),
+                    Expanded(
+                      child: IndexedStack(
+                        index: tabState.index,
+                        children: [
+                          for (final t in tabState.tabs) t.$2,
+                        ],
+                      ),
                     ),
-                    _ProfileTab(
-                      profile: _profile,
-                      repo: _repo,
-                      onSaved: _load,
-                    ),
-                    _PaymentsTab(
-                      profile: _profile,
-                      repo: _repo,
-                      onSaved: _load,
-                    ),
-                    _ReviewsTab(reviews: _reviews),
                   ],
                 ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tab,
+        currentIndex: tabState.index,
         onTap: (i) {
           setState(() => _tab = i);
           NavMemory.save(NavMemory.doctorTab, i);
         },
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_month),
-            label: 'Visits',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.payments),
-            label: 'Payments',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.star),
-            label: 'Reviews',
-          ),
-        ],
+        items: [for (final t in tabState.tabs) t.$3],
       ),
     );
   }
