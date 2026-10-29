@@ -14,10 +14,11 @@ After that one sign-in, everything here is done in one go.
 - DONE: Step 1 (email 3600, confirmed on reopen), Step 2 (all 17 SQL
   files PASSED in order, no errors), Step 2b item 2 (admin-staff
   redeploy), Step 2d (payment-create + route-create-account
-  redeploys), Step 2e (provider-team NEW deploy), Step 3 autofill
+  redeploys), Step 2e (provider-team NEW deploy), Step 2b item 1
+  code (account-notify NEW deploy, 2026-10-29), Step 3 autofill
   check (popup works live, verified 2026-10-27).
-- PENDING: Step 2b item 1 (account-notify NEW deploy +
-  RESEND_API_KEY secret — key never supplied); Step 2c checks
+- PENDING: RESEND_API_KEY secret for account-notify (key never
+  supplied — emails wait in the queue until it is set); Step 2c checks
   (admin email edit + delete flow, need admin OTP); Step 3
   signup-code + lab home-collection checks; doctor/panel live
   checks (Visits patient names, Team tab form — need panel
