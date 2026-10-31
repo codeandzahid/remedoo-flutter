@@ -50,6 +50,26 @@ class AdminField {
   });
 }
 
+/// Admin Add Driver plan (owner order 2026-10-31): returns the message
+/// to show when the add cannot proceed, or null when it can. A filled-in
+/// login email creates a fresh driver account; otherwise the row must
+/// link an existing account by user ID.
+String? validateDriverAdd({
+  required String email,
+  required String password,
+  required String userId,
+}) {
+  if (email.isNotEmpty) {
+    if (!email.contains('@')) return 'Enter a valid email';
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters';
+    }
+    return null;
+  }
+  if (userId.isEmpty) return 'Add a login email or a linked user ID';
+  return null;
+}
+
 /// Backend-driven generic admin table screen: search, add/edit dialog from
 /// field specs, delete with confirm. Reads/writes Supabase via
 /// [AppState.adminTable]/[AppState.loadAdminTable]/[AppState.adminSaveRow]/
@@ -343,7 +363,14 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
 
   Future<void> _editDialog(Map<String, dynamic>? row) async {
     final state = AppStateScope.of(context);
-    final fields = _fields;
+    // Driver login fields are add-only (owner order 2026-10-31):
+    // editing a driver never changes their login here (password
+    // changes live in the Users edit dialog instead).
+    final fields = widget.table == 'delivery_drivers' && row != null
+        ? _fields
+            .where((f) => f.key != 'email' && f.key != 'password')
+            .toList()
+        : _fields;
     final ctrls = {
       for (final f in fields.where((f) =>
           f.type != 'bool' && f.type != 'fk' && f.type != 'dropdown'))
@@ -459,9 +486,12 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                 maxLines: (f.type == 'json' || f.type == 'textarea')
                     ? 3
                     : 1,
+                obscureText: f.type == 'password',
                 keyboardType: (f.type == 'int' || f.type == 'double')
                     ? TextInputType.number
-                    : TextInputType.text,
+                    : f.type == 'password'
+                        ? TextInputType.visiblePassword
+                        : TextInputType.text,
               ),
             );
           }
@@ -682,14 +712,60 @@ class _AdminTableScreenState extends State<AdminTableScreen> {
                     values['code'] =
                         (values['code'] as String).toUpperCase();
                   }
+                  // Admin add driver (owner order 2026-10-31): a
+                  // filled-in login email creates the driver's
+                  // account + row through the provider-team
+                  // function (general pool, no provider); otherwise
+                  // the row links an existing account by user ID.
+                  // Email/password are never columns, so they are
+                  // stripped before the direct save below.
+                  var driverCreated = false;
+                  if (widget.table == 'delivery_drivers' &&
+                      row == null) {
+                    final email =
+                        (values.remove('email') as String? ?? '').trim();
+                    final password =
+                        (values.remove('password') as String? ?? '');
+                    final userId =
+                        (values['user_id'] as String? ?? '').trim();
+                    final planErr = validateDriverAdd(
+                      email: email,
+                      password: password,
+                      userId: userId,
+                    );
+                    if (planErr != null) {
+                      fail(planErr);
+                      return;
+                    }
+                    if (email.isNotEmpty) {
+                      final err = await state.createAdminDriver(
+                        name: '${values['name'] ?? ''}',
+                        phone: '${values['phone'] ?? ''}',
+                        vehicleType:
+                            '${values['vehicle_type'] ?? 'bike'}',
+                        vehicleNumber:
+                            '${values['vehicle_number'] ?? ''}',
+                        status: '${values['status'] ?? 'available'}',
+                        email: email,
+                        password: password,
+                      );
+                      if (!mounted) return;
+                      if (err != null) {
+                        fail(err);
+                        return;
+                      }
+                      driverCreated = true;
+                    }
+                  }
                   if (row != null) values['id'] = row['id'];
                   // Full-check fix 2026-10-22: the dialog used to
                   // pop BEFORE the save ran, so a failed save lost
                   // everything the admin typed. Save first; only
                   // close on success, and on failure keep the
                   // dialog (and the entered values) for a retry.
-                  final ok =
-                      await state.adminSaveRow(widget.table, values);
+                  final ok = driverCreated
+                      ? true
+                      : await state.adminSaveRow(widget.table, values);
                   if (!mounted) return;
                   if (!ok) {
                     fail('Save failed. Your entries are kept — '
@@ -1164,7 +1240,18 @@ List<AdminField> adminTableFields(String table) {
             type: 'dropdown',
             options: ['available', 'offline'],
             defaultValue: 'available'),
-        AdminField(key: 'user_id', label: 'Linked User ID'),
+        AdminField(
+            key: 'user_id', label: 'Linked User ID (existing account)'),
+        // Driver login (owner order 2026-10-31): the Admin Drivers
+        // form takes the email + password the driver signs in
+        // with. Filled in, a fresh driver login is created on
+        // save; left blank, the row links an existing account by
+        // the user ID above. Add only — hidden when editing.
+        AdminField(key: 'email', label: 'Email (their login)'),
+        AdminField(
+            key: 'password',
+            label: 'Password (8+ characters)',
+            type: 'password'),
         AdminField(key: 'is_active', label: 'Active', type: 'bool'),
       ];
     case 'faqs':

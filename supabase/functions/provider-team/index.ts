@@ -13,10 +13,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // POST { action: 'remove_team_member', user_id }
 //   — owner only; deletes the account (membership row cascades).
 // POST { action: 'create_driver', name, phone, vehicle_type,
-//        vehicle_number }
+//        vehicle_number, email, password, status? }
 //   — hospital / lab / pharmacy owner only; creates a 'driver'
 //   account + delivery_drivers row tagged with the adding provider,
 //   so the driver joins the pool the provider assigns from.
+//   The super admin may also add a general-pool driver with no
+//   provider (Admin > Drivers, owner order 2026-10-31): the row
+//   stays untagged and the status comes from the form
+//   (default 'offline').
 // POST { action: 'remove_driver', user_id }
 //   — owner only; deactivates the driver row (history is kept, the
 //   login stays so past deliveries still resolve).
@@ -117,7 +121,14 @@ serve(async (req) => {
         break;
       }
     }
-    if (!providerType || !providerId) {
+    const body = await req.json().catch(() => ({}));
+    const action = String(body.action ?? '');
+
+    // Admin path: the provider comes from the body — except an
+    // admin adding a general-pool driver (Admin > Drivers, owner
+    // order 2026-10-31), who names no provider and the driver row
+    // stays untagged.
+    if (!providerType) {
       // Super admin may act for a provider named in the body.
       const { data: roleRows } = await admin
         .from('user_roles')
@@ -129,18 +140,14 @@ serve(async (req) => {
         return json(
           { error: 'Only a provider owner can manage a team.' }, 403);
       }
-    }
-
-    const body = await req.json().catch(() => ({}));
-    const action = String(body.action ?? '');
-
-    // Admin path: the provider comes from the body.
-    if (!providerType) {
-      providerType = String(body.provider_type ?? '');
-      providerId = String(body.provider_id ?? '');
-      if (
-        !(providerType in PROVIDER_TABLES) || !providerId
-      ) {
+      const namedType = String(body.provider_type ?? '');
+      const namedId = String(body.provider_id ?? '');
+      if (!namedType && !namedId && action === 'create_driver') {
+        // General-pool driver: providerType/providerId stay null.
+      } else if (namedType in PROVIDER_TABLES && namedId) {
+        providerType = namedType;
+        providerId = namedId;
+      } else {
         return json(
           { error: 'provider_type and provider_id are required.' }, 400);
       }
@@ -227,7 +234,11 @@ serve(async (req) => {
     }
 
     if (action === 'create_driver') {
+      // A provider adding a driver must be a hospital, lab or
+      // pharmacy; a null provider means the super admin adding a
+      // general-pool driver (Admin > Drivers).
       if (
+        providerType !== null &&
         providerType !== 'hospital' &&
         providerType !== 'lab' &&
         providerType !== 'pharmacy'
@@ -240,6 +251,10 @@ serve(async (req) => {
       const phone = String(body.phone ?? '').trim();
       const vehicleType = String(body.vehicle_type ?? 'bike').trim();
       const vehicleNumber = String(body.vehicle_number ?? '').trim();
+      const status =
+        body.status === 'available' || body.status === 'offline'
+          ? String(body.status)
+          : 'offline';
       // A driver login needs an email; the panel builds a private
       // placeholder from the phone when none is given.
       const email = String(body.email ?? '').trim().toLowerCase();
@@ -274,7 +289,7 @@ serve(async (req) => {
           phone: phone || null,
           vehicle_type: vehicleType || 'bike',
           vehicle_number: vehicleNumber || null,
-          status: 'offline',
+          status,
           is_active: true,
           added_by_provider_type: providerType,
           added_by_provider_id: providerId,

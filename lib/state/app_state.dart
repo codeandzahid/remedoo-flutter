@@ -3324,6 +3324,33 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
+  /// Admin Add Driver with a fresh login (owner order 2026-10-31):
+  /// creates the driver account + delivery_drivers row (general pool,
+  /// no provider) through the provider-team function. Returns the
+  /// function's error string, or null on success.
+  Future<String?> createAdminDriver({
+    required String name,
+    required String phone,
+    required String vehicleType,
+    required String vehicleNumber,
+    required String status,
+    required String email,
+    required String password,
+  }) async {
+    final err = await _repo.invokeProviderTeam({
+      'action': 'create_driver',
+      'name': name,
+      'phone': phone,
+      'vehicle_type': vehicleType,
+      'vehicle_number': vehicleNumber,
+      'status': status,
+      'email': email,
+      'password': password,
+    });
+    if (err == null) await loadAdminTable('delivery_drivers');
+    return err;
+  }
+
   Future<bool> adminDeleteRow(String t, String id) async {
     final ok = await _repo.adminDelete(t, id);
     if (ok) {
