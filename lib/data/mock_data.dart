@@ -242,25 +242,6 @@ Hospital hospitalById(String id) => hospitals.firstWhere((h) => h.id == id);
 Lab labById(String id) => labs.firstWhere((l) => l.id == id);
 Pharmacy pharmacyById(String id) => pharmacies.firstWhere((p) => p.id == id);
 
-const List<String> pharmacyCategories = [
-  'All',
-  'Allergy',
-  'Cardiology',
-  'Diabetes',
-  'Gastro',
-  'Respiratory',
-  'Thyroid',
-];
-
-const List<String> symptomChips = [
-  'Fever and body ache',
-  'Chest discomfort',
-  'Persistent cough',
-  'Stomach pain',
-  'Skin rash',
-  'Headache and dizziness',
-];
-
 final List<LabTest> labTests = [
   LabTest(id: 't0', name: 'Complete Blood Count', price: 350),
   LabTest(id: 't1', name: 'Lipid Profile', price: 650),
@@ -276,31 +257,6 @@ final List<LabTest> labTests = [
   LabTest(id: 't11', name: 'Ultrasound Abdomen', price: 1100),
   LabTest(id: 't12', name: 'Dengue NS1', price: 400),
   LabTest(id: 't13', name: 'COVID RT-PCR', price: 600),
-];
-
-const List<String> ticketCategories = [
-  'Appointment',
-  'Order',
-  'Payment',
-  'Refund',
-  'Account',
-  'Other',
-];
-
-const List<Map<String, String>> emergencyContacts = [
-  {'name': 'Ambulance', 'number': '108'},
-  {'name': 'Women Helpline', 'number': '1091'},
-  {'name': 'Police', 'number': '100'},
-  {'name': 'Fire Dept', 'number': '101'},
-  {'name': 'Child Helpline', 'number': '1098'},
-  {'name': 'Disaster Mgmt', 'number': '1078'},
-];
-
-final List<Map<String, String>> healthTips = [
-  {'id': 'H1', 'title': 'Stay Hydrated', 'text': 'Drink 8 glasses of water daily', 'active': '1'},
-  {'id': 'H2', 'title': 'Quality Sleep', 'text': 'Aim for 7-8 hours every night', 'active': '1'},
-  {'id': 'H3', 'title': 'Balanced Diet', 'text': 'Include fruits and vegetables daily', 'active': '1'},
-  {'id': 'H4', 'title': 'Stay Active', 'text': 'Walk 30 minutes every day', 'active': '1'},
 ];
 
 /// SUPABASE SEAM: to go live, create a SupabaseRepository with the same

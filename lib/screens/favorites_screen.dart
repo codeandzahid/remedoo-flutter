@@ -103,7 +103,6 @@ class FavoritesScreen extends StatelessWidget {
     String sub = kind;
     double? rating;
     VoidCallback? onTap;
-    var orphan = false;
     try {
       switch (kind) {
         case 'doctor':
@@ -140,7 +139,6 @@ class FavoritesScreen extends StatelessWidget {
       // to vanish silently while the header count still included
       // it. Show a removable placeholder tile instead, so the
       // count and the list agree and the user can clear it.
-      orphan = true;
       title = 'No longer available';
       sub = 'This saved item is not in the catalogue anymore.';
     }

@@ -69,9 +69,6 @@ class AppState extends ChangeNotifier {
 
   User? _supaUser;
 
-  /// The signed-in Supabase user id, or null.
-  String? get supaUserId => _supaUser?.id;
-
   bool _authAttached = false;
 
   /// Called by the root gates after Supabase init. Restores any persisted
@@ -255,20 +252,11 @@ class AppState extends ChangeNotifier {
   DateTime? get deletionRequestedAt => _deletionRequestedAt;
   bool get deletionPending => _deletionRequestedAt != null;
 
-  /// Test-only: forces the deletion-pending flag RootGate gates on.
-  @visibleForTesting
-  void debugSetDeletionRequestedAt(DateTime? value) =>
-      _deletionRequestedAt = value;
-
   /// True when the signed-in account's profile is marked
   /// 'suspended' in Admin > Users. RootGate shows the suspended
   /// page instead of any shell (full-check fix 2026-10-22).
   bool _accountSuspended = false;
   bool get accountSuspended => _accountSuspended;
-
-  /// Test-only: forces the suspension flag RootGate gates on.
-  @visibleForTesting
-  void debugSetAccountSuspended(bool value) => _accountSuspended = value;
 
   /// Display name: Supabase user metadata -> email fallback -> mock name.
   String get userName {
@@ -625,28 +613,6 @@ class AppState extends ChangeNotifier {
     return result;
   }
 
-  /// Real sign-up via Supabase. Returns needsConfirmation when the project
-  /// requires email confirmation (user must click the email link).
-  Future<AuthResult> signUpWithPassword({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
-    final result = await AuthService.instance.signUp(
-      email: email,
-      password: password,
-      name: name,
-    );
-    if (result.ok && !result.confirmationRequired) {
-      _syncUserFromSession();
-    }
-    return result;
-  }
-
-  Future<AuthResult> resendConfirmationEmail(String email) {
-    return AuthService.instance.resendConfirmation(email);
-  }
-
   /// Completes registration after the email OTP was verified (the user is
   /// already signed in at this point): sets the password and the profile
   /// name. Returns failure if the email already belongs to a finished
@@ -742,7 +708,6 @@ class AppState extends ChangeNotifier {
     cart.clear();
     cartPharmacyId = null;
     cartPharmacyName = null;
-    testCart.clear();
     notifications.clear();
     _supportUnread = 0;
     _supportUnreadByTicket.clear();
@@ -1506,21 +1471,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setLanguage(String v) {
-    _language = v;
-    notifyListeners();
-    // Persist the code to profiles.language (audit Patient 20:
-    // the language choice was memory-only).
-    if (_supaUser != null) {
-      unawaited(_repo.saveProfile({'language': languageCodeForName(v)}));
-    }
-  }
-
-  void setMaintenanceMode(bool v) {
-    _maintenanceMode = v;
-    notifyListeners();
-  }
-
   // ---------- Favorites ----------
 
   final Set<String> _favorites = {};  Set<String> get favorites => _favorites;
@@ -1537,16 +1487,6 @@ class AppState extends ChangeNotifier {
     _syncToggleFavorite(key, added);
     notifyListeners();
   }
-
-  List<Doctor> get favoriteDoctors =>
-      doctors.where((d) => _favorites.contains('doctor:${d.id}')).toList();
-  List<Hospital> get favoriteHospitals =>
-      hospitals.where((h) => _favorites.contains('hospital:${h.id}')).toList();
-  List<Lab> get favoriteLabs =>
-      labs.where((l) => _favorites.contains('lab:${l.id}')).toList();
-  List<Pharmacy> get favoritePharmacies => pharmacies
-      .where((p) => _favorites.contains('pharmacy:${p.id}'))
-      .toList();
 
   // ---------- Appointments ----------
 
@@ -1632,36 +1572,6 @@ class AppState extends ChangeNotifier {
     );
     notifyListeners();
     return appt;
-  }
-
-  /// Approve a pending appointment (called by doctor/hospital panel or admin)
-  Future<void> approveAppointment(String id) async {
-    final appt = appointments.where((a) => a.id == id).firstOrNull;
-    if (appt == null) return;
-    appt.status = 'upcoming';
-    // Sync to backend — 'confirmed' is the storable approved status;
-    // the DB rejects 'upcoming' (see approvedDbStatus).
-    unawaited(_repo.updateAppointmentStatus(id, approvedDbStatus));
-    addNotification(
-      title: 'Appointment confirmed',
-      message: '${appt.doctorName} on ${appt.date.day}/${appt.date.month} at ${appt.timeLabel} is confirmed',
-      category: 'appointments',
-    );
-    notifyListeners();
-  }
-
-  /// Reject a pending appointment
-  Future<void> rejectAppointment(String id, {String reason = ''}) async {
-    final appt = appointments.where((a) => a.id == id).firstOrNull;
-    if (appt == null) return;
-    appt.status = 'cancelled';
-    unawaited(_repo.updateAppointmentStatus(id, 'cancelled'));
-    addNotification(
-      title: 'Appointment not approved',
-      message: '${appt.doctorName} on ${appt.date.day}/${appt.date.month} was not approved${reason.isNotEmpty ? ': $reason' : ''}',
-      category: 'appointments',
-    );
-    notifyListeners();
   }
 
   /// Cancels an appointment. Awaited (full-check fix 2026-10-22):
@@ -1783,12 +1693,6 @@ class AppState extends ChangeNotifier {
 
   static String _slotKey(String title, DateTime day, String label) =>
       '$title|${day.year}-${day.month}-${day.day}|$label';
-
-  List<DateTime> nextDays(int n) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return List.generate(n, (i) => today.add(Duration(days: i)));
-  }
 
   /// 09:00–16:30 pill grid; some slots deterministically pre-booked.
   List<String> timeSlotsFor(String title, DateTime day) {
@@ -2146,38 +2050,6 @@ class AppState extends ChangeNotifier {
 
   // ---------- Lab test booking list ----------
 
-  final List<LabTest> testCart = [];
-  String? testCartLabId;
-  String? testCartLabName;
-
-  double get testCartTotal =>
-      testCart.fold(0.0, (s, t) => s + t.price);
-
-  bool addTest(LabTest t, {required String labId, required String labName}) {
-    if (testCartLabId != null && testCartLabId != labId) return false;
-    testCartLabId = labId;
-    testCartLabName = labName;
-    if (!testCart.any((e) => e.id == t.id)) testCart.add(t);
-    notifyListeners();
-    return true;
-  }
-
-  void removeTest(String id) {
-    testCart.removeWhere((t) => t.id == id);
-    if (testCart.isEmpty) {
-      testCartLabId = null;
-      testCartLabName = null;
-    }
-    notifyListeners();
-  }
-
-  void clearTests() {
-    testCart.clear();
-    testCartLabId = null;
-    testCartLabName = null;
-    notifyListeners();
-  }
-
   // ---------- Notifications ----------
 
   final List<AppNotification> notifications = [];
@@ -2488,11 +2360,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     unawaited(_persistReminders());
   }
-
-  List<Reminder> get upcomingReminders =>
-      reminders.where((r) => !r.done).toList();
-  List<Reminder> get completedReminders =>
-      reminders.where((r) => r.done).toList();
 
   /// Adds a reminder. Reminders persist on-device like the other
   /// patient datasets (audit fix 2026-10-19) AND write through to
@@ -2861,30 +2728,6 @@ class AppState extends ChangeNotifier {
 
   // ---------- Driver ----------
 
-  bool driverOnline = false;
-  final List<DriverDelivery> deliveries = [];
-
-  void toggleDriverOnline() {
-    driverOnline = !driverOnline;
-    notifyListeners();
-  }
-
-  void acceptDelivery(String id) {
-    deliveries.where((d) => d.id == id).firstOrNull?.status = 'accepted';
-    notifyListeners();
-  }
-
-  void advanceDelivery(String id) {
-    final d = deliveries.where((e) => e.id == id).firstOrNull;
-    if (d == null) return;
-    if (d.status == 'accepted') {
-      d.status = 'picked_up';
-    } else if (d.status == 'picked_up') {
-      d.status = 'delivered';
-    }
-    notifyListeners();
-  }
-
   // ---------- Seed ----------
 
   // ---------- Roles ----------
@@ -2967,13 +2810,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get notificationsEnabled => _pushNotif;
-  void setNotificationsEnabled(bool v) {
-    _pushNotif = v;
-    _syncPreferences();
-    notifyListeners();
-  }
-
   int get unreadNotifications => unreadCount;
   void markAllNotificationsRead() => markAllRead();
 
@@ -3006,11 +2842,6 @@ class AppState extends ChangeNotifier {
       cartPharmacyName = null;
     }
     _persistCart();
-    notifyListeners();
-  }
-
-  void setDriverOnline(bool v) {
-    driverOnline = v;
     notifyListeners();
   }
 
@@ -3063,14 +2894,10 @@ class AppState extends ChangeNotifier {
   /// super admin assigned in Admin > Team. Enforced by RLS as well.
   /// Each option has a level (owner order 2026-10-23): view only or
   /// full access — see utils/staff_access.dart for the encoding.
-  bool get isStaff => _isStaff;
   List<String> get staffSections => _staffSections;
 
   /// Options this staff member may look at but not change.
   Set<String> get staffViewOnly => _staffViewOnly;
-
-  bool staffCan(String section) =>
-      _isAdmin || _staffSections.contains(section);
 
   /// True when the user may CHANGE things in [section]: the super
   /// admin always can; staff only with full (not view-only) access.
@@ -3840,7 +3667,6 @@ class AppState extends ChangeNotifier {
   }
 
   String? _providerUpiId;
-  String? get providerUpiId => _providerUpiId;
 
   /// Checks if the UPI setup popup should be shown: a signed-in
   /// provider with no UPI ID set. Full-check fix 2026-10-22: this
@@ -3899,8 +3725,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     return saved;
   }
-
-  List<String> slotsFor(DateTime day) => timeSlotsFor('', day);
 
   bool canReview(String appointmentId) {
     final a = appointments.where((e) => e.id == appointmentId);
@@ -4211,63 +4035,11 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void setSosStatus(String id, String status) {
-    sosAlerts.where((a) => a.id == id).firstOrNull?.status = status;
-    notifyListeners();
-  }
-
   // ---------- Refund requests ----------
 
   final List<RefundRequest> refundRequests = [];
 
-  void setRefundStatus(String id, String status) {
-    refundRequests.where((r) => r.id == id).firstOrNull?.status = status;
-    notifyListeners();
-  }
-
-  void requestRefund({
-    required String orderId,
-    String? appointmentId,
-    required double amount,
-    required String reason,
-  }) {
-    final local = RefundRequest(
-      id: 'RF${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-      orderId: orderId,
-      appointmentId: appointmentId,
-      amount: amount,
-      reason: reason,
-      date: DateTime.now(),
-    );
-    refundRequests.insert(0, local);
-    notifyListeners();
-    // Persist so the admin queue and the tracker agree (audit M8).
-    if (_supaUser != null) {
-      unawaited(_repo
-          .createRefundRequest(
-        orderId: orderId.isEmpty ? null : orderId,
-        appointmentId: appointmentId,
-        amount: amount,
-        reason: reason,
-      )
-          .then((_) => loadMyRefunds()));
-    }
-  }
-
   // ---------- Reviews admin ----------
-
-  void toggleReviewHidden(String appointmentId) {
-    final r = reviews[appointmentId];
-    if (r != null) {
-      r.hidden = !r.hidden;
-      notifyListeners();
-      final id = r.id;
-      if (id != null) {
-        unawaited(
-            _repo.setReviewStatus(id, r.hidden ? 'hidden' : 'approved'));
-      }
-    }
-  }
 
   // ---------- Orders admin ----------
 
@@ -4278,65 +4050,13 @@ class AppState extends ChangeNotifier {
     'delivered'
   ];
 
-  void setOrderStatus(String id, String status) {
-    orders.where((o) => o.id == id).firstOrNull?.status = status;
-    notifyListeners();
-  }
-
-  void advanceOrderStatus(String id) {
-    final o = orders.where((e) => e.id == id).firstOrNull;
-    if (o == null) return;
-    final i = orderStatuses.indexOf(o.status);
-    if (i >= 0 && i < orderStatuses.length - 1) {
-      o.status = orderStatuses[i + 1];
-      notifyListeners();
-    }
-  }
-
   // ---------- Doctor schedule (doctor portal) ----------
-
-  final Map<String, List<String>> _doctorSlots = {};
-
-  List<String> doctorSlots(String doctorId, int dayIdx) {
-    final key = '$doctorId|$dayIdx';
-    return _doctorSlots.putIfAbsent(
-        key, () => ['09:00', '09:30', '10:00', '17:00', '17:30']);
-  }
-
-  void addDoctorSlot(String doctorId, int dayIdx, String slot) {
-    final key = '$doctorId|$dayIdx';
-    final list = _doctorSlots.putIfAbsent(key, () => []);
-    if (!list.contains(slot)) {
-      list.add(slot);
-      list.sort();
-      notifyListeners();
-    }
-  }
-
-  void removeDoctorSlot(String doctorId, int dayIdx, String slot) {
-    final key = '$doctorId|$dayIdx';
-    _doctorSlots[key]?.remove(slot);
-    notifyListeners();
-  }
 
   // ---------- Pharmacy inventory (pharmacy portal) ----------
 
-  final Map<String, int> _medStock = {};
   final Map<String, double> _medPrice = {};
 
-  int stockOf(String medicineId) => _medStock[medicineId] ?? 50;
-
-  void setStock(String medicineId, int v) {
-    _medStock[medicineId] = v.clamp(0, 9999);
-    notifyListeners();
-  }
-
   double priceOf(Medicine m) => _medPrice[m.id] ?? m.price;
-
-  void setPrice(String medicineId, double v) {
-    _medPrice[medicineId] = v;
-    notifyListeners();
-  }
 
   // ---------- Admin config ----------
 
@@ -4352,17 +4072,6 @@ class AppState extends ChangeNotifier {
 
   String brandName = 'Remedoo';
   String brandTagline = 'Your Health, Our Priority';
-  int brandColorIndex = 0;
-
-  static const List<Color> brandSwatches = [
-    Color(0xFFE86A1C),
-    Color(0xFF0E9F8A),
-    Color(0xFF3B82F6),
-    Color(0xFF8B5CF6),
-    Color(0xFFD43D3D),
-  ];
-
-  Color get brandPrimary => brandSwatches[brandColorIndex];
 
   final Map<String, bool> quickActions = {
     'Book Appointment': true,

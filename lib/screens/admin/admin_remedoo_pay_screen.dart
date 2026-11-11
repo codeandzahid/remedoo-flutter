@@ -41,7 +41,6 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
   bool _saving = false;
   List<Map<String, dynamic>> _sessions = [];
 
-  Map<String, dynamic> _fullConfig = {};
   String _activeGateway = '';
   bool _enabled = false;
   final _serverUrl = TextEditingController();
@@ -99,7 +98,6 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
     final sessions = await repo.fetchRemedooPaySessions();
     if (!mounted) return;
     setState(() {
-      _fullConfig = Map<String, dynamic>.from(cfg);
       _activeGateway = '${cfg['active'] ?? ''}';
       _enabled = yp['enabled'] == true;
       _serverUrl.text = '${yp['base_url'] ?? ''}';
@@ -202,7 +200,6 @@ class _AdminRemedooPayScreenState extends State<AdminRemedooPayScreen> {
         _activeGateway = 'youpi';
         _enabled = true;
       }
-      _fullConfig = config;
     });
     _snack(
         context,

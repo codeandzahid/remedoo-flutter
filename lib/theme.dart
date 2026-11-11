@@ -291,7 +291,6 @@ class RemedooTheme {
   static Color get sidebarLight => _pack.background;
 
   /// Legacy aliases kept for screens written before the reskin.
-  static Color get pageBg => background;
   static const Color ratingGreen = success;
   static const Color purple = Color(0xFF6B4FA0);
   static const Color teal = Color(0xFF2E9E6B);
@@ -773,23 +772,6 @@ class RemedooTheme {
   ];
 }
 
-/// 8pt spacing scale.
-class RemedooSpacing {
-  static const double xs = 4;
-  static const double sm = 8;
-  static const double md = 12;
-  static const double lg = 16;
-  static const double xl = 24;
-  static const double xxl = 32;
-  static const double xxxl = 48;
-
-  /// Page padding used across the React app.
-  static const double page = 16;
-
-  /// Gap between sections.
-  static const double section = 22;
-}
-
 /// Corner radius scale (matches `--radius` language of the React app).
 class RemedooRadius {
   static const double sm = 8;
@@ -896,22 +878,3 @@ const _months = [
 String shortDate(DateTime d) =>
     '${_weekdays[d.weekday - 1]} ${d.day} ${_months[d.month - 1]}';
 
-/// "Today", "Tomorrow" or "Mon 5 Oct"
-String friendlyDay(DateTime d) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final day = DateTime(d.year, d.month, d.day);
-  final diff = day.difference(today).inDays;
-  if (diff == 0) return 'Today';
-  if (diff == 1) return 'Tomorrow';
-  return shortDate(d);
-}
-
-/// "4:16 PM"
-String shortTime(DateTime d) {
-  var h = d.hour % 12;
-  if (h == 0) h = 12;
-  final m = d.minute.toString().padLeft(2, '0');
-  final suffix = d.hour >= 12 ? 'PM' : 'AM';
-  return '$h:$m $suffix';
-}

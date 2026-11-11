@@ -207,7 +207,7 @@ class _RemedooCheckoutScreenState
     final pharm = state.activePharmacies
         .where((p) => p.id == state.cartPharmacyId);
     final codOn =
-        pharm.isEmpty ? true : (pharm.first.payInClinicEnabled ?? true);
+        pharm.isEmpty ? true : pharm.first.payInClinicEnabled;
     if (_payment == 'Cash on Delivery' && !codOn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

@@ -1311,7 +1311,7 @@ class _ThemePackAdminCardState extends State<_ThemePackAdminCard> {
     if (_loading) {
       return const RCard(
         padding: EdgeInsets.all(20),
-        child: const RLoading(),
+        child: RLoading(),
       );
     }
     if (_packs.isEmpty) {

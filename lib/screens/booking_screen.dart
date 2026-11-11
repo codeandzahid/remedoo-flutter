@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models.dart';
 import '../responsive/responsive.dart';
@@ -204,7 +203,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   type: FileType.custom,
                   allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
                 );
-                if (files != null && files.isNotEmpty) {
+                if (files.isNotEmpty) {
                   final file = files.single;
                   Uint8List? data;
                   try {

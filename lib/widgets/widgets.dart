@@ -126,8 +126,6 @@ class InitialsAvatar extends StatelessWidget {
 
   const InitialsAvatar({super.key, required this.name, this.radius = 28});
 
-
-
   @override
   Widget build(BuildContext context) {
     final parts = name.replaceAll(RegExp(r'^(Dr\.\s*)'), '').split(' ');
@@ -901,45 +899,6 @@ class LabCompareSheet extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Simple help dialog for the floating "?" button. Contact lines
-/// come from the admin-configured support settings and are only
-/// shown when actually configured — this dialog previously
-/// displayed a hardcoded placeholder number (audit fix
-/// 2026-10-19).
-void showHelpDialog(BuildContext context) {
-  final state = AppStateScope.of(context);
-  final phone = state.supportPhone.trim();
-  final email = state.supportEmail.trim();
-  // Admin-configured support hours when set (full-check fix
-  // 2026-10-22: the field was saved but shown nowhere).
-  final hours = state.supportHours.trim();
-  final buffer = StringBuffer(hours.isNotEmpty
-      ? 'Our support team is available $hours.'
-      : 'Our support team is available 24x7.');
-  if (phone.isNotEmpty || email.isNotEmpty) {
-    buffer.write('\n');
-    if (phone.isNotEmpty) buffer.write('\n• Call us: $phone');
-    if (email.isNotEmpty) buffer.write('\n• Email: $email');
-  } else {
-    buffer.write(
-        '\n\nYou can reach us any time from Help & Support in Settings.');
-  }
-  buffer.write('\n\nFor emergencies, use the Emergency SOS screen.');
-  showDialog(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Need help?'),
-      content: Text(buffer.toString()),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('OK'),
-        ),
-      ],
-    ),
-  );
 }
 
 /// Confirm dialog returning true when confirmed.
@@ -2090,7 +2049,6 @@ class RPromoBanner extends StatelessWidget {
     );
   }
 }
-
 
 /// Theme-tinted ribbon badge overlaid at the bottom of a listing image
 /// header (e.g. "ICU Available 24/7", "Government Hospital").

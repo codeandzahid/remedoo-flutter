@@ -53,7 +53,6 @@ enum AdminStyle {
   /// (the Cognify layout the owner picked on Dribbble).
   bool get topNav => this == AdminStyle.remedoo;
 
-  bool get isDark => this == AdminStyle.darkCommand;
 }
 
 /// Carries the active style down the admin subtree so shared
