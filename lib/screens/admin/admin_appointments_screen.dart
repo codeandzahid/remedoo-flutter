@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
+import '../../widgets/existing_user_lookup.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/form_kit.dart';
 
@@ -122,6 +123,15 @@ class _AdminAppointmentsScreenState
     }
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: RButton(
+            label: 'Book for patient',
+            icon: Icons.calendar_month_outlined,
+            fullWidth: true,
+            onPressed: _bookForPatient,
+          ),
+        ),
         SizedBox(
           height: 52,
           child: ListView.separated(
@@ -260,6 +270,22 @@ class _AdminAppointmentsScreenState
         onCancel: _confirmCancel,
         onEdit: _editAppointment,
       ),
+    );
+  }
+
+  /// Book-for-patient (owner order, 2026-11-11): opens the booking
+  /// form; on success the admin list reloads and the booked
+  /// patient's name is reported back.
+  Future<void> _bookForPatient() async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => const _BookForPatientDialog(),
+    );
+    if (name == null || name.isEmpty || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Appointment booked for $name.')),
     );
   }
 
@@ -619,6 +645,393 @@ class _AppointmentDetailDialog extends StatelessWidget {
             variant: RButtonVariant.danger,
             onPressed: () => onCancel(row),
           ),
+      ],
+    );
+  }
+}
+
+/// Book-for-patient form (owner order, 2026-11-11).
+///
+/// The patient must already have a Remedoo account: the admin types
+/// their phone or email, the autofill lookup offers their saved
+/// details, and Fill pins the booking to that account. Without a
+/// found patient the booking cannot be made — appointments.
+/// patient_id must be a real user id. Doctor, date and time slot
+/// follow the patient booking flow (same working-hours slots and
+/// blocked-slot filtering via [AppState.doctorSlotsFor]). The
+/// booking starts 'pending', like a patient-made one.
+class _BookForPatientDialog extends StatefulWidget {
+  const _BookForPatientDialog();
+
+  @override
+  State<_BookForPatientDialog> createState() =>
+      _BookForPatientDialogState();
+}
+
+class _BookForPatientDialogState extends State<_BookForPatientDialog> {
+  final _contact = TextEditingController();
+  final _notes = TextEditingController();
+  FormUserRecord? _patient;
+  String? _doctorId;
+  String _doctorName = '';
+  DateTime _date = DateTime.now();
+  String? _slot;
+  String _payment = 'At Clinic';
+  bool _saving = false;
+  late final List<DateTime> _days;
+
+  static const _weekdays = [
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _date = DateTime(now.year, now.month, now.day);
+    _days = List.generate(7, (i) => _date.add(Duration(days: i)));
+  }
+
+  @override
+  void dispose() {
+    _contact.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: now.add(const Duration(days: 90)),
+    );
+    if (picked == null) return;
+    setState(() {
+      _date = DateTime(picked.year, picked.month, picked.day);
+      _slot = null;
+    });
+  }
+
+  Future<void> _save() async {
+    final state = AppStateScope.of(context);
+    final patient = _patient;
+    final doctorId = _doctorId;
+    final slot = _slot;
+    final date = _date;
+    final error = validateAdminBookingForPatient(
+      patientId: patient?.userId ?? '',
+      doctorId: doctorId ?? '',
+      date: date,
+      timeLabel: slot ?? '',
+    );
+    if (error != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    var specialty = '';
+    for (final d in state.activeDoctors) {
+      if (d.id == doctorId) specialty = d.specialty;
+    }
+    setState(() => _saving = true);
+    final id = await state.bookAppointmentForPatient(
+      patientId: patient!.userId,
+      doctorId: doctorId!,
+      doctorName: _doctorName,
+      date: date,
+      timeLabel: slot!,
+      payment: _payment,
+      notes: _notes.text,
+      department: specialty.isEmpty ? null : specialty,
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not book. Try again.')),
+      );
+      return;
+    }
+    Navigator.pop(
+        context,
+        patient.fullName.isEmpty ? 'the patient' : patient.fullName);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppStateScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final doctors = state.activeDoctors;
+    final slots = _doctorId == null
+        ? const <String>[]
+        : state.doctorSlotsFor(_doctorId!, _doctorName, _date);
+    return AlertDialog(
+      title: const Text('Book for patient',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ExistingUserLookup(
+                trigger: _contact,
+                onFill: (record) {
+                  setState(() => _patient = record);
+                },
+                child: RKitField(
+                  controller: _contact,
+                  label: 'Patient phone or email',
+                  hint: '9876543210 or name@example.com',
+                  keyboardType: TextInputType.emailAddress,
+                  onChanged: (_) {
+                    if (_patient != null) {
+                      setState(() => _patient = null);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'The patient needs a Remedoo account. If they have '
+                'one, their saved details appear — tap Fill.',
+                style: TextStyle(fontSize: 12),
+              ),
+              if (_patient != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      InitialsAvatar(
+                          name: _patient!.fullName, radius: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _patient!.fullName.isEmpty
+                                  ? 'Patient'
+                                  : _patient!.fullName,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700),
+                            ),
+                            if (_patient!.email.isNotEmpty)
+                              Text(_patient!.email,
+                                  style: const TextStyle(
+                                      fontSize: 12)),
+                            if (_patient!.phone.isNotEmpty)
+                              Text(_patient!.phone,
+                                  style: const TextStyle(
+                                      fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              RKitDropdown<String>(
+                label: 'Doctor',
+                value: _doctorId,
+                hint: doctors.isEmpty
+                    ? 'No doctors loaded'
+                    : 'Choose a doctor',
+                items: [
+                  for (final d in doctors)
+                    DropdownMenuItem(
+                      value: d.id,
+                      child: Text(
+                        '${d.name} — ${d.specialty} • ₹${d.fee.toStringAsFixed(0)}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (v) {
+                  if (v == null) return;
+                  var name = '';
+                  for (final d in doctors) {
+                    if (d.id == v) name = d.name;
+                  }
+                  setState(() {
+                    _doctorId = v;
+                    _doctorName = name;
+                    _slot = null;
+                  });
+                  state.loadBlockedSlots(v);
+                },
+              ),
+              const SizedBox(height: 14),
+              const Text('Date',
+                  style: TextStyle(
+                      fontSize: 13.5, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 64,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _days.length + 1,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    if (i == _days.length) {
+                      return InkWell(
+                        onTap: _pickDate,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          width: 58,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Theme.of(context)
+                                    .dividerColor),
+                          ),
+                          child: Column(
+                            mainAxisAlignment:
+                                MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.calendar_month_outlined,
+                                  size: 20,
+                                  color: scheme.primary),
+                              const SizedBox(height: 2),
+                              const Text('More',
+                                  style: TextStyle(fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    final d = _days[i];
+                    final sel = _sameDay(d, _date);
+                    return InkWell(
+                      onTap: () => setState(() {
+                        _date = d;
+                        _slot = null;
+                      }),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 58,
+                        decoration: BoxDecoration(
+                          color: sel
+                              ? scheme.primary
+                              : scheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: sel
+                                  ? scheme.primary
+                                  : Theme.of(context).dividerColor),
+                        ),
+                        child: Column(
+                          mainAxisAlignment:
+                              MainAxisAlignment.center,
+                          children: [
+                            Text(_weekdays[d.weekday - 1],
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: sel
+                                        ? Colors.white
+                                        : scheme.onSurfaceVariant)),
+                            Text('${d.day}',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: sel
+                                        ? Colors.white
+                                        : scheme.onSurface)),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Date: ${_date.day}/${_date.month}/${_date.year}',
+                style: const TextStyle(fontSize: 12),
+              ),
+              if (_doctorId != null) ...[
+                const SizedBox(height: 14),
+                const Text('Time slot',
+                    style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                if (slots.isEmpty)
+                  const Text(
+                    'No slots on this day for this doctor.',
+                    style: TextStyle(fontSize: 13),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final s in slots)
+                        RFilterChip(
+                          label: s,
+                          selected: s == _slot,
+                          onTap: () =>
+                              setState(() => _slot = s),
+                        ),
+                    ],
+                  ),
+              ],
+              const SizedBox(height: 14),
+              RKitDropdown<String>(
+                label: 'Payment',
+                value: _payment,
+                items: const [
+                  DropdownMenuItem(
+                      value: 'At Clinic',
+                      child: Text('At Clinic')),
+                  DropdownMenuItem(
+                      value: 'Pay Online',
+                      child: Text('Pay Online')),
+                ],
+                onChanged: (v) =>
+                    setState(() => _payment = v ?? 'At Clinic'),
+              ),
+              const SizedBox(height: 14),
+              RKitField(
+                controller: _notes,
+                label: 'Notes (optional)',
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed:
+              _saving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        RButton(
+          label: _saving ? 'Booking…' : 'Book appointment',
+          small: true,
+          onPressed: _saving ? null : _save,
+        ),
       ],
     );
   }

@@ -38,6 +38,28 @@ class AppStateScope extends InheritedNotifier<AppState> {
 }
 
 /// In-memory app state. Swap the mutation bodies for Supabase calls later.
+/// Validation for the admin Book-for-patient form (owner order,
+/// 2026-11-11). Returns the first problem as plain text, or null
+/// when the booking can go ahead.
+String? validateAdminBookingForPatient({
+  required String patientId,
+  required String doctorId,
+  required DateTime? date,
+  required String timeLabel,
+}) {
+  if (patientId.trim().isEmpty) {
+    return 'Find the patient first — type their phone or email and tap Fill.';
+  }
+  if (doctorId.trim().isEmpty) return 'Choose a doctor.';
+  if (date == null) return 'Choose a date.';
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(date.year, date.month, date.day);
+  if (day.isBefore(today)) return 'Choose today or a later date.';
+  if (timeLabel.trim().isEmpty) return 'Choose a time slot.';
+  return null;
+}
+
 class AppState extends ChangeNotifier {
   AppState();
 
@@ -3458,6 +3480,49 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
     return ok;
+  }
+
+  /// Admin books a doctor appointment for a patient (owner order,
+  /// 2026-11-11). The patient must already have a Remedoo account
+  /// — their user id comes from the autofill lookup. Returns the
+  /// remote appointment id, or null when the booking did not happen
+  /// (bad input, no signed-in admin, or a rejected insert). The
+  /// booking starts 'pending', like a patient-made one, so the
+  /// doctor approves it the same way. It is NOT added to this
+  /// session's own appointments list — that list belongs to the
+  /// signed-in user — the admin list is reloaded instead, so the
+  /// new row appears there.
+  Future<String?> bookAppointmentForPatient({
+    required String patientId,
+    required String doctorId,
+    required String doctorName,
+    required DateTime date,
+    required String timeLabel,
+    String payment = 'At Clinic',
+    String notes = '',
+    String? department,
+  }) async {
+    final error = validateAdminBookingForPatient(
+      patientId: patientId,
+      doctorId: doctorId,
+      date: date,
+      timeLabel: timeLabel,
+    );
+    if (error != null) return null;
+    if (_supaUser == null) return null;
+    final id = await _repo.bookAppointment(
+      serviceType: 'doctor',
+      doctorId: doctorId,
+      patientId: patientId,
+      date: date,
+      timeLabel: timeLabel,
+      notes: notes.trim().isEmpty ? null : notes.trim(),
+      paymentMethod: dbPaymentMethod(payment),
+      department: department,
+    );
+    if (id == null) return null;
+    await loadAdminAppointments();
+    return id;
   }
 
   bool _adminWritesLocalForTest = false;

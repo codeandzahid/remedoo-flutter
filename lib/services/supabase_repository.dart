@@ -280,6 +280,13 @@ class SupabaseRepository {
     String? hospitalId,
     String? labId,
     String? pharmacyId,
+    // Admin booking for a patient (owner order, 2026-11-11): the
+    // patient's user id. When given, the row belongs to that
+    // patient; otherwise it belongs to the signed-in user, as
+    // before. Admins may insert for any patient — the
+    // "Admins can manage all appointments" FOR ALL policy
+    // (admin_panel_backend.sql) allows it.
+    String? patientId,
     required DateTime date,
     required String timeLabel, // 'HH:MM'
     String? notes,
@@ -310,9 +317,10 @@ class SupabaseRepository {
     String? collectionAddress,
   }) async {
     final uid = _uid;
-    if (!_ready || uid == null) return null;
+    final pid = patientId ?? uid;
+    if (!_ready || pid == null) return null;
     final payload = <String, dynamic>{
-      'patient_id': uid,
+      'patient_id': pid,
       'service_type': serviceType,
       'doctor_id': doctorId,
       'hospital_id': hospitalId,
