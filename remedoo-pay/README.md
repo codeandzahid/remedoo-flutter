@@ -5,12 +5,15 @@ A Cloudflare-native version of the YouPI PG self-hosted UPI gateway
 run on Cloudflare Workers). Same product behaviour:
 
 - **0% fees** — customers pay straight to the merchant's own UPI ID.
-- **Hosted checkout page** — "Pay with any UPI app" button (no QR, by owner choice),
-  auto-confirms when the payment lands.
-- **One payment at a time per receiving UPI — no queue** — a new payment
-  cannot start until the current one for that UPI is paid, cancelled,
-  or expires (5-minute window), so bank SMS credits can be matched to
-  the right session.
+- **Hosted checkout page** — "Pay with any UPI app" button + a QR code
+  to scan, auto-confirms when the payment lands.
+- **Several payments at a time per receiving UPI (micro-paise
+  allocation)** — each open session gets a unique payable amount:
+  the base amount, or base +1, +2, ... paise when the base is
+  already in use (5-minute window per session). Bank credits are
+  matched by exact amount, so the paise offset tells sessions
+  apart — two customers paying the same amount at the same moment
+  no longer block each other.
 - **Per-provider UPI (panelists)** — doctors / pharmacies / labs /
   hospitals add their OWN UPI ID in their panel (Payments section).
   Bookings for a provider who activated their UPI are paid straight to
@@ -54,8 +57,9 @@ Worker at `gateways.youpi.base_url` with the YouPI API shape
 
 ## Limits
 
-- Matching is by exact amount against the single ACTIVE session
-  (only one payment is ever open, so this is reliable).
+- Matching is by exact amount. Open sessions on the same UPI always
+  carry different amounts (micro-paise allocation), so an exact-amount
+  match is reliable even with several payments open at once.
 - If the phone/observer is off, a payment stays unverified until the
   SMS is forwarded; the session expires after 5 minutes and the
   customer can retry.
@@ -82,5 +86,11 @@ payment confirms itself with zero action by customer or panelist.
   `POST /api/v1/gmail/test`, `POST /api/v1/gmail/poll`,
   `POST /api/v1/gmail/disconnect` (test/poll/disconnect use the
   observer token, same as the SMS webhook).
+- **Instant check**: the checkout page calls
+  `POST /api/v1/checkout/:id/check` the moment the customer comes
+  back from their UPI app (page visible / window focus). The Worker
+  runs a Gmail poll right then (throttled to one per 8 seconds), so
+  a payment that just landed confirms in seconds instead of waiting
+  for the next 1-minute cron tick.
 - Parser fixtures (SMS + email bodies, Gmail message shapes):
   `node remedoo-pay/test-parse.mjs`.

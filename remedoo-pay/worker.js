@@ -1,10 +1,11 @@
 // Remedoo Pay — Cloudflare Worker (YouPI-style self-hosted UPI gateway)
 //
 // A Cloudflare-native re-implementation of the YouPI PG pattern:
-// hosted UPI checkout page (Pay-with-UPI-app button), ONE payment at a
-// time (no queue — a new payment can start only after the current one
-// is paid, cancelled, or expires), and payment verification by a
-// bank-SMS observer
+// hosted UPI checkout page (Pay-with-UPI-app button + QR code),
+// several payments at a time per UPI via micro-paise allocation
+// (each open session gets a unique payable amount — base, or base
+// +1, +2 paise... — so bank credits match by exact amount), and
+// payment verification by a bank-SMS observer
 // (a free SMS-forwarder app on the merchant's phone POSTs each bank
 // credit SMS to /api/v1/observer/sms).
 //
@@ -168,6 +169,45 @@ async function currentActive(env, targetVpa, centralVpa) {
       activated_at: new Date().toISOString(),
     });
     return { id };
+  }
+  return null;
+}
+
+/// Expire ACTIVE sessions older than the 5-minute window.
+/// Returns the still-open ACTIVE rows (with amounts).
+async function openActives(env) {
+  const actives = await sb(
+    env,
+    `remedoo_pay_sessions?status=eq.ACTIVE&select=id,activated_at,vpa,amount_paise&order=activated_at.asc`
+  );
+  const now = Date.now();
+  const open = [];
+  for (const a of actives ?? []) {
+    if (now - new Date(a.activated_at).getTime() <= ACTIVE_WINDOW_MS) {
+      open.push(a);
+    } else {
+      await patchSession(env, a.id, { status: 'EXPIRED' });
+    }
+  }
+  return open;
+}
+
+/// Micro-paise allocation (AuraPay-style anti-collision): several
+/// payments to the SAME UPI can run at once because each open
+/// session gets a unique payable amount — the base amount, or base
+/// +1, +2, ... paise when the base is already in use. Bank credits
+/// are matched by exact amount, so the paise offset tells sessions
+/// apart. Returns the payable paise, or null when 100 slots are full.
+async function allocateAmount(env, targetVpa, centralVpa, basePaise) {
+  const open = await openActives(env);
+  const used = new Set(
+    open
+      .filter((a) => (a.vpa || centralVpa) === targetVpa)
+      .map((a) => a.amount_paise)
+  );
+  for (let offset = 0; offset <= 99; offset++) {
+    const candidate = basePaise + offset;
+    if (!used.has(candidate)) return candidate;
   }
   return null;
 }
@@ -493,8 +533,21 @@ function checkoutPage(session, cfg) {
           ? `<div class="apps">
                <a href="${upi}">Pay with any UPI app</a>
              </div>
-             <p class="muted">Tap the button — your UPI app (GPay / PhonePe / Paytm) opens with the amount ready. Payment confirms automatically when your payment lands — keep this page open.</p>
-             <p class="status wait" id="st">Waiting for payment…</p>`
+             <div id="qr" style="display:flex;justify-content:center;margin:14px 0"></div>
+             <p class="muted">Or scan this QR with any UPI app (GPay / PhonePe / Paytm).</p>
+             <p class="muted">Payment confirms automatically when your payment lands — keep this page open.</p>
+             <p class="status wait" id="st">Waiting for payment…</p>
+             <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+             <script>
+               try {
+                 new QRCode(document.getElementById('qr'), {
+                   text: ${JSON.stringify(upi)},
+                   width: 200,
+                   height: 200,
+                   correctLevel: QRCode.CorrectLevel.M
+                 });
+               } catch(e) {}
+             </script>`
           : `<p class="status wait">This payment session is no longer open.</p>
              <p class="muted">Please go back to Remedoo and try booking again.</p>`
   }
@@ -504,15 +557,33 @@ function checkoutPage(session, cfg) {
   var returnUrl = ${JSON.stringify(session.return_url || 'https://remedoo-app.pages.dev/')};
   if (done) setTimeout(function(){ location.href = returnUrl; }, 2000);
   if (!done && !${isDead ? 'true' : 'false'}) {
-    setInterval(async function(){
+    var wasActive = ${isActive ? 'true' : 'false'};
+    async function applyStatus(d){
+      if (!d) return;
+      if (d.status === 'SUCCESS') location.reload();
+      if (['EXPIRED','CANCELLED','FAILED'].indexOf(d.status) >= 0) location.reload();
+      if (d.status === 'ACTIVE' && !wasActive) location.reload();
+    }
+    async function checkStatus(){
       try {
         var r = await fetch('/api/v1/payments/${session.id}');
-        var d = await r.json();
-        if (d.status === 'SUCCESS') location.reload();
-        if (['EXPIRED','CANCELLED','FAILED'].indexOf(d.status) >= 0) location.reload();
-        if (d.status === 'ACTIVE' && ${isActive ? 'false' : 'true'}) location.reload();
+        applyStatus(await r.json());
       } catch(e) {}
-    }, 4000);
+    }
+    // Instant check: the moment the customer comes back from their
+    // UPI app, ask the server to check Gmail right now instead of
+    // waiting for the next 1-minute cron.
+    async function checkNow(){
+      try {
+        var r = await fetch('/api/v1/checkout/${session.id}/check', { method: 'POST' });
+        applyStatus(await r.json());
+      } catch(e) { checkStatus(); }
+    }
+    setInterval(checkStatus, 4000);
+    document.addEventListener('visibilitychange', function(){
+      if (!document.hidden) checkNow();
+    });
+    window.addEventListener('focus', checkNow);
   }
 </script>
 </body></html>`;
@@ -540,7 +611,7 @@ export default {
       if (req.method === 'OPTIONS') return json({}, 204);
 
       if (path === '/' && req.method === 'GET') {
-        return json({ ok: true, service: 'Remedoo Pay', version: 'cloud-2' });
+        return json({ ok: true, service: 'Remedoo Pay', version: 'cloud-3' });
       }
 
       // ---- Create payment session ----
@@ -561,27 +632,27 @@ export default {
             503
           );
         }
-        const busy = await currentActive(env, vpa, cfg.vpa);
-        if (busy) {
-          // "Pay New" escape hatch: the customer explicitly chose to
-          // drop the pending payment and start a fresh one.
-          if (body.forceNew === true) {
-            await patchSession(env, busy.id, { status: 'CANCELLED' });
-          } else {
-            return json(
-              {
-                error:
-                  'A payment is already in progress. It must be paid, cancelled, or expire (5 minutes) before a new payment can start.',
-              },
-              409
-            );
-          }
+        // Micro-paise allocation: payments to the same UPI can run
+        // together — each open session gets a unique payable amount
+        // (base, or base +1, +2 paise...), so bank credits match the
+        // right session by exact amount. Replaces the old
+        // one-payment-at-a-time block.
+        const basePaise = Math.round(amount * 100);
+        const payablePaise = await allocateAmount(env, vpa, cfg.vpa, basePaise);
+        if (payablePaise === null) {
+          return json(
+            {
+              error:
+                'Too many payments are in progress for this UPI right now. Please try again in a few minutes.',
+            },
+            409
+          );
         }
         const rows = await sb(env, 'remedoo_pay_sessions', {
           method: 'POST',
           body: {
             order_id: String(body.orderId).slice(0, 64),
-            amount_paise: Math.round(amount * 100),
+            amount_paise: payablePaise,
             status: 'ACTIVE',
             customer: body.customer ?? null,
             description: body.description ?? null,
@@ -627,6 +698,27 @@ export default {
           await patchSession(env, session.id, { status: 'CANCELLED' });
         }
         return json({ success: true, status: 'CANCELLED' });
+      }
+
+      // ---- Instant check (checkout page, on return from UPI app) ----
+      // Runs a Gmail poll right now (throttled to one per 8s) so a
+      // payment that just landed confirms in seconds instead of
+      // waiting for the next 1-minute cron tick. No token needed:
+      // it only reads Gmail server-side and returns session status.
+      const checkMatch = path.match(/^\/api\/v1\/checkout\/([\w-]+)\/check$/);
+      if (checkMatch && req.method === 'POST') {
+        const session = await getSession(env, checkMatch[1]);
+        if (!session) return json({ error: 'Payment session not found' }, 404);
+        if (session.status === 'ACTIVE') {
+          const lastPoll = await getSecureSetting(env, 'gmail_last_poll_at');
+          const lastMs = lastPoll ? new Date(lastPoll).getTime() : 0;
+          if (Date.now() - lastMs > 8000) {
+            await gmailPoll(env);
+          }
+        }
+        await currentActive(env);
+        const fresh = await getSession(env, checkMatch[1]);
+        return json(publicSession(fresh, url.origin));
       }
 
       // ---- Hosted checkout page ----
