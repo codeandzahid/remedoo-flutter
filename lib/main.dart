@@ -15,6 +15,8 @@ import 'screens/account_deletion_pending_screen.dart';
 import 'screens/account_suspended_screen.dart';
 import 'screens/driver_dashboard_screen.dart';
 import 'screens/admin/admin_shell.dart';
+import 'screens/admin/admin_login_screen.dart';
+import 'screens/admin/admin_remedoo_pay_admin_screen.dart';
 import 'screens/partner/doctor_dashboard.dart';
 import 'screens/partner/hospital_dashboard.dart';
 import 'screens/partner/lab_dashboard.dart';
@@ -130,11 +132,31 @@ class _RootGateState extends State<RootGate> {
     );
   }
 
+  /// Deep link: /remedoopayadmin opens the full Remedoo Pay admin
+  /// console (admin login required — same gate as the admin panel).
+  bool get _isRemedooPayAdminRoute {
+    final base = Uri.base;
+    return base.path.endsWith('/remedoopayadmin') ||
+        base.fragment.contains('remedoopayadmin');
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     if (state.maintenanceMode) return const MaintenanceScreen();
     if (!_splashDone || !_authReady) return const SplashView();
+    if (_isRemedooPayAdminRoute) {
+      if (state.accountSuspended) {
+        return const AccountSuspendedScreen();
+      }
+      if (state.deletionPending) {
+        return const AccountDeletionPendingScreen();
+      }
+      if (state.role == 'admin' || state.role == 'staff') {
+        return const AdminRemedooPayAdminScreen();
+      }
+      return const AdminLoginScreen(isRoot: true);
+    }
     if (!state.seenOnboarding) return const OnboardingScreen();
     // Suspension gate (full-check fix 2026-10-22): a suspended
     // account reaches no shell at all — the status flag used to be

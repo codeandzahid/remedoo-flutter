@@ -222,6 +222,7 @@ function publicSession(session, origin) {
     status: session.status,
     queuePosition: 0,
     checkoutUrl: `${origin}/checkout/${session.id}`,
+    ...(session.project_id ? { projectId: session.project_id } : {}),
     ...(session.utr ? { utr: session.utr } : {}),
   };
 }
@@ -622,10 +623,50 @@ export default {
           return json({ error: 'orderId and a positive amount are required' }, 400);
         }
         const cfg = await getYoupiConfig(env);
+        // Standalone reuse (owner order 2026-11-23): other projects
+        // can use Remedoo Pay through this API. A caller may send
+        // projectId (+ x-api-key header when the project has one).
+        // No projectId = the built-in 'remedoo' project, unchanged.
+        // Pre-migration safe: if the projects table does not exist
+        // yet, the lookup fails soft and behaviour is as before.
+        const projectId = clean(body.projectId, 40) || 'remedoo';
+        let project = null;
+        if (projectId !== 'remedoo') {
+          try {
+            const prow = await sb(
+              env,
+              `remedoo_pay_projects?id=eq.${encodeURIComponent(projectId)}&select=*`
+            );
+            project = prow?.[0] ?? null;
+          } catch (_) {
+            project = null;
+          }
+          if (project) {
+            if (project.enabled === false) {
+              return json(
+                { error: 'This project is disabled on Remedoo Pay.' },
+                403
+              );
+            }
+            if (project.api_key) {
+              const given = req.headers.get('x-api-key') || '';
+              if (given !== project.api_key) {
+                return json(
+                  { error: 'Invalid API key for this project.' },
+                  401
+                );
+              }
+            }
+          }
+        }
         // Per-provider UPI: when the payment belongs to a provider who
         // added their own UPI ID, the money goes straight to them.
-        const vpa = clean(body.vpa, 80) || cfg.vpa;
-        const payeeName = clean(body.payeeName, 80) || cfg.payeeName;
+        const vpa =
+          clean(body.vpa, 80) || clean(project?.vpa, 80) || cfg.vpa;
+        const payeeName =
+          clean(body.payeeName, 80) ||
+          clean(project?.payee_name, 80) ||
+          cfg.payeeName;
         if (!vpa) {
           return json(
             { error: 'Remedoo Pay is not configured: set your UPI ID in Remedoo Admin > Payment System.' },
@@ -648,9 +689,8 @@ export default {
             409
           );
         }
-        const rows = await sb(env, 'remedoo_pay_sessions', {
-          method: 'POST',
-          body: {
+        const sessionBody = {
+            project_id: projectId,
             order_id: String(body.orderId).slice(0, 64),
             amount_paise: payablePaise,
             status: 'ACTIVE',
@@ -673,8 +713,21 @@ export default {
             provider_id: clean(body.providerId, 64) || null,
             provider_user_id: clean(body.providerUserId, 64) || null,
             activated_at: new Date().toISOString(),
-          },
-        });
+        };
+        let rows;
+        try {
+          rows = await sb(env, 'remedoo_pay_sessions', {
+            method: 'POST',
+            body: sessionBody,
+          });
+        } catch (_) {
+          // Pre-migration: the project_id column may not exist yet.
+          delete sessionBody.project_id;
+          rows = await sb(env, 'remedoo_pay_sessions', {
+            method: 'POST',
+            body: sessionBody,
+          });
+        }
         const session = rows[0];
         const fresh = await getSession(env, session.id);
         return json(publicSession(fresh, url.origin), 201);

@@ -94,3 +94,23 @@ payment confirms itself with zero action by customer or panelist.
   for the next 1-minute cron tick.
 - Parser fixtures (SMS + email bodies, Gmail message shapes):
   `node remedoo-pay/test-parse.mjs`.
+
+## Standalone reuse — other projects (2026-11-23)
+
+Remedoo Pay is a separate payment system. The Remedoo app is just
+its first project; any other project can use the same Worker API:
+
+1. Run `supabase/migration/remedoo_pay_projects.sql` once
+   (adds `remedoo_pay_projects` + `project_id` on sessions).
+2. In the admin console (https://remedoo-app.pages.dev/remedoopayadmin
+   → Projects tab) add the project: ID, name, its own UPI ID,
+   payee name, and an API key.
+3. The other project calls:
+   - `POST /api/v1/payments` with `{orderId, amount, projectId}`
+     and header `x-api-key: <key>` → returns `checkoutUrl`.
+   - `GET /api/v1/payments/{id}` for status.
+   - Customers pay on the hosted checkout page; confirmation is by
+     the same SMS-observer / Gmail automation.
+
+No `projectId` = the built-in `remedoo` project (unchanged
+behaviour). A disabled project or a wrong API key is rejected.

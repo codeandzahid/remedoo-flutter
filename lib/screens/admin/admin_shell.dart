@@ -22,7 +22,7 @@ import 'admin_analytics_screen.dart';
 import 'admin_config_screens.dart';
 import 'admin_ops_screens.dart';
 import 'admin_payments_screen.dart';
-import 'admin_remedoo_pay_screen.dart';
+import 'admin_remedoo_pay_admin_screen.dart';
 import 'admin_app_settings_screen.dart';
 import 'admin_users_screen.dart';
 import 'admin_team_screen.dart';
@@ -87,7 +87,7 @@ List<_NavItem> _items(AppState s, void Function(int) onNavigate) => [
       // 2026-10-23): Remedoo Pay plus the per-provider UPI
       // payments screen, which used to sit under Providers.
       _NavItem('Payments', 'Remedoo Pay', Icons.qr_code_2,
-          (_) => const AdminRemedooPayScreen()),
+          (_) => const AdminRemedooPayAdminScreen()),
       _NavItem('Payments', 'Payments (UPI)', Icons.qr_code,
           (_) => const AdminProviderPaymentsScreen()),
       // Orders & Care

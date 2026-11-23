@@ -2095,6 +2095,50 @@ class SupabaseRepository {
     }
   }
 
+  /// Remedoo Pay projects/merchants (standalone gateway reuse).
+  /// Returns empty until migration remedoo_pay_projects.sql is run.
+  Future<List<Map<String, dynamic>>> fetchRemedooPayProjects() async {
+    if (!_ready) return const [];
+    try {
+      final rows = await _db
+          .from('remedoo_pay_projects')
+          .select('*')
+          .order('created_at', ascending: true);
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('fetchRemedooPayProjects failed: $e');
+      return const [];
+    }
+  }
+
+  /// Create/update one Remedoo Pay project (admin console).
+  Future<bool> upsertRemedooPayProject(
+      Map<String, dynamic> project) async {
+    if (!_ready) return false;
+    try {
+      await _db.from('remedoo_pay_projects').upsert(project);
+      return true;
+    } catch (e) {
+      debugPrint('upsertRemedooPayProject failed: $e');
+      return false;
+    }
+  }
+
+  /// Enable/disable one Remedoo Pay project (admin console).
+  Future<bool> setRemedooPayProjectEnabled(
+      String id, bool enabled) async {
+    if (!_ready) return false;
+    try {
+      await _db
+          .from('remedoo_pay_projects')
+          .update({'enabled': enabled}).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('setRemedooPayProjectEnabled failed: $e');
+      return false;
+    }
+  }
+
   /// Admin manual control of a Remedoo Pay session (confirm paid /
   /// cancel / re-open as pending) from the management screen.
   Future<bool> updateRemedooPaySession(
