@@ -136,7 +136,7 @@ class _RootGateState extends State<RootGate> {
   /// console (admin login required — same gate as the admin panel).
   bool get _isRemedooPayAdminRoute {
     final base = Uri.base;
-    return base.path.endsWith('/remedoopayadmin') ||
+    return base.path.contains('/remedoopayadmin') ||
         base.fragment.contains('remedoopayadmin');
   }
 
